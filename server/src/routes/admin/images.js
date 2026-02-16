@@ -3,6 +3,7 @@ import multer from 'multer'
 import { auth } from '../../middleware/auth.js'
 import { adminOnly } from '../../middleware/adminOnly.js'
 import { supabaseAdmin } from '../../config/supabase.js'
+import { logActivity } from '../../services/activityLogger.js'
 
 const router = Router()
 router.use(auth, adminOnly)
@@ -48,6 +49,16 @@ router.post('/:plotId', upload.single('image'), async (req, res, next) => {
       .single()
 
     if (error) throw error
+
+    logActivity({
+      action: 'create',
+      entityType: 'image',
+      entityId: data.id,
+      userId: req.user?.id,
+      description: `הועלתה תמונה לחלקה ${plotId}`,
+      metadata: { plot_id: plotId, filename: req.file.originalname },
+    })
+
     res.status(201).json(data)
   } catch (err) {
     next(err)
@@ -57,12 +68,27 @@ router.post('/:plotId', upload.single('image'), async (req, res, next) => {
 // DELETE /api/admin/images/:id
 router.delete('/:id', async (req, res, next) => {
   try {
+    const { data: existing } = await supabaseAdmin
+      .from('plot_images')
+      .select('plot_id')
+      .eq('id', req.params.id)
+      .single()
+
     const { error } = await supabaseAdmin
       .from('plot_images')
       .delete()
       .eq('id', req.params.id)
 
     if (error) throw error
+
+    logActivity({
+      action: 'delete',
+      entityType: 'image',
+      entityId: req.params.id,
+      userId: req.user?.id,
+      description: `נמחקה תמונה מחלקה ${existing?.plot_id || ''}`,
+    })
+
     res.json({ success: true })
   } catch (err) {
     next(err)

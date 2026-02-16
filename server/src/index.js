@@ -16,6 +16,7 @@ import adminDocumentRoutes from './routes/admin/documents.js'
 import adminImageRoutes from './routes/admin/images.js'
 import adminPoiRoutes from './routes/admin/pois.js'
 import adminActivityRoutes from './routes/admin/activity.js'
+import adminSettingsRoutes from './routes/admin/settings.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import { supabaseAdmin } from './config/supabase.js'
 
@@ -70,6 +71,7 @@ app.use('/api/admin/documents', adminDocumentRoutes)
 app.use('/api/admin/images', adminImageRoutes)
 app.use('/api/admin/pois', adminPoiRoutes)
 app.use('/api/admin/activity', adminActivityRoutes)
+app.use('/api/admin/settings', adminSettingsRoutes)
 
 // Health check with DB connectivity
 app.get('/api/health', async (req, res) => {

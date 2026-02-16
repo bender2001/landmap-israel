@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { adminPlots } from '../../api/admin.js'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants.js'
 import { formatCurrency } from '../../utils/formatters.js'
-import { Plus, Pencil, Trash2, Eye, EyeOff, Search, CheckSquare, Square, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, Eye, EyeOff, Search, CheckSquare, Square, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
-import Spinner from '../../components/ui/Spinner.jsx'
+import TableSkeleton from '../../components/ui/TableSkeleton.jsx'
+import SortableHeader from '../../components/admin/SortableHeader.jsx'
+import usePagination from '../../hooks/usePagination.js'
 import { useToast } from '../../components/ui/ToastContainer.jsx'
 
 export default function PlotList() {
@@ -14,11 +16,19 @@ export default function PlotList() {
   const { toast } = useToast()
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(new Set())
+  const { page, setPage, sortBy, sortDir, handleSort, params } = usePagination()
 
-  const { data: plots = [], isLoading } = useQuery({
-    queryKey: ['admin', 'plots'],
-    queryFn: adminPlots.list,
+  const queryParams = { ...params, search: search || undefined }
+
+  const { data: result, isLoading } = useQuery({
+    queryKey: ['admin', 'plots', queryParams],
+    queryFn: () => adminPlots.list(queryParams),
+    keepPreviousData: true,
   })
+
+  const plots = result?.data || []
+  const total = result?.total || 0
+  const totalPages = Math.ceil(total / params.limit)
 
   const togglePublish = useMutation({
     mutationFn: ({ id, published }) => adminPlots.togglePublish(id, published),
@@ -54,16 +64,6 @@ export default function PlotList() {
     },
   })
 
-  const filtered = plots.filter((p) => {
-    if (!search) return true
-    const s = search.toLowerCase()
-    return (
-      (p.city || '').toLowerCase().includes(s) ||
-      String(p.block_number || '').includes(s) ||
-      String(p.number || '').includes(s)
-    )
-  })
-
   const toggleSelect = (id) => {
     setSelected((prev) => {
       const next = new Set(prev)
@@ -74,17 +74,21 @@ export default function PlotList() {
   }
 
   const toggleAll = () => {
-    if (selected.size === filtered.length) {
+    if (selected.size === plots.length) {
       setSelected(new Set())
     } else {
-      setSelected(new Set(filtered.map((p) => p.id)))
+      setSelected(new Set(plots.map((p) => p.id)))
     }
   }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Spinner className="w-10 h-10 text-gold" />
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto" dir="rtl">
+        <div className="flex items-center justify-between mb-6">
+          <div className="h-7 bg-white/5 rounded-lg w-32 animate-pulse" />
+          <div className="h-10 bg-white/5 rounded-xl w-28 animate-pulse" />
+        </div>
+        <TableSkeleton rows={8} cols={9} />
       </div>
     )
   }
@@ -109,7 +113,7 @@ export default function PlotList() {
           type="text"
           placeholder="חפש לפי עיר, גוש, חלקה..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1) }}
           className="w-full pr-10 pl-4 py-2.5 bg-navy-light/60 border border-white/10 rounded-xl text-slate-200 placeholder-slate-500 focus:border-gold/50 focus:outline-none transition text-sm"
         />
       </div>
@@ -157,25 +161,25 @@ export default function PlotList() {
               <tr className="border-b border-white/10 text-slate-400">
                 <th className="py-3 px-3 w-10">
                   <button onClick={toggleAll} className="text-slate-400 hover:text-gold transition">
-                    {selected.size === filtered.length && filtered.length > 0 ? (
+                    {selected.size === plots.length && plots.length > 0 ? (
                       <CheckSquare className="w-4 h-4" />
                     ) : (
                       <Square className="w-4 h-4" />
                     )}
                   </button>
                 </th>
-                <th className="text-right py-3 px-4 font-medium">גוש / חלקה</th>
-                <th className="text-right py-3 px-4 font-medium">עיר</th>
-                <th className="text-right py-3 px-4 font-medium">מחיר</th>
-                <th className="text-right py-3 px-4 font-medium">שטח</th>
-                <th className="text-right py-3 px-4 font-medium">סטטוס</th>
-                <th className="text-right py-3 px-4 font-medium">ייעוד</th>
+                <SortableHeader label="גוש / חלקה" column="block_number" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="עיר" column="city" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="מחיר" column="total_price" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="שטח" column="size_sqm" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="סטטוס" column="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="ייעוד" column="zoning_stage" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                 <th className="text-right py-3 px-4 font-medium">פורסם</th>
                 <th className="text-right py-3 px-4 font-medium">פעולות</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((plot) => {
+              {plots.map((plot) => {
                 const color = statusColors[plot.status]
                 const isChecked = selected.has(plot.id)
                 return (
@@ -243,7 +247,7 @@ export default function PlotList() {
                   </tr>
                 )
               })}
-              {filtered.length === 0 && (
+              {plots.length === 0 && (
                 <tr>
                   <td colSpan={9} className="text-center py-10 text-slate-500">
                     {search ? 'לא נמצאו תוצאות' : 'אין חלקות'}
@@ -254,6 +258,30 @@ export default function PlotList() {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 mt-4">
+          <button
+            onClick={() => setPage(Math.max(1, page - 1))}
+            disabled={page <= 1}
+            className="p-2 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 disabled:opacity-30 transition"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          <span className="text-sm text-slate-400">
+            {page} / {totalPages}
+          </span>
+          <button
+            onClick={() => setPage(Math.min(totalPages, page + 1))}
+            disabled={page >= totalPages}
+            className="p-2 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 disabled:opacity-30 transition"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-xs text-slate-600">({total} סה"כ)</span>
+        </div>
+      )}
     </div>
   )
 }

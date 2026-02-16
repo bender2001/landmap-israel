@@ -2,9 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminLeads } from '../../api/admin.js'
 import { leadStatusLabels, leadStatusColors } from '../../utils/constants.js'
 import { formatDate } from '../../utils/formatters.js'
-import { Download, Search, ChevronDown, CheckSquare, Square, X } from 'lucide-react'
+import { Download, Search, ChevronDown, ChevronLeft, ChevronRight, CheckSquare, Square, X } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
-import Spinner from '../../components/ui/Spinner.jsx'
+import TableSkeleton from '../../components/ui/TableSkeleton.jsx'
+import SortableHeader from '../../components/admin/SortableHeader.jsx'
+import usePagination from '../../hooks/usePagination.js'
 import { useToast } from '../../components/ui/ToastContainer.jsx'
 
 const statusOptions = [
@@ -22,11 +24,23 @@ export default function LeadList() {
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(new Set())
+  const { page, setPage, sortBy, sortDir, handleSort, params } = usePagination()
 
-  const { data: leads = [], isLoading } = useQuery({
-    queryKey: ['admin', 'leads', statusFilter],
-    queryFn: () => adminLeads.list(statusFilter ? { status: statusFilter } : {}),
+  const queryParams = {
+    ...params,
+    status: statusFilter || undefined,
+    search: search || undefined,
+  }
+
+  const { data: result, isLoading } = useQuery({
+    queryKey: ['admin', 'leads', queryParams],
+    queryFn: () => adminLeads.list(queryParams),
+    keepPreviousData: true,
   })
+
+  const leads = result?.data || []
+  const total = result?.total || 0
+  const totalPages = Math.ceil(total / params.limit)
 
   const updateStatus = useMutation({
     mutationFn: ({ id, status }) => adminLeads.updateStatus(id, status),
@@ -61,16 +75,6 @@ export default function LeadList() {
     }
   }
 
-  const filtered = leads.filter((l) => {
-    if (!search) return true
-    const s = search.toLowerCase()
-    return (
-      (l.full_name || '').toLowerCase().includes(s) ||
-      (l.phone || '').includes(s) ||
-      (l.email || '').toLowerCase().includes(s)
-    )
-  })
-
   const toggleSelect = (id) => {
     setSelected((prev) => {
       const next = new Set(prev)
@@ -81,17 +85,21 @@ export default function LeadList() {
   }
 
   const toggleAll = () => {
-    if (selected.size === filtered.length) {
+    if (selected.size === leads.length) {
       setSelected(new Set())
     } else {
-      setSelected(new Set(filtered.map((l) => l.id)))
+      setSelected(new Set(leads.map((l) => l.id)))
     }
   }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Spinner className="w-10 h-10 text-gold" />
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto" dir="rtl">
+        <div className="flex items-center justify-between mb-6">
+          <div className="h-7 bg-white/5 rounded-lg w-32 animate-pulse" />
+          <div className="h-10 bg-white/5 rounded-xl w-28 animate-pulse" />
+        </div>
+        <TableSkeleton rows={8} cols={7} />
       </div>
     )
   }
@@ -118,7 +126,7 @@ export default function LeadList() {
             type="text"
             placeholder="חפש לפי שם, טלפון, אימייל..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             className="w-full pr-10 pl-4 py-2.5 bg-navy-light/60 border border-white/10 rounded-xl text-slate-200 placeholder-slate-500 focus:border-gold/50 focus:outline-none transition text-sm"
           />
         </div>
@@ -126,7 +134,7 @@ export default function LeadList() {
         {/* Status filter */}
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
           className="px-4 py-2.5 bg-navy-light/60 border border-white/10 rounded-xl text-slate-200 focus:border-gold/50 focus:outline-none transition text-sm"
         >
           {statusOptions.map((opt) => (
@@ -169,23 +177,23 @@ export default function LeadList() {
               <tr className="border-b border-white/10 text-slate-400">
                 <th className="py-3 px-3 w-10">
                   <button onClick={toggleAll} className="text-slate-400 hover:text-gold transition">
-                    {selected.size === filtered.length && filtered.length > 0 ? (
+                    {selected.size === leads.length && leads.length > 0 ? (
                       <CheckSquare className="w-4 h-4" />
                     ) : (
                       <Square className="w-4 h-4" />
                     )}
                   </button>
                 </th>
-                <th className="text-right py-3 px-4 font-medium">שם</th>
-                <th className="text-right py-3 px-4 font-medium">טלפון</th>
-                <th className="text-right py-3 px-4 font-medium">אימייל</th>
+                <SortableHeader label="שם" column="full_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="טלפון" column="phone" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="אימייל" column="email" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                 <th className="text-right py-3 px-4 font-medium">חלקה</th>
-                <th className="text-right py-3 px-4 font-medium">סטטוס</th>
-                <th className="text-right py-3 px-4 font-medium">תאריך</th>
+                <SortableHeader label="סטטוס" column="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="תאריך" column="created_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               </tr>
             </thead>
             <tbody>
-              {filtered.map((lead) => {
+              {leads.map((lead) => {
                 const isChecked = selected.has(lead.id)
                 return (
                   <tr key={lead.id} className={`border-b border-white/5 transition-colors ${isChecked ? 'bg-gold/5' : 'hover:bg-white/5'}`}>
@@ -216,7 +224,7 @@ export default function LeadList() {
                   </tr>
                 )
               })}
-              {filtered.length === 0 && (
+              {leads.length === 0 && (
                 <tr>
                   <td colSpan={7} className="text-center py-10 text-slate-500">
                     {search || statusFilter ? 'לא נמצאו תוצאות' : 'אין לידים'}
@@ -227,6 +235,30 @@ export default function LeadList() {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 mt-4">
+          <button
+            onClick={() => setPage(Math.max(1, page - 1))}
+            disabled={page <= 1}
+            className="p-2 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 disabled:opacity-30 transition"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          <span className="text-sm text-slate-400">
+            {page} / {totalPages}
+          </span>
+          <button
+            onClick={() => setPage(Math.min(totalPages, page + 1))}
+            disabled={page >= totalPages}
+            className="p-2 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 disabled:opacity-30 transition"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-xs text-slate-600">({total} סה"כ)</span>
+        </div>
+      )}
     </div>
   )
 }

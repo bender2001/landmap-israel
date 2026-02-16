@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { adminPois } from '../../api/admin.js'
 import { Plus, Pencil, Trash2, Search, MapPin } from 'lucide-react'
 import { useState } from 'react'
-import Spinner from '../../components/ui/Spinner.jsx'
+import TableSkeleton from '../../components/ui/TableSkeleton.jsx'
 import { useToast } from '../../components/ui/ToastContainer.jsx'
 
 export default function PoiList() {
@@ -34,8 +34,12 @@ export default function PoiList() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Spinner className="w-10 h-10 text-gold" />
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto" dir="rtl">
+        <div className="flex items-center justify-between mb-6">
+          <div className="h-7 bg-white/5 rounded-lg w-40 animate-pulse" />
+          <div className="h-10 bg-white/5 rounded-xl w-28 animate-pulse" />
+        </div>
+        <TableSkeleton rows={6} cols={5} />
       </div>
     )
   }

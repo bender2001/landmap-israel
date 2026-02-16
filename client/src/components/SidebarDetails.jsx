@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart } from 'lucide-react'
+import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon } from 'lucide-react'
 import ShareMenu from './ui/ShareMenu'
+import ImageLightbox from './ui/ImageLightbox'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
 import { formatCurrency } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
@@ -109,6 +110,8 @@ export default function SidebarDetails({ plot, onClose, onOpenLeadModal, favorit
   const [scrollShadow, setScrollShadow] = useState({ top: false, bottom: false })
   const [linkCopied, setLinkCopied] = useState(false)
   const [sheetSnap, setSheetSnap] = useState(SNAP_PEEK) // start at peek
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
 
   // Animate to mid after mount on mobile
   useEffect(() => {
@@ -671,6 +674,33 @@ export default function SidebarDetails({ plot, onClose, onOpenLeadModal, favorit
               </div>
             </CollapsibleSection>
 
+            {/* Images */}
+            {plot.plot_images && plot.plot_images.length > 0 && (
+              <CollapsibleSection
+                number={`0${++sectionNum}`}
+                icon={ImageIcon}
+                title="תמונות"
+              >
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {plot.plot_images.map((img, i) => (
+                    <button
+                      key={img.id || i}
+                      onClick={() => { setLightboxIndex(i); setLightboxOpen(true) }}
+                      className="aspect-square rounded-xl overflow-hidden border border-white/10 hover:border-gold/40 transition-all group relative"
+                    >
+                      <img
+                        src={img.url}
+                        alt={img.alt || `תמונה ${i + 1}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                    </button>
+                  ))}
+                </div>
+              </CollapsibleSection>
+            )}
+
             {/* Documents */}
             {plot.documents && plot.documents.length > 0 && (
               <CollapsibleSection
@@ -719,6 +749,16 @@ export default function SidebarDetails({ plot, onClose, onOpenLeadModal, favorit
           </div>
         </div>
       </div>
+
+      {/* Image Lightbox */}
+      {plot.plot_images && plot.plot_images.length > 0 && (
+        <ImageLightbox
+          images={plot.plot_images}
+          initialIndex={lightboxIndex}
+          isOpen={lightboxOpen}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </>
   )
 }

@@ -51,6 +51,22 @@ export async function getPlotById(id) {
   return data
 }
 
+// Admin-specific: no is_published filter, includes images & docs
+export async function getPlotByIdAdmin(id) {
+  const { data, error } = await supabaseAdmin
+    .from('plots')
+    .select(`
+      *,
+      plot_documents(*),
+      plot_images(*)
+    `)
+    .eq('id', id)
+    .single()
+
+  if (error) throw error
+  return data
+}
+
 export async function getAllPlots() {
   const { data, error } = await supabaseAdmin
     .from('plots')

@@ -35,12 +35,27 @@ export default function PoiForm() {
 
   useEffect(() => {
     if (existingPoi) {
+      // Extract lat/lng — prefer flat fields, fall back to coordinates JSONB
+      let lat = existingPoi.lat
+      let lng = existingPoi.lng
+      if (lat == null || lng == null) {
+        const coords = existingPoi.coordinates
+        if (coords) {
+          if (typeof coords === 'object' && !Array.isArray(coords)) {
+            lat = coords.lat ?? coords.latitude ?? lat
+            lng = coords.lng ?? coords.longitude ?? lng
+          } else if (Array.isArray(coords) && coords.length >= 2) {
+            lat = coords[0]
+            lng = coords[1]
+          }
+        }
+      }
       setFormData({
         name: existingPoi.name || '',
         type: existingPoi.type || 'general',
         icon: existingPoi.icon || '📍',
-        lat: existingPoi.lat?.toString() || '',
-        lng: existingPoi.lng?.toString() || '',
+        lat: lat != null ? lat.toString() : '',
+        lng: lng != null ? lng.toString() : '',
         description: existingPoi.description || '',
       })
     }

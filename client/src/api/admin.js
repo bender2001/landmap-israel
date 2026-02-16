@@ -2,28 +2,42 @@ import { api } from './client.js'
 
 // ─── Plots ───
 export const adminPlots = {
-  list: () => api.get('/admin/plots'),
+  list: (params = {}) => {
+    const qs = new URLSearchParams()
+    if (params.page) qs.set('page', params.page)
+    if (params.limit) qs.set('limit', params.limit)
+    if (params.search) qs.set('search', params.search)
+    if (params.sort_by) qs.set('sort_by', params.sort_by)
+    if (params.sort_dir) qs.set('sort_dir', params.sort_dir)
+    const str = qs.toString()
+    return api.get(`/admin/plots${str ? `?${str}` : ''}`)
+  },
   get: (id) => api.get(`/admin/plots/${id}`),
   create: (data) => api.post('/admin/plots', data),
   update: (id, data) => api.patch(`/admin/plots/${id}`, data),
   delete: (id) => api.delete(`/admin/plots/${id}`),
   togglePublish: (id, published) => api.patch(`/admin/plots/${id}/publish`, { is_published: published }),
-  bulkDelete: (ids) => Promise.all(ids.map((id) => api.delete(`/admin/plots/${id}`))),
-  bulkPublish: (ids, published) => Promise.all(ids.map((id) => api.patch(`/admin/plots/${id}/publish`, { is_published: published }))),
+  bulkDelete: (ids) => api.post('/admin/plots/bulk-delete', { ids }),
+  bulkPublish: (ids, published) => api.post('/admin/plots/bulk-publish', { ids, is_published: published }),
 }
 
 // ─── Leads ───
 export const adminLeads = {
-  list: (filters) => {
-    const params = new URLSearchParams()
-    if (filters?.status) params.set('status', filters.status)
-    const qs = params.toString()
-    return api.get(`/admin/leads${qs ? `?${qs}` : ''}`)
+  list: (params = {}) => {
+    const qs = new URLSearchParams()
+    if (params.status) qs.set('status', params.status)
+    if (params.page) qs.set('page', params.page)
+    if (params.limit) qs.set('limit', params.limit)
+    if (params.search) qs.set('search', params.search)
+    if (params.sort_by) qs.set('sort_by', params.sort_by)
+    if (params.sort_dir) qs.set('sort_dir', params.sort_dir)
+    const str = qs.toString()
+    return api.get(`/admin/leads${str ? `?${str}` : ''}`)
   },
   get: (id) => api.get(`/admin/leads/${id}`),
   updateStatus: (id, status, notes) => api.patch(`/admin/leads/${id}/status`, { status, notes }),
   export: () => api.get('/admin/leads/export'),
-  bulkUpdateStatus: (ids, status) => Promise.all(ids.map((id) => api.patch(`/admin/leads/${id}/status`, { status }))),
+  bulkUpdateStatus: (ids, status) => api.post('/admin/leads/bulk-status', { ids, status }),
 }
 
 // ─── Dashboard ───
@@ -73,4 +87,10 @@ export const adminActivity = {
     const str = qs.toString()
     return api.get(`/admin/activity${str ? `?${str}` : ''}`)
   },
+}
+
+// ─── Settings ───
+export const adminSettings = {
+  get: () => api.get('/admin/settings'),
+  update: (data) => api.patch('/admin/settings', data),
 }

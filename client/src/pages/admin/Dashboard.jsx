@@ -3,7 +3,7 @@ import { adminDashboard } from '../../api/admin.js'
 import { formatCurrency } from '../../utils/formatters.js'
 import { leadStatusLabels, leadStatusColors, statusLabels, statusColors } from '../../utils/constants.js'
 import { Map, Users, TrendingUp, BarChart3, Clock } from 'lucide-react'
-import Spinner from '../../components/ui/Spinner.jsx'
+import DashboardSkeleton from '../../components/ui/DashboardSkeleton.jsx'
 
 function KPICard({ icon: Icon, label, value, color = 'text-gold', subtext }) {
   return (
@@ -164,11 +164,7 @@ export default function Dashboard() {
   })
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Spinner className="w-10 h-10 text-gold" />
-      </div>
-    )
+    return <DashboardSkeleton />
   }
 
   if (error) {

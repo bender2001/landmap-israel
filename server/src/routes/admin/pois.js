@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { auth } from '../../middleware/auth.js'
 import { adminOnly } from '../../middleware/adminOnly.js'
 import { supabaseAdmin } from '../../config/supabase.js'
+import { logActivity } from '../../services/activityLogger.js'
 
 const router = Router()
 router.use(auth, adminOnly)
@@ -10,12 +11,43 @@ router.use(auth, adminOnly)
 router.get('/', async (req, res, next) => {
   try {
     const { data, error } = await supabaseAdmin
-      .from('pois')
+      .from('points_of_interest')
       .select('*')
       .order('created_at', { ascending: false })
 
     if (error) throw error
-    res.json(data)
+
+    // Map coordinates JSONB → flat lat/lng for client compatibility
+    const mapped = (data || []).map((poi) => ({
+      ...poi,
+      lat: poi.lat ?? poi.coordinates?.lat ?? null,
+      lng: poi.lng ?? poi.coordinates?.lng ?? null,
+    }))
+
+    res.json(mapped)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// GET /api/admin/pois/:id — Get single POI
+router.get('/:id', async (req, res, next) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('points_of_interest')
+      .select('*')
+      .eq('id', req.params.id)
+      .single()
+
+    if (error) throw error
+    if (!data) return res.status(404).json({ error: 'POI not found' })
+
+    // Map coordinates JSONB → flat lat/lng
+    res.json({
+      ...data,
+      lat: data.lat ?? data.coordinates?.lat ?? null,
+      lng: data.lng ?? data.coordinates?.lng ?? null,
+    })
   } catch (err) {
     next(err)
   }
@@ -31,20 +63,30 @@ router.post('/', async (req, res, next) => {
     }
 
     const { data, error } = await supabaseAdmin
-      .from('pois')
+      .from('points_of_interest')
       .insert({
         name,
         type: type || 'general',
         icon: icon || '📍',
         lat,
         lng,
+        coordinates: { lat, lng },
         description: description || null,
       })
       .select()
       .single()
 
     if (error) throw error
-    res.status(201).json(data)
+
+    logActivity({
+      action: 'create',
+      entityType: 'poi',
+      entityId: data.id,
+      userId: req.user?.id,
+      description: `נוצרה נקודת עניין: ${name}`,
+    })
+
+    res.status(201).json({ ...data, lat, lng })
   } catch (err) {
     next(err)
   }
@@ -60,12 +102,15 @@ router.patch('/:id', async (req, res, next) => {
     if (name !== undefined) update.name = name
     if (type !== undefined) update.type = type
     if (icon !== undefined) update.icon = icon
-    if (lat !== undefined) update.lat = lat
-    if (lng !== undefined) update.lng = lng
+    if (lat !== undefined) { update.lat = lat }
+    if (lng !== undefined) { update.lng = lng }
+    if (lat !== undefined || lng !== undefined) {
+      update.coordinates = { lat: lat ?? undefined, lng: lng ?? undefined }
+    }
     if (description !== undefined) update.description = description
 
     const { data, error } = await supabaseAdmin
-      .from('pois')
+      .from('points_of_interest')
       .update(update)
       .eq('id', id)
       .select()
@@ -73,7 +118,20 @@ router.patch('/:id', async (req, res, next) => {
 
     if (error) throw error
     if (!data) return res.status(404).json({ error: 'POI not found' })
-    res.json(data)
+
+    logActivity({
+      action: 'update',
+      entityType: 'poi',
+      entityId: id,
+      userId: req.user?.id,
+      description: `עודכנה נקודת עניין: ${data.name}`,
+    })
+
+    res.json({
+      ...data,
+      lat: data.lat ?? data.coordinates?.lat ?? null,
+      lng: data.lng ?? data.coordinates?.lng ?? null,
+    })
   } catch (err) {
     next(err)
   }
@@ -83,12 +141,29 @@ router.patch('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const { id } = req.params
+
+    // Get name before deleting for log
+    const { data: existing } = await supabaseAdmin
+      .from('points_of_interest')
+      .select('name')
+      .eq('id', id)
+      .single()
+
     const { error } = await supabaseAdmin
-      .from('pois')
+      .from('points_of_interest')
       .delete()
       .eq('id', id)
 
     if (error) throw error
+
+    logActivity({
+      action: 'delete',
+      entityType: 'poi',
+      entityId: id,
+      userId: req.user?.id,
+      description: `נמחקה נקודת עניין: ${existing?.name || id}`,
+    })
+
     res.json({ success: true })
   } catch (err) {
     next(err)
