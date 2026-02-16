@@ -2,6 +2,8 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
+import compression from 'compression'
+import morgan from 'morgan'
 import { rateLimit } from 'express-rate-limit'
 import plotRoutes from './routes/plots.js'
 import leadRoutes from './routes/leads.js'
@@ -13,16 +15,32 @@ import adminDashboardRoutes from './routes/admin/dashboard.js'
 import adminDocumentRoutes from './routes/admin/documents.js'
 import adminImageRoutes from './routes/admin/images.js'
 import { errorHandler } from './middleware/errorHandler.js'
+import { supabaseAdmin } from './config/supabase.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
 
 // Security
 app.use(helmet())
+
+// CORS — support multiple origins
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim())
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true)
+    cb(new Error('Not allowed by CORS'))
+  },
   credentials: true,
 }))
+
+// Compression
+app.use(compression())
+
+// Request logging
+app.use(morgan('short'))
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }))
@@ -49,9 +67,22 @@ app.use('/api/admin/dashboard', adminDashboardRoutes)
 app.use('/api/admin/documents', adminDocumentRoutes)
 app.use('/api/admin/images', adminImageRoutes)
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+// Health check with DB connectivity
+app.get('/api/health', async (req, res) => {
+  try {
+    const { error } = await supabaseAdmin.from('plots').select('id').limit(1)
+    res.json({
+      status: 'ok',
+      db: error ? 'error' : 'connected',
+      timestamp: new Date().toISOString(),
+    })
+  } catch (e) {
+    res.status(503).json({
+      status: 'degraded',
+      db: 'unreachable',
+      timestamp: new Date().toISOString(),
+    })
+  }
 })
 
 // Error handler
