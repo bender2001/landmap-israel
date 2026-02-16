@@ -603,11 +603,12 @@ body {
   font-size: 13px;
   font-family: 'Heebo', sans-serif;
   border-radius: 12px;
-  background: rgba(22, 42, 74, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: #0B1929;
+  border: 1px solid rgba(200, 148, 42, 0.2);
   color: #CBD5E1;
   outline: none;
   transition: all 0.2s;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .filter-search-input::placeholder {
@@ -616,8 +617,8 @@ body {
 
 .filter-search-input:focus {
   border-color: rgba(200, 148, 42, 0.4);
-  background: rgba(200, 148, 42, 0.06);
-  box-shadow: 0 0 0 3px rgba(200, 148, 42, 0.08);
+  background: #0D1D30;
+  box-shadow: 0 0 0 3px rgba(200, 148, 42, 0.08), 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .filter-search-clear {
@@ -1614,6 +1615,259 @@ body {
   animation: cta-shimmer 3s ease-in-out infinite;
   border-radius: inherit;
   pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════
+   PLOT CARD STRIP (Bottom horizontal cards)
+   ═══════════════════════════════════════════ */
+
+/* ── Wrapper: pinned to bottom, above map but below sidebar/chat ── */
+.plot-strip-wrapper {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 24;
+  pointer-events: none;
+  background: linear-gradient(0deg, rgba(5, 13, 26, 0.75) 0%, rgba(5, 13, 26, 0.35) 60%, transparent 100%);
+}
+
+/* ── Fade edges to hint at scrollable content ── */
+.plot-strip-fade-right {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 60px;
+  background: linear-gradient(to right, transparent, rgba(5, 13, 26, 0.8));
+  z-index: 5;
+  pointer-events: none;
+}
+
+.plot-strip-fade-left {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 60px;
+  background: linear-gradient(to left, transparent, rgba(5, 13, 26, 0.8));
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* ── Scrollable track ── */
+.plot-strip-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  padding: 8px 80px 16px 16px; /* right padding clears AI chat fab (physical right) */
+  pointer-events: auto;
+  /* Hide scrollbar */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.plot-strip-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Scroll arrows ── */
+.plot-strip-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(8, 18, 35, 0.95);
+  border: 1px solid rgba(200, 148, 42, 0.25);
+  color: #E5B94E;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+
+.plot-strip-arrow:hover {
+  background: rgba(200, 148, 42, 0.12);
+  border-color: rgba(200, 148, 42, 0.5);
+  box-shadow: 0 4px 24px rgba(200, 148, 42, 0.15);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.plot-strip-arrow-right {
+  right: 74px; /* clear AI chat fab area */
+}
+
+.plot-strip-arrow-left {
+  left: 8px;
+}
+
+/* ── Card ── */
+.plot-card-mini {
+  flex-shrink: 0;
+  width: 200px;
+  background: rgba(8, 18, 35, 0.96);
+  border: 1px solid rgba(200, 148, 42, 0.12);
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  scroll-snap-align: center;
+  box-shadow:
+    0 8px 28px -6px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.plot-card-mini:hover {
+  border-color: rgba(200, 148, 42, 0.3);
+  transform: translateY(-4px);
+  box-shadow:
+    0 14px 40px -6px rgba(0, 0, 0, 0.55),
+    0 0 16px rgba(200, 148, 42, 0.06);
+}
+
+.plot-card-mini-selected {
+  border-color: rgba(200, 148, 42, 0.5) !important;
+  background: rgba(15, 28, 50, 0.98) !important;
+  box-shadow:
+    0 14px 40px -6px rgba(0, 0, 0, 0.55),
+    0 0 20px rgba(200, 148, 42, 0.1),
+    inset 0 0 0 1px rgba(200, 148, 42, 0.08) !important;
+  transform: translateY(-4px);
+}
+
+.plot-card-mini-accent {
+  height: 3px;
+}
+
+.plot-card-mini-body {
+  padding: 10px 12px 10px;
+}
+
+.plot-card-mini-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.plot-card-mini-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #E2E8F0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plot-card-mini-status {
+  font-size: 9px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.plot-card-mini-city {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #64748B;
+  margin-bottom: 8px;
+}
+
+.plot-card-mini-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.plot-card-mini-price {
+  font-size: 14px;
+  font-weight: 800;
+  color: #E5B94E;
+  text-shadow: 0 0 12px rgba(229, 185, 78, 0.15);
+}
+
+.plot-card-mini-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.plot-card-mini-roi {
+  font-size: 10px;
+  font-weight: 600;
+  color: #34D399;
+  background: rgba(52, 211, 153, 0.1);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.plot-card-mini-time {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: #475569;
+}
+
+/* ═══════════════════════════════════════════
+   PLOT CARD STRIP — Desktop (≥640px)
+   ═══════════════════════════════════════════ */
+
+@media (min-width: 640px) {
+  .plot-strip-scroll {
+    gap: 14px;
+    padding: 8px 88px 20px 20px; /* right padding for AI chat fab */
+  }
+  .plot-card-mini {
+    width: 220px;
+  }
+  .plot-strip-arrow-right {
+    right: 80px;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   PLOT CARD STRIP — Mobile (< 640px)
+   ═══════════════════════════════════════════ */
+
+@media (max-width: 639px) {
+  .plot-strip-scroll {
+    gap: 10px;
+    padding: 6px 12px 12px 12px;
+  }
+  .plot-card-mini {
+    width: 170px;
+  }
+  .plot-card-mini-body {
+    padding: 8px 10px 8px;
+  }
+  .plot-card-mini-title {
+    font-size: 11px;
+  }
+  .plot-card-mini-price {
+    font-size: 13px;
+  }
+  .plot-strip-fade-right,
+  .plot-strip-fade-left {
+    width: 24px;
+  }
+  /* Move AI chat fab above the strip on mobile */
+  .ai-chat-fab {
+    bottom: 120px !important;
+  }
 }
 
 /* Better scrollbar for sidebar on mobile */

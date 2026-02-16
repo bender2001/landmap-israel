@@ -3,14 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { adminPlots } from '../../api/admin.js'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants.js'
 import { formatCurrency } from '../../utils/formatters.js'
-import { Plus, Pencil, Trash2, Eye, EyeOff, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Eye, EyeOff, Search, CheckSquare, Square, X } from 'lucide-react'
 import { useState } from 'react'
 import Spinner from '../../components/ui/Spinner.jsx'
+import { useToast } from '../../components/ui/ToastContainer.jsx'
 
 export default function PlotList() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { toast } = useToast()
   const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState(new Set())
 
   const { data: plots = [], isLoading } = useQuery({
     queryKey: ['admin', 'plots'],
@@ -19,12 +22,36 @@ export default function PlotList() {
 
   const togglePublish = useMutation({
     mutationFn: ({ id, published }) => adminPlots.togglePublish(id, published),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'plots'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'plots'] })
+      toast('סטטוס פרסום עודכן', 'success')
+    },
   })
 
   const deletePlot = useMutation({
     mutationFn: (id) => adminPlots.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'plots'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'plots'] })
+      toast('חלקה נמחקה', 'success')
+    },
+  })
+
+  const bulkDelete = useMutation({
+    mutationFn: (ids) => adminPlots.bulkDelete(ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'plots'] })
+      setSelected(new Set())
+      toast('חלקות נמחקו', 'success')
+    },
+  })
+
+  const bulkPublish = useMutation({
+    mutationFn: ({ ids, published }) => adminPlots.bulkPublish(ids, published),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'plots'] })
+      setSelected(new Set())
+      toast('סטטוס פרסום עודכן', 'success')
+    },
   })
 
   const filtered = plots.filter((p) => {
@@ -36,6 +63,23 @@ export default function PlotList() {
       String(p.number || '').includes(s)
     )
   })
+
+  const toggleSelect = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleAll = () => {
+    if (selected.size === filtered.length) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(filtered.map((p) => p.id)))
+    }
+  }
 
   if (isLoading) {
     return (
@@ -70,12 +114,56 @@ export default function PlotList() {
         />
       </div>
 
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-3 mb-4 p-3 bg-gold/5 border border-gold/20 rounded-xl animate-fade-in">
+          <span className="text-sm text-gold font-medium">{selected.size} נבחרו</span>
+          <button
+            onClick={() => bulkPublish.mutate({ ids: [...selected], published: true })}
+            className="px-3 py-1.5 text-xs bg-emerald-500/15 text-emerald-400 rounded-lg hover:bg-emerald-500/25 transition"
+          >
+            פרסם
+          </button>
+          <button
+            onClick={() => bulkPublish.mutate({ ids: [...selected], published: false })}
+            className="px-3 py-1.5 text-xs bg-slate-500/15 text-slate-400 rounded-lg hover:bg-slate-500/25 transition"
+          >
+            הסר פרסום
+          </button>
+          <button
+            onClick={() => {
+              if (confirm(`האם למחוק ${selected.size} חלקות?`)) {
+                bulkDelete.mutate([...selected])
+              }
+            }}
+            className="px-3 py-1.5 text-xs bg-red-500/15 text-red-400 rounded-lg hover:bg-red-500/25 transition"
+          >
+            מחק
+          </button>
+          <button
+            onClick={() => setSelected(new Set())}
+            className="mr-auto p-1 text-slate-400 hover:text-slate-200 transition"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="glass-panel overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/10 text-slate-400">
+                <th className="py-3 px-3 w-10">
+                  <button onClick={toggleAll} className="text-slate-400 hover:text-gold transition">
+                    {selected.size === filtered.length && filtered.length > 0 ? (
+                      <CheckSquare className="w-4 h-4" />
+                    ) : (
+                      <Square className="w-4 h-4" />
+                    )}
+                  </button>
+                </th>
                 <th className="text-right py-3 px-4 font-medium">גוש / חלקה</th>
                 <th className="text-right py-3 px-4 font-medium">עיר</th>
                 <th className="text-right py-3 px-4 font-medium">מחיר</th>
@@ -89,8 +177,18 @@ export default function PlotList() {
             <tbody>
               {filtered.map((plot) => {
                 const color = statusColors[plot.status]
+                const isChecked = selected.has(plot.id)
                 return (
-                  <tr key={plot.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                  <tr key={plot.id} className={`border-b border-white/5 transition-colors ${isChecked ? 'bg-gold/5' : 'hover:bg-white/5'}`}>
+                    <td className="py-3 px-3">
+                      <button onClick={() => toggleSelect(plot.id)} className="text-slate-400 hover:text-gold transition">
+                        {isChecked ? (
+                          <CheckSquare className="w-4 h-4 text-gold" />
+                        ) : (
+                          <Square className="w-4 h-4" />
+                        )}
+                      </button>
+                    </td>
                     <td className="py-3 px-4 text-slate-200 font-medium">
                       {plot.block_number} / {plot.number}
                     </td>
@@ -147,7 +245,7 @@ export default function PlotList() {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="text-center py-10 text-slate-500">
+                  <td colSpan={9} className="text-center py-10 text-slate-500">
                     {search ? 'לא נמצאו תוצאות' : 'אין חלקות'}
                   </td>
                 </tr>

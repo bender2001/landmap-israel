@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, User, Phone, Mail, Lock } from 'lucide-react'
 import { useCreateLead } from '../hooks/useLeads.js'
+import { useToast } from './ui/ToastContainer.jsx'
 
 const phoneRegex = /^0[2-9]\d{7,8}$/
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -10,6 +11,7 @@ export default function LeadModal({ isOpen, onClose, plot }) {
   const [isSuccess, setIsSuccess] = useState(false)
   const [errors, setErrors] = useState({})
   const createLead = useCreateLead()
+  const { toast } = useToast()
 
   if (!isOpen) return null
 
@@ -48,6 +50,7 @@ export default function LeadModal({ isOpen, onClose, plot }) {
         email: formData.email.trim(),
       })
       setIsSuccess(true)
+      toast('הפרטים נשלחו בהצלחה!', 'success')
       setTimeout(() => {
         setIsSuccess(false)
         setFormData({ name: '', phone: '', email: '' })
@@ -56,6 +59,7 @@ export default function LeadModal({ isOpen, onClose, plot }) {
         onClose()
       }, 2000)
     } catch {
+      toast('שגיאה בשליחת הפרטים', 'error')
       setErrors({ form: 'אירעה שגיאה בשליחת הפרטים. נסה שוב.' })
     }
   }

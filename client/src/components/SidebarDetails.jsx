@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart } from 'lucide-react'
+import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart } from 'lucide-react'
+import ShareMenu from './ui/ShareMenu'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
 import { formatCurrency } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
@@ -702,28 +703,19 @@ export default function SidebarDetails({ plot, onClose, onOpenLeadModal, favorit
             צור קשר לפרטים מלאים
           </button>
           <div className="flex gap-2 mt-2.5">
+            <ShareMenu
+              plotTitle={`גוש ${blockNumber} חלקה ${plot.number} - ${plot.city}`}
+              plotPrice={formatCurrency(totalPrice)}
+              plotUrl={`${window.location.origin}/?plot=${plot.id}`}
+              className="flex-1"
+            />
             <a
-              href={`https://wa.me/?text=${encodeURIComponent(`חלקה ${plot.number} גוש ${blockNumber} - ${plot.city}\n${window.location.origin}/plots/${plot.id}`)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-green-600/20 border border-green-500/30 text-green-400 text-sm font-medium hover:bg-green-600/30 transition-colors"
+              href={`/compare?plots=${plot.id}`}
+              className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-purple-600/20 border border-purple-500/30 text-purple-400 text-sm font-medium hover:bg-purple-600/30 transition-colors"
             >
-              <MessageCircle className="w-4 h-4" />
-              WhatsApp
+              <BarChart className="w-4 h-4" />
+              השווה
             </a>
-            <button
-              onClick={() => {
-                const url = `${window.location.origin}/plots/${plot.id}`
-                navigator.clipboard.writeText(url).then(() => {
-                  setLinkCopied(true)
-                  setTimeout(() => setLinkCopied(false), 2000)
-                })
-              }}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 text-sm font-medium hover:bg-blue-600/30 transition-colors"
-            >
-              {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              {linkCopied ? 'הועתק!' : 'העתק קישור'}
-            </button>
           </div>
         </div>
       </div>

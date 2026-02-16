@@ -1,13 +1,16 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { useEffect } from 'react'
-import { LayoutDashboard, Map, Users, LogOut } from 'lucide-react'
+import { LayoutDashboard, Map, Users, MapPin, Activity, Settings, LogOut } from 'lucide-react'
 import Spinner from '../components/ui/Spinner.jsx'
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'דשבורד', end: true },
   { to: '/admin/plots', icon: Map, label: 'חלקות' },
   { to: '/admin/leads', icon: Users, label: 'לידים' },
+  { to: '/admin/pois', icon: MapPin, label: 'נק׳ עניין' },
+  { to: '/admin/activity', icon: Activity, label: 'יומן' },
+  { to: '/admin/settings', icon: Settings, label: 'הגדרות' },
 ]
 
 export default function AdminLayout() {
@@ -93,7 +96,7 @@ export default function AdminLayout() {
 
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex bg-navy-mid border-t border-white/10">
-        {navItems.map(({ to, icon: Icon, label, end }) => (
+        {navItems.slice(0, 4).map(({ to, icon: Icon, label, end }) => (
           <NavLink
             key={to}
             to={to}

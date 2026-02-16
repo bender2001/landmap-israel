@@ -6,6 +6,7 @@ import { useFavorites } from '../../hooks/useFavorites.js'
 import MapArea from '../../components/MapArea.jsx'
 import FilterBar from '../../components/FilterBar.jsx'
 import SidebarDetails from '../../components/SidebarDetails.jsx'
+import PlotCardStrip from '../../components/PlotCardStrip.jsx'
 import AIChat from '../../components/AIChat.jsx'
 import LeadModal from '../../components/LeadModal.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
@@ -148,6 +149,12 @@ export default function MapView() {
         isOpen={isChatOpen}
         onToggle={() => setIsChatOpen(prev => !prev)}
         selectedPlot={selectedPlot}
+      />
+
+      <PlotCardStrip
+        plots={filteredPlots}
+        selectedPlot={selectedPlot}
+        onSelectPlot={handleSelectPlot}
       />
 
       <LeadModal
