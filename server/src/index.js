@@ -1,6 +1,11 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 import helmet from 'helmet'
 import compression from 'compression'
 import morgan from 'morgan'
@@ -24,7 +29,10 @@ const app = express()
 const PORT = process.env.PORT || 3001
 
 // Security
-app.use(helmet())
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}))
 
 // CORS — support multiple origins
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
@@ -90,6 +98,15 @@ app.get('/api/health', async (req, res) => {
     })
   }
 })
+
+// ─── Serve frontend static files in production ───
+if (process.env.NODE_ENV === 'production') {
+  const clientDist = path.resolve(__dirname, '../../client/dist')
+  app.use(express.static(clientDist))
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'))
+  })
+}
 
 // Error handler
 app.use(errorHandler)
