@@ -9,7 +9,7 @@
     "dev:client": "cd client && npx vite",
     "build": "cd client && npm install && npx vite build",
     "start": "cd server && node src/index.js",
-    "render-build": "npm install && cd server && npm install && cd ../client && npm install && npx vite build",
+    "render-build": "npm install && cd server && npm install && cd ../client && npm install --include=dev && npx vite build",
     "seed": "cd server && node src/seed.js"
   },
   "devDependencies": {
