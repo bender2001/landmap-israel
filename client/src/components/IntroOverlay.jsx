@@ -3,12 +3,16 @@ import { useState, useEffect } from 'react'
 export default function IntroOverlay({ onComplete }) {
   const [phase, setPhase] = useState(0) // 0=grid, 1=brand, 2=subtitle, 3=exit
 
+  const skip = () => { setPhase(3); setTimeout(onComplete, 400) }
+
   useEffect(() => {
     const t1 = setTimeout(() => setPhase(1), 400)
     const t2 = setTimeout(() => setPhase(2), 1200)
     const t3 = setTimeout(() => setPhase(3), 2800)
     const t4 = setTimeout(() => onComplete(), 3600)
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4) }
+    const onKey = (e) => { if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') skip() }
+    window.addEventListener('keydown', onKey)
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); window.removeEventListener('keydown', onKey) }
   }, [onComplete])
 
   return (
@@ -103,6 +107,17 @@ export default function IntroOverlay({ onComplete }) {
       <div className="intro-corner intro-corner-tr" />
       <div className="intro-corner intro-corner-bl" />
       <div className="intro-corner intro-corner-br" />
+
+      {/* Skip button */}
+      {phase < 3 && (
+        <button
+          onClick={skip}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 text-xs text-slate-500 hover:text-gold/70 transition-colors tracking-widest uppercase font-mono cursor-pointer"
+          style={{ letterSpacing: '0.2em' }}
+        >
+          דלג ›
+        </button>
+      )}
 
       {/* Vignette */}
       <div

@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check } from 'lucide-react'
+import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart } from 'lucide-react'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
 import { formatCurrency } from '../utils/formatters'
+import AnimatedNumber from './ui/AnimatedNumber'
 
 function SectionIcon({ icon: Icon, className = '' }) {
   return (
@@ -90,10 +91,102 @@ const committeeLevels = [
   { key: 'local', label: 'מקומית' },
 ]
 
-export default function SidebarDetails({ plot, onClose, onOpenLeadModal }) {
+// Snap points as % of viewport height (from bottom)
+const SNAP_PEEK = 35   // title + key info peek
+const SNAP_MID = 75    // default open
+const SNAP_FULL = 95   // fully expanded
+const SNAPS = [SNAP_PEEK, SNAP_MID, SNAP_FULL]
+
+function isMobile() {
+  return typeof window !== 'undefined' && window.innerWidth < 640
+}
+
+export default function SidebarDetails({ plot, onClose, onOpenLeadModal, favorites }) {
   const scrollRef = useRef(null)
+  const panelRef = useRef(null)
+  const dragRef = useRef({ startY: 0, startSnap: SNAP_MID, isDragging: false, velocity: 0, lastY: 0, lastTime: 0 })
   const [scrollShadow, setScrollShadow] = useState({ top: false, bottom: false })
   const [linkCopied, setLinkCopied] = useState(false)
+  const [sheetSnap, setSheetSnap] = useState(SNAP_PEEK) // start at peek
+
+  // Animate to mid after mount on mobile
+  useEffect(() => {
+    if (plot && isMobile()) {
+      // Start at peek, then animate to mid after a short delay
+      setSheetSnap(SNAP_PEEK)
+      const t = setTimeout(() => setSheetSnap(SNAP_MID), 50)
+      return () => clearTimeout(t)
+    }
+  }, [plot?.id])
+
+  // Set sheet height via CSS custom property
+  useEffect(() => {
+    if (panelRef.current && isMobile()) {
+      panelRef.current.style.height = `${sheetSnap}vh`
+    }
+  }, [sheetSnap])
+
+  // Mobile drag with velocity + multi-snap
+  const handleDragStart = useCallback((e) => {
+    if (!isMobile()) return
+    const touch = e.touches[0]
+    dragRef.current = {
+      startY: touch.clientY,
+      startSnap: sheetSnap,
+      isDragging: true,
+      velocity: 0,
+      lastY: touch.clientY,
+      lastTime: Date.now(),
+    }
+    if (panelRef.current) panelRef.current.style.transition = 'none'
+  }, [sheetSnap])
+
+  const handleDragMove = useCallback((e) => {
+    if (!dragRef.current.isDragging || !panelRef.current) return
+    const touch = e.touches[0]
+    const now = Date.now()
+    const dt = now - dragRef.current.lastTime
+    if (dt > 0) {
+      dragRef.current.velocity = (dragRef.current.lastY - touch.clientY) / dt // positive = dragging up
+    }
+    dragRef.current.lastY = touch.clientY
+    dragRef.current.lastTime = now
+
+    const deltaY = touch.clientY - dragRef.current.startY
+    const deltaPct = (deltaY / window.innerHeight) * 100
+    const newHeight = Math.max(10, Math.min(98, dragRef.current.startSnap - deltaPct))
+    panelRef.current.style.height = `${newHeight}vh`
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    if (!dragRef.current.isDragging || !panelRef.current) return
+    dragRef.current.isDragging = false
+
+    const currentHeight = (panelRef.current.getBoundingClientRect().height / window.innerHeight) * 100
+    const vel = dragRef.current.velocity // positive = up, negative = down
+
+    // If fast fling down below peek → dismiss
+    if (vel < -0.8 && currentHeight < SNAP_PEEK + 5) {
+      panelRef.current.style.transition = 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease'
+      panelRef.current.style.height = '0vh'
+      panelRef.current.style.opacity = '0'
+      setTimeout(onClose, 300)
+      return
+    }
+
+    // Find nearest snap, biased by velocity
+    const biased = currentHeight + vel * 40
+    let bestSnap = SNAPS[0]
+    let bestDist = Math.abs(biased - SNAPS[0])
+    for (const s of SNAPS) {
+      const d = Math.abs(biased - s)
+      if (d < bestDist) { bestDist = d; bestSnap = s }
+    }
+
+    panelRef.current.style.transition = 'height 0.35s cubic-bezier(0.32, 0.72, 0, 1)'
+    panelRef.current.style.height = `${bestSnap}vh`
+    setSheetSnap(bestSnap)
+  }, [onClose])
 
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return
@@ -145,10 +238,11 @@ export default function SidebarDetails({ plot, onClose, onOpenLeadModal }) {
 
       {/* Panel */}
       <div
-        className="sidebar-panel fixed top-0 right-0 h-full w-[480px] max-w-full z-[60] bg-navy border-l border-white/10 shadow-2xl flex flex-col overflow-hidden animate-slide-in-right"
+        ref={panelRef}
+        className="sidebar-panel fixed top-0 right-0 h-full w-full sm:w-[420px] md:w-[480px] max-w-full z-[60] bg-navy border-l border-white/10 shadow-2xl flex flex-col overflow-hidden animate-slide-in-right"
         dir="rtl"
       >
-        {/* Mobile drag handle */}
+        {/* Mobile drag handle (visual only — drag events on header zone below) */}
         <div className="sidebar-drag-handle">
           <div className="sidebar-drag-handle-bar" />
         </div>
@@ -159,26 +253,39 @@ export default function SidebarDetails({ plot, onClose, onOpenLeadModal }) {
           style={{ background: 'linear-gradient(90deg, #C8942A, #E5B94E, #F0D078, #E5B94E, #C8942A)' }}
         />
 
-        {/* Map preview area */}
-        <div className="h-36 bg-navy-mid relative overflow-hidden flex-shrink-0">
-          <div
-            className="absolute inset-0 opacity-10"
-            style={{
-              backgroundImage: 'linear-gradient(rgba(200,148,42,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(200,148,42,0.3) 1px, transparent 1px)',
-              backgroundSize: '40px 40px',
-            }}
-          />
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div className="w-3 h-3 rounded-full bg-gold animate-pulse-gold" />
-            <span className="text-xs text-gold/80 mt-2">
-              גוש {blockNumber} | {plot.city}
-            </span>
-          </div>
-          <div className="absolute bottom-0 w-full h-12 bg-gradient-to-t from-navy to-transparent" />
-        </div>
+        {/* Draggable header zone (drag handle + preview + title) */}
+        <div
+          className="sidebar-header-drag-zone flex-shrink-0"
+          onTouchStart={handleDragStart}
+          onTouchMove={handleDragMove}
+          onTouchEnd={handleDragEnd}
+        >
+          {/* Map preview area */}
+          <div className="h-36 bg-navy-mid relative overflow-hidden">
+            <div
+              className="absolute inset-0 opacity-10"
+              style={{
+                backgroundImage: 'linear-gradient(rgba(200,148,42,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(200,148,42,0.3) 1px, transparent 1px)',
+                backgroundSize: '40px 40px',
+              }}
+            />
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div className="w-3 h-3 rounded-full bg-gold animate-pulse-gold" />
+              <span className="text-xs text-gold/80 mt-2">
+                גוש {blockNumber} | {plot.city}
+              </span>
+            </div>
+            <div className="absolute bottom-0 w-full h-12 bg-gradient-to-t from-navy to-transparent" />
 
-        {/* Header */}
-        <div className="flex justify-between items-start p-5 pb-3 flex-shrink-0">
+            {/* Mobile: tap-to-expand hint */}
+            <div className="sidebar-expand-hint">
+              <ChevronDown className="w-4 h-4 text-gold/50 rotate-180" />
+              <span>גרור למעלה לפרטים</span>
+            </div>
+          </div>
+
+          {/* Header */}
+          <div className="flex justify-between items-start p-5 pb-3">
           <div>
             <h2 className="text-2xl font-black">
               <span className="bg-gradient-to-r from-gold to-gold-bright bg-clip-text text-transparent">גוש</span>
@@ -215,13 +322,34 @@ export default function SidebarDetails({ plot, onClose, onOpenLeadModal }) {
               </span>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:rotate-90 transition-all duration-300 flex items-center justify-center flex-shrink-0"
-          >
-            <X className="w-4 h-4 text-slate-400" />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {favorites && (
+              <button
+                onClick={() => favorites.toggle(plot.id)}
+                className={`w-10 h-10 rounded-xl border transition-all duration-300 flex items-center justify-center ${
+                  favorites.isFavorite(plot.id)
+                    ? 'bg-red-500/15 border-red-500/30 hover:bg-red-500/25'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                <Heart
+                  className={`w-4 h-4 transition-all ${
+                    favorites.isFavorite(plot.id)
+                      ? 'text-red-400 fill-red-400 scale-110'
+                      : 'text-slate-400'
+                  }`}
+                />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:rotate-90 transition-all duration-300 flex items-center justify-center"
+            >
+              <X className="w-4 h-4 text-slate-400" />
+            </button>
+          </div>
         </div>
+        </div>{/* end sidebar-header-drag-zone */}
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden relative" ref={scrollRef} onScroll={handleScroll}>
@@ -377,21 +505,21 @@ export default function SidebarDetails({ plot, onClose, onOpenLeadModal }) {
                 <div className="rounded-2xl p-4 flex flex-col items-center gap-2 text-center bg-gradient-to-b from-blue-500/15 to-blue-500/8 border border-blue-500/20 relative overflow-hidden card-lift">
                   <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-400 to-blue-600" />
                   <div className="text-[10px] text-slate-400">מחיר מבוקש</div>
-                  <div className="text-lg font-bold" style={{ color: '#60A5FA' }}>{formatCurrency(totalPrice)}</div>
+                  <div className="text-lg font-bold" style={{ color: '#60A5FA' }}><AnimatedNumber value={totalPrice} formatter={formatCurrency} /></div>
                   <div className="text-[10px] text-slate-500">{pricePerDunam} / דונם</div>
                 </div>
                 {/* Projected value */}
                 <div className="rounded-2xl p-4 flex flex-col items-center gap-2 text-center bg-gradient-to-b from-emerald-500/15 to-emerald-500/8 border border-emerald-500/20 relative overflow-hidden card-lift">
                   <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-400 to-emerald-600" />
                   <div className="text-[10px] text-slate-400">שווי צפוי</div>
-                  <div className="text-lg font-bold" style={{ color: '#6EE7A0' }}>{formatCurrency(projectedValue)}</div>
+                  <div className="text-lg font-bold" style={{ color: '#6EE7A0' }}><AnimatedNumber value={projectedValue} formatter={formatCurrency} /></div>
                   <div className="text-[10px] text-slate-500">בסיום תהליך</div>
                 </div>
                 {/* ROI */}
                 <div className="rounded-2xl p-4 flex flex-col items-center gap-2 text-center bg-gradient-to-b from-gold/15 to-gold/8 border border-gold/20 relative overflow-hidden card-lift">
                   <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-gold to-gold-bright" />
                   <div className="text-[10px] text-slate-400">תשואה צפויה</div>
-                  <div className="text-lg font-bold" style={{ color: '#E5B94E' }}>{roi}%</div>
+                  <div className="text-lg font-bold" style={{ color: '#E5B94E' }}><AnimatedNumber value={roi} />%</div>
                   <div className="text-[10px] text-slate-500">ROI</div>
                 </div>
               </div>

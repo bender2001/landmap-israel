@@ -1,6 +1,8 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAllPlots } from '../../hooks/usePlots.js'
 import { usePois } from '../../hooks/usePois.js'
+import { useFavorites } from '../../hooks/useFavorites.js'
 import MapArea from '../../components/MapArea.jsx'
 import FilterBar from '../../components/FilterBar.jsx'
 import SidebarDetails from '../../components/SidebarDetails.jsx'
@@ -15,14 +17,17 @@ const initialFilters = {
   sizeMin: '',
   sizeMax: '',
   ripeness: 'all',
+  search: '',
 }
 
 export default function MapView() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [selectedPlot, setSelectedPlot] = useState(null)
   const [filters, setFilters] = useState(initialFilters)
   const [statusFilter, setStatusFilter] = useState([])
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
+  const favorites = useFavorites()
 
   // Build API filter params
   const apiFilters = useMemo(() => {
@@ -40,13 +45,50 @@ export default function MapView() {
   const { data: plots = [], isLoading } = useAllPlots(apiFilters)
   const { data: pois = [] } = usePois()
 
+  // Client-side search filter
+  const filteredPlots = useMemo(() => {
+    if (!filters.search) return plots
+    const q = filters.search.toLowerCase()
+    return plots.filter((p) => {
+      const bn = (p.block_number ?? p.blockNumber ?? '').toString()
+      const num = (p.number ?? '').toString()
+      const city = (p.city ?? '').toLowerCase()
+      const desc = (p.description ?? '').toLowerCase()
+      return bn.includes(q) || num.includes(q) || city.includes(q) || desc.includes(q)
+    })
+  }, [plots, filters.search])
+
+  // URL sync: open plot from ?plot=id on load
+  useEffect(() => {
+    const plotId = searchParams.get('plot')
+    if (plotId && filteredPlots.length > 0 && !selectedPlot) {
+      const found = filteredPlots.find((p) => p.id === plotId)
+      if (found) setSelectedPlot(found)
+    }
+  }, [searchParams, filteredPlots])
+
+  // ESC key to close sidebar/modal/chat
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape') {
+        if (isLeadModalOpen) setIsLeadModalOpen(false)
+        else if (isChatOpen) setIsChatOpen(false)
+        else if (selectedPlot) handleCloseSidebar()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isLeadModalOpen, isChatOpen, selectedPlot])
+
   const handleSelectPlot = useCallback((plot) => {
     setSelectedPlot(plot)
-  }, [])
+    setSearchParams({ plot: plot.id }, { replace: true })
+  }, [setSearchParams])
 
   const handleCloseSidebar = useCallback(() => {
     setSelectedPlot(null)
-  }, [])
+    setSearchParams({}, { replace: true })
+  }, [setSearchParams])
 
   const handleFilterChange = useCallback((key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
@@ -77,19 +119,20 @@ export default function MapView() {
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-navy">
       <MapArea
-        plots={plots}
+        plots={filteredPlots}
         pois={pois}
         selectedPlot={selectedPlot}
         onSelectPlot={handleSelectPlot}
         statusFilter={statusFilter}
         onToggleStatus={handleToggleStatus}
+        favorites={favorites}
       />
 
       <FilterBar
         filters={filters}
         onFilterChange={handleFilterChange}
         onClearFilters={handleClearFilters}
-        plotCount={plots.length}
+        plotCount={filteredPlots.length}
         statusFilter={statusFilter}
         onToggleStatus={handleToggleStatus}
       />
@@ -98,6 +141,7 @@ export default function MapView() {
         plot={selectedPlot}
         onClose={handleCloseSidebar}
         onOpenLeadModal={() => setIsLeadModalOpen(true)}
+        favorites={favorites}
       />
 
       <AIChat

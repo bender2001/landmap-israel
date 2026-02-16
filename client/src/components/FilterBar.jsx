@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye } from 'lucide-react'
+import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
 
 const cityOptions = [
@@ -118,6 +118,7 @@ export default function FilterBar({
     (priceRangeValue !== 'all' ? 1 : 0) +
     (sizeRangeValue !== 'all' ? 1 : 0) +
     (filters.ripeness !== 'all' ? 1 : 0) +
+    (filters.search ? 1 : 0) +
     statusFilter.length
 
   const cityDisplay = filters.city !== 'all' ? filters.city : null
@@ -141,6 +142,28 @@ export default function FilterBar({
           <span className="filter-mobile-badge">{activeCount}</span>
         )}
       </button>
+
+      {/* ── Search bar (always visible) ── */}
+      <div className="filter-search-row">
+        <div className="filter-search-input-wrap">
+          <Search className="filter-search-icon" />
+          <input
+            type="text"
+            placeholder="חיפוש גוש, חלקה, עיר..."
+            value={filters.search || ''}
+            onChange={(e) => onFilterChange('search', e.target.value)}
+            className="filter-search-input"
+          />
+          {filters.search && (
+            <button
+              className="filter-search-clear"
+              onClick={() => onFilterChange('search', '')}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* ── Desktop + expanded mobile ── */}
       <div className={`filter-bar-panel ${isExpanded ? 'is-expanded' : ''}`}>

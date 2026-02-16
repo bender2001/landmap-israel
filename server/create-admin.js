@@ -6,19 +6,20 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-async function createAdmin() {
-  const { data, error } = await supabase.auth.admin.createUser({
-    email: 'meir.debiyev@gmail.com',
-    password: 'meirdood99',
-    email_confirm: true,
-    user_metadata: { role: 'admin' },
-  })
+async function fixAdmin() {
+  // Update app_metadata to include admin role
+  const { data, error } = await supabase.auth.admin.updateUserById(
+    '5a8eb8ac-f536-4295-af0e-85c8b8ffaff3',
+    {
+      app_metadata: { role: 'admin' },
+    }
+  )
 
   if (error) {
     console.error('Ошибка:', error.message)
   } else {
-    console.log('Админ создан:', data.user.id, data.user.email)
+    console.log('app_metadata обновлён:', JSON.stringify(data.user.app_metadata))
   }
 }
 
-createAdmin()
+fixAdmin()

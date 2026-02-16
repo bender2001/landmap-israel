@@ -36,9 +36,9 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className="h-screen flex bg-navy" dir="rtl">
-      {/* Sidebar */}
-      <aside className="w-56 flex-shrink-0 bg-navy-mid border-l border-white/10 flex flex-col">
+    <div className="h-screen flex flex-col md:flex-row bg-navy" dir="rtl">
+      {/* Sidebar — desktop: left column, mobile: bottom nav */}
+      <aside className="hidden md:flex w-56 flex-shrink-0 bg-navy-mid border-l border-white/10 flex-col">
         {/* Logo */}
         <div className="px-5 py-5 border-b border-white/5">
           <div className="flex items-center gap-2">
@@ -87,9 +87,37 @@ export default function AdminLayout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
         <Outlet />
       </main>
+
+      {/* Mobile bottom nav */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex bg-navy-mid border-t border-white/10">
+        {navItems.map(({ to, icon: Icon, label, end }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            className={({ isActive }) =>
+              `flex-1 flex flex-col items-center gap-1 py-3 text-[10px] transition-colors ${
+                isActive
+                  ? 'text-gold'
+                  : 'text-slate-500'
+              }`
+            }
+          >
+            <Icon className="w-5 h-5" />
+            {label}
+          </NavLink>
+        ))}
+        <button
+          onClick={handleLogout}
+          className="flex-1 flex flex-col items-center gap-1 py-3 text-[10px] text-red-400"
+        >
+          <LogOut className="w-5 h-5" />
+          יציאה
+        </button>
+      </nav>
     </div>
   )
 }

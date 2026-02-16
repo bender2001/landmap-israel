@@ -1,7 +1,7 @@
-import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, ZoomControl, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, ZoomControl, useMap, LayersControl } from 'react-leaflet'
 import L from 'leaflet'
 import { useState, useEffect } from 'react'
-import { MapPin, Eye, Check, ArrowLeft } from 'lucide-react'
+import { MapPin, Eye, Check, ArrowLeft, Navigation, Layers } from 'lucide-react'
 import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
 import { formatCurrency, formatPriceShort } from '../utils/formatters'
 
@@ -19,6 +19,33 @@ function FlyToSelected({ plot }) {
   return null
 }
 
+function LocateButton() {
+  const map = useMap()
+  const [locating, setLocating] = useState(false)
+
+  const handleLocate = () => {
+    setLocating(true)
+    map.locate({ setView: true, maxZoom: 14 })
+    map.once('locationfound', () => setLocating(false))
+    map.once('locationerror', () => setLocating(false))
+    // timeout fallback
+    setTimeout(() => setLocating(false), 8000)
+  }
+
+  return (
+    <div className="absolute bottom-40 left-4 z-[30] pointer-events-none">
+      <button
+        onClick={handleLocate}
+        disabled={locating}
+        className="glass-panel w-9 h-9 flex items-center justify-center pointer-events-auto hover:border-gold/20 transition-colors disabled:opacity-50"
+        title="המיקום שלי"
+      >
+        <Navigation className={`w-4 h-4 text-gold ${locating ? 'animate-spin' : ''}`} />
+      </button>
+    </div>
+  )
+}
+
 const poiIcon = (poi) =>
   L.divIcon({
     className: 'poi-marker',
@@ -27,7 +54,7 @@ const poiIcon = (poi) =>
     iconAnchor: [30, 20],
   })
 
-export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus }) {
+export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites }) {
   const [hoveredId, setHoveredId] = useState(null)
 
   return (
@@ -38,9 +65,16 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         zoomControl={false}
         className="h-full w-full"
       >
+        {/* Satellite base layer for rich visuals */}
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          attribution='&copy; Esri, Maxar, Earthstar Geographics'
+        />
+        {/* Semi-transparent label overlay for readability */}
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
+          attribution='&copy; OpenStreetMap'
+          opacity={0.7}
         />
         <ZoomControl position="bottomleft" />
         <FlyToSelected plot={selectedPlot} />
@@ -61,10 +95,11 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
               key={plot.id}
               positions={plot.coordinates}
               pathOptions={{
-                color,
+                color: isHovered ? '#FFFFFF' : color,
                 fillColor: color,
-                fillOpacity: isHovered ? 0.55 : 0.35,
-                weight: isHovered ? 3 : 2,
+                fillOpacity: isHovered ? 0.6 : 0.45,
+                weight: isHovered ? 4 : 2.5,
+                dashArray: isHovered ? '' : '6 4',
               }}
               eventHandlers={{
                 click: () => onSelectPlot(plot),
@@ -73,7 +108,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
               }}
             >
               <Tooltip permanent direction="center" className="price-tooltip">
-                {formatPriceShort(price)}
+                {favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{formatPriceShort(price)}
               </Tooltip>
 
               <Popup>
@@ -185,6 +220,17 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
           <span className="text-xs text-slate-300">{plots.length} חלקות</span>
         </div>
       </div>
+
+      {/* Empty state */}
+      {plots.length === 0 && (
+        <div className="absolute inset-0 z-[20] flex items-center justify-center pointer-events-none">
+          <div className="glass-panel px-8 py-6 text-center pointer-events-auto">
+            <div className="text-3xl mb-3">🔍</div>
+            <div className="text-sm font-medium text-slate-300 mb-1">לא נמצאו חלקות</div>
+            <div className="text-xs text-slate-500">נסה לשנות את הסינון</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
