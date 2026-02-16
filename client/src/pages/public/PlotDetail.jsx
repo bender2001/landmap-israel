@@ -1,0 +1,81 @@
+import { useParams, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { usePlot } from '../../hooks/usePlots.js'
+import SidebarDetails from '../../components/SidebarDetails.jsx'
+import LeadModal from '../../components/LeadModal.jsx'
+import Spinner from '../../components/ui/Spinner.jsx'
+import { ArrowRight } from 'lucide-react'
+
+export default function PlotDetail() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const { data: plot, isLoading, error } = usePlot(id)
+  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
+
+  if (isLoading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-navy">
+        <div className="flex flex-col items-center gap-4">
+          <Spinner className="w-12 h-12 text-gold" />
+          <span className="text-sm text-slate-400">טוען פרטי חלקה...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !plot) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-navy" dir="rtl">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="text-6xl">🏗️</div>
+          <h1 className="text-xl font-bold text-slate-200">חלקה לא נמצאה</h1>
+          <p className="text-sm text-slate-400">ייתכן שהחלקה הוסרה או שהקישור שגוי</p>
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 px-6 py-2.5 bg-gold/20 border border-gold/30 rounded-xl text-gold text-sm hover:bg-gold/30 transition-colors"
+          >
+            <ArrowRight className="w-4 h-4" />
+            חזרה למפה
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-screen w-screen bg-navy relative">
+      {/* Background with grid */}
+      <div
+        className="absolute inset-0 opacity-5"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(200,148,42,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(200,148,42,0.3) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+        }}
+      />
+
+      {/* Back to map button */}
+      <div className="absolute top-6 right-6 z-10" dir="rtl">
+        <button
+          onClick={() => navigate('/')}
+          className="glass-panel flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:text-gold transition-colors"
+        >
+          <ArrowRight className="w-4 h-4" />
+          חזרה למפה
+        </button>
+      </div>
+
+      {/* SidebarDetails rendered full-width in this context */}
+      <SidebarDetails
+        plot={plot}
+        onClose={() => navigate('/')}
+        onOpenLeadModal={() => setIsLeadModalOpen(true)}
+      />
+
+      <LeadModal
+        isOpen={isLeadModalOpen}
+        onClose={() => setIsLeadModalOpen(false)}
+        plot={plot}
+      />
+    </div>
+  )
+}
