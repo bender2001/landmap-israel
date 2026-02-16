@@ -5,6 +5,7 @@ import { useAllPlots } from '../../hooks/usePlots'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
 import { formatCurrency } from '../../utils/formatters'
 import PublicNav from '../../components/PublicNav'
+import PublicFooter from '../../components/PublicFooter'
 import Spinner from '../../components/ui/Spinner'
 
 function CompareCell({ value, highlight = false, className = '' }) {
@@ -259,6 +260,8 @@ export default function Compare() {
           )}
         </div>
       </div>
+
+      <PublicFooter />
     </div>
   )
 }

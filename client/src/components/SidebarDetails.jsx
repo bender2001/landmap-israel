@@ -1,10 +1,18 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon } from 'lucide-react'
+import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon, Download, File, FileImage, FileSpreadsheet } from 'lucide-react'
 import ShareMenu from './ui/ShareMenu'
 import ImageLightbox from './ui/ImageLightbox'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
 import { formatCurrency } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
+import { usePlot } from '../hooks/usePlots'
+
+function getDocIcon(mimeType) {
+  if (!mimeType) return File
+  if (mimeType.startsWith('image/')) return FileImage
+  if (mimeType.includes('spreadsheet') || mimeType.includes('excel') || mimeType.includes('csv')) return FileSpreadsheet
+  return FileText
+}
 
 function SectionIcon({ icon: Icon, className = '' }) {
   return (
@@ -103,7 +111,12 @@ function isMobile() {
   return typeof window !== 'undefined' && window.innerWidth < 640
 }
 
-export default function SidebarDetails({ plot, onClose, onOpenLeadModal, favorites }) {
+export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal, favorites }) {
+  // Enrich plot data: fetch full plot when images/documents are missing (e.g. from list endpoint)
+  const needsEnrich = rawPlot && !rawPlot.plot_images && !rawPlot.plot_documents
+  const { data: enrichedPlot, isLoading: isEnriching } = usePlot(needsEnrich ? rawPlot.id : null)
+  const plot = needsEnrich && enrichedPlot ? { ...rawPlot, ...enrichedPlot } : rawPlot
+
   const scrollRef = useRef(null)
   const panelRef = useRef(null)
   const dragRef = useRef({ startY: 0, startSnap: SNAP_MID, isDragging: false, velocity: 0, lastY: 0, lastTime: 0 })
@@ -701,26 +714,58 @@ export default function SidebarDetails({ plot, onClose, onOpenLeadModal, favorit
               </CollapsibleSection>
             )}
 
-            {/* Documents */}
-            {plot.documents && plot.documents.length > 0 && (
-              <CollapsibleSection
-                number={`0${++sectionNum}`}
-                icon={FileText}
-                title="מסמכים ותוכניות"
-              >
-                <div className="space-y-2 mb-2">
-                  {plot.documents.map((doc, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-3 bg-navy-light/40 border border-white/5 rounded-xl px-4 py-2.5 hover:border-gold/20 transition-colors cursor-pointer group card-lift"
-                    >
-                      <FileText className="w-4 h-4 text-gold/60 group-hover:text-gold transition-colors flex-shrink-0" />
-                      <span className="text-sm text-slate-300 group-hover:text-slate-200 transition-colors">{doc}</span>
+            {/* Documents — supports both API objects (plot_documents) and legacy string arrays (documents) */}
+            {(() => {
+              const docs = plot.plot_documents?.length ? plot.plot_documents : plot.documents?.length ? plot.documents : null
+              if (!docs) return null
+              return (
+                <CollapsibleSection
+                  number={`0${++sectionNum}`}
+                  icon={FileText}
+                  title="מסמכים ותוכניות"
+                >
+                  {isEnriching && !plot.plot_documents && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-3 h-3 rounded-full bg-gold/30 animate-pulse" />
+                      <span className="text-xs text-slate-500">טוען מסמכים...</span>
                     </div>
-                  ))}
-                </div>
-              </CollapsibleSection>
-            )}
+                  )}
+                  <div className="space-y-2 mb-2">
+                    {docs.map((doc, i) => {
+                      // API format: { id, name, url, mime_type }
+                      if (typeof doc === 'object' && doc.url) {
+                        const DocIcon = getDocIcon(doc.mime_type)
+                        return (
+                          <a
+                            key={doc.id || i}
+                            href={doc.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-3 bg-navy-light/40 border border-white/5 rounded-xl px-4 py-2.5 hover:border-gold/20 transition-colors cursor-pointer group card-lift"
+                          >
+                            <DocIcon className="w-4 h-4 text-gold/60 group-hover:text-gold transition-colors flex-shrink-0" />
+                            <span className="text-sm text-slate-300 group-hover:text-slate-200 transition-colors flex-1 truncate">
+                              {doc.name || 'מסמך'}
+                            </span>
+                            <Download className="w-3.5 h-3.5 text-slate-500 group-hover:text-gold transition-colors flex-shrink-0" />
+                          </a>
+                        )
+                      }
+                      // Legacy format: plain string
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-center gap-3 bg-navy-light/40 border border-white/5 rounded-xl px-4 py-2.5 hover:border-gold/20 transition-colors cursor-pointer group card-lift"
+                        >
+                          <FileText className="w-4 h-4 text-gold/60 group-hover:text-gold transition-colors flex-shrink-0" />
+                          <span className="text-sm text-slate-300 group-hover:text-slate-200 transition-colors">{doc}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CollapsibleSection>
+              )
+            })()}
           </div>
         </div>
 

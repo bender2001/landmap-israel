@@ -646,12 +646,15 @@ body {
 .filter-mobile-toggle {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 18px;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  width: 36px;
+  height: 36px;
   background: rgba(8, 18, 35, 0.88);
   backdrop-filter: blur(24px) saturate(1.4);
   border: 1px solid rgba(200, 148, 42, 0.18);
-  border-radius: 14px;
+  border-radius: 12px;
   color: #E5B94E;
   font-size: 13px;
   font-weight: 600;
@@ -660,7 +663,7 @@ body {
   transition: all 0.2s;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   position: relative;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .filter-mobile-toggle:hover {
@@ -736,6 +739,10 @@ body {
 }
 
 @media (max-width: 767px) {
+  .filter-bar-container {
+    top: 10px;
+    max-width: calc(100vw - 24px);
+  }
   .filter-pills-row {
     flex-direction: column;
     align-items: stretch;
@@ -1844,12 +1851,18 @@ body {
    ═══════════════════════════════════════════ */
 
 @media (max-width: 639px) {
+  .plot-strip-wrapper {
+    /* Tighter gradient on mobile */
+    background: linear-gradient(0deg, rgba(5, 13, 26, 0.85) 0%, rgba(5, 13, 26, 0.4) 55%, transparent 100%);
+  }
   .plot-strip-scroll {
     gap: 10px;
-    padding: 6px 12px 12px 12px;
+    padding: 6px 16px 14px 16px;
+    /* Leave room for AI fab on the left (physical left = visual right in RTL) */
+    scroll-padding-inline: 16px;
   }
   .plot-card-mini {
-    width: 170px;
+    width: 180px;
   }
   .plot-card-mini-body {
     padding: 8px 10px 8px;
@@ -1862,11 +1875,14 @@ body {
   }
   .plot-strip-fade-right,
   .plot-strip-fade-left {
-    width: 24px;
+    width: 20px;
   }
   /* Move AI chat fab above the strip on mobile */
   .ai-chat-fab {
-    bottom: 120px !important;
+    bottom: 110px !important;
+    right: 12px !important;
+    width: 44px !important;
+    height: 44px !important;
   }
 }
 
@@ -1877,5 +1893,14 @@ body {
   }
   .filter-search-input {
     font-size: 16px; /* prevents iOS zoom */
+  }
+  /* Tighter search bar on mobile */
+  .filter-search-input {
+    height: 36px;
+    border-radius: 12px;
+  }
+  /* Ensure Leaflet zoom controls don't conflict with cards */
+  .leaflet-control-zoom {
+    margin-bottom: 120px !important;
   }
 }

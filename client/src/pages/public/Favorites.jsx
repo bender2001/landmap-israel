@@ -5,6 +5,7 @@ import { useFavorites } from '../../hooks/useFavorites'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
 import { formatCurrency } from '../../utils/formatters'
 import PublicNav from '../../components/PublicNav'
+import PublicFooter from '../../components/PublicFooter'
 import Spinner from '../../components/ui/Spinner'
 
 export default function Favorites() {
@@ -150,6 +151,8 @@ export default function Favorites() {
           )}
         </div>
       </div>
+
+      <PublicFooter />
     </div>
   )
 }

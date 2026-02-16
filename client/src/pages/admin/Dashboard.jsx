@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate, Link } from 'react-router-dom'
 import { adminDashboard } from '../../api/admin.js'
 import { formatCurrency } from '../../utils/formatters.js'
 import { leadStatusLabels, leadStatusColors, statusLabels, statusColors } from '../../utils/constants.js'
-import { Map, Users, TrendingUp, BarChart3, Clock } from 'lucide-react'
+import { Map, Users, TrendingUp, BarChart3, Clock, ArrowLeft } from 'lucide-react'
 import DashboardSkeleton from '../../components/ui/DashboardSkeleton.jsx'
 
-function KPICard({ icon: Icon, label, value, color = 'text-gold', subtext }) {
-  return (
-    <div className="glass-panel p-5 flex flex-col gap-3">
+function KPICard({ icon: Icon, label, value, color = 'text-gold', subtext, to }) {
+  const content = (
+    <>
       <div className="flex items-center gap-3">
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-white/5`}>
           <Icon className={`w-5 h-5 ${color}`} />
@@ -16,6 +17,20 @@ function KPICard({ icon: Icon, label, value, color = 'text-gold', subtext }) {
       </div>
       <div className={`text-2xl font-bold ${color}`}>{value}</div>
       {subtext && <div className="text-xs text-slate-500">{subtext}</div>}
+    </>
+  )
+
+  if (to) {
+    return (
+      <Link to={to} className="glass-panel p-5 flex flex-col gap-3 hover:border-gold/30 transition-all cursor-pointer group">
+        {content}
+      </Link>
+    )
+  }
+
+  return (
+    <div className="glass-panel p-5 flex flex-col gap-3">
+      {content}
     </div>
   )
 }
@@ -157,6 +172,7 @@ function HorizontalBarChart({ data = {}, labels = {}, colors = {}, title }) {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate()
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin', 'dashboard'],
     queryFn: adminDashboard.stats,
@@ -189,24 +205,28 @@ export default function Dashboard() {
           label="סה&quot;כ חלקות"
           value={stats.totalPlots ?? 0}
           color="text-blue-400"
+          to="/admin/plots"
         />
         <KPICard
           icon={Map}
           label="חלקות זמינות"
           value={stats.availablePlots ?? 0}
           color="text-emerald-400"
+          to="/admin/plots"
         />
         <KPICard
           icon={Users}
           label="לידים החודש"
           value={stats.leadsThisMonth ?? 0}
           color="text-gold"
+          to="/admin/leads"
         />
         <KPICard
           icon={TrendingUp}
           label="אחוז המרה"
           value={`${stats.conversionRate ?? 0}%`}
           color="text-purple-400"
+          to="/admin/leads"
         />
       </div>
 
@@ -232,10 +252,16 @@ export default function Dashboard() {
 
       {/* Recent Leads */}
       <div className="glass-panel p-5">
-        <h2 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2">
-          <Clock className="w-5 h-5 text-gold" />
-          לידים אחרונים
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-gold" />
+            לידים אחרונים
+          </h2>
+          <Link to="/admin/leads" className="text-xs text-gold hover:underline flex items-center gap-1">
+            הצג הכל
+            <ArrowLeft className="w-3 h-3" />
+          </Link>
+        </div>
 
         {stats.recentLeads?.length > 0 ? (
           <div className="overflow-x-auto">
@@ -251,7 +277,11 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {stats.recentLeads.map((lead) => (
-                  <tr key={lead.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                  <tr
+                    key={lead.id}
+                    onClick={() => navigate(`/admin/leads/${lead.id}`)}
+                    className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+                  >
                     <td className="py-2.5 px-3 text-slate-200">{lead.full_name}</td>
                     <td className="py-2.5 px-3 text-slate-300" dir="ltr">{lead.phone}</td>
                     <td className="py-2.5 px-3 text-slate-300">

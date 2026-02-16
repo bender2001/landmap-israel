@@ -3,6 +3,7 @@ import { adminLeads } from '../../api/admin.js'
 import { leadStatusLabels, leadStatusColors } from '../../utils/constants.js'
 import { formatDate } from '../../utils/formatters.js'
 import { Download, Search, ChevronDown, ChevronLeft, ChevronRight, CheckSquare, Square, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import TableSkeleton from '../../components/ui/TableSkeleton.jsx'
 import SortableHeader from '../../components/admin/SortableHeader.jsx'
@@ -43,7 +44,7 @@ export default function LeadList() {
   const totalPages = Math.ceil(total / params.limit)
 
   const updateStatus = useMutation({
-    mutationFn: ({ id, status }) => adminLeads.updateStatus(id, status),
+    mutationFn: ({ id, status, notes }) => adminLeads.updateStatus(id, status, notes),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'leads'] })
       toast('סטטוס עודכן', 'success')
@@ -206,7 +207,11 @@ export default function LeadList() {
                         )}
                       </button>
                     </td>
-                    <td className="py-3 px-4 text-slate-200 font-medium">{lead.full_name}</td>
+                    <td className="py-3 px-4 text-slate-200 font-medium">
+                      <Link to={`/admin/leads/${lead.id}`} className="hover:text-gold transition-colors">
+                        {lead.full_name}
+                      </Link>
+                    </td>
                     <td className="py-3 px-4 text-slate-300" dir="ltr">{lead.phone}</td>
                     <td className="py-3 px-4 text-slate-400" dir="ltr">{lead.email}</td>
                     <td className="py-3 px-4 text-slate-300">
@@ -215,7 +220,7 @@ export default function LeadList() {
                     <td className="py-3 px-4">
                       <StatusDropdown
                         value={lead.status}
-                        onChange={(status) => updateStatus.mutate({ id: lead.id, status })}
+                        onChange={(status, notes) => updateStatus.mutate({ id: lead.id, status, notes })}
                       />
                     </td>
                     <td className="py-3 px-4 text-slate-500 text-xs">
@@ -265,22 +270,37 @@ export default function LeadList() {
 
 function StatusDropdown({ value, onChange }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState(null)
+  const [notes, setNotes] = useState('')
   const ref = useRef(null)
 
   useEffect(() => {
     function handleClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setIsOpen(false)
+      if (ref.current && !ref.current.contains(e.target)) {
+        setIsOpen(false)
+        setPendingStatus(null)
+        setNotes('')
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  const handleConfirm = () => {
+    if (pendingStatus) {
+      onChange(pendingStatus, notes.trim() || undefined)
+    }
+    setIsOpen(false)
+    setPendingStatus(null)
+    setNotes('')
+  }
 
   const color = leadStatusColors[value] || '#64748b'
 
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => setIsOpen(prev => !prev)}
+        onClick={() => { setIsOpen(prev => !prev); setPendingStatus(null); setNotes('') }}
         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors hover:opacity-80"
         style={{ background: color + '20', color }}
       >
@@ -288,23 +308,56 @@ function StatusDropdown({ value, onChange }) {
         <ChevronDown className="w-3 h-3" />
       </button>
       {isOpen && (
-        <div className="absolute top-full mt-1 right-0 z-20 min-w-[120px] bg-navy-mid border border-white/10 rounded-xl shadow-xl overflow-hidden">
-          {statusOptions.filter(o => o.value).map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => {
-                onChange(opt.value)
-                setIsOpen(false)
-              }}
-              className={`block w-full text-right px-3 py-2 text-xs transition-colors ${
-                value === opt.value
-                  ? 'bg-gold/10 text-gold'
-                  : 'text-slate-300 hover:bg-white/5'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="absolute top-full mt-1 right-0 z-20 min-w-[200px] bg-navy-mid border border-white/10 rounded-xl shadow-xl overflow-hidden">
+          {!pendingStatus ? (
+            // Step 1: Select status
+            statusOptions.filter(o => o.value).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  if (opt.value === value) return
+                  setPendingStatus(opt.value)
+                }}
+                className={`block w-full text-right px-3 py-2 text-xs transition-colors ${
+                  value === opt.value
+                    ? 'bg-gold/10 text-gold'
+                    : 'text-slate-300 hover:bg-white/5'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))
+          ) : (
+            // Step 2: Add note + confirm
+            <div className="p-3 space-y-2">
+              <div className="text-xs text-slate-400">
+                שינוי ל: <span className="text-slate-200 font-medium">{leadStatusLabels[pendingStatus]}</span>
+              </div>
+              <input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="הערה (אופציונלי)..."
+                className="w-full px-2.5 py-1.5 bg-navy-light/60 border border-white/10 rounded-lg text-slate-200 placeholder-slate-500 focus:border-gold/50 focus:outline-none transition text-xs"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter') handleConfirm() }}
+              />
+              <div className="flex gap-1.5">
+                <button
+                  onClick={handleConfirm}
+                  className="flex-1 px-2 py-1.5 bg-gold/20 text-gold text-xs rounded-lg hover:bg-gold/30 transition font-medium"
+                >
+                  אישור
+                </button>
+                <button
+                  onClick={() => { setPendingStatus(null); setNotes('') }}
+                  className="px-2 py-1.5 text-slate-400 text-xs hover:text-slate-200 transition"
+                >
+                  ביטול
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

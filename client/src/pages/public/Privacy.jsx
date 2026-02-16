@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import PublicNav from '../../components/PublicNav'
+import PublicFooter from '../../components/PublicFooter'
 
 export default function Privacy() {
   return (
@@ -99,6 +100,8 @@ export default function Privacy() {
           </div>
         </div>
       </div>
+
+      <PublicFooter />
     </div>
   )
 }

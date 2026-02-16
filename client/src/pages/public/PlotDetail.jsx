@@ -3,8 +3,8 @@ import { useState } from 'react'
 import { usePlot } from '../../hooks/usePlots.js'
 import SidebarDetails from '../../components/SidebarDetails.jsx'
 import LeadModal from '../../components/LeadModal.jsx'
+import PublicNav from '../../components/PublicNav.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
-import { ArrowRight } from 'lucide-react'
 
 export default function PlotDetail() {
   const { id } = useParams()
@@ -43,7 +43,9 @@ export default function PlotDetail() {
   }
 
   return (
-    <div className="h-screen w-screen bg-navy relative">
+    <div className="h-screen w-screen bg-navy relative pt-16">
+      <PublicNav />
+
       {/* Background with grid */}
       <div
         className="absolute inset-0 opacity-5"
@@ -52,17 +54,6 @@ export default function PlotDetail() {
           backgroundSize: '40px 40px',
         }}
       />
-
-      {/* Back to map button */}
-      <div className="absolute top-6 right-6 z-10" dir="rtl">
-        <button
-          onClick={() => navigate('/')}
-          className="glass-panel flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:text-gold transition-colors"
-        >
-          <ArrowRight className="w-4 h-4" />
-          חזרה למפה
-        </button>
-      </div>
 
       {/* SidebarDetails rendered full-width in this context */}
       <SidebarDetails

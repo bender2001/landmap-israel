@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { User, Phone, Mail, MessageSquare, Lock, Send, CheckCircle2 } from 'lucide-react'
 import { useCreateLead } from '../../hooks/useLeads'
 import PublicNav from '../../components/PublicNav'
+import PublicFooter from '../../components/PublicFooter'
 
 const phoneRegex = /^0[2-9]\d{7,8}$/
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -228,6 +229,8 @@ export default function Contact() {
           </div>
         </div>
       </div>
+
+      <PublicFooter />
     </div>
   )
 }

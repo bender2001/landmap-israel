@@ -21,6 +21,7 @@ const Dashboard = lazy(() => import('./pages/admin/Dashboard'))
 const PlotList = lazy(() => import('./pages/admin/PlotList'))
 const PlotForm = lazy(() => import('./pages/admin/PlotForm'))
 const LeadList = lazy(() => import('./pages/admin/LeadList'))
+const LeadDetail = lazy(() => import('./pages/admin/LeadDetail'))
 const PoiList = lazy(() => import('./pages/admin/PoiList'))
 const PoiForm = lazy(() => import('./pages/admin/PoiForm'))
 const ActivityLog = lazy(() => import('./pages/admin/ActivityLog'))
@@ -63,6 +64,7 @@ export default function App() {
               <Route path="plots/new" element={<PlotForm />} />
               <Route path="plots/:id/edit" element={<PlotForm />} />
               <Route path="leads" element={<LeadList />} />
+              <Route path="leads/:id" element={<LeadDetail />} />
               <Route path="pois" element={<PoiList />} />
               <Route path="pois/new" element={<PoiForm />} />
               <Route path="pois/:id/edit" element={<PoiForm />} />

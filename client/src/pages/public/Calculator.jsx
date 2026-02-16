@@ -3,6 +3,7 @@ import { Calculator as CalcIcon, TrendingUp, DollarSign, Percent, ArrowDown } fr
 import { roiStages, zoningLabels, ZoningStage } from '../../utils/constants'
 import { formatCurrency } from '../../utils/formatters'
 import PublicNav from '../../components/PublicNav'
+import PublicFooter from '../../components/PublicFooter'
 
 const zoningOptions = Object.entries(zoningLabels)
 
@@ -255,6 +256,8 @@ export default function Calculator() {
           </div>
         </div>
       </div>
+
+      <PublicFooter />
     </div>
   )
 }

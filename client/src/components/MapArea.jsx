@@ -174,8 +174,8 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
       {/* Map noise texture */}
       <div className="map-noise" />
 
-      {/* Top-left: Brand badge */}
-      <div className="absolute top-4 left-4 z-[30] pointer-events-none">
+      {/* Top-left: Brand badge — compact on mobile */}
+      <div className="absolute top-4 left-4 z-[30] pointer-events-none hidden sm:block">
         <div className="glass-panel px-4 py-3 pointer-events-auto">
           <div className="flex items-center gap-2">
             <span className="text-lg">🏗️</span>
@@ -186,9 +186,18 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
           </div>
         </div>
       </div>
+      {/* Mobile brand badge — smaller, bottom-left above zoom */}
+      <div className="absolute top-3 left-3 z-[25] pointer-events-none sm:hidden">
+        <div className="glass-panel px-2.5 py-1.5 pointer-events-auto">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm">🏗️</span>
+            <span className="text-[11px] font-bold brand-text">LandMap</span>
+          </div>
+        </div>
+      </div>
 
-      {/* Bottom-right: Interactive Legend */}
-      <div className="absolute bottom-6 right-4 z-[30] pointer-events-none">
+      {/* Bottom-right: Interactive Legend — hidden on mobile (use filter bar instead) */}
+      <div className="absolute bottom-6 right-4 z-[30] pointer-events-none hidden sm:block">
         <div className="glass-panel px-3 py-2.5 pointer-events-auto">
           <div className="flex flex-col gap-0.5">
             {Object.entries(statusColors).map(([status, color]) => {
@@ -213,8 +222,8 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         </div>
       </div>
 
-      {/* Bottom-left (above zoom): Plot count badge */}
-      <div className="absolute bottom-24 left-4 z-[30] pointer-events-none">
+      {/* Bottom-left (above zoom): Plot count badge — repositioned on mobile */}
+      <div className="absolute bottom-24 sm:bottom-24 left-4 z-[30] pointer-events-none hidden sm:flex">
         <div className="glass-panel px-3 py-1.5 pointer-events-auto flex items-center gap-1.5">
           <Eye className="w-3.5 h-3.5 text-gold" />
           <span className="text-xs text-slate-300">{plots.length} חלקות</span>

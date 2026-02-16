@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Map, Shield, Brain, Eye, ArrowLeft, Compass, TrendingUp, Lock } from 'lucide-react'
 import PublicNav from '../../components/PublicNav'
+import PublicFooter from '../../components/PublicFooter'
 
 const steps = [
   {
@@ -135,21 +136,7 @@ export default function About() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-8 px-4 border-t border-white/5">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
-          <div className="flex items-center gap-2">
-            <span>🏗️</span>
-            <span className="font-medium">LandMap</span>
-            <span>© {new Date().getFullYear()}</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link to="/terms" className="hover:text-gold transition">תנאי שימוש</Link>
-            <Link to="/privacy" className="hover:text-gold transition">פרטיות</Link>
-            <Link to="/contact" className="hover:text-gold transition">צור קשר</Link>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   )
 }

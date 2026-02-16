@@ -131,20 +131,39 @@ export default function FilterBar({
 
   return (
     <div className="filter-bar-container" dir="rtl">
-      {/* ── Mobile toggle ── */}
-      <button
-        className="filter-mobile-toggle md:hidden"
-        onClick={() => setIsExpanded((prev) => !prev)}
-      >
-        <SlidersHorizontal className="w-4 h-4" />
-        <span>סינון</span>
-        {activeCount > 0 && (
-          <span className="filter-mobile-badge">{activeCount}</span>
-        )}
-      </button>
+      {/* ── Mobile: compact row with toggle + search side by side ── */}
+      <div className="flex items-center gap-2 md:hidden mb-2">
+        <button
+          className="filter-mobile-toggle flex-shrink-0"
+          onClick={() => setIsExpanded((prev) => !prev)}
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+          {activeCount > 0 && (
+            <span className="filter-mobile-badge">{activeCount}</span>
+          )}
+        </button>
+        <div className="filter-search-input-wrap flex-1">
+          <Search className="filter-search-icon" />
+          <input
+            type="text"
+            placeholder="חיפוש גוש, חלקה..."
+            value={filters.search || ''}
+            onChange={(e) => onFilterChange('search', e.target.value)}
+            className="filter-search-input"
+          />
+          {filters.search && (
+            <button
+              className="filter-search-clear"
+              onClick={() => onFilterChange('search', '')}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      </div>
 
-      {/* ── Search bar (always visible) ── */}
-      <div className="filter-search-row">
+      {/* ── Desktop: search bar full width ── */}
+      <div className="filter-search-row hidden md:block">
         <div className="filter-search-input-wrap">
           <Search className="filter-search-icon" />
           <input
