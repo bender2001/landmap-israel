@@ -357,10 +357,17 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
       {/* Empty state */}
       {plots.length === 0 && (
         <div className="absolute inset-0 z-[20] flex items-center justify-center pointer-events-none">
-          <div className="glass-panel px-8 py-6 text-center pointer-events-auto">
-            <div className="text-3xl mb-3">🔍</div>
-            <div className="text-sm font-medium text-slate-300 mb-1">לא נמצאו חלקות</div>
-            <div className="text-xs text-slate-500">נסה לשנות את הסינון</div>
+          <div className="glass-panel px-8 py-8 text-center pointer-events-auto max-w-xs">
+            <div className="text-4xl mb-4">🏜️</div>
+            <div className="text-base font-bold text-slate-200 mb-2">לא נמצאו חלקות</div>
+            <div className="text-xs text-slate-400 mb-4 leading-relaxed">
+              נסה להרחיב את הסינון — הסר מסננים או בחר עיר אחרת
+            </div>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <div className="text-[10px] text-slate-500 bg-white/5 px-3 py-1.5 rounded-lg">💡 הסר מסנן מחיר</div>
+              <div className="text-[10px] text-slate-500 bg-white/5 px-3 py-1.5 rounded-lg">💡 בחר "כל הערים"</div>
+              <div className="text-[10px] text-slate-500 bg-white/5 px-3 py-1.5 rounded-lg">💡 הסר סינון סטטוס</div>
+            </div>
           </div>
         </div>
       )}

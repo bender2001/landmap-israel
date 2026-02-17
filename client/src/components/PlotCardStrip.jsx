@@ -4,8 +4,29 @@ import { statusColors, statusLabels } from '../utils/constants'
 import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
 
+function useAreaAverages(plots) {
+  return useMemo(() => {
+    if (!plots || plots.length === 0) return {}
+    const byCity = {}
+    plots.forEach(p => {
+      const city = p.city || 'unknown'
+      const price = p.total_price ?? p.totalPrice ?? 0
+      const size = p.size_sqm ?? p.sizeSqM ?? 1
+      if (!byCity[city]) byCity[city] = { total: 0, count: 0 }
+      byCity[city].total += price / size
+      byCity[city].count += 1
+    })
+    const result = {}
+    for (const [city, data] of Object.entries(byCity)) {
+      result[city] = Math.round(data.total / data.count)
+    }
+    return result
+  }, [plots])
+}
+
 export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare }) {
   const prefetchPlot = usePrefetchPlot()
+  const areaAverages = useAreaAverages(plots)
   const scrollRef = useRef(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
@@ -221,6 +242,20 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
                   <span className="plot-card-mini-roi-bar-label">{formatPriceShort(price)}</span>
                   <span className="plot-card-mini-roi-bar-target">→ {formatPriceShort(projValue)}</span>
                 </div>
+
+                {/* Deal badge — shows when plot is below area average */}
+                {(() => {
+                  const avgPsm = areaAverages[plot.city]
+                  if (!avgPsm || sizeSqM <= 0) return null
+                  const plotPsm = price / sizeSqM
+                  const diffPct = Math.round(((plotPsm - avgPsm) / avgPsm) * 100)
+                  if (diffPct >= -3) return null // only show if meaningfully below
+                  return (
+                    <div className="plot-card-mini-deal">
+                      🔥 {Math.abs(diffPct)}% מתחת לממוצע
+                    </div>
+                  )
+                })()}
 
                 {/* Price + ROI row */}
                 <div className="plot-card-mini-footer">

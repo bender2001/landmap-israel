@@ -440,6 +440,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
 
   if (!plot) return null
 
+  // Show a shimmer skeleton over content sections while enriching
+  const isLoadingExtra = isEnriching && !enrichedPlot
+
   // Handle both snake_case (API) and camelCase (legacy) field names
   const totalPrice = plot.total_price ?? plot.totalPrice
   const projectedValue = plot.projected_value ?? plot.projectedValue
