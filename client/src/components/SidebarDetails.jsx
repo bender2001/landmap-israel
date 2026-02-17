@@ -3,7 +3,7 @@ import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2,
 import ShareMenu from './ui/ShareMenu'
 import ImageLightbox from './ui/ImageLightbox'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
-import { formatCurrency } from '../utils/formatters'
+import { formatCurrency, formatDunam } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
 import { usePlot } from '../hooks/usePlots'
 
@@ -316,7 +316,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
             </h2>
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <span className="text-xs text-slate-400 bg-white/5 px-2.5 py-1 rounded-lg">
-                {sizeSqM.toLocaleString()} מ&quot;ר
+                {formatDunam(sizeSqM)} דונם ({sizeSqM.toLocaleString()} מ&quot;ר)
               </span>
               <span className="text-xs text-slate-300 bg-white/5 px-2.5 py-1 rounded-lg">
                 {zoningLabels[zoningStage]}

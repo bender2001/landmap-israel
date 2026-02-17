@@ -3,7 +3,7 @@ import L from 'leaflet'
 import { useState, useEffect, useCallback } from 'react'
 import { MapPin, Eye, Check, ArrowLeft, Navigation, Layers, Map as MapIcon } from 'lucide-react'
 import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
-import { formatCurrency, formatPriceShort } from '../utils/formatters'
+import { formatCurrency, formatPriceShort, formatDunam } from '../utils/formatters'
 
 function FlyToSelected({ plot }) {
   const map = useMap()
@@ -189,7 +189,8 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
               }}
             >
               <Tooltip permanent direction="center" className="price-tooltip">
-                {favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{formatPriceShort(price)}
+                <span className="tooltip-main-price">{favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{formatPriceShort(price)}</span>
+                <span className="tooltip-sub">{formatDunam(sizeSqM)} דונם · +{roi}%</span>
               </Tooltip>
 
               <Popup>
@@ -207,7 +208,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
                   </div>
                   <div className="plot-popup-row">
                     <span className="plot-popup-label">שטח</span>
-                    <span className="plot-popup-value">{sizeSqM.toLocaleString()} מ&quot;ר</span>
+                    <span className="plot-popup-value">{formatDunam(sizeSqM)} דונם ({sizeSqM.toLocaleString()} מ&quot;ר)</span>
                   </div>
                   <div className="plot-popup-row">
                     <span className="plot-popup-label">מחיר</span>
