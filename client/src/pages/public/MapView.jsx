@@ -28,6 +28,7 @@ export default function MapView() {
   const [statusFilter, setStatusFilter] = useState([])
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
+  const [sortBy, setSortBy] = useState('default')
   const favorites = useFavorites()
 
   // Build API filter params
@@ -47,7 +48,7 @@ export default function MapView() {
   const { data: pois = [] } = usePois()
 
   // Client-side search filter
-  const filteredPlots = useMemo(() => {
+  const searchedPlots = useMemo(() => {
     if (!filters.search) return plots
     const q = filters.search.toLowerCase()
     return plots.filter((p) => {
@@ -58,6 +59,28 @@ export default function MapView() {
       return bn.includes(q) || num.includes(q) || city.includes(q) || desc.includes(q)
     })
   }, [plots, filters.search])
+
+  // Sort
+  const filteredPlots = useMemo(() => {
+    if (sortBy === 'default') return searchedPlots
+    const sorted = [...searchedPlots]
+    const getPrice = (p) => p.total_price ?? p.totalPrice ?? 0
+    const getSize = (p) => p.size_sqm ?? p.sizeSqM ?? 0
+    const getRoi = (p) => {
+      const price = getPrice(p)
+      const proj = p.projected_value ?? p.projectedValue ?? 0
+      return price > 0 ? (proj - price) / price : 0
+    }
+    switch (sortBy) {
+      case 'price-asc': sorted.sort((a, b) => getPrice(a) - getPrice(b)); break
+      case 'price-desc': sorted.sort((a, b) => getPrice(b) - getPrice(a)); break
+      case 'size-asc': sorted.sort((a, b) => getSize(a) - getSize(b)); break
+      case 'size-desc': sorted.sort((a, b) => getSize(b) - getSize(a)); break
+      case 'roi-desc': sorted.sort((a, b) => getRoi(b) - getRoi(a)); break
+      case 'roi-asc': sorted.sort((a, b) => getRoi(a) - getRoi(b)); break
+    }
+    return sorted
+  }, [searchedPlots, sortBy])
 
   // URL sync: open plot from ?plot=id on load
   useEffect(() => {
@@ -136,6 +159,8 @@ export default function MapView() {
         plotCount={filteredPlots.length}
         statusFilter={statusFilter}
         onToggleStatus={handleToggleStatus}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
       />
 
       <SidebarDetails

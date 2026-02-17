@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search } from 'lucide-react'
+import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
 
 const cityOptions = [
@@ -27,6 +27,16 @@ const ripenessOptions = [
   { label: '1-3 שנים', value: '1-3' },
   { label: '3-5 שנים', value: '3-5' },
   { label: '5+ שנים', value: '5+' },
+]
+
+const sortOptions = [
+  { label: 'ברירת מחדל', value: 'default', icon: ArrowUpDown },
+  { label: 'מחיר: נמוך לגבוה', value: 'price-asc', icon: ArrowUp },
+  { label: 'מחיר: גבוה לנמוך', value: 'price-desc', icon: ArrowDown },
+  { label: 'שטח: קטן לגדול', value: 'size-asc', icon: ArrowUp },
+  { label: 'שטח: גדול לקטן', value: 'size-desc', icon: ArrowDown },
+  { label: 'תשואה: גבוהה לנמוכה', value: 'roi-desc', icon: ArrowDown },
+  { label: 'תשואה: נמוכה לגבוהה', value: 'roi-asc', icon: ArrowUp },
 ]
 
 const statusEntries = Object.entries(statusColors)
@@ -82,6 +92,8 @@ export default function FilterBar({
   plotCount,
   statusFilter,
   onToggleStatus,
+  sortBy = 'default',
+  onSortChange,
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -253,6 +265,22 @@ export default function FilterBar({
               {opt.label}
             </button>
           ))}
+
+          {/* Sort */}
+          {onSortChange && (
+            <>
+              <div className="filter-separator" />
+              <SelectPill
+                icon={ArrowUpDown}
+                label="מיון"
+                value={sortBy}
+                displayValue={sortBy !== 'default' ? sortOptions.find(o => o.value === sortBy)?.label : null}
+                options={sortOptions}
+                onChange={onSortChange}
+                isActive={sortBy !== 'default'}
+              />
+            </>
+          )}
         </div>
 
         {/* Bottom row: Clear + count */}
