@@ -230,6 +230,8 @@ export default function MapView() {
         onToggleStatus={handleToggleStatus}
         sortBy={sortBy}
         onSortChange={setSortBy}
+        allPlots={plots}
+        onSelectPlot={handleSelectPlot}
       />
 
       <SidebarDetails

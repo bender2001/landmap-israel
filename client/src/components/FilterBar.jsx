@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
+import SearchAutocomplete from './SearchAutocomplete'
 
 const cityOptions = [
   { label: 'כל הערים', value: 'all' },
@@ -94,6 +95,8 @@ export default function FilterBar({
   onToggleStatus,
   sortBy = 'default',
   onSortChange,
+  allPlots = [],
+  onSelectPlot,
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -154,46 +157,26 @@ export default function FilterBar({
             <span className="filter-mobile-badge">{activeCount}</span>
           )}
         </button>
-        <div className="filter-search-input-wrap flex-1">
-          <Search className="filter-search-icon" />
-          <input
-            type="text"
-            placeholder="חיפוש גוש, חלקה..."
+        <div className="flex-1">
+          <SearchAutocomplete
             value={filters.search || ''}
-            onChange={(e) => onFilterChange('search', e.target.value)}
-            className="filter-search-input"
+            onChange={(val) => onFilterChange('search', val)}
+            plots={allPlots}
+            onSelectPlot={onSelectPlot || (() => {})}
+            placeholder="חיפוש גוש, חלקה..."
           />
-          {filters.search && (
-            <button
-              className="filter-search-clear"
-              onClick={() => onFilterChange('search', '')}
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
         </div>
       </div>
 
       {/* ── Desktop: search bar full width ── */}
       <div className="filter-search-row hidden md:block">
-        <div className="filter-search-input-wrap">
-          <Search className="filter-search-icon" />
-          <input
-            type="text"
-            placeholder="חיפוש גוש, חלקה, עיר..."
-            value={filters.search || ''}
-            onChange={(e) => onFilterChange('search', e.target.value)}
-            className="filter-search-input"
-          />
-          {filters.search && (
-            <button
-              className="filter-search-clear"
-              onClick={() => onFilterChange('search', '')}
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
-        </div>
+        <SearchAutocomplete
+          value={filters.search || ''}
+          onChange={(val) => onFilterChange('search', val)}
+          plots={allPlots}
+          onSelectPlot={onSelectPlot || (() => {})}
+          placeholder="חיפוש גוש, חלקה, עיר..."
+        />
       </div>
 
       {/* ── Desktop + expanded mobile ── */}
