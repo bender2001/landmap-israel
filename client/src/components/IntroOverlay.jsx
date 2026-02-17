@@ -47,7 +47,7 @@ export default function IntroOverlay({ onComplete }) {
 
         {/* Brand */}
         <h1
-          className={`font-heebo font-black text-6xl md:text-7xl tracking-tight transition-all duration-1000 ease-out ${
+          className={`font-heebo font-black text-4xl sm:text-6xl md:text-7xl tracking-tight transition-all duration-1000 ease-out ${
             phase >= 1
               ? 'opacity-100 translate-y-0 blur-0'
               : 'opacity-0 translate-y-8 blur-sm'
@@ -66,7 +66,7 @@ export default function IntroOverlay({ onComplete }) {
 
         {/* Subtitle */}
         <p
-          className={`mt-4 font-heebo text-lg md:text-xl text-slate-400 tracking-widest uppercase transition-all duration-700 delay-200 ${
+          className={`mt-4 font-heebo text-sm sm:text-lg md:text-xl text-slate-400 tracking-widest uppercase transition-all duration-700 delay-200 ${
             phase >= 2
               ? 'opacity-100 translate-y-0'
               : 'opacity-0 translate-y-4'
@@ -78,7 +78,7 @@ export default function IntroOverlay({ onComplete }) {
 
         {/* Coordinate readout */}
         <div
-          className={`mt-8 flex items-center gap-6 transition-all duration-500 delay-500 ${
+          className={`mt-8 flex items-center gap-3 sm:gap-6 flex-wrap justify-center transition-all duration-500 delay-500 ${
             phase >= 2 ? 'opacity-100' : 'opacity-0'
           }`}
         >

@@ -37,7 +37,8 @@ function LocateButton() {
       <button
         onClick={handleLocate}
         disabled={locating}
-        className="glass-panel w-9 h-9 flex items-center justify-center pointer-events-auto hover:border-gold/20 transition-colors disabled:opacity-50"
+        className="glass-panel w-9 h-9 sm:w-9 sm:h-9 flex items-center justify-center pointer-events-auto hover:border-gold/20 transition-colors disabled:opacity-50"
+        style={{ minWidth: 44, minHeight: 44 }}
         title="המיקום שלי"
       >
         <Navigation className={`w-4 h-4 text-gold ${locating ? 'animate-spin' : ''}`} />

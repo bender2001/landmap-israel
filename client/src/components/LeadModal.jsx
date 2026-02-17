@@ -201,13 +201,13 @@ export default function LeadModal({ isOpen, onClose, plot }) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-end sm:items-center justify-center"
       style={backdropStyle}
       onClick={animatedClose}
     >
       <div
         ref={modalRef}
-        className="glass-panel max-w-md w-full mx-4 p-0 overflow-hidden"
+        className="glass-panel sm:max-w-md w-full mx-0 sm:mx-4 p-0 overflow-hidden lead-modal-card"
         dir="rtl"
         onClick={(e) => e.stopPropagation()}
         style={modalStyle}
@@ -248,13 +248,13 @@ export default function LeadModal({ isOpen, onClose, plot }) {
           <>
             {/* Draggable Header */}
             <div
-              className="p-6 pb-4 relative cursor-grab active:cursor-grabbing select-none"
+              className="p-5 sm:p-6 pb-3 sm:pb-4 relative cursor-grab active:cursor-grabbing select-none"
               onPointerDown={handlePointerDown}
             >
               <div className="flex items-center justify-center mb-2">
-                <div className="w-10 h-1 rounded-full bg-white/15" />
+                <div className="w-10 h-1 rounded-full bg-white/20" />
               </div>
-              <h2 className="text-xl font-bold text-slate-100">צור קשר</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-slate-100">צור קשר</h2>
               {plot && (
                 <p className="text-sm text-slate-400 mt-1">
                   גוש {blockNumber} | חלקה {plot.number}
@@ -262,14 +262,14 @@ export default function LeadModal({ isOpen, onClose, plot }) {
               )}
               <button
                 onClick={animatedClose}
-                className="absolute top-4 left-4 w-8 h-8 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center"
+                className="absolute top-4 left-4 w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center"
               >
                 <X className="w-4 h-4 text-slate-400" />
               </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="p-6 pt-2">
+            <form onSubmit={handleSubmit} className="px-5 sm:px-6 pb-5 sm:pb-6 pt-2">
               {errors.form && (
                 <p className="text-red-400 text-sm mb-3 text-center">{errors.form}</p>
               )}

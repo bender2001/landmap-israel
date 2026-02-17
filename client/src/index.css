@@ -741,12 +741,12 @@ body {
 @media (max-width: 767px) {
   .filter-bar-container {
     top: 10px;
-    max-width: calc(100vw - 24px);
+    max-width: calc(100vw - 20px);
   }
   .filter-pills-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
   }
   .filter-separator {
     display: none !important;
@@ -761,6 +761,15 @@ body {
   }
   .filter-select-pill {
     position: relative;
+  }
+  .filter-status-chip,
+  .filter-ripeness-chip {
+    font-size: 11px;
+  }
+  /* Expanded panel: max-height and scroll */
+  .filter-bar-panel.is-expanded {
+    max-height: 65vh;
+    max-height: 65dvh;
   }
 }
 
@@ -1206,6 +1215,7 @@ body {
     animation: sheet-appear 0.35s cubic-bezier(0.32, 0.72, 0, 1) !important;
     transition: height 0.35s cubic-bezier(0.32, 0.72, 0, 1);
     will-change: height;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .sidebar-panel .sidebar-drag-handle {
@@ -1349,111 +1359,102 @@ body {
    COMPREHENSIVE MOBILE RESPONSIVE
    ═══════════════════════════════════════════ */
 
-/* ── AI Chat: full-screen on mobile ── */
 @media (max-width: 639px) {
-  /* AI Chat button */
-  .fixed.right-6.bottom-6.z-\[40\].flex.h-14 {
-    right: 16px !important;
-    bottom: 16px !important;
-  }
-
-  /* Map brand badge */
-  .absolute.top-4.left-4 {
-    top: 8px !important;
-    left: 8px !important;
-  }
-  .absolute.top-4.left-4 .glass-panel {
-    padding: 8px 12px !important;
-  }
-  .absolute.top-4.left-4 .text-sm {
-    font-size: 12px !important;
-  }
-  .absolute.top-4.left-4 .text-\[10px\] {
-    display: none !important;
-  }
-
-  /* Map legend: horizontal bottom bar */
-  .absolute.bottom-6.right-4 {
-    bottom: 16px !important;
-    right: 8px !important;
-    left: 8px !important;
-  }
-  .absolute.bottom-6.right-4 .glass-panel {
-    padding: 6px 10px !important;
-  }
-  .absolute.bottom-6.right-4 .flex-col {
-    flex-direction: row !important;
-    flex-wrap: wrap !important;
-    gap: 2px 8px !important;
-  }
-  .legend-item {
-    font-size: 10px !important;
-    padding: 2px 4px !important;
-    gap: 4px !important;
-  }
-  .legend-item-check {
-    width: 10px !important;
-    height: 10px !important;
-  }
-
-  /* Plot count badge */
-  .absolute.bottom-24.left-4 {
-    bottom: auto !important;
-    top: 8px !important;
-    left: auto !important;
-    right: 8px !important;
-  }
-
-  /* Sidebar map preview shorter on mobile */
+  /* ── Sidebar: map preview shorter on mobile ── */
   .sidebar-panel .h-36 {
-    height: 80px !important;
+    height: 64px !important;
   }
 
-  /* Sidebar header compact */
+  /* ── Sidebar: header compact ── */
   .sidebar-panel .text-2xl {
-    font-size: 1.15rem !important;
+    font-size: 1.1rem !important;
   }
   .sidebar-panel .p-5 {
-    padding: 12px 16px !important;
+    padding: 10px 14px !important;
   }
   .sidebar-panel .px-6 {
-    padding-left: 16px !important;
-    padding-right: 16px !important;
+    padding-left: 14px !important;
+    padding-right: 14px !important;
   }
 
-  /* Financial cards: 3-col → stack better */
+  /* ── Sidebar: financial cards - stack to 1 col on narrow phones ── */
   .sidebar-panel .grid-cols-3 {
     grid-template-columns: repeat(3, 1fr) !important;
-    gap: 8px !important;
+    gap: 6px !important;
+  }
+  .sidebar-panel .grid-cols-3 > div {
+    padding: 8px 6px !important;
   }
   .sidebar-panel .grid-cols-3 .text-lg {
-    font-size: 14px !important;
+    font-size: 13px !important;
   }
   .sidebar-panel .grid-cols-3 .text-\[10px\] {
-    font-size: 9px !important;
+    font-size: 8px !important;
   }
 
-  /* CTA footer */
+  /* ── Sidebar: CTA footer with safe area ── */
   .sidebar-cta-footer {
-    padding: 12px 16px !important;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
   }
   .sidebar-cta-footer .py-3\.5 {
     padding-top: 10px !important;
     padding-bottom: 10px !important;
   }
-}
 
-/* ── AI Chat: mobile full-width ── */
-@media (max-width: 639px) {
-  div[dir="rtl"].fixed.right-6.bottom-6.z-\[40\].flex.flex-col.w-\[400px\] {
-    right: 0 !important;
+  /* ── Sidebar: distance chips wrap tighter ── */
+  .sidebar-panel .flex.flex-wrap.gap-2\.5 {
+    gap: 6px !important;
+  }
+  .sidebar-panel .flex.flex-wrap.gap-2\.5 > div {
+    padding: 6px 10px !important;
+  }
+
+  /* ── Sidebar: sections tighter ── */
+  .section-header {
+    gap: 8px !important;
+    padding: 6px 0 !important;
+  }
+  .section-number {
+    min-width: 16px !important;
+    font-size: 9px !important;
+  }
+
+  /* ── Sidebar: Standard 22 grid ── */
+  .sidebar-panel .grid.grid-cols-2 {
+    gap: 10px 8px !important;
+  }
+
+  /* ── LeadModal: bottom sheet on mobile ── */
+  .lead-modal-card {
+    position: fixed !important;
     bottom: 0 !important;
     left: 0 !important;
-    width: 100% !important;
+    right: 0 !important;
     max-width: 100% !important;
-    height: 100vh !important;
-    height: 100dvh !important;
-    border-radius: 0 !important;
+    margin: 0 !important;
+    border-radius: 24px 24px 0 0 !important;
+    max-height: 90vh !important;
+    max-height: 90dvh !important;
+    overflow-y: auto !important;
+    transform-origin: bottom center !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  }
+  .lead-modal-card .p-6 {
+    padding: 16px 18px !important;
+  }
+  .lead-modal-card form.p-6 {
+    padding: 14px 18px !important;
+  }
+
+  /* ── iOS input zoom prevention ── */
+  input[type="text"],
+  input[type="tel"],
+  input[type="email"],
+  input[type="number"],
+  input[type="search"],
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 }
 
@@ -1680,7 +1681,7 @@ body {
   display: none;
 }
 
-/* ── Scroll arrows ── */
+/* ── Scroll arrows (hidden by default, shown via sm:flex in JSX) ── */
 .plot-strip-arrow {
   position: absolute;
   top: 50%;
@@ -1692,7 +1693,7 @@ body {
   background: rgba(8, 18, 35, 0.95);
   border: 1px solid rgba(200, 148, 42, 0.25);
   color: #E5B94E;
-  display: flex;
+  /* display controlled by Tailwind hidden/sm:flex */
   align-items: center;
   justify-content: center;
   cursor: pointer;
@@ -1852,17 +1853,18 @@ body {
 
 @media (max-width: 639px) {
   .plot-strip-wrapper {
-    /* Tighter gradient on mobile */
-    background: linear-gradient(0deg, rgba(5, 13, 26, 0.85) 0%, rgba(5, 13, 26, 0.4) 55%, transparent 100%);
+    /* Tighter gradient + safe area */
+    background: linear-gradient(0deg, rgba(5, 13, 26, 0.9) 0%, rgba(5, 13, 26, 0.45) 55%, transparent 100%);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
   }
   .plot-strip-scroll {
     gap: 10px;
-    padding: 6px 16px 14px 16px;
-    /* Leave room for AI fab on the left (physical left = visual right in RTL) */
+    padding: 6px 16px 10px 16px;
     scroll-padding-inline: 16px;
   }
   .plot-card-mini {
-    width: 180px;
+    width: 168px;
   }
   .plot-card-mini-body {
     padding: 8px 10px 8px;
@@ -1873,16 +1875,29 @@ body {
   .plot-card-mini-price {
     font-size: 13px;
   }
+  .plot-card-mini-city {
+    margin-bottom: 5px;
+  }
   .plot-strip-fade-right,
   .plot-strip-fade-left {
-    width: 20px;
+    width: 16px;
   }
   /* Move AI chat fab above the strip on mobile */
   .ai-chat-fab {
-    bottom: 110px !important;
+    bottom: calc(105px + env(safe-area-inset-bottom, 0px)) !important;
     right: 12px !important;
-    width: 44px !important;
-    height: 44px !important;
+    width: 48px !important;
+    height: 48px !important;
+  }
+  /* Hide plot strip when sidebar is showing */
+  .sidebar-open .plot-strip-wrapper {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(20px);
+  }
+  /* Reposition AI fab when sidebar is open */
+  .sidebar-open .ai-chat-fab {
+    bottom: calc(40vh + 12px) !important;
   }
 }
 
@@ -1892,15 +1907,258 @@ body {
     width: 3px;
   }
   .filter-search-input {
-    font-size: 16px; /* prevents iOS zoom */
-  }
-  /* Tighter search bar on mobile */
-  .filter-search-input {
-    height: 36px;
+    font-size: 16px !important; /* prevents iOS zoom */
+    height: 44px; /* touch-friendly */
     border-radius: 12px;
   }
   /* Ensure Leaflet zoom controls don't conflict with cards */
   .leaflet-control-zoom {
-    margin-bottom: 120px !important;
+    margin-bottom: calc(115px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  /* Bigger zoom controls for touch */
+  .leaflet-control-zoom a {
+    width: 44px !important;
+    height: 44px !important;
+    line-height: 44px !important;
+    font-size: 20px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   SAFE AREA INSETS (notched phones)
+   ═══════════════════════════════════════════ */
+
+@supports (padding: env(safe-area-inset-bottom)) {
+  .sidebar-cta-footer {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+  .plot-strip-wrapper {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* Admin mobile bottom nav */
+  @media (max-width: 767px) {
+    .admin-mobile-nav {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════
+   GLOBAL TOUCH TARGET MINIMUM (44px)
+   ═══════════════════════════════════════════ */
+
+@media (max-width: 639px) {
+  /* All interactive elements minimum touch target */
+  .filter-pill-trigger {
+    min-height: 44px;
+    padding: 0 14px 0 12px;
+  }
+  .filter-status-chip,
+  .filter-ripeness-chip {
+    min-height: 40px;
+    padding: 0 14px;
+    font-size: 12px;
+  }
+  .filter-mobile-toggle {
+    width: 44px;
+    height: 44px;
+  }
+  .filter-pill-option {
+    min-height: 44px;
+    padding: 12px 14px;
+  }
+
+  /* Sidebar close/favorite buttons */
+  .sidebar-panel button[class*="w-10 h-10"] {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  /* CTA buttons */
+  .plot-popup-cta {
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  /* All form inputs touch-friendly */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="search"],
+  textarea,
+  select {
+    font-size: 16px !important; /* prevent iOS zoom */
+    min-height: 44px;
+  }
+
+  /* Legend items bigger touch targets */
+  .legend-item {
+    min-height: 36px;
+    padding: 6px 8px !important;
+  }
+
+  /* Locate button bigger */
+  .glass-panel.w-9.h-9 {
+    width: 44px !important;
+    height: 44px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   PREVENT HORIZONTAL OVERFLOW (mobile)
+   ═══════════════════════════════════════════ */
+
+@media (max-width: 767px) {
+  .leaflet-popup-content-wrapper {
+    max-width: calc(100vw - 40px) !important;
+  }
+  .leaflet-popup-content {
+    min-width: 200px !important;
+    max-width: calc(100vw - 60px) !important;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   INTRO OVERLAY — Mobile responsive
+   ═══════════════════════════════════════════ */
+
+@media (max-width: 639px) {
+  .intro-ring {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 20px;
+  }
+  .intro-corner-tl, .intro-corner-tr { top: 16px; }
+  .intro-corner-bl, .intro-corner-br { bottom: 16px; }
+  .intro-corner-tl, .intro-corner-bl { left: 16px; }
+  .intro-corner-tr, .intro-corner-br { right: 16px; }
+  .intro-coord {
+    font-size: 9px;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   PUBLIC NAV — Hamburger menu on mobile
+   ═══════════════════════════════════════════ */
+
+.nav-hamburger {
+  display: none;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: #94A3B8;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: all 0.2s;
+}
+
+.nav-hamburger:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #E5B94E;
+}
+
+.nav-mobile-menu {
+  display: none;
+  position: fixed;
+  top: 64px;
+  left: 0;
+  right: 0;
+  background: rgba(8, 18, 35, 0.97);
+  backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(200, 148, 42, 0.15);
+  padding: 12px 16px;
+  z-index: 49;
+  flex-direction: column;
+  gap: 4px;
+  animation: nav-menu-in 0.2s ease-out;
+}
+
+.nav-mobile-menu.is-open {
+  display: flex;
+}
+
+.nav-mobile-menu a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 15px;
+  color: #94A3B8;
+  transition: all 0.2s;
+  min-height: 44px;
+}
+
+.nav-mobile-menu a:hover,
+.nav-mobile-menu a.active {
+  background: rgba(200, 148, 42, 0.1);
+  color: #E5B94E;
+}
+
+@keyframes nav-menu-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 639px) {
+  .nav-hamburger {
+    display: flex;
+  }
+  .nav-desktop-links {
+    display: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   ADMIN LAYOUT — Better mobile
+   ═══════════════════════════════════════════ */
+
+@media (max-width: 767px) {
+  /* Admin page content padding */
+  .admin-content-area {
+    padding: 12px !important;
+  }
+  /* Admin KPI cards responsive */
+  .admin-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  /* Admin tables: horizontal scroll wrapper */
+  .admin-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -12px;
+    padding: 0 12px;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   LEAD MODAL — Mobile full-width
+   ═══════════════════════════════════════════ */
+
+@media (max-width: 639px) {
+  .lead-modal-card {
+    margin: 0 !important;
+    max-width: 100% !important;
+    border-radius: 24px 24px 0 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   PLOT DETAIL PAGE — Mobile
+   ═══════════════════════════════════════════ */
+
+@media (max-width: 639px) {
+  .plot-detail-page {
+    padding-top: 56px; /* smaller nav on mobile */
   }
 }

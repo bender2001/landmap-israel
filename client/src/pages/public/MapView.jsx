@@ -118,7 +118,7 @@ export default function MapView() {
   }
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-navy">
+    <div className={`relative h-screen w-screen overflow-hidden bg-navy ${selectedPlot ? 'sidebar-open' : ''}`}>
       <MapArea
         plots={filteredPlots}
         pois={pois}

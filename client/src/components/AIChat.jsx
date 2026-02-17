@@ -184,7 +184,7 @@ export default function AIChat({ isOpen, onToggle, selectedPlot }) {
     return (
       <button
         onClick={onToggle}
-        className="ai-chat-fab fixed right-4 bottom-4 sm:right-6 sm:bottom-6 z-[40] flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-gradient-to-br from-gold to-gold-bright shadow-lg shadow-gold/25 hover:shadow-xl hover:shadow-gold/40 hover:scale-110 active:scale-95 transition-all duration-200"
+        className="ai-chat-fab fixed right-4 bottom-4 sm:right-6 sm:bottom-6 z-[40] flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-gradient-to-br from-gold to-gold-bright shadow-lg shadow-gold/25 hover:shadow-xl hover:shadow-gold/40 hover:scale-110 active:scale-95 transition-all duration-300"
         aria-label="פתח יועץ AI"
       >
         <MessageCircle className="h-6 w-6 text-navy" />
@@ -225,7 +225,7 @@ export default function AIChat({ isOpen, onToggle, selectedPlot }) {
         </div>
         <button
           onClick={onToggle}
-          className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
+          className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
           aria-label="סגור צ׳אט"
         >
           <X className="h-4 w-4 text-slate-400" />
@@ -299,7 +299,7 @@ export default function AIChat({ isOpen, onToggle, selectedPlot }) {
       </div>
 
       {/* Input */}
-      <div className="px-4 pb-3 pt-1 flex-shrink-0 border-t border-white/5">
+      <div className="px-4 pb-3 sm:pb-3 pt-1 flex-shrink-0 border-t border-white/5" style={{ paddingBottom: typeof window !== 'undefined' && window.innerWidth < 640 ? 'calc(12px + env(safe-area-inset-bottom, 0px))' : undefined }}>
         <div className="flex items-center gap-2 rounded-xl bg-navy-light/40 border border-white/5 px-3 py-2 focus-within:border-gold/30 transition-colors">
           <input
             ref={inputRef}
@@ -309,12 +309,13 @@ export default function AIChat({ isOpen, onToggle, selectedPlot }) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isSending}
-            className="flex-1 bg-transparent text-sm text-slate-200 placeholder-slate-500 outline-none disabled:opacity-50"
+            className="flex-1 bg-transparent text-sm sm:text-sm text-slate-200 placeholder-slate-500 outline-none disabled:opacity-50"
+            style={{ fontSize: '16px' }}
           />
           <button
             onClick={() => handleSend()}
             disabled={isSending || !input.trim()}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold/20 hover:bg-gold/30 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-90"
+            className="flex h-10 w-10 items-center justify-center rounded-lg bg-gold/20 hover:bg-gold/30 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 flex-shrink-0"
             aria-label="שלח"
           >
             <Send className="h-4 w-4 text-gold" />

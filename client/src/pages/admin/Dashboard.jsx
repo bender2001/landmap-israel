@@ -195,7 +195,7 @@ export default function Dashboard() {
   const charts = stats.charts || {}
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto" dir="rtl">
+    <div className="p-3 sm:p-4 md:p-6 max-w-6xl mx-auto" dir="rtl">
       <h1 className="text-2xl font-bold text-slate-100 mb-6">דשבורד</h1>
 
       {/* KPI Grid */}

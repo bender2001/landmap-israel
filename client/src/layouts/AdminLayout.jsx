@@ -95,14 +95,14 @@ export default function AdminLayout() {
       </main>
 
       {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex bg-navy-mid border-t border-white/10">
+      <nav className="admin-mobile-nav md:hidden fixed bottom-0 left-0 right-0 z-50 flex bg-navy-mid border-t border-white/10" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         {navItems.slice(0, 4).map(({ to, icon: Icon, label, end }) => (
           <NavLink
             key={to}
             to={to}
             end={end}
             className={({ isActive }) =>
-              `flex-1 flex flex-col items-center gap-1 py-3 text-[10px] transition-colors ${
+              `flex-1 flex flex-col items-center gap-1 py-3 min-h-[56px] justify-center text-[10px] transition-colors ${
                 isActive
                   ? 'text-gold'
                   : 'text-slate-500'
@@ -115,7 +115,7 @@ export default function AdminLayout() {
         ))}
         <button
           onClick={handleLogout}
-          className="flex-1 flex flex-col items-center gap-1 py-3 text-[10px] text-red-400"
+          className="flex-1 flex flex-col items-center gap-1 py-3 min-h-[56px] justify-center text-[10px] text-red-400"
         >
           <LogOut className="w-5 h-5" />
           יציאה

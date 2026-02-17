@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon, Download, File, FileImage, FileSpreadsheet } from 'lucide-react'
 import ShareMenu from './ui/ShareMenu'
 import ImageLightbox from './ui/ImageLightbox'
@@ -28,10 +28,10 @@ function CollapsibleSection({ number, icon, title, children, animClass = '' }) {
   const [maxHeight, setMaxHeight] = useState('2000px')
 
   useEffect(() => {
-    if (contentRef.current) {
-      setMaxHeight(isOpen ? `${contentRef.current.scrollHeight + 20}px` : '0px')
-    }
-  }, [isOpen])
+    if (!contentRef.current) return
+    const target = isOpen ? `${contentRef.current.scrollHeight + 20}px` : '0px'
+    if (target !== maxHeight) setMaxHeight(target)
+  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className={animClass}>
@@ -115,7 +115,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
   // Enrich plot data: fetch full plot when images/documents are missing (e.g. from list endpoint)
   const needsEnrich = rawPlot && !rawPlot.plot_images && !rawPlot.plot_documents
   const { data: enrichedPlot, isLoading: isEnriching } = usePlot(needsEnrich ? rawPlot.id : null)
-  const plot = needsEnrich && enrichedPlot ? { ...rawPlot, ...enrichedPlot } : rawPlot
+  const plot = useMemo(() => {
+    return needsEnrich && enrichedPlot ? { ...rawPlot, ...enrichedPlot } : rawPlot
+  }, [needsEnrich, enrichedPlot, rawPlot])
 
   const scrollRef = useRef(null)
   const panelRef = useRef(null)
@@ -208,9 +210,11 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
-    setScrollShadow({
-      top: scrollTop > 10,
-      bottom: scrollTop + clientHeight < scrollHeight - 10,
+    const top = scrollTop > 10
+    const bottom = scrollTop + clientHeight < scrollHeight - 10
+    setScrollShadow(prev => {
+      if (prev.top === top && prev.bottom === bottom) return prev
+      return { top, bottom }
     })
   }, [])
 
@@ -256,7 +260,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
       {/* Panel */}
       <div
         ref={panelRef}
-        className="sidebar-panel fixed top-0 right-0 h-full w-full sm:w-[420px] md:w-[480px] max-w-full z-[60] bg-navy border-l border-white/10 shadow-2xl flex flex-col overflow-hidden animate-slide-in-right"
+        className="sidebar-panel fixed top-0 right-0 h-full w-full sm:w-[420px] md:w-[480px] max-w-full z-[60] bg-navy border-l border-white/10 shadow-2xl flex flex-col overflow-hidden sm:animate-slide-in-right"
         dir="rtl"
       >
         {/* Mobile drag handle (visual only — drag events on header zone below) */}
@@ -519,25 +523,25 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
             >
               <div className="grid grid-cols-3 gap-3 mb-3">
                 {/* Asked price */}
-                <div className="rounded-2xl p-4 flex flex-col items-center gap-2 text-center bg-gradient-to-b from-blue-500/15 to-blue-500/8 border border-blue-500/20 relative overflow-hidden card-lift">
+                <div className="rounded-2xl p-3 sm:p-4 flex flex-col items-center gap-1.5 sm:gap-2 text-center bg-gradient-to-b from-blue-500/15 to-blue-500/8 border border-blue-500/20 relative overflow-hidden card-lift">
                   <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-400 to-blue-600" />
                   <div className="text-[10px] text-slate-400">מחיר מבוקש</div>
-                  <div className="text-lg font-bold" style={{ color: '#60A5FA' }}><AnimatedNumber value={totalPrice} formatter={formatCurrency} /></div>
-                  <div className="text-[10px] text-slate-500">{pricePerDunam} / דונם</div>
+                  <div className="text-base sm:text-lg font-bold leading-tight" style={{ color: '#60A5FA' }}><AnimatedNumber value={totalPrice} formatter={formatCurrency} /></div>
+                  <div className="text-[10px] text-slate-500 hidden sm:block">{pricePerDunam} / דונם</div>
                 </div>
                 {/* Projected value */}
-                <div className="rounded-2xl p-4 flex flex-col items-center gap-2 text-center bg-gradient-to-b from-emerald-500/15 to-emerald-500/8 border border-emerald-500/20 relative overflow-hidden card-lift">
+                <div className="rounded-2xl p-3 sm:p-4 flex flex-col items-center gap-1.5 sm:gap-2 text-center bg-gradient-to-b from-emerald-500/15 to-emerald-500/8 border border-emerald-500/20 relative overflow-hidden card-lift">
                   <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-400 to-emerald-600" />
                   <div className="text-[10px] text-slate-400">שווי צפוי</div>
-                  <div className="text-lg font-bold" style={{ color: '#6EE7A0' }}><AnimatedNumber value={projectedValue} formatter={formatCurrency} /></div>
-                  <div className="text-[10px] text-slate-500">בסיום תהליך</div>
+                  <div className="text-base sm:text-lg font-bold leading-tight" style={{ color: '#6EE7A0' }}><AnimatedNumber value={projectedValue} formatter={formatCurrency} /></div>
+                  <div className="text-[10px] text-slate-500 hidden sm:block">בסיום תהליך</div>
                 </div>
                 {/* ROI */}
-                <div className="rounded-2xl p-4 flex flex-col items-center gap-2 text-center bg-gradient-to-b from-gold/15 to-gold/8 border border-gold/20 relative overflow-hidden card-lift">
+                <div className="rounded-2xl p-3 sm:p-4 flex flex-col items-center gap-1.5 sm:gap-2 text-center bg-gradient-to-b from-gold/15 to-gold/8 border border-gold/20 relative overflow-hidden card-lift">
                   <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-gold to-gold-bright" />
                   <div className="text-[10px] text-slate-400">תשואה צפויה</div>
-                  <div className="text-lg font-bold" style={{ color: '#E5B94E' }}><AnimatedNumber value={roi} />%</div>
-                  <div className="text-[10px] text-slate-500">ROI</div>
+                  <div className="text-base sm:text-lg font-bold leading-tight" style={{ color: '#E5B94E' }}><AnimatedNumber value={roi} />%</div>
+                  <div className="text-[10px] text-slate-500 hidden sm:block">ROI</div>
                 </div>
               </div>
 
