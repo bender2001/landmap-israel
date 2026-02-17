@@ -1,34 +1,116 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import { ArrowRight } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { ArrowRight, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle } from 'lucide-react'
 import { usePlot } from '../../hooks/usePlots.js'
-import SidebarDetails from '../../components/SidebarDetails.jsx'
+import { useFavorites } from '../../hooks/useFavorites.js'
 import LeadModal from '../../components/LeadModal.jsx'
+import ShareMenu from '../../components/ui/ShareMenu.jsx'
+import ImageLightbox from '../../components/ui/ImageLightbox.jsx'
 import PublicNav from '../../components/PublicNav.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
+import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../../utils/constants.js'
+import { formatCurrency, formatDunam } from '../../utils/formatters.js'
+
+function JsonLdSchema({ plot }) {
+  const blockNum = plot.block_number ?? plot.blockNumber
+  const price = plot.total_price ?? plot.totalPrice
+  const sizeSqM = plot.size_sqm ?? plot.sizeSqM
+
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: `גוש ${blockNum} חלקה ${plot.number} - ${plot.city}`,
+    description: plot.description || `קרקע להשקעה ב${plot.city}, שטח ${formatDunam(sizeSqM)} דונם`,
+    url: window.location.href,
+    offers: {
+      '@type': 'Offer',
+      price: price,
+      priceCurrency: 'ILS',
+      availability: plot.status === 'AVAILABLE'
+        ? 'https://schema.org/InStock'
+        : plot.status === 'SOLD'
+          ? 'https://schema.org/SoldOut'
+          : 'https://schema.org/PreOrder',
+    },
+    additionalProperty: [
+      { '@type': 'PropertyValue', name: 'שטח (מ"ר)', value: sizeSqM },
+      { '@type': 'PropertyValue', name: 'עיר', value: plot.city },
+      { '@type': 'PropertyValue', name: 'גוש', value: blockNum },
+    ],
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
+function BreadcrumbSchema({ plot }) {
+  const blockNum = plot.block_number ?? plot.blockNumber
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'מפת קרקעות', item: window.location.origin },
+      { '@type': 'ListItem', position: 2, name: plot.city, item: `${window.location.origin}/?city=${plot.city}` },
+      { '@type': 'ListItem', position: 3, name: `גוש ${blockNum} חלקה ${plot.number}` },
+    ],
+  }
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
 
 export default function PlotDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { data: plot, isLoading, error } = usePlot(id)
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
+  const favorites = useFavorites()
 
-  // Dynamic page title for SEO
+  // Dynamic page title + OG meta for SEO
   useEffect(() => {
     if (plot) {
       const blockNum = plot.block_number ?? plot.blockNumber
-      document.title = `גוש ${blockNum} חלקה ${plot.number} - ${plot.city} | LandMap Israel`
-      // Update meta description
-      let meta = document.querySelector('meta[name="description"]')
-      if (!meta) {
-        meta = document.createElement('meta')
-        meta.name = 'description'
-        document.head.appendChild(meta)
-      }
       const price = plot.total_price ?? plot.totalPrice
-      meta.content = `קרקע להשקעה בגוש ${blockNum} חלקה ${plot.number}, ${plot.city}. מחיר: ₪${Math.round(price/1000)}K. שטח: ${(plot.size_sqm ?? plot.sizeSqM)?.toLocaleString()} מ"ר.`
+      const sizeSqM = plot.size_sqm ?? plot.sizeSqM
+
+      document.title = `גוש ${blockNum} חלקה ${plot.number} - ${plot.city} | LandMap Israel`
+
+      const setMeta = (attr, key, content) => {
+        let el = document.querySelector(`meta[${attr}="${key}"]`)
+        if (!el) { el = document.createElement('meta'); el.setAttribute(attr, key); document.head.appendChild(el) }
+        el.content = content
+      }
+
+      const desc = `קרקע להשקעה בגוש ${blockNum} חלקה ${plot.number}, ${plot.city}. מחיר: ₪${Math.round(price/1000)}K. שטח: ${sizeSqM?.toLocaleString()} מ"ר.`
+      setMeta('name', 'description', desc)
+      setMeta('property', 'og:title', `גוש ${blockNum} חלקה ${plot.number} - ${plot.city}`)
+      setMeta('property', 'og:description', desc)
+      setMeta('property', 'og:url', window.location.href)
     }
     return () => { document.title = 'LandMap Israel - מפת קרקעות להשקעה' }
+  }, [plot])
+
+  const computed = useMemo(() => {
+    if (!plot) return null
+    const totalPrice = plot.total_price ?? plot.totalPrice
+    const projectedValue = plot.projected_value ?? plot.projectedValue
+    const sizeSqM = plot.size_sqm ?? plot.sizeSqM
+    const blockNumber = plot.block_number ?? plot.blockNumber
+    const roi = Math.round((projectedValue - totalPrice) / totalPrice * 100)
+    const pricePerDunam = formatCurrency(Math.round(totalPrice / sizeSqM * 1000))
+    const readiness = plot.readiness_estimate ?? plot.readinessEstimate
+    const zoningStage = plot.zoning_stage ?? plot.zoningStage
+    const currentStageIndex = zoningPipelineStages.findIndex((s) => s.key === zoningStage)
+    return { totalPrice, projectedValue, sizeSqM, blockNumber, roi, pricePerDunam, readiness, zoningStage, currentStageIndex }
   }, [plot])
 
   if (isLoading) {
@@ -61,31 +143,255 @@ export default function PlotDetail() {
     )
   }
 
-  return (
-    <div className="h-screen w-screen bg-navy relative pt-16">
-      <PublicNav />
+  const { totalPrice, projectedValue, sizeSqM, blockNumber, roi, pricePerDunam, readiness, zoningStage, currentStageIndex } = computed
+  const statusColor = statusColors[plot.status]
+  const distanceToSea = plot.distance_to_sea ?? plot.distanceToSea
+  const distanceToPark = plot.distance_to_park ?? plot.distanceToPark
+  const distanceToHospital = plot.distance_to_hospital ?? plot.distanceToHospital
+  const areaContext = plot.area_context ?? plot.areaContext
+  const images = plot.plot_images || []
 
-      {/* Background with grid */}
+  return (
+    <div className="min-h-screen w-full bg-navy" dir="rtl">
+      <PublicNav />
+      <JsonLdSchema plot={plot} />
+      <BreadcrumbSchema plot={plot} />
+
+      {/* Background grid */}
       <div
-        className="absolute inset-0 opacity-5"
+        className="fixed inset-0 opacity-5 pointer-events-none"
         style={{
           backgroundImage: 'linear-gradient(rgba(200,148,42,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(200,148,42,0.3) 1px, transparent 1px)',
           backgroundSize: '40px 40px',
         }}
       />
 
-      {/* SidebarDetails rendered full-width in this context */}
-      <SidebarDetails
-        plot={plot}
-        onClose={() => navigate('/')}
-        onOpenLeadModal={() => setIsLeadModalOpen(true)}
-      />
+      <div className="relative z-10 pt-20 pb-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6">
+
+          {/* Breadcrumb */}
+          <nav className="flex items-center gap-2 text-xs text-slate-500 mb-6">
+            <button onClick={() => navigate('/')} className="hover:text-gold transition-colors">מפת קרקעות</button>
+            <span>/</span>
+            <button onClick={() => navigate(`/?city=${plot.city}`)} className="hover:text-gold transition-colors">{plot.city}</button>
+            <span>/</span>
+            <span className="text-slate-300">גוש {blockNumber} חלקה {plot.number}</span>
+          </nav>
+
+          {/* Hero header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-8">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-black mb-3">
+                <span className="bg-gradient-to-r from-gold to-gold-bright bg-clip-text text-transparent">גוש</span>
+                {' '}{blockNumber}{' | '}
+                <span className="bg-gradient-to-r from-gold to-gold-bright bg-clip-text text-transparent">חלקה</span>
+                {' '}{plot.number}
+              </h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="flex items-center gap-1.5 text-sm text-slate-400">
+                  <MapPin className="w-4 h-4" /> {plot.city}
+                </span>
+                <span className="text-xs text-slate-400 bg-white/5 px-2.5 py-1 rounded-lg">
+                  {formatDunam(sizeSqM)} דונם
+                </span>
+                <span className="text-xs text-slate-300 bg-white/5 px-2.5 py-1 rounded-lg">
+                  {zoningLabels[zoningStage]}
+                </span>
+                <span
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium"
+                  style={{ background: statusColor + '14', border: `1px solid ${statusColor}35`, color: statusColor }}
+                >
+                  <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: statusColor }} />
+                  {statusLabels[plot.status]}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => favorites.toggle(plot.id)}
+                className={`w-10 h-10 rounded-xl border transition-all flex items-center justify-center ${
+                  favorites.isFavorite(plot.id) ? 'bg-red-500/15 border-red-500/30' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                <Heart className={`w-4 h-4 ${favorites.isFavorite(plot.id) ? 'text-red-400 fill-red-400' : 'text-slate-400'}`} />
+              </button>
+              <ShareMenu
+                plotTitle={`גוש ${blockNumber} חלקה ${plot.number} - ${plot.city}`}
+                plotPrice={formatCurrency(totalPrice)}
+                plotUrl={window.location.href}
+              />
+            </div>
+          </div>
+
+          {/* Images gallery */}
+          {images.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+              {images.map((img, i) => (
+                <button
+                  key={img.id || i}
+                  onClick={() => { setLightboxIndex(i); setLightboxOpen(true) }}
+                  className={`rounded-2xl overflow-hidden border border-white/10 hover:border-gold/40 transition-all group relative ${i === 0 ? 'col-span-2 row-span-2' : ''}`}
+                >
+                  <img
+                    src={img.url}
+                    alt={img.alt || `תמונה ${i + 1}`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    style={{ aspectRatio: i === 0 ? '16/9' : '1/1' }}
+                    loading={i === 0 ? 'eager' : 'lazy'}
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Financial cards grid */}
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="rounded-2xl p-5 flex flex-col items-center gap-2 text-center bg-gradient-to-b from-blue-500/15 to-blue-500/8 border border-blue-500/20 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-400 to-blue-600" />
+              <div className="text-xs text-slate-400">מחיר מבוקש</div>
+              <div className="text-xl sm:text-2xl font-bold text-blue-400">{formatCurrency(totalPrice)}</div>
+              <div className="text-xs text-slate-500">{pricePerDunam} / דונם</div>
+            </div>
+            <div className="rounded-2xl p-5 flex flex-col items-center gap-2 text-center bg-gradient-to-b from-emerald-500/15 to-emerald-500/8 border border-emerald-500/20 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-400 to-emerald-600" />
+              <div className="text-xs text-slate-400">שווי צפוי</div>
+              <div className="text-xl sm:text-2xl font-bold text-emerald-400">{formatCurrency(projectedValue)}</div>
+              <div className="text-xs text-slate-500">בסיום תהליך</div>
+            </div>
+            <div className="rounded-2xl p-5 flex flex-col items-center gap-2 text-center bg-gradient-to-b from-gold/15 to-gold/8 border border-gold/20 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-gold to-gold-bright" />
+              <div className="text-xs text-slate-400">תשואה צפויה</div>
+              <div className="text-xl sm:text-2xl font-bold text-gold">{roi}%</div>
+              {readiness && <div className="text-xs text-slate-500">{readiness}</div>}
+            </div>
+          </div>
+
+          {/* Two-column layout for details */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Left: Description + location */}
+            <div className="space-y-4">
+              {plot.description && (
+                <div className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+                  <h2 className="text-base font-bold text-slate-100 mb-3">תיאור</h2>
+                  <p className="text-sm text-slate-300 leading-relaxed">{plot.description}</p>
+                </div>
+              )}
+
+              {areaContext && (
+                <div className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+                  <h2 className="text-base font-bold text-slate-100 mb-3">הקשר אזורי</h2>
+                  <p className="text-sm text-slate-300 leading-relaxed">{areaContext}</p>
+                </div>
+              )}
+
+              {/* Proximity chips */}
+              <div className="flex flex-wrap gap-3">
+                {distanceToSea != null && (
+                  <div className="flex items-center gap-2 bg-navy-light/40 border border-blue-500/15 rounded-xl px-4 py-2.5 text-sm text-slate-300">
+                    <Waves className="w-4 h-4 text-blue-400" /> {distanceToSea} מ׳ מהים
+                  </div>
+                )}
+                {distanceToPark != null && (
+                  <div className="flex items-center gap-2 bg-navy-light/40 border border-green-500/15 rounded-xl px-4 py-2.5 text-sm text-slate-300">
+                    <TreePine className="w-4 h-4 text-green-400" /> {distanceToPark} מ׳ מפארק
+                  </div>
+                )}
+                {distanceToHospital != null && (
+                  <div className="flex items-center gap-2 bg-navy-light/40 border border-red-500/15 rounded-xl px-4 py-2.5 text-sm text-slate-300">
+                    <Hospital className="w-4 h-4 text-red-400" /> {distanceToHospital} מ׳ מבי"ח
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Zoning pipeline + costs */}
+            <div className="space-y-4">
+              {/* Zoning pipeline */}
+              <div className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+                <h2 className="text-base font-bold text-slate-100 mb-3">צינור תכנוני</h2>
+                {readiness && (
+                  <div className="flex items-center gap-2 mb-4 bg-gold/5 border border-gold/20 rounded-xl px-4 py-2.5">
+                    <Hourglass className="w-4 h-4 text-gold" />
+                    <span className="text-sm text-slate-300">מוכנות:</span>
+                    <span className="text-sm font-bold text-gold">{readiness}</span>
+                  </div>
+                )}
+                <div className="space-y-0">
+                  {zoningPipelineStages.map((stage, i) => {
+                    const isCompleted = i < currentStageIndex
+                    const isCurrent = i === currentStageIndex
+                    const isFuture = i > currentStageIndex
+                    return (
+                      <div key={stage.key} className={`flex items-center gap-3 py-2 ${isFuture ? 'opacity-40' : ''} ${isCurrent ? 'bg-gold/5 -mx-2 px-2 rounded-xl' : ''}`}>
+                        <span className="text-lg w-7 text-center">{stage.icon}</span>
+                        <span className={`text-sm ${isCompleted ? 'text-green-400' : isCurrent ? 'text-gold font-bold' : 'text-slate-500'}`}>{stage.label}</span>
+                        {isCompleted && <CheckCircle2 className="w-3.5 h-3.5 text-green-400 mr-auto" />}
+                        {isCurrent && <span className="mr-auto text-[10px] text-gold bg-gold/10 px-2 py-0.5 rounded-full">נוכחי</span>}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Associated costs */}
+              <div className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <DollarSign className="w-4 h-4 text-gold" />
+                  <h2 className="text-base font-bold text-slate-100">עלויות נלוות משוערות</h2>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm"><span className="text-slate-400">מס רכישה (6%)</span><span className="text-slate-300">{formatCurrency(Math.round(totalPrice * 0.06))}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-slate-400">שכ"ט עו"ד (~1.5%+מע"מ)</span><span className="text-slate-300">{formatCurrency(Math.round(totalPrice * 0.0175))}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-slate-400">היטל השבחה משוער</span><span className="text-slate-300">{formatCurrency(Math.round((projectedValue - totalPrice) * 0.5))}</span></div>
+                  <div className="h-px bg-white/5 my-1" />
+                  <div className="flex justify-between text-sm font-medium"><span className="text-slate-300">סה"כ עלות כוללת</span><span className="text-gold">{formatCurrency(Math.round(totalPrice * 1.0775))}</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sticky CTA */}
+          <div className="fixed bottom-0 left-0 right-0 z-40 bg-navy/90 backdrop-blur-xl border-t border-white/10 px-4 py-3">
+            <div className="max-w-4xl mx-auto flex gap-3">
+              <button
+                onClick={() => setIsLeadModalOpen(true)}
+                className="flex-1 py-3.5 bg-gradient-to-r from-gold via-gold-bright to-gold rounded-2xl text-navy font-extrabold text-base shadow-lg shadow-gold/30 hover:shadow-xl transition-all"
+              >
+                צור קשר לפרטים מלאים
+              </button>
+              <a
+                href={`https://wa.me/972500000000?text=${encodeURIComponent(`שלום, אני מעוניין בפרטים על גוש ${blockNumber} חלקה ${plot.number} ב${plot.city}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-14 flex items-center justify-center bg-[#25D366] rounded-2xl hover:bg-[#20BD5A] transition-all shadow-lg shadow-[#25D366]/20"
+              >
+                <MessageCircle className="w-6 h-6 text-white" />
+              </a>
+              <button
+                onClick={() => navigate('/')}
+                className="w-14 flex items-center justify-center bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all"
+              >
+                <MapPin className="w-5 h-5 text-gold" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <LeadModal
         isOpen={isLeadModalOpen}
         onClose={() => setIsLeadModalOpen(false)}
         plot={plot}
       />
+
+      {images.length > 0 && (
+        <ImageLightbox
+          images={images}
+          initialIndex={lightboxIndex}
+          isOpen={lightboxOpen}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </div>
   )
 }

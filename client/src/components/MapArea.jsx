@@ -9,10 +9,13 @@ function FlyToSelected({ plot }) {
   const map = useMap()
 
   useEffect(() => {
-    if (!plot) return
+    if (!plot?.coordinates?.length) return
     const coords = plot.coordinates
-    const lat = coords.reduce((sum, c) => sum + c[0], 0) / coords.length
-    const lng = coords.reduce((sum, c) => sum + c[1], 0) / coords.length
+    const validCoords = coords.filter(c => Array.isArray(c) && c.length >= 2 && isFinite(c[0]) && isFinite(c[1]))
+    if (validCoords.length === 0) return
+    const lat = validCoords.reduce((sum, c) => sum + c[0], 0) / validCoords.length
+    const lng = validCoords.reduce((sum, c) => sum + c[1], 0) / validCoords.length
+    if (!isFinite(lat) || !isFinite(lng)) return
     map.flyTo([lat, lng], 15, { duration: 1.2 })
   }, [plot, map])
 
@@ -161,11 +164,18 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         <LocateButton />
 
         {plots.map((plot) => {
+          // Validate coordinates before rendering polygon
+          if (!plot.coordinates || !Array.isArray(plot.coordinates) || plot.coordinates.length < 3) return null
+          const hasValidCoords = plot.coordinates.every(
+            (c) => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number' && isFinite(c[0]) && isFinite(c[1])
+          )
+          if (!hasValidCoords) return null
+
           const color = statusColors[plot.status]
           const isHovered = hoveredId === plot.id
           const price = plot.total_price ?? plot.totalPrice
           const projValue = plot.projected_value ?? plot.projectedValue
-          const roi = Math.round((projValue - price) / price * 100)
+          const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
           const blockNum = plot.block_number ?? plot.blockNumber
           const sizeSqM = plot.size_sqm ?? plot.sizeSqM
           const zoningStage = plot.zoning_stage ?? plot.zoningStage
