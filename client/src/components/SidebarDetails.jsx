@@ -3,7 +3,7 @@ import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2,
 import ShareMenu from './ui/ShareMenu'
 import ImageLightbox from './ui/ImageLightbox'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
-import { formatCurrency, formatDunam } from '../utils/formatters'
+import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
 import { usePlot } from '../hooks/usePlots'
 
@@ -557,6 +557,24 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 />
                 {statusLabels[plot.status]}
               </span>
+              {/* Investment score badge */}
+              {(() => {
+                const score = calcInvestmentScore(plot)
+                const { label, color } = getScoreLabel(score)
+                return (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold"
+                    style={{
+                      background: `${color}14`,
+                      border: `1px solid ${color}35`,
+                      color,
+                    }}
+                    title={`ציון השקעה: ${score}/10 — ${label}`}
+                  >
+                    ⭐ {score}/10
+                  </span>
+                )
+              })()}
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">

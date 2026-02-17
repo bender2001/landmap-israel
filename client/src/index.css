@@ -1859,6 +1859,16 @@ body {
   margin-bottom: 8px;
 }
 
+.plot-card-mini-score {
+  margin-right: auto;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 6px;
+  border: 1px solid;
+  line-height: 1.4;
+}
+
 .plot-card-mini-footer {
   display: flex;
   align-items: center;

@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
-import { formatPriceShort, formatCurrency } from '../utils/formatters'
+import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel } from '../utils/formatters'
 
 export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare }) {
   const scrollRef = useRef(null)
@@ -180,10 +180,23 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
                   </span>
                 </div>
 
-                {/* City */}
+                {/* City + Score */}
                 <div className="plot-card-mini-city">
                   <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
                   <span>{plot.city}</span>
+                  {(() => {
+                    const score = calcInvestmentScore(plot)
+                    const { label, color } = getScoreLabel(score)
+                    return (
+                      <span
+                        className="plot-card-mini-score"
+                        style={{ color, background: `${color}15`, borderColor: `${color}30` }}
+                        title={`ציון השקעה: ${score}/10`}
+                      >
+                        {score}/10
+                      </span>
+                    )
+                  })()}
                 </div>
 
                 {/* Price + ROI row */}
