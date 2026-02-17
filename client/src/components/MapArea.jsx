@@ -137,7 +137,7 @@ function LocateButton() {
   }
 
   return (
-    <div className="absolute bottom-40 left-4 z-[30] pointer-events-none">
+    <div className="absolute bottom-48 sm:bottom-40 left-4 z-[20] pointer-events-none">
       <button
         onClick={handleLocate}
         disabled={locating}
@@ -320,8 +320,8 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         </div>
       </div>
 
-      {/* Bottom-right: Interactive Legend — hidden on mobile (use filter bar instead) */}
-      <div className="absolute bottom-6 right-4 z-[30] pointer-events-none hidden sm:block">
+      {/* Bottom-right: Interactive Legend — hidden on mobile, positioned above card strip */}
+      <div className="absolute bottom-36 right-4 z-[20] pointer-events-none hidden sm:block">
         <div className="glass-panel px-3 py-2.5 pointer-events-auto">
           <div className="flex flex-col gap-0.5">
             {Object.entries(statusColors).map(([status, color]) => {

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp } from 'lucide-react'
+import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, Link2 } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
 import SearchAutocomplete from './SearchAutocomplete'
 
@@ -42,10 +42,13 @@ const sortOptions = [
   { label: 'ברירת מחדל', value: 'default', icon: ArrowUpDown },
   { label: 'מחיר: נמוך לגבוה', value: 'price-asc', icon: ArrowUp },
   { label: 'מחיר: גבוה לנמוך', value: 'price-desc', icon: ArrowDown },
+  { label: 'מחיר/מ״ר: נמוך לגבוה', value: 'ppsqm-asc', icon: ArrowUp },
+  { label: 'מחיר/מ״ר: גבוה לנמוך', value: 'ppsqm-desc', icon: ArrowDown },
   { label: 'שטח: קטן לגדול', value: 'size-asc', icon: ArrowUp },
   { label: 'שטח: גדול לקטן', value: 'size-desc', icon: ArrowDown },
   { label: 'תשואה: גבוהה לנמוכה', value: 'roi-desc', icon: ArrowDown },
   { label: 'תשואה: נמוכה לגבוהה', value: 'roi-asc', icon: ArrowUp },
+  { label: 'ציון השקעה: גבוה לנמוך', value: 'score-desc', icon: ArrowDown },
 ]
 
 const statusEntries = Object.entries(statusColors)
@@ -107,6 +110,14 @@ export default function FilterBar({
   onSelectPlot,
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
+
+  const handleCopySearch = () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    }).catch(() => {})
+  }
 
   // Dynamic city options with plot counts (like Madlan shows listing counts per area)
   const cityOptions = useMemo(() => {
@@ -334,6 +345,14 @@ export default function FilterBar({
             <button className="filter-clear-btn" onClick={onClearFilters}>
               <X className="w-3 h-3" />
               נקה הכל
+            </button>
+            <button
+              className="filter-clear-btn"
+              onClick={handleCopySearch}
+              style={{ background: linkCopied ? 'rgba(34,197,94,0.15)' : undefined, borderColor: linkCopied ? 'rgba(34,197,94,0.3)' : undefined }}
+            >
+              {linkCopied ? <Check className="w-3 h-3 text-green-400" /> : <Link2 className="w-3 h-3" />}
+              {linkCopied ? 'הועתק!' : 'שתף חיפוש'}
             </button>
             <div className="filter-count">
               <Eye className="w-3 h-3" />

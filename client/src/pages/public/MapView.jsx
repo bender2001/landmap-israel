@@ -16,7 +16,7 @@ import KeyboardShortcuts from '../../components/KeyboardShortcuts.jsx'
 import RecentlyViewed from '../../components/RecentlyViewed.jsx'
 import ConnectionStatus from '../../components/ui/ConnectionStatus.jsx'
 import { useMetaTags } from '../../hooks/useMetaTags.js'
-import { formatCurrency } from '../../utils/formatters.js'
+import { formatCurrency, calcInvestmentScore } from '../../utils/formatters.js'
 import { Phone } from 'lucide-react'
 
 const initialFilters = {
@@ -155,6 +155,17 @@ export default function MapView() {
       case 'size-desc': sorted.sort((a, b) => getSize(b) - getSize(a)); break
       case 'roi-desc': sorted.sort((a, b) => getRoi(b) - getRoi(a)); break
       case 'roi-asc': sorted.sort((a, b) => getRoi(a) - getRoi(b)); break
+      case 'ppsqm-asc': sorted.sort((a, b) => {
+        const aPpsqm = getSize(a) > 0 ? getPrice(a) / getSize(a) : Infinity
+        const bPpsqm = getSize(b) > 0 ? getPrice(b) / getSize(b) : Infinity
+        return aPpsqm - bPpsqm
+      }); break
+      case 'ppsqm-desc': sorted.sort((a, b) => {
+        const aPpsqm = getSize(a) > 0 ? getPrice(a) / getSize(a) : 0
+        const bPpsqm = getSize(b) > 0 ? getPrice(b) / getSize(b) : 0
+        return bPpsqm - aPpsqm
+      }); break
+      case 'score-desc': sorted.sort((a, b) => calcInvestmentScore(b) - calcInvestmentScore(a)); break
     }
     return sorted
   }, [searchedPlots, sortBy])
@@ -325,19 +336,19 @@ export default function MapView() {
         selectedPlot={selectedPlot}
       />
 
+      <CompareBar
+        compareIds={compareIds}
+        plots={filteredPlots}
+        onRemove={removeFromCompare}
+        onClear={clearCompare}
+      />
+
       <PlotCardStrip
         plots={filteredPlots}
         selectedPlot={selectedPlot}
         onSelectPlot={handleSelectPlot}
         compareIds={compareIds}
         onToggleCompare={toggleCompare}
-      />
-
-      <CompareBar
-        compareIds={compareIds}
-        plots={filteredPlots}
-        onRemove={removeFromCompare}
-        onClear={clearCompare}
       />
 
       <LeadModal
