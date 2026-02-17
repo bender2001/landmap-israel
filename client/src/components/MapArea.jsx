@@ -1,6 +1,6 @@
 import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, ZoomControl, useMap, LayersControl } from 'react-leaflet'
 import L from 'leaflet'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { MapPin, Eye, Check, ArrowLeft, Navigation, Layers, Map as MapIcon } from 'lucide-react'
 import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
 import { formatCurrency, formatPriceShort, formatDunam } from '../utils/formatters'
@@ -18,6 +18,32 @@ function FlyToSelected({ plot }) {
     if (!isFinite(lat) || !isFinite(lng)) return
     map.flyTo([lat, lng], 15, { duration: 1.2 })
   }, [plot, map])
+
+  return null
+}
+
+function AutoFitBounds({ plots }) {
+  const map = useMap()
+  const fitted = useRef(false)
+
+  useEffect(() => {
+    if (fitted.current || !plots || plots.length === 0) return
+    const allCoords = []
+    plots.forEach(p => {
+      if (!p.coordinates || !Array.isArray(p.coordinates)) return
+      p.coordinates.forEach(c => {
+        if (Array.isArray(c) && c.length >= 2 && isFinite(c[0]) && isFinite(c[1])) {
+          allCoords.push(c)
+        }
+      })
+    })
+    if (allCoords.length < 2) return
+    const bounds = L.latLngBounds(allCoords)
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14, animate: true, duration: 1 })
+      fitted.current = true
+    }
+  }, [plots, map])
 
   return null
 }
@@ -160,6 +186,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
           />
         )}
         <ZoomControl position="bottomleft" />
+        <AutoFitBounds plots={plots} />
         <FlyToSelected plot={selectedPlot} />
         <LocateButton />
 

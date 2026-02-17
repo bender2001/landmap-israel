@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon, Download, File, FileImage, FileSpreadsheet } from 'lucide-react'
+import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon, Download, File, FileImage, FileSpreadsheet, Printer } from 'lucide-react'
 import ShareMenu from './ui/ShareMenu'
 import ImageLightbox from './ui/ImageLightbox'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
@@ -186,6 +186,84 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
   const [sheetSnap, setSheetSnap] = useState(SNAP_PEEK) // start at peek
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
+
+  const handlePrintReport = useCallback(() => {
+    if (!plot) return
+    const bn = plot.block_number ?? plot.blockNumber
+    const price = plot.total_price ?? plot.totalPrice
+    const proj = plot.projected_value ?? plot.projectedValue
+    const size = plot.size_sqm ?? plot.sizeSqM
+    const roi = price > 0 ? Math.round((proj - price) / price * 100) : 0
+    const zoning = plot.zoning_stage ?? plot.zoningStage
+    const readiness = plot.readiness_estimate ?? plot.readinessEstimate
+    const ctx = plot.area_context ?? plot.areaContext ?? ''
+    const nearby = plot.nearby_development ?? plot.nearbyDevelopment ?? ''
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    printWindow.document.write(`<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8">
+      <title>דו״ח השקעה - גוש ${bn} חלקה ${plot.number}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a2e; padding: 40px; max-width: 800px; margin: 0 auto; line-height: 1.6; }
+        h1 { font-size: 24px; margin-bottom: 4px; color: #1a1a2e; }
+        .subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
+        .section { margin-bottom: 24px; }
+        .section h2 { font-size: 16px; color: #C8942A; border-bottom: 2px solid #C8942A; padding-bottom: 6px; margin-bottom: 12px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        .card { background: #f8f9fa; border-radius: 8px; padding: 12px; }
+        .card .label { font-size: 11px; color: #888; margin-bottom: 4px; }
+        .card .value { font-size: 18px; font-weight: 700; }
+        .card .value.gold { color: #C8942A; }
+        .card .value.green { color: #22C55E; }
+        .card .value.blue { color: #3B82F6; }
+        .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 13px; }
+        .row:last-child { border-bottom: none; }
+        .row .label { color: #666; }
+        .row .val { font-weight: 600; }
+        .footer { margin-top: 40px; text-align: center; color: #aaa; font-size: 11px; border-top: 1px solid #eee; padding-top: 16px; }
+        .desc { font-size: 13px; color: #444; margin-bottom: 16px; }
+        @media print { body { padding: 20px; } }
+      </style></head><body>
+      <h1>🏗️ דו״ח השקעה — גוש ${bn} | חלקה ${plot.number}</h1>
+      <div class="subtitle">${plot.city} • ${new Date().toLocaleDateString('he-IL')}</div>
+      ${plot.description ? `<p class="desc">${plot.description}</p>` : ''}
+      ${ctx ? `<p class="desc">📍 ${ctx}</p>` : ''}
+      ${nearby ? `<p class="desc">🏗️ ${nearby}</p>` : ''}
+      <div class="section">
+        <h2>נתונים פיננסיים</h2>
+        <div class="grid3">
+          <div class="card"><div class="label">מחיר מבוקש</div><div class="value blue">${formatCurrency(price)}</div></div>
+          <div class="card"><div class="label">שווי צפוי</div><div class="value green">${formatCurrency(proj)}</div></div>
+          <div class="card"><div class="label">תשואה צפויה</div><div class="value gold">+${roi}%</div></div>
+        </div>
+      </div>
+      <div class="section">
+        <h2>פרטי חלקה</h2>
+        <div class="row"><span class="label">שטח</span><span class="val">${(size / 1000).toFixed(1)} דונם (${size.toLocaleString()} מ״ר)</span></div>
+        <div class="row"><span class="label">מחיר למ״ר</span><span class="val">${formatCurrency(Math.round(price / size))}</span></div>
+        <div class="row"><span class="label">מחיר לדונם</span><span class="val">${formatCurrency(Math.round(price / size * 1000))}</span></div>
+        <div class="row"><span class="label">סטטוס</span><span class="val">${statusLabels[plot.status] || plot.status}</span></div>
+        <div class="row"><span class="label">ייעוד קרקע</span><span class="val">${zoningLabels[zoning] || zoning}</span></div>
+        ${readiness ? `<div class="row"><span class="label">מוכנות לבנייה</span><span class="val">${readiness}</span></div>` : ''}
+      </div>
+      <div class="section">
+        <h2>עלויות נלוות (הערכה)</h2>
+        <div class="row"><span class="label">מס רכישה (6%)</span><span class="val">${formatCurrency(Math.round(price * 0.06))}</span></div>
+        <div class="row"><span class="label">שכ״ט עו״ד (~1.75%)</span><span class="val">${formatCurrency(Math.round(price * 0.0175))}</span></div>
+        <div class="row"><span class="label">היטל השבחה משוער</span><span class="val">${formatCurrency(Math.round((proj - price) * 0.5))}</span></div>
+        <div class="row"><span class="label">סה״כ עלות כוללת</span><span class="val" style="color:#C8942A">${formatCurrency(Math.round(price * 1.0775))}</span></div>
+      </div>
+      <div class="footer">
+        <div>LandMap Israel — מפת קרקעות להשקעה</div>
+        <div>הופק ב-${new Date().toLocaleDateString('he-IL')} ${new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</div>
+        <div style="margin-top:8px;font-size:10px">⚠️ מסמך זה הינו לצרכי מידע בלבד ואינו מהווה ייעוץ השקעות</div>
+      </div>
+    </body></html>`)
+    printWindow.document.close()
+    setTimeout(() => printWindow.print(), 300)
+  }, [plot])
 
   // Animate to mid after mount on mobile
   useEffect(() => {
@@ -933,6 +1011,13 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
             </a>
           </div>
           <div className="flex gap-2 mt-2.5">
+            <button
+              onClick={handlePrintReport}
+              className="flex-shrink-0 w-11 flex items-center justify-center bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 hover:border-gold/20 transition-all"
+              title="הדפס דו״ח השקעה"
+            >
+              <Printer className="w-4 h-4 text-slate-400 hover:text-gold" />
+            </button>
             <ShareMenu
               plotTitle={`גוש ${blockNumber} חלקה ${plot.number} - ${plot.city}`}
               plotPrice={formatCurrency(totalPrice)}
