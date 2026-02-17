@@ -111,7 +111,66 @@ function isMobile() {
   return typeof window !== 'undefined' && window.innerWidth < 640
 }
 
-export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal, favorites, compareIds = [], onToggleCompare }) {
+function SimilarPlots({ currentPlot, allPlots, onSelectPlot }) {
+  const similar = useMemo(() => {
+    if (!currentPlot || !allPlots || allPlots.length < 2) return []
+    const price = currentPlot.total_price ?? currentPlot.totalPrice ?? 0
+    const size = currentPlot.size_sqm ?? currentPlot.sizeSqM ?? 0
+
+    return allPlots
+      .filter(p => p.id !== currentPlot.id)
+      .map(p => {
+        const pPrice = p.total_price ?? p.totalPrice ?? 0
+        const pSize = p.size_sqm ?? p.sizeSqM ?? 0
+        // Score: closer price + size + same city bonus
+        const priceDiff = price > 0 ? Math.abs(pPrice - price) / price : 1
+        const sizeDiff = size > 0 ? Math.abs(pSize - size) / size : 1
+        const cityBonus = p.city === currentPlot.city ? 0 : 0.3
+        return { ...p, score: priceDiff + sizeDiff + cityBonus }
+      })
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 3)
+  }, [currentPlot?.id, allPlots])
+
+  if (similar.length === 0) return null
+
+  return (
+    <div className="mt-4 mb-2">
+      <h4 className="text-xs font-bold text-slate-400 mb-3 flex items-center gap-2">
+        <span className="w-5 h-5 rounded bg-gold/15 flex items-center justify-center text-[10px]">🔗</span>
+        חלקות דומות
+      </h4>
+      <div className="space-y-2">
+        {similar.map(p => {
+          const bn = p.block_number ?? p.blockNumber
+          const price = p.total_price ?? p.totalPrice
+          const projValue = p.projected_value ?? p.projectedValue
+          const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
+          const color = statusColors[p.status]
+          return (
+            <button
+              key={p.id}
+              onClick={() => onSelectPlot(p)}
+              className="w-full flex items-center gap-3 bg-navy-light/40 border border-white/5 rounded-xl px-3 py-2.5 hover:border-gold/20 transition-all text-right group card-lift"
+            >
+              <div className="w-1 h-8 rounded-full flex-shrink-0" style={{ background: color }} />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-slate-200 truncate">גוש {bn} | חלקה {p.number}</div>
+                <div className="text-[10px] text-slate-500">{p.city}</div>
+              </div>
+              <div className="text-left flex-shrink-0">
+                <div className="text-xs font-bold text-gold">{formatCurrency(price)}</div>
+                <div className="text-[10px] text-emerald-400">+{roi}%</div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal, favorites, compareIds = [], onToggleCompare, allPlots = [], onSelectPlot }) {
   // Enrich plot data: fetch full plot when images/documents are missing (e.g. from list endpoint)
   const needsEnrich = rawPlot && !rawPlot.plot_images && !rawPlot.plot_documents
   const { data: enrichedPlot, isLoading: isEnriching } = usePlot(needsEnrich ? rawPlot.id : null)
@@ -846,6 +905,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 </CollapsibleSection>
               )
             })()}
+
+            {/* Similar Plots */}
+            <SimilarPlots currentPlot={plot} allPlots={allPlots} onSelectPlot={onSelectPlot} />
           </div>
         </div>
 

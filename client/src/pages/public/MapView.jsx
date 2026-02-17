@@ -12,6 +12,7 @@ import AIChat from '../../components/AIChat.jsx'
 import LeadModal from '../../components/LeadModal.jsx'
 import CompareBar from '../../components/CompareBar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
+import KeyboardShortcuts from '../../components/KeyboardShortcuts.jsx'
 
 const initialFilters = {
   city: 'all',
@@ -28,6 +29,7 @@ export default function MapView() {
   const [selectedPlot, setSelectedPlot] = useState(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false)
 
   // Hydrate filters from URL params for shareable links
   const [filters, setFilters] = useState(() => {
@@ -145,13 +147,36 @@ export default function MapView() {
     }
   }, [searchParams, filteredPlots])
 
-  // Keyboard shortcuts: ESC to close, ← → to navigate plots
+  // Dynamic document title for SEO & UX
+  useEffect(() => {
+    const parts = ['LandMap Israel']
+    if (filters.city !== 'all') parts.unshift(filters.city)
+    if (selectedPlot) {
+      const bn = selectedPlot.block_number ?? selectedPlot.blockNumber
+      parts.unshift(`גוש ${bn} חלקה ${selectedPlot.number}`)
+    }
+    if (filteredPlots.length > 0 && !selectedPlot) {
+      parts.splice(1, 0, `${filteredPlots.length} חלקות`)
+    }
+    document.title = parts.join(' | ')
+    return () => { document.title = 'LandMap Israel - מפת קרקעות להשקעה' }
+  }, [filters.city, selectedPlot?.id, filteredPlots.length])
+
+  // Keyboard shortcuts: ESC to close, ← → to navigate plots, ? for help
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Escape') {
-        if (isLeadModalOpen) setIsLeadModalOpen(false)
+        if (isShortcutsOpen) setIsShortcutsOpen(false)
+        else if (isLeadModalOpen) setIsLeadModalOpen(false)
         else if (isChatOpen) setIsChatOpen(false)
         else if (selectedPlot) handleCloseSidebar()
+      }
+      // ? key for shortcuts help
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
+        const tag = document.activeElement?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+        e.preventDefault()
+        setIsShortcutsOpen(prev => !prev)
       }
       // Arrow keys to navigate between plots (only when no input is focused)
       if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && filteredPlots.length > 0) {
@@ -173,7 +198,7 @@ export default function MapView() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [isLeadModalOpen, isChatOpen, selectedPlot, filteredPlots])
+  }, [isShortcutsOpen, isLeadModalOpen, isChatOpen, selectedPlot, filteredPlots])
 
   const handleSelectPlot = useCallback((plot) => {
     setSelectedPlot(plot)
@@ -241,6 +266,8 @@ export default function MapView() {
         favorites={favorites}
         compareIds={compareIds}
         onToggleCompare={toggleCompare}
+        allPlots={filteredPlots}
+        onSelectPlot={handleSelectPlot}
       />
 
       <AIChat
@@ -268,6 +295,11 @@ export default function MapView() {
         isOpen={isLeadModalOpen}
         onClose={() => setIsLeadModalOpen(false)}
         plot={selectedPlot}
+      />
+
+      <KeyboardShortcuts
+        isOpen={isShortcutsOpen}
+        onClose={() => setIsShortcutsOpen(false)}
       />
     </div>
   )
