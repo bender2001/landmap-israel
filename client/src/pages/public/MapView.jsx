@@ -24,12 +24,44 @@ const initialFilters = {
 export default function MapView() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [selectedPlot, setSelectedPlot] = useState(null)
-  const [filters, setFilters] = useState(initialFilters)
-  const [statusFilter, setStatusFilter] = useState([])
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
-  const [sortBy, setSortBy] = useState('default')
+
+  // Hydrate filters from URL params for shareable links
+  const [filters, setFilters] = useState(() => {
+    const p = Object.fromEntries(searchParams.entries())
+    return {
+      city: p.city || 'all',
+      priceMin: p.priceMin || '',
+      priceMax: p.priceMax || '',
+      sizeMin: p.sizeMin || '',
+      sizeMax: p.sizeMax || '',
+      ripeness: p.ripeness || 'all',
+      search: p.q || '',
+    }
+  })
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const s = searchParams.get('status')
+    return s ? s.split(',') : []
+  })
+  const [sortBy, setSortBy] = useState(() => searchParams.get('sort') || 'default')
   const favorites = useFavorites()
+
+  // Sync filters to URL for shareable links
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (filters.city !== 'all') params.set('city', filters.city)
+    if (filters.priceMin) params.set('priceMin', filters.priceMin)
+    if (filters.priceMax) params.set('priceMax', filters.priceMax)
+    if (filters.sizeMin) params.set('sizeMin', filters.sizeMin)
+    if (filters.sizeMax) params.set('sizeMax', filters.sizeMax)
+    if (filters.ripeness !== 'all') params.set('ripeness', filters.ripeness)
+    if (filters.search) params.set('q', filters.search)
+    if (statusFilter.length > 0) params.set('status', statusFilter.join(','))
+    if (sortBy !== 'default') params.set('sort', sortBy)
+    if (selectedPlot) params.set('plot', selectedPlot.id)
+    setSearchParams(params, { replace: true })
+  }, [filters, statusFilter, sortBy, selectedPlot?.id])
 
   // Build API filter params
   const apiFilters = useMemo(() => {
@@ -106,13 +138,11 @@ export default function MapView() {
 
   const handleSelectPlot = useCallback((plot) => {
     setSelectedPlot(plot)
-    setSearchParams({ plot: plot.id }, { replace: true })
-  }, [setSearchParams])
+  }, [])
 
   const handleCloseSidebar = useCallback(() => {
     setSelectedPlot(null)
-    setSearchParams({}, { replace: true })
-  }, [setSearchParams])
+  }, [])
 
   const handleFilterChange = useCallback((key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }))

@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { ArrowRight } from 'lucide-react'
 import { usePlot } from '../../hooks/usePlots.js'
 import SidebarDetails from '../../components/SidebarDetails.jsx'
 import LeadModal from '../../components/LeadModal.jsx'
@@ -11,6 +12,24 @@ export default function PlotDetail() {
   const navigate = useNavigate()
   const { data: plot, isLoading, error } = usePlot(id)
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
+
+  // Dynamic page title for SEO
+  useEffect(() => {
+    if (plot) {
+      const blockNum = plot.block_number ?? plot.blockNumber
+      document.title = `גוש ${blockNum} חלקה ${plot.number} - ${plot.city} | LandMap Israel`
+      // Update meta description
+      let meta = document.querySelector('meta[name="description"]')
+      if (!meta) {
+        meta = document.createElement('meta')
+        meta.name = 'description'
+        document.head.appendChild(meta)
+      }
+      const price = plot.total_price ?? plot.totalPrice
+      meta.content = `קרקע להשקעה בגוש ${blockNum} חלקה ${plot.number}, ${plot.city}. מחיר: ₪${Math.round(price/1000)}K. שטח: ${(plot.size_sqm ?? plot.sizeSqM)?.toLocaleString()} מ"ר.`
+    }
+    return () => { document.title = 'LandMap Israel - מפת קרקעות להשקעה' }
+  }, [plot])
 
   if (isLoading) {
     return (

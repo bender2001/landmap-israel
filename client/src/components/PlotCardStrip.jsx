@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { MapPin, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
-import { formatPriceShort } from '../utils/formatters'
+import { formatPriceShort, formatCurrency } from '../utils/formatters'
 
 export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot }) {
   const scrollRef = useRef(null)
@@ -84,7 +84,9 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot }) {
           const projValue = plot.projected_value ?? plot.projectedValue
           const roi = price ? Math.round((projValue - price) / price * 100) : 0
           const blockNum = plot.block_number ?? plot.blockNumber
+          const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
           const readiness = plot.readiness_estimate ?? plot.readinessEstimate
+          const pricePerDunam = sizeSqM > 0 ? formatPriceShort(Math.round(price / sizeSqM * 1000)) : null
           const isSelected = selectedPlot?.id === plot.id
 
           return (
@@ -120,7 +122,10 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot }) {
 
                 {/* Price + ROI row */}
                 <div className="plot-card-mini-footer">
-                  <span className="plot-card-mini-price">{formatPriceShort(price)}</span>
+                  <div className="flex flex-col">
+                    <span className="plot-card-mini-price">{formatPriceShort(price)}</span>
+                    {pricePerDunam && <span className="text-[9px] text-slate-500">{pricePerDunam}/דונם</span>}
+                  </div>
                   <div className="plot-card-mini-tags">
                     <span className="plot-card-mini-roi">+{roi}%</span>
                     {readiness && (
