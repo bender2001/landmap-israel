@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
 import SearchAutocomplete from './SearchAutocomplete'
 
@@ -28,6 +28,14 @@ const ripenessOptions = [
   { label: '1-3 שנים', value: '1-3' },
   { label: '3-5 שנים', value: '3-5' },
   { label: '5+ שנים', value: '5+' },
+]
+
+const roiOptions = [
+  { label: 'כל התשואות', value: 'all' },
+  { label: '50%+', value: '50' },
+  { label: '100%+', value: '100' },
+  { label: '150%+', value: '150' },
+  { label: '200%+', value: '200' },
 ]
 
 const sortOptions = [
@@ -133,6 +141,7 @@ export default function FilterBar({
     (priceRangeValue !== 'all' ? 1 : 0) +
     (sizeRangeValue !== 'all' ? 1 : 0) +
     (filters.ripeness !== 'all' ? 1 : 0) +
+    (filters.minRoi && filters.minRoi !== 'all' ? 1 : 0) +
     (filters.search ? 1 : 0) +
     statusFilter.length
 
@@ -211,6 +220,16 @@ export default function FilterBar({
             options={sizeRangeOptions}
             onChange={handleSizeRange}
             isActive={sizeRangeValue !== 'all'}
+          />
+
+          <SelectPill
+            icon={TrendingUp}
+            label="תשואה"
+            value={filters.minRoi || 'all'}
+            displayValue={filters.minRoi && filters.minRoi !== 'all' ? `${filters.minRoi}%+` : null}
+            options={roiOptions}
+            onChange={(val) => onFilterChange('minRoi', val)}
+            isActive={filters.minRoi && filters.minRoi !== 'all'}
           />
 
           {/* Thin separator */}

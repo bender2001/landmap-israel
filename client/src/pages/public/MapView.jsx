@@ -24,6 +24,7 @@ const initialFilters = {
   sizeMin: '',
   sizeMax: '',
   ripeness: 'all',
+  minRoi: 'all',
   search: '',
 }
 
@@ -44,6 +45,7 @@ export default function MapView() {
       sizeMin: p.sizeMin || '',
       sizeMax: p.sizeMax || '',
       ripeness: p.ripeness || 'all',
+      minRoi: p.minRoi || 'all',
       search: p.q || '',
     }
   })
@@ -80,6 +82,7 @@ export default function MapView() {
     if (filters.sizeMin) params.set('sizeMin', filters.sizeMin)
     if (filters.sizeMax) params.set('sizeMax', filters.sizeMax)
     if (filters.ripeness !== 'all') params.set('ripeness', filters.ripeness)
+    if (filters.minRoi && filters.minRoi !== 'all') params.set('minRoi', filters.minRoi)
     if (filters.search) params.set('q', filters.search)
     if (statusFilter.length > 0) params.set('status', statusFilter.join(','))
     if (sortBy !== 'default') params.set('sort', sortBy)
@@ -106,18 +109,31 @@ export default function MapView() {
   // Debounce search for performance
   const debouncedSearch = useDebounce(filters.search, 250)
 
+  // Client-side ROI filter
+  const roiFilteredPlots = useMemo(() => {
+    if (!filters.minRoi || filters.minRoi === 'all') return plots
+    const minRoi = parseInt(filters.minRoi, 10)
+    return plots.filter((p) => {
+      const price = p.total_price ?? p.totalPrice ?? 0
+      const proj = p.projected_value ?? p.projectedValue ?? 0
+      if (price <= 0) return false
+      const roi = ((proj - price) / price) * 100
+      return roi >= minRoi
+    })
+  }, [plots, filters.minRoi])
+
   // Client-side search filter
   const searchedPlots = useMemo(() => {
-    if (!debouncedSearch) return plots
+    if (!debouncedSearch) return roiFilteredPlots
     const q = debouncedSearch.toLowerCase()
-    return plots.filter((p) => {
+    return roiFilteredPlots.filter((p) => {
       const bn = (p.block_number ?? p.blockNumber ?? '').toString()
       const num = (p.number ?? '').toString()
       const city = (p.city ?? '').toLowerCase()
       const desc = (p.description ?? '').toLowerCase()
       return bn.includes(q) || num.includes(q) || city.includes(q) || desc.includes(q)
     })
-  }, [plots, debouncedSearch])
+  }, [roiFilteredPlots, debouncedSearch])
 
   // Sort
   const filteredPlots = useMemo(() => {
