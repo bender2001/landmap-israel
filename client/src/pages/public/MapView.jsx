@@ -1,14 +1,16 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAllPlots } from '../../hooks/usePlots.js'
 import { usePois } from '../../hooks/usePois.js'
 import { useFavorites } from '../../hooks/useFavorites.js'
+import { useDebounce } from '../../hooks/useDebounce.js'
 import MapArea from '../../components/MapArea.jsx'
 import FilterBar from '../../components/FilterBar.jsx'
 import SidebarDetails from '../../components/SidebarDetails.jsx'
 import PlotCardStrip from '../../components/PlotCardStrip.jsx'
 import AIChat from '../../components/AIChat.jsx'
 import LeadModal from '../../components/LeadModal.jsx'
+import CompareBar from '../../components/CompareBar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 
 const initialFilters = {
@@ -47,6 +49,23 @@ export default function MapView() {
   const [sortBy, setSortBy] = useState(() => searchParams.get('sort') || 'default')
   const favorites = useFavorites()
 
+  // Compare state (localStorage-backed, not URL to avoid conflict with filters)
+  const [compareIds, setCompareIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('landmap_compare') || '[]') } catch { return [] }
+  })
+  useEffect(() => {
+    localStorage.setItem('landmap_compare', JSON.stringify(compareIds))
+  }, [compareIds])
+  const toggleCompare = useCallback((plotId) => {
+    setCompareIds((prev) =>
+      prev.includes(plotId) ? prev.filter((id) => id !== plotId) : prev.length < 3 ? [...prev, plotId] : prev
+    )
+  }, [])
+  const removeFromCompare = useCallback((plotId) => {
+    setCompareIds((prev) => prev.filter((id) => id !== plotId))
+  }, [])
+  const clearCompare = useCallback(() => setCompareIds([]), [])
+
   // Sync filters to URL for shareable links
   useEffect(() => {
     const params = new URLSearchParams()
@@ -79,10 +98,13 @@ export default function MapView() {
   const { data: plots = [], isLoading } = useAllPlots(apiFilters)
   const { data: pois = [] } = usePois()
 
+  // Debounce search for performance
+  const debouncedSearch = useDebounce(filters.search, 250)
+
   // Client-side search filter
   const searchedPlots = useMemo(() => {
-    if (!filters.search) return plots
-    const q = filters.search.toLowerCase()
+    if (!debouncedSearch) return plots
+    const q = debouncedSearch.toLowerCase()
     return plots.filter((p) => {
       const bn = (p.block_number ?? p.blockNumber ?? '').toString()
       const num = (p.number ?? '').toString()
@@ -90,7 +112,7 @@ export default function MapView() {
       const desc = (p.description ?? '').toLowerCase()
       return bn.includes(q) || num.includes(q) || city.includes(q) || desc.includes(q)
     })
-  }, [plots, filters.search])
+  }, [plots, debouncedSearch])
 
   // Sort
   const filteredPlots = useMemo(() => {
@@ -215,6 +237,8 @@ export default function MapView() {
         onClose={handleCloseSidebar}
         onOpenLeadModal={() => setIsLeadModalOpen(true)}
         favorites={favorites}
+        compareIds={compareIds}
+        onToggleCompare={toggleCompare}
       />
 
       <AIChat
@@ -227,6 +251,15 @@ export default function MapView() {
         plots={filteredPlots}
         selectedPlot={selectedPlot}
         onSelectPlot={handleSelectPlot}
+        compareIds={compareIds}
+        onToggleCompare={toggleCompare}
+      />
+
+      <CompareBar
+        compareIds={compareIds}
+        plots={filteredPlots}
+        onRemove={removeFromCompare}
+        onClear={clearCompare}
       />
 
       <LeadModal

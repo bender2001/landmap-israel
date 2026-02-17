@@ -1,9 +1,9 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
-import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler } from 'lucide-react'
+import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
 import { formatPriceShort, formatCurrency } from '../utils/formatters'
 
-export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot }) {
+export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare }) {
   const scrollRef = useRef(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
@@ -141,17 +141,29 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot }) {
           const isSelected = selectedPlot?.id === plot.id
 
           const wasViewed = recentlyViewed.has(plot.id)
+          const isCompared = compareIds.includes(plot.id)
 
           return (
             <div
               key={plot.id}
               data-plot-id={plot.id}
               onClick={() => onSelectPlot(plot)}
-              className={`plot-card-mini ${isSelected ? 'plot-card-mini-selected' : ''}`}
+              className={`plot-card-mini ${isSelected ? 'plot-card-mini-selected' : ''} ${isCompared ? 'plot-card-mini-compared' : ''}`}
               style={{ '--card-color': color }}
             >
               {/* Top color line */}
-              <div className="plot-card-mini-accent" style={{ background: color }} />
+              <div className="plot-card-mini-accent" style={{ background: isCompared ? '#8B5CF6' : color }} />
+
+              {/* Compare toggle */}
+              {onToggleCompare && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onToggleCompare(plot.id) }}
+                  className={`plot-card-compare-btn ${isCompared ? 'is-active' : ''}`}
+                  title={isCompared ? 'הסר מהשוואה' : 'הוסף להשוואה'}
+                >
+                  <GitCompareArrows className="w-3 h-3" />
+                </button>
+              )}
 
               <div className="plot-card-mini-body">
                 {/* Title row */}

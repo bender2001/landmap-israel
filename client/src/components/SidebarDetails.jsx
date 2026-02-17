@@ -111,7 +111,7 @@ function isMobile() {
   return typeof window !== 'undefined' && window.innerWidth < 640
 }
 
-export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal, favorites }) {
+export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal, favorites, compareIds = [], onToggleCompare }) {
   // Enrich plot data: fetch full plot when images/documents are missing (e.g. from list endpoint)
   const needsEnrich = rawPlot && !rawPlot.plot_images && !rawPlot.plot_documents
   const { data: enrichedPlot, isLoading: isEnriching } = usePlot(needsEnrich ? rawPlot.id : null)
@@ -877,13 +877,19 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               plotUrl={`${window.location.origin}/?plot=${plot.id}`}
               className="flex-1"
             />
-            <a
-              href={`/compare?plots=${plot.id}`}
-              className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-purple-600/20 border border-purple-500/30 text-purple-400 text-sm font-medium hover:bg-purple-600/30 transition-colors"
-            >
-              <BarChart className="w-4 h-4" />
-              השווה
-            </a>
+            {onToggleCompare && (
+              <button
+                onClick={() => onToggleCompare(plot.id)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-sm font-medium transition-colors ${
+                  compareIds.includes(plot.id)
+                    ? 'bg-purple-600/30 border-purple-500/50 text-purple-300'
+                    : 'bg-purple-600/20 border-purple-500/30 text-purple-400 hover:bg-purple-600/30'
+                }`}
+              >
+                <BarChart className="w-4 h-4" />
+                {compareIds.includes(plot.id) ? 'בהשוואה ✓' : 'השווה'}
+              </button>
+            )}
           </div>
         </div>
       </div>
