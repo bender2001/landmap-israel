@@ -1,7 +1,7 @@
 import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, ZoomControl, useMap, LayersControl } from 'react-leaflet'
 import L from 'leaflet'
-import { useState, useEffect } from 'react'
-import { MapPin, Eye, Check, ArrowLeft, Navigation, Layers } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { MapPin, Eye, Check, ArrowLeft, Navigation, Layers, Map as MapIcon } from 'lucide-react'
 import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
 import { formatCurrency, formatPriceShort } from '../utils/formatters'
 
@@ -17,6 +17,80 @@ function FlyToSelected({ plot }) {
   }, [plot, map])
 
   return null
+}
+
+const MAP_LAYERS = [
+  {
+    id: 'satellite',
+    label: 'לוויין',
+    emoji: '🛰️',
+    tiles: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: '&copy; Esri, Maxar, Earthstar Geographics',
+    showLabels: true,
+  },
+  {
+    id: 'street',
+    label: 'רחובות',
+    emoji: '🗺️',
+    tiles: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors',
+    showLabels: false,
+  },
+  {
+    id: 'topo',
+    label: 'טופוגרפי',
+    emoji: '⛰️',
+    tiles: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenTopoMap',
+    showLabels: false,
+  },
+  {
+    id: 'dark',
+    label: 'כהה',
+    emoji: '🌙',
+    tiles: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; CARTO',
+    showLabels: false,
+  },
+]
+
+function MapLayerSwitcher({ activeLayer, onChangeLayer }) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div className="absolute top-4 right-4 z-[30] pointer-events-none">
+      <div className="pointer-events-auto relative">
+        <button
+          onClick={() => setIsOpen(prev => !prev)}
+          className="glass-panel w-9 h-9 flex items-center justify-center hover:border-gold/20 transition-colors"
+          style={{ minWidth: 44, minHeight: 44 }}
+          title="שכבות מפה"
+          aria-label="שכבות מפה"
+        >
+          <Layers className="w-4 h-4 text-gold" />
+        </button>
+        {isOpen && (
+          <div className="absolute top-12 right-0 glass-panel p-2 min-w-[140px] flex flex-col gap-1" dir="rtl">
+            {MAP_LAYERS.map(layer => (
+              <button
+                key={layer.id}
+                onClick={() => { onChangeLayer(layer.id); setIsOpen(false) }}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors ${
+                  activeLayer === layer.id
+                    ? 'bg-gold/15 text-gold font-medium'
+                    : 'text-slate-300 hover:bg-white/5'
+                }`}
+              >
+                <span>{layer.emoji}</span>
+                <span>{layer.label}</span>
+                {activeLayer === layer.id && <Check className="w-3 h-3 mr-auto" />}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function LocateButton() {
@@ -57,6 +131,8 @@ const poiIcon = (poi) =>
 
 export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites }) {
   const [hoveredId, setHoveredId] = useState(null)
+  const [activeLayerId, setActiveLayerId] = useState('satellite')
+  const activeLayer = MAP_LAYERS.find(l => l.id === activeLayerId) || MAP_LAYERS[0]
 
   return (
     <div className="h-full w-full relative z-0">
@@ -66,19 +142,23 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         zoomControl={false}
         className="h-full w-full"
       >
-        {/* Satellite base layer for rich visuals */}
+        {/* Dynamic base layer */}
         <TileLayer
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          attribution='&copy; Esri, Maxar, Earthstar Geographics'
+          key={activeLayer.id}
+          url={activeLayer.tiles}
+          attribution={activeLayer.attribution}
         />
-        {/* Semi-transparent label overlay for readability */}
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
-          attribution='&copy; OpenStreetMap'
-          opacity={0.7}
-        />
+        {/* Label overlay for satellite/topo */}
+        {activeLayer.showLabels && (
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
+            attribution='&copy; OpenStreetMap'
+            opacity={0.7}
+          />
+        )}
         <ZoomControl position="bottomleft" />
         <FlyToSelected plot={selectedPlot} />
+        <LocateButton />
 
         {plots.map((plot) => {
           const color = statusColors[plot.status]
@@ -169,6 +249,9 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
           <Marker key={idx} position={poi.coordinates} icon={poiIcon(poi)} />
         ))}
       </MapContainer>
+
+      {/* Map layer switcher */}
+      <MapLayerSwitcher activeLayer={activeLayerId} onChangeLayer={setActiveLayerId} />
 
       {/* Map vignette overlay */}
       <div className="map-vignette" />
