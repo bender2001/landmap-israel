@@ -1,5 +1,5 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
-import { MapPin, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
+import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
 import { formatPriceShort, formatCurrency } from '../utils/formatters'
 
@@ -39,6 +39,37 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot }) {
     }
   }, [selectedPlot?.id])
 
+  // Aggregate stats
+  const stats = useMemo(() => {
+    if (!plots || plots.length === 0) return null
+    const available = plots.filter(p => p.status === 'AVAILABLE')
+    const totalValue = plots.reduce((sum, p) => sum + (p.total_price ?? p.totalPrice ?? 0), 0)
+    const avgRoi = plots.reduce((sum, p) => {
+      const price = p.total_price ?? p.totalPrice ?? 0
+      const proj = p.projected_value ?? p.projectedValue ?? 0
+      return sum + (price > 0 ? ((proj - price) / price) * 100 : 0)
+    }, 0) / plots.length
+    const totalArea = plots.reduce((sum, p) => sum + (p.size_sqm ?? p.sizeSqM ?? 0), 0)
+    return { available: available.length, totalValue, avgRoi: Math.round(avgRoi), totalArea }
+  }, [plots])
+
+  // Track recently viewed plots
+  useEffect(() => {
+    if (!selectedPlot) return
+    try {
+      const key = 'landmap_recently_viewed'
+      const recent = JSON.parse(localStorage.getItem(key) || '[]')
+      const updated = [selectedPlot.id, ...recent.filter(id => id !== selectedPlot.id)].slice(0, 20)
+      localStorage.setItem(key, JSON.stringify(updated))
+    } catch {}
+  }, [selectedPlot?.id])
+
+  const recentlyViewed = useMemo(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('landmap_recently_viewed') || '[]'))
+    } catch { return new Set() }
+  }, [selectedPlot?.id])
+
   if (!plots || plots.length === 0) return null
 
   // RTL scroll: positive = scroll left visually (show more to the left)
@@ -49,6 +80,26 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot }) {
 
   return (
     <div className="plot-strip-wrapper" dir="rtl">
+      {/* Aggregate stats bar */}
+      {stats && (
+        <div className="plot-strip-stats">
+          <div className="plot-strip-stat">
+            <BarChart3 className="w-3 h-3 text-gold" />
+            <span>{stats.available} זמינות</span>
+          </div>
+          <div className="plot-strip-stat-divider" />
+          <div className="plot-strip-stat">
+            <TrendingUp className="w-3 h-3 text-emerald-400" />
+            <span>ממוצע +{stats.avgRoi}% ROI</span>
+          </div>
+          <div className="plot-strip-stat-divider" />
+          <div className="plot-strip-stat">
+            <Ruler className="w-3 h-3 text-blue-400" />
+            <span>{(stats.totalArea / 1000).toFixed(1)} דונם סה״כ</span>
+          </div>
+        </div>
+      )}
+
       {/* Fade edges */}
       <div className="plot-strip-fade-right" />
       <div className="plot-strip-fade-left" />
@@ -89,6 +140,8 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot }) {
           const pricePerDunam = sizeSqM > 0 ? formatPriceShort(Math.round(price / sizeSqM * 1000)) : null
           const isSelected = selectedPlot?.id === plot.id
 
+          const wasViewed = recentlyViewed.has(plot.id)
+
           return (
             <div
               key={plot.id}
@@ -104,6 +157,7 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot }) {
                 {/* Title row */}
                 <div className="plot-card-mini-header">
                   <span className="plot-card-mini-title">
+                    {wasViewed && !isSelected && <span className="plot-card-viewed-dot" title="נצפה לאחרונה" />}
                     גוש {blockNum} | חלקה {plot.number}
                   </span>
                   <span

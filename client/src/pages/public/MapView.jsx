@@ -123,7 +123,7 @@ export default function MapView() {
     }
   }, [searchParams, filteredPlots])
 
-  // ESC key to close sidebar/modal/chat
+  // Keyboard shortcuts: ESC to close, ← → to navigate plots
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Escape') {
@@ -131,10 +131,27 @@ export default function MapView() {
         else if (isChatOpen) setIsChatOpen(false)
         else if (selectedPlot) handleCloseSidebar()
       }
+      // Arrow keys to navigate between plots (only when no input is focused)
+      if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && filteredPlots.length > 0) {
+        const tag = document.activeElement?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+        e.preventDefault()
+        const currentIdx = selectedPlot
+          ? filteredPlots.findIndex((p) => p.id === selectedPlot.id)
+          : -1
+        // RTL: ArrowRight = previous, ArrowLeft = next
+        let nextIdx
+        if (e.key === 'ArrowLeft') {
+          nextIdx = currentIdx < filteredPlots.length - 1 ? currentIdx + 1 : 0
+        } else {
+          nextIdx = currentIdx > 0 ? currentIdx - 1 : filteredPlots.length - 1
+        }
+        setSelectedPlot(filteredPlots[nextIdx])
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [isLeadModalOpen, isChatOpen, selectedPlot])
+  }, [isLeadModalOpen, isChatOpen, selectedPlot, filteredPlots])
 
   const handleSelectPlot = useCallback((plot) => {
     setSelectedPlot(plot)

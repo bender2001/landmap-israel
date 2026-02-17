@@ -1640,6 +1640,53 @@ body {
   background: linear-gradient(0deg, rgba(5, 13, 26, 0.75) 0%, rgba(5, 13, 26, 0.35) 60%, transparent 100%);
 }
 
+/* ── Aggregate stats bar ── */
+.plot-strip-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 6px 16px;
+  pointer-events: auto;
+}
+
+.plot-strip-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.plot-strip-stat-divider {
+  width: 1px;
+  height: 12px;
+  background: rgba(148, 163, 184, 0.2);
+}
+
+/* ── Recently viewed dot ── */
+.plot-card-viewed-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #60a5fa;
+  margin-left: 4px;
+  vertical-align: middle;
+  opacity: 0.7;
+}
+
+@media (max-width: 639px) {
+  .plot-strip-stats {
+    gap: 8px;
+    padding: 4px 12px;
+  }
+  .plot-strip-stat {
+    font-size: 10px;
+  }
+}
+
 /* ── Fade edges to hint at scrollable content ── */
 .plot-strip-fade-right {
   position: absolute;
