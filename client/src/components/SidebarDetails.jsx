@@ -170,6 +170,85 @@ function SimilarPlots({ currentPlot, allPlots, onSelectPlot }) {
   )
 }
 
+function MiniMortgageCalc({ totalPrice }) {
+  const [equity, setEquity] = useState(50) // % equity
+  const [years, setYears] = useState(15)
+  const [rate, setRate] = useState(4.5)
+
+  const loanAmount = totalPrice * (1 - equity / 100)
+  const monthlyRate = rate / 100 / 12
+  const numPayments = years * 12
+  const monthlyPayment = monthlyRate > 0
+    ? Math.round(loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1))
+    : Math.round(loanAmount / numPayments)
+  const totalPayment = monthlyPayment * numPayments
+  const totalInterest = totalPayment - loanAmount
+
+  return (
+    <div className="bg-navy-light/40 border border-white/5 rounded-xl p-3 mt-3 mb-3">
+      <div className="flex items-center gap-2 mb-3">
+        <DollarSign className="w-3.5 h-3.5 text-gold" />
+        <span className="text-xs font-medium text-slate-200">מחשבון מימון</span>
+      </div>
+      <div className="space-y-3">
+        {/* Equity slider */}
+        <div>
+          <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+            <span>הון עצמי</span>
+            <span className="text-gold font-medium">{equity}% ({formatCurrency(Math.round(totalPrice * equity / 100))})</span>
+          </div>
+          <input
+            type="range" min="20" max="100" step="5" value={equity}
+            onChange={(e) => setEquity(Number(e.target.value))}
+            className="w-full h-1.5 rounded-full appearance-none bg-white/10 accent-gold cursor-pointer"
+          />
+        </div>
+        {/* Years slider */}
+        <div>
+          <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+            <span>תקופה</span>
+            <span className="text-slate-300 font-medium">{years} שנים</span>
+          </div>
+          <input
+            type="range" min="5" max="30" step="1" value={years}
+            onChange={(e) => setYears(Number(e.target.value))}
+            className="w-full h-1.5 rounded-full appearance-none bg-white/10 accent-gold cursor-pointer"
+          />
+        </div>
+        {/* Rate slider */}
+        <div>
+          <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+            <span>ריבית</span>
+            <span className="text-slate-300 font-medium">{rate}%</span>
+          </div>
+          <input
+            type="range" min="2" max="8" step="0.25" value={rate}
+            onChange={(e) => setRate(Number(e.target.value))}
+            className="w-full h-1.5 rounded-full appearance-none bg-white/10 accent-gold cursor-pointer"
+          />
+        </div>
+        {/* Results */}
+        {equity < 100 && (
+          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5">
+            <div className="text-center">
+              <div className="text-[10px] text-slate-500">החזר חודשי</div>
+              <div className="text-xs font-bold text-gold">{formatCurrency(monthlyPayment)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-[10px] text-slate-500">סה״כ ריבית</div>
+              <div className="text-xs font-bold text-orange-400">{formatCurrency(totalInterest)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-[10px] text-slate-500">סה״כ תשלום</div>
+              <div className="text-xs font-bold text-slate-300">{formatCurrency(totalPayment)}</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal, favorites, compareIds = [], onToggleCompare, allPlots = [], onSelectPlot }) {
   // Enrich plot data: fetch full plot when images/documents are missing (e.g. from list endpoint)
   const needsEnrich = rawPlot && !rawPlot.plot_images && !rawPlot.plot_documents
@@ -702,8 +781,16 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
 
               {/* Area Price Benchmark */}
               {(() => {
-                // Average land price per sqm in Hadera area (~1500 ILS/sqm for agricultural land)
-                const areaAvgPerSqm = 1500
+                // Dynamic average: compute from all plots in the same city, fallback to all plots
+                const sameCityPlots = allPlots.filter(p => p.city === plot.city && p.id !== plot.id)
+                const benchmarkPlots = sameCityPlots.length >= 2 ? sameCityPlots : allPlots.filter(p => p.id !== plot.id)
+                const areaAvgPerSqm = benchmarkPlots.length > 0
+                  ? Math.round(benchmarkPlots.reduce((sum, p) => {
+                      const pp = p.total_price ?? p.totalPrice ?? 0
+                      const ps = p.size_sqm ?? p.sizeSqM ?? 1
+                      return sum + pp / ps
+                    }, 0) / benchmarkPlots.length)
+                  : 1500
                 const plotPricePerSqm = Math.round(totalPrice / sizeSqM)
                 const diffPct = Math.round(((plotPricePerSqm - areaAvgPerSqm) / areaAvgPerSqm) * 100)
                 const isBelow = diffPct < 0
@@ -801,6 +888,8 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                     </span>
                   </div>
                 </div>
+              {/* Mini Mortgage Calculator */}
+              <MiniMortgageCalc totalPrice={totalPrice} />
               </div>
             </CollapsibleSection>
 
