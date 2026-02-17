@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
 import { getPlots, getPlot } from '../api/plots.js'
 import { plots as mockPlots } from '../data/mockData.js'
 
@@ -76,4 +77,20 @@ export function usePlot(id) {
     enabled: !!id,
     retry: 1,
   })
+}
+
+/**
+ * Prefetch a plot's full details into the query cache on hover.
+ * This eliminates the loading delay when the user clicks a plot card.
+ */
+export function usePrefetchPlot() {
+  const queryClient = useQueryClient()
+  return useCallback((id) => {
+    if (!id) return
+    queryClient.prefetchQuery({
+      queryKey: ['plot', id],
+      queryFn: () => fetchPlotWithFallback(id),
+      staleTime: 60_000,
+    })
+  }, [queryClient])
 }

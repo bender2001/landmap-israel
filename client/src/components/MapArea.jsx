@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { MapPin, Eye, Check, ArrowLeft, Navigation, Layers, Map as MapIcon } from 'lucide-react'
 import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
 import { formatCurrency, formatPriceShort, formatDunam } from '../utils/formatters'
+import { usePrefetchPlot } from '../hooks/usePlots'
 
 function FlyToSelected({ plot }) {
   const map = useMap()
@@ -161,6 +162,7 @@ const poiIcon = (poi) =>
 export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites }) {
   const [hoveredId, setHoveredId] = useState(null)
   const [activeLayerId, setActiveLayerId] = useState('satellite')
+  const prefetchPlot = usePrefetchPlot()
   const activeLayer = MAP_LAYERS.find(l => l.id === activeLayerId) || MAP_LAYERS[0]
 
   return (
@@ -221,7 +223,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
               }}
               eventHandlers={{
                 click: () => onSelectPlot(plot),
-                mouseover: () => setHoveredId(plot.id),
+                mouseover: () => { setHoveredId(plot.id); prefetchPlot(plot.id) },
                 mouseout: () => setHoveredId(null),
               }}
             >

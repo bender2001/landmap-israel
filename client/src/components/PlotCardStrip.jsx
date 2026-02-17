@@ -2,8 +2,10 @@ import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
 import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel } from '../utils/formatters'
+import { usePrefetchPlot } from '../hooks/usePlots'
 
 export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare }) {
+  const prefetchPlot = usePrefetchPlot()
   const scrollRef = useRef(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
@@ -148,6 +150,7 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
               key={plot.id}
               data-plot-id={plot.id}
               onClick={() => onSelectPlot(plot)}
+              onMouseEnter={() => prefetchPlot(plot.id)}
               className={`plot-card-mini ${isSelected ? 'plot-card-mini-selected' : ''} ${isCompared ? 'plot-card-mini-compared' : ''}`}
               style={{ '--card-color': color }}
             >

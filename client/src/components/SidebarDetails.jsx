@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon, Download, File, FileImage, FileSpreadsheet, Printer } from 'lucide-react'
+import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon, Download, File, FileImage, FileSpreadsheet, Printer, ExternalLink, Eye, Navigation } from 'lucide-react'
 import ShareMenu from './ui/ShareMenu'
 import ImageLightbox from './ui/ImageLightbox'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
@@ -667,6 +667,54 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 </div>
               )}
             </div>
+
+            {/* External Map Links (Street View, Google Maps, Waze) */}
+            {plot.coordinates?.length >= 3 && (() => {
+              const validCoords = plot.coordinates.filter(c => Array.isArray(c) && c.length >= 2 && isFinite(c[0]) && isFinite(c[1]))
+              if (validCoords.length === 0) return null
+              const lat = validCoords.reduce((s, c) => s + c[0], 0) / validCoords.length
+              const lng = validCoords.reduce((s, c) => s + c[1], 0) / validCoords.length
+              return (
+                <div className="flex flex-wrap gap-2 mt-3 animate-stagger-3">
+                  <a
+                    href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 bg-gradient-to-r from-navy-light/50 to-navy-light/60 border border-yellow-500/15 rounded-xl px-4 py-2 text-xs text-slate-300 hover:border-gold/30 transition-all card-lift"
+                  >
+                    <div className="w-6 h-6 rounded-lg bg-yellow-500/15 flex items-center justify-center">
+                      <Eye className="w-3.5 h-3.5 text-yellow-400" />
+                    </div>
+                    Street View
+                    <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
+                  </a>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 bg-gradient-to-r from-navy-light/50 to-navy-light/60 border border-blue-500/15 rounded-xl px-4 py-2 text-xs text-slate-300 hover:border-gold/30 transition-all card-lift"
+                  >
+                    <div className="w-6 h-6 rounded-lg bg-blue-500/15 flex items-center justify-center">
+                      <MapPin className="w-3.5 h-3.5 text-blue-400" />
+                    </div>
+                    Google Maps
+                    <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
+                  </a>
+                  <a
+                    href={`https://www.waze.com/ul?ll=${lat},${lng}&navigate=yes`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 bg-gradient-to-r from-navy-light/50 to-navy-light/60 border border-cyan-500/15 rounded-xl px-4 py-2 text-xs text-slate-300 hover:border-gold/30 transition-all card-lift"
+                  >
+                    <div className="w-6 h-6 rounded-lg bg-cyan-500/15 flex items-center justify-center">
+                      <Navigation className="w-3.5 h-3.5 text-cyan-400" />
+                    </div>
+                    Waze
+                    <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
+                  </a>
+                </div>
+              )
+            })()}
 
             {/* Divider */}
             <div

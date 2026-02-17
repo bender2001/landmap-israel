@@ -14,6 +14,7 @@ import CompareBar from '../../components/CompareBar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import KeyboardShortcuts from '../../components/KeyboardShortcuts.jsx'
 import RecentlyViewed from '../../components/RecentlyViewed.jsx'
+import ConnectionStatus from '../../components/ui/ConnectionStatus.jsx'
 import { useMetaTags } from '../../hooks/useMetaTags.js'
 import { formatCurrency } from '../../utils/formatters.js'
 
@@ -269,6 +270,7 @@ export default function MapView() {
 
   return (
     <div className={`relative h-screen w-screen overflow-hidden bg-navy ${selectedPlot ? 'sidebar-open' : ''}`}>
+      <ConnectionStatus />
       <MapArea
         plots={filteredPlots}
         pois={pois}
