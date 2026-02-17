@@ -108,3 +108,39 @@ export async function deletePlot(id) {
 
   if (error) throw error
 }
+
+// Lightweight aggregate stats for published plots
+export async function getPlotStats() {
+  const { data, error } = await supabaseAdmin
+    .from('plots')
+    .select('status, total_price, projected_value, size_sqm, city')
+    .eq('is_published', true)
+
+  if (error) throw error
+  if (!data || data.length === 0) return { total: 0, cities: [], byStatus: {}, avgRoi: 0, totalArea: 0 }
+
+  const byStatus = {}
+  const citySet = new Set()
+  let totalPrice = 0
+  let totalProj = 0
+  let totalArea = 0
+
+  for (const p of data) {
+    byStatus[p.status] = (byStatus[p.status] || 0) + 1
+    if (p.city) citySet.add(p.city)
+    totalPrice += p.total_price || 0
+    totalProj += p.projected_value || 0
+    totalArea += p.size_sqm || 0
+  }
+
+  const avgRoi = totalPrice > 0 ? Math.round(((totalProj - totalPrice) / totalPrice) * 100) : 0
+
+  return {
+    total: data.length,
+    cities: [...citySet].sort(),
+    byStatus,
+    avgRoi,
+    totalArea,
+    totalValue: totalPrice,
+  }
+}

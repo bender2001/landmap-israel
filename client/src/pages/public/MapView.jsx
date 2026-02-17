@@ -13,6 +13,9 @@ import LeadModal from '../../components/LeadModal.jsx'
 import CompareBar from '../../components/CompareBar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import KeyboardShortcuts from '../../components/KeyboardShortcuts.jsx'
+import RecentlyViewed from '../../components/RecentlyViewed.jsx'
+import { useMetaTags } from '../../hooks/useMetaTags.js'
+import { formatCurrency } from '../../utils/formatters.js'
 
 const initialFilters = {
   city: 'all',
@@ -223,6 +226,20 @@ export default function MapView() {
     )
   }, [])
 
+  // Dynamic OG meta tags for social sharing
+  useMetaTags(
+    selectedPlot
+      ? {
+          title: `גוש ${selectedPlot.block_number ?? selectedPlot.blockNumber} חלקה ${selectedPlot.number} | LandMap Israel`,
+          description: `${selectedPlot.city} · ${formatCurrency(selectedPlot.total_price ?? selectedPlot.totalPrice)} · ${((selectedPlot.size_sqm ?? selectedPlot.sizeSqM) / 1000).toFixed(1)} דונם`,
+          url: window.location.href,
+        }
+      : {
+          title: `LandMap Israel — ${filteredPlots.length} חלקות להשקעה`,
+          description: 'מפת קרקעות להשקעה בישראל — חדרה, נתניה, קיסריה. מחירים, תשואות, ייעודי קרקע.',
+        }
+  )
+
   if (isLoading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-navy">
@@ -267,6 +284,12 @@ export default function MapView() {
         compareIds={compareIds}
         onToggleCompare={toggleCompare}
         allPlots={filteredPlots}
+        onSelectPlot={handleSelectPlot}
+      />
+
+      <RecentlyViewed
+        plots={filteredPlots}
+        selectedPlot={selectedPlot}
         onSelectPlot={handleSelectPlot}
       />
 
