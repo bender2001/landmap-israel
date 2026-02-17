@@ -563,6 +563,49 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 </div>
               )}
 
+              {/* Area Price Benchmark */}
+              {(() => {
+                // Average land price per sqm in Hadera area (~1500 ILS/sqm for agricultural land)
+                const areaAvgPerSqm = 1500
+                const plotPricePerSqm = Math.round(totalPrice / sizeSqM)
+                const diffPct = Math.round(((plotPricePerSqm - areaAvgPerSqm) / areaAvgPerSqm) * 100)
+                const isBelow = diffPct < 0
+                const barPct = Math.min(100, Math.max(5, (plotPricePerSqm / (areaAvgPerSqm * 2)) * 100))
+                const avgBarPct = Math.min(100, (areaAvgPerSqm / (areaAvgPerSqm * 2)) * 100)
+                return (
+                  <div className="bg-navy-light/40 border border-white/5 rounded-xl p-3 mt-3 mb-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <BarChart3 className="w-3.5 h-3.5 text-gold" />
+                      <span className="text-xs font-medium text-slate-200">השוואה למחיר אזורי</span>
+                      <span className={`text-xs font-bold mr-auto ${isBelow ? 'text-green-400' : 'text-orange-400'}`}>
+                        {isBelow ? `${Math.abs(diffPct)}% מתחת` : `${diffPct}% מעל`} הממוצע
+                      </span>
+                    </div>
+                    <div className="relative h-3 rounded-full bg-white/5 overflow-hidden">
+                      <div
+                        className="absolute top-0 right-0 h-full rounded-full transition-all"
+                        style={{
+                          width: `${barPct}%`,
+                          background: isBelow
+                            ? 'linear-gradient(90deg, #22C55E, #4ADE80)'
+                            : 'linear-gradient(90deg, #F59E0B, #FB923C)',
+                        }}
+                      />
+                      {/* Area average marker */}
+                      <div
+                        className="absolute top-0 h-full w-0.5 bg-white/40"
+                        style={{ right: `${avgBarPct}%` }}
+                        title={`ממוצע אזורי: ₪${areaAvgPerSqm.toLocaleString()}/מ״ר`}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-[9px] text-slate-500">₪{plotPricePerSqm.toLocaleString()}/מ״ר (חלקה זו)</span>
+                      <span className="text-[9px] text-slate-500">₪{areaAvgPerSqm.toLocaleString()}/מ״ר (ממוצע)</span>
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* Associated Costs */}
               <div className="bg-navy-light/40 border border-white/5 rounded-xl p-3 mb-3">
                 <div className="flex items-center gap-2 mb-2">
@@ -586,6 +629,39 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   <div className="flex justify-between text-xs font-medium">
                     <span className="text-slate-300">סה&quot;כ עלות כוללת (ללא היטל)</span>
                     <span className="text-gold">{formatCurrency(Math.round(totalPrice * 1.0775))}</span>
+                  </div>
+                </div>
+              </div>
+              {/* Quick Investment Summary */}
+              <div className="bg-gradient-to-r from-gold/5 to-gold/10 border border-gold/20 rounded-xl p-3 mb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="w-3.5 h-3.5 text-gold" />
+                  <span className="text-xs font-medium text-slate-200">סיכום השקעה</span>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-400">רווח צפוי (ברוטו)</span>
+                    <span className="text-emerald-400 font-medium">{formatCurrency(projectedValue - totalPrice)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-400">רווח צפוי (נטו, אחרי היטל)</span>
+                    <span className="text-emerald-400 font-medium">{formatCurrency(Math.round((projectedValue - totalPrice) * 0.5))}</span>
+                  </div>
+                  {readinessEstimate && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400">זמן החזר משוער</span>
+                      <span className="text-gold font-medium">{readinessEstimate}</span>
+                    </div>
+                  )}
+                  <div className="h-px bg-white/5 my-1" />
+                  <div className="flex justify-between text-xs font-medium">
+                    <span className="text-slate-300">תשואה שנתית משוערת</span>
+                    <span className="text-gold">
+                      {(() => {
+                        const years = readinessEstimate?.includes('1-3') ? 2 : readinessEstimate?.includes('3-5') ? 4 : readinessEstimate?.includes('5+') ? 6 : 3
+                        return `~${Math.round(roi / years)}%`
+                      })()}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -775,12 +851,25 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
 
         {/* Sticky CTA footer */}
         <div className="sidebar-cta-footer">
-          <button
-            onClick={onOpenLeadModal}
-            className="cta-shimmer relative overflow-hidden w-full py-3.5 px-6 bg-gradient-to-r from-gold via-gold-bright to-gold rounded-2xl text-navy font-extrabold text-base shadow-lg shadow-gold/30 hover:shadow-xl hover:shadow-gold/40 hover:-translate-y-px transition-all duration-300"
-          >
-            צור קשר לפרטים מלאים
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onOpenLeadModal}
+              className="cta-shimmer relative overflow-hidden flex-1 py-3.5 px-6 bg-gradient-to-r from-gold via-gold-bright to-gold rounded-2xl text-navy font-extrabold text-base shadow-lg shadow-gold/30 hover:shadow-xl hover:shadow-gold/40 hover:-translate-y-px transition-all duration-300"
+            >
+              צור קשר לפרטים מלאים
+            </button>
+            <a
+              href={`https://wa.me/972500000000?text=${encodeURIComponent(`שלום, אני מעוניין בפרטים על גוש ${blockNumber} חלקה ${plot.number} ב${plot.city}`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-shrink-0 w-14 py-3.5 flex items-center justify-center bg-[#25D366] rounded-2xl hover:bg-[#20BD5A] hover:-translate-y-px transition-all duration-300 shadow-lg shadow-[#25D366]/20"
+              title="WhatsApp"
+            >
+              <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+              </svg>
+            </a>
+          </div>
           <div className="flex gap-2 mt-2.5">
             <ShareMenu
               plotTitle={`גוש ${blockNumber} חלקה ${plot.number} - ${plot.city}`}
