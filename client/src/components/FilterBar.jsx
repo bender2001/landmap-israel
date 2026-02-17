@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
 import SearchAutocomplete from './SearchAutocomplete'
 
-const cityOptions = [
+const baseCityOptions = [
   { label: 'כל הערים', value: 'all' },
   { label: 'חדרה', value: 'חדרה' },
   { label: 'נתניה', value: 'נתניה' },
@@ -108,6 +108,21 @@ export default function FilterBar({
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
 
+  // Dynamic city options with plot counts (like Madlan shows listing counts per area)
+  const cityOptions = useMemo(() => {
+    if (!allPlots || allPlots.length === 0) return baseCityOptions
+    const counts = {}
+    allPlots.forEach(p => {
+      const city = p.city || 'unknown'
+      counts[city] = (counts[city] || 0) + 1
+    })
+    return baseCityOptions.map(opt => {
+      if (opt.value === 'all') return { ...opt, label: `כל הערים (${allPlots.length})` }
+      const count = counts[opt.value] || 0
+      return { ...opt, label: `${opt.value} (${count})` }
+    })
+  }, [allPlots])
+
   // Derive price range value
   const priceRangeValue =
     priceRangeOptions.find(
@@ -153,8 +168,36 @@ export default function FilterBar({
     ? sizeRangeOptions.find((o) => o.value === sizeRangeValue)?.label
     : null
 
+  // Market snapshot stats
+  const marketStats = useMemo(() => {
+    if (!allPlots || allPlots.length === 0) return null
+    const available = allPlots.filter(p => p.status === 'AVAILABLE')
+    const totalSize = allPlots.reduce((s, p) => s + (p.size_sqm ?? p.sizeSqM ?? 0), 0)
+    const avgPricePerDunam = allPlots.length > 0
+      ? Math.round(allPlots.reduce((s, p) => {
+          const price = p.total_price ?? p.totalPrice ?? 0
+          const size = p.size_sqm ?? p.sizeSqM ?? 1
+          return s + (price / size * 1000)
+        }, 0) / allPlots.length)
+      : 0
+    return { available: available.length, totalDunam: (totalSize / 1000).toFixed(1), avgPricePerDunam }
+  }, [allPlots])
+
   return (
     <div className="filter-bar-container" dir="rtl">
+      {/* Market snapshot — like Madlan's data-driven header */}
+      {marketStats && !isExpanded && (
+        <div className="hidden md:flex items-center gap-4 mb-2 px-1 text-[10px] text-slate-500">
+          <span>🟢 {marketStats.available} זמינות</span>
+          <span className="w-px h-3 bg-white/10" />
+          <span>📐 {marketStats.totalDunam} דונם סה״כ</span>
+          <span className="w-px h-3 bg-white/10" />
+          <span>💰 ממוצע ₪{marketStats.avgPricePerDunam.toLocaleString()}/דונם</span>
+          <span className="w-px h-3 bg-white/10" />
+          <span>🕐 עודכן היום</span>
+        </div>
+      )}
+
       {/* ── Mobile: compact row with toggle + search side by side ── */}
       <div className="flex items-center gap-2 md:hidden mb-2">
         <button

@@ -5,7 +5,15 @@ export default function IntroOverlay({ onComplete }) {
 
   const skip = () => { setPhase(3); setTimeout(onComplete, 400) }
 
+  // Skip intro for returning visitors (show only on first visit)
   useEffect(() => {
+    const hasVisited = localStorage.getItem('landmap_intro_seen')
+    if (hasVisited) {
+      onComplete()
+      return
+    }
+    localStorage.setItem('landmap_intro_seen', '1')
+
     const t1 = setTimeout(() => setPhase(1), 400)
     const t2 = setTimeout(() => setPhase(2), 1200)
     const t3 = setTimeout(() => setPhase(3), 2800)
