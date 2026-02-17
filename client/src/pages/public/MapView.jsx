@@ -17,6 +17,7 @@ import RecentlyViewed from '../../components/RecentlyViewed.jsx'
 import ConnectionStatus from '../../components/ui/ConnectionStatus.jsx'
 import { useMetaTags } from '../../hooks/useMetaTags.js'
 import { formatCurrency } from '../../utils/formatters.js'
+import { Phone } from 'lucide-react'
 
 const initialFilters = {
   city: 'all',
@@ -270,6 +271,13 @@ export default function MapView() {
 
   return (
     <div className={`relative h-screen w-screen overflow-hidden bg-navy ${selectedPlot ? 'sidebar-open' : ''}`}>
+      {/* Skip navigation for accessibility */}
+      <a
+        href="#map-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:right-2 focus:z-[100] focus:bg-gold focus:text-navy focus:px-4 focus:py-2 focus:rounded-lg focus:font-bold"
+      >
+        דלג לתוכן המפה
+      </a>
       <ConnectionStatus />
       <MapArea
         plots={filteredPlots}
@@ -342,6 +350,18 @@ export default function MapView() {
         isOpen={isShortcutsOpen}
         onClose={() => setIsShortcutsOpen(false)}
       />
+
+      {/* Floating contact CTA — always visible, like competitors */}
+      {selectedPlot && (
+        <button
+          onClick={() => setIsLeadModalOpen(true)}
+          className="fixed bottom-20 sm:bottom-6 left-4 z-[45] flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-gold via-gold-bright to-gold text-navy font-extrabold text-sm rounded-2xl shadow-lg shadow-gold/30 hover:shadow-xl hover:scale-105 transition-all animate-bounce-in"
+          aria-label="צור קשר לגבי חלקה זו"
+        >
+          <Phone className="w-4 h-4" />
+          <span className="hidden sm:inline">צור קשר</span>
+        </button>
+      )}
     </div>
   )
 }

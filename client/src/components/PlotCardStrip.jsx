@@ -202,6 +202,26 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
                   })()}
                 </div>
 
+                {/* ROI visual bar */}
+                <div className="plot-card-mini-roi-bar">
+                  <div
+                    className="plot-card-mini-roi-bar-fill"
+                    style={{
+                      width: `${Math.min(100, Math.max(8, (price / (projValue || 1)) * 100))}%`,
+                      background: 'linear-gradient(90deg, #3B82F6, #60A5FA)',
+                    }}
+                  />
+                  <div
+                    className="plot-card-mini-roi-bar-proj"
+                    style={{
+                      width: '100%',
+                      background: 'linear-gradient(90deg, rgba(34,197,94,0.15), rgba(34,197,94,0.08))',
+                    }}
+                  />
+                  <span className="plot-card-mini-roi-bar-label">{formatPriceShort(price)}</span>
+                  <span className="plot-card-mini-roi-bar-target">→ {formatPriceShort(projValue)}</span>
+                </div>
+
                 {/* Price + ROI row */}
                 <div className="plot-card-mini-footer">
                   <div className="flex flex-col">
