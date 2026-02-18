@@ -1,8 +1,9 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Calculator as CalcIcon, TrendingUp, DollarSign, Percent, ArrowDown, Landmark, Table2, PiggyBank, Printer, Share2, Check } from 'lucide-react'
+import { Calculator as CalcIcon, TrendingUp, DollarSign, Percent, ArrowDown, Landmark, Table2, PiggyBank, Printer, Share2, Check, AlertTriangle, Target, Clock } from 'lucide-react'
 import { roiStages, zoningLabels, ZoningStage } from '../../utils/constants'
 import { formatCurrency } from '../../utils/formatters'
+import { calcTransactionCosts, calcExitCosts, calcAnnualHoldingCosts } from '../../utils/plot'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
 import BackToTopButton from '../../components/ui/BackToTopButton'
@@ -67,12 +68,21 @@ export default function Calculator() {
     const projectedValue = Math.round(targetPricePerSqm * size)
     const roiPercent = Math.round((projectedValue - price) / price * 100)
 
-    // Costs
-    const purchaseTax = Math.round(price * 0.06)
-    const lawyerFee = Math.round(price * 0.0175)
-    const bettermentLevy = Math.round((projectedValue - price) * 0.5)
-    const totalCosts = purchaseTax + lawyerFee
-    const netProfit = projectedValue - price - totalCosts - bettermentLevy
+    // Use centralized cost utilities (consistent with Compare page and sidebar)
+    const transaction = calcTransactionCosts(price)
+    const exit = calcExitCosts(price, projectedValue)
+    const years = parseFloat(holdingYears) || 5
+    const holding = calcAnnualHoldingCosts(price, size, currentZoning)
+    const totalHoldingCosts = holding.totalAnnual * years
+
+    // Legacy aliases for backward compatibility with existing UI
+    const purchaseTax = transaction.purchaseTax
+    const lawyerFee = transaction.attorneyFees
+    const bettermentLevy = exit.bettermentLevy
+    const capitalGainsTax = exit.capitalGains
+    const agentCommission = exit.agentCommission
+    const totalCosts = transaction.total
+    const netProfit = exit.netProfit - totalHoldingCosts
 
     // Progress stages
     const stages = roiStages.slice(cIdx, tIdx + 1).map((s, i) => ({
@@ -83,15 +93,35 @@ export default function Calculator() {
     }))
 
     // Annualized ROI (CAGR) based on holding period
-    const years = parseFloat(holdingYears) || 5
     const annualizedRoi = years > 0
       ? Math.round((Math.pow((projectedValue / price), 1 / years) - 1) * 100)
       : 0
     const netAnnualizedRoi = years > 0 && price > 0
       ? Math.round((Math.pow(((price + netProfit) / price), 1 / years) - 1) * 100)
       : 0
-    // Monthly cost of holding (opportunity cost at 4% annual)
-    const monthlyCost = Math.round((price * 0.04) / 12)
+
+    // Break-even analysis — what's the minimum selling price to not lose money?
+    // Includes all entry costs, holding costs, and exit cost structure.
+    // Investors use this to decide their minimum acceptable offer.
+    const breakEvenPrice = (() => {
+      // Total sunk costs: purchase + transaction + holding
+      const sunk = transaction.totalWithPurchase + totalHoldingCosts
+      // At break-even: sale_price - exit_costs(sale_price) = sunk
+      // exit_costs = betterment(50% of gain) + capital_gains(25% of taxable) + agent(1%)
+      // Simplify: iterate to find break-even (Newton's method approximation)
+      let guess = sunk * 1.1 // start slightly above sunk cost
+      for (let i = 0; i < 20; i++) {
+        const exitAtGuess = calcExitCosts(price, guess)
+        const net = guess - price - transaction.total - totalHoldingCosts - exitAtGuess.totalExit
+        const target = 0 // break-even = net profit of 0
+        const error = net - target
+        if (Math.abs(error) < 100) break // close enough (within ₪100)
+        // Adjust: if net > 0, guess is too high; if net < 0, guess is too low
+        guess -= error * 0.6 // damped correction
+      }
+      return Math.round(guess)
+    })()
+    const breakEvenPerSqm = size > 0 ? Math.round(breakEvenPrice / size) : 0
 
     // Financing calculations
     const dpPct = parseFloat(downPaymentPct) || 30
@@ -107,10 +137,12 @@ export default function Calculator() {
     const sensitivityYears = [3, 5, 7, 10, 15]
     const sensitivity = sensitivityYears.map(y => {
       const cagr = y > 0 ? Math.round((Math.pow(projectedValue / price, 1 / y) - 1) * 100) : 0
-      const netCagr = y > 0 && price > 0 ? Math.round((Math.pow((price + netProfit) / price, 1 / y) - 1) * 100) : 0
+      const holdCosts = holding.totalAnnual * y
+      const netAfterAll = exit.netProfit - holdCosts
+      const netCagr = y > 0 && price > 0 ? Math.round((Math.pow(Math.max(0, (price + netAfterAll)) / price, 1 / y) - 1) * 100) : 0
       const totalFinancingCost = calcMonthlyPayment(loanAmount, rate, Math.min(loanDuration, y)) * Math.min(loanDuration, y) * 12
-      const netWithFinancing = netProfit - (totalFinancingCost - loanAmount)
-      return { years: y, cagr, netCagr, netWithFinancing, isSelected: y === years }
+      const netWithFinancing = netAfterAll - (totalFinancingCost - loanAmount)
+      return { years: y, cagr, netCagr, netWithFinancing, holdCosts, isSelected: y === years }
     })
 
     return {
@@ -121,13 +153,23 @@ export default function Calculator() {
       purchaseTax,
       lawyerFee,
       bettermentLevy,
+      capitalGainsTax,
+      agentCommission,
       totalCosts,
       netProfit,
       stages,
       annualizedRoi,
       netAnnualizedRoi,
-      monthlyCost,
       holdingYears: years,
+      // Holding costs
+      holding,
+      totalHoldingCosts,
+      // Break-even
+      breakEvenPrice,
+      breakEvenPerSqm,
+      // Transaction detail
+      appraiserFee: transaction.appraiserFee,
+      registrationFee: transaction.registrationFee,
       // Financing
       downPayment,
       loanAmount,
@@ -328,9 +370,9 @@ export default function Calculator() {
                       <div className="text-[9px] text-slate-500 mt-0.5">על פני {result.holdingYears} שנים</div>
                     </div>
                     <div className="glass-panel p-4 text-center">
-                      <div className="text-[10px] text-slate-400 mb-1">עלות הזדמנות/חודש</div>
-                      <div className="text-lg font-bold text-red-400">{formatCurrency(result.monthlyCost)}</div>
-                      <div className="text-[9px] text-slate-500 mt-0.5">ריבית 4% שנתית</div>
+                      <div className="text-[10px] text-slate-400 mb-1">נקודת איזון</div>
+                      <div className="text-lg font-bold text-amber-400">{formatCurrency(result.breakEvenPrice)}</div>
+                      <div className="text-[9px] text-slate-500 mt-0.5">מינימום למכירה</div>
                     </div>
                   </div>
 
@@ -373,13 +415,15 @@ export default function Calculator() {
                     </div>
                   </div>
 
-                  {/* Costs breakdown */}
+                  {/* Costs breakdown — comprehensive P&L like Madlan's investment analysis */}
                   <div className="glass-panel p-5">
                     <h3 className="text-sm font-bold text-slate-100 mb-4 flex items-center gap-2">
                       <DollarSign className="w-4 h-4 text-gold" />
-                      פירוט עלויות
+                      פירוט עלויות מלא
                     </h3>
                     <div className="space-y-2.5">
+                      {/* Entry costs */}
+                      <div className="text-[10px] text-gold/70 font-semibold uppercase tracking-wider mb-1">עלויות כניסה</div>
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-400">מס רכישה (6%)</span>
                         <span className="text-slate-300">{formatCurrency(result.purchaseTax)}</span>
@@ -389,28 +433,119 @@ export default function Calculator() {
                         <span className="text-slate-300">{formatCurrency(result.lawyerFee)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
+                        <span className="text-slate-400">שמאי</span>
+                        <span className="text-slate-300">{formatCurrency(result.appraiserFee)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-400">אגרת רישום (טאבו)</span>
+                        <span className="text-slate-300">{formatCurrency(result.registrationFee)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-medium border-t border-white/5 pt-2">
+                        <span className="text-blue-400">סה״כ עלויות כניסה</span>
+                        <span className="text-blue-400">{formatCurrency(result.totalCosts)}</span>
+                      </div>
+
+                      {/* Holding costs — often overlooked by novice investors */}
+                      <div className="h-px bg-white/10 my-2" />
+                      <div className="text-[10px] text-gold/70 font-semibold uppercase tracking-wider mb-1">עלויות החזקה שנתיות</div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-400">ארנונה ({result.holding.arnonaPerSqm} ₪/מ״ר)</span>
+                        <span className="text-slate-300">{formatCurrency(result.holding.arnona)}/שנה</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-400">ניהול וגידור</span>
+                        <span className="text-slate-300">{formatCurrency(result.holding.management)}/שנה</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-slate-500">
+                        <span className="text-slate-500 italic">עלות הזדמנות (8% שנתי)</span>
+                        <span className="italic">{formatCurrency(result.holding.opportunityCost)}/שנה</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-medium border-t border-white/5 pt-2">
+                        <span className="text-orange-400">סה״כ {result.holdingYears} שנים (ללא הזדמנות)</span>
+                        <span className="text-orange-400">{formatCurrency(result.totalHoldingCosts)}</span>
+                      </div>
+
+                      {/* Exit costs */}
+                      <div className="h-px bg-white/10 my-2" />
+                      <div className="text-[10px] text-gold/70 font-semibold uppercase tracking-wider mb-1">עלויות יציאה</div>
+                      <div className="flex justify-between text-sm">
                         <span className="text-slate-400">היטל השבחה (50% מהרווח)</span>
-                        <span className="text-slate-300">{formatCurrency(result.bettermentLevy)}</span>
+                        <span className="text-red-400/80">-{formatCurrency(result.bettermentLevy)}</span>
                       </div>
-                      <div className="h-px bg-white/10 my-2" />
                       <div className="flex justify-between text-sm">
-                        <span className="text-slate-300 font-medium">סה"כ עלויות (ללא היטל)</span>
-                        <span className="text-gold font-bold">{formatCurrency(result.totalCosts)}</span>
+                        <span className="text-slate-400">מס שבח (25% מהחייב)</span>
+                        <span className="text-red-400/80">-{formatCurrency(result.capitalGainsTax)}</span>
                       </div>
-                      <div className="h-px bg-white/10 my-2" />
                       <div className="flex justify-between text-sm">
-                        <span className="text-slate-200 font-bold">רווח נקי משוער</span>
-                        <span className={`font-bold text-lg ${result.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {formatCurrency(result.netProfit)}
-                        </span>
+                        <span className="text-slate-400">עמלת מתווך (~1%)</span>
+                        <span className="text-red-400/80">-{formatCurrency(result.agentCommission)}</span>
                       </div>
-                      <div className="flex justify-between text-sm mt-1">
-                        <span className="text-slate-400">תשואה נקי שנתית (CAGR)</span>
-                        <span className={`font-bold ${result.netAnnualizedRoi >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                          +{result.netAnnualizedRoi}%
-                        </span>
+
+                      {/* Bottom line */}
+                      <div className="h-px bg-white/10 my-3" />
+                      <div className={`rounded-xl p-3 ${result.netProfit >= 0 ? 'bg-emerald-500/8' : 'bg-red-500/8'}`}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-slate-200 font-bold">✨ רווח נקי (אחרי הכל)</span>
+                          <span className={`font-bold text-lg ${result.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {formatCurrency(result.netProfit)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-slate-500">תשואה נקי שנתית (CAGR)</span>
+                          <span className={`font-bold ${result.netAnnualizedRoi >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {result.netAnnualizedRoi >= 0 ? '+' : ''}{result.netAnnualizedRoi}%
+                          </span>
+                        </div>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Break-even analysis — shows minimum selling price to avoid loss.
+                      Key negotiation tool: investors know their floor price. */}
+                  <div className="glass-panel p-5 border-amber-500/10">
+                    <h3 className="text-sm font-bold text-slate-100 mb-4 flex items-center gap-2">
+                      <Target className="w-4 h-4 text-amber-400" />
+                      ניתוח נקודת איזון
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div className="bg-navy-light/40 rounded-xl p-3 text-center">
+                        <div className="text-[10px] text-slate-400 mb-1">מחיר מכירה מינימלי</div>
+                        <div className="text-lg font-bold text-amber-400">{formatCurrency(result.breakEvenPrice)}</div>
+                        <div className="text-[9px] text-slate-500 mt-0.5">לא להפסיד כסף</div>
+                      </div>
+                      <div className="bg-navy-light/40 rounded-xl p-3 text-center">
+                        <div className="text-[10px] text-slate-400 mb-1">מחיר/מ״ר מינימלי</div>
+                        <div className="text-lg font-bold text-amber-400">{result.breakEvenPerSqm.toLocaleString()} ₪</div>
+                        <div className="text-[9px] text-slate-500 mt-0.5">vs {result.targetPricePerSqm.toLocaleString()} ₪ צפי</div>
+                      </div>
+                    </div>
+                    <div className="relative h-3 rounded-full bg-white/5 overflow-hidden">
+                      <div
+                        className="absolute inset-y-0 right-0 rounded-full bg-gradient-to-l from-red-500/30 to-red-500/5"
+                        style={{ width: `${Math.min(100, (result.breakEvenPrice / result.projectedValue) * 100)}%` }}
+                      />
+                      <div
+                        className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-navy shadow-sm z-10"
+                        style={{ right: `calc(${Math.min(96, (result.breakEvenPrice / result.projectedValue) * 100)}% - 5px)` }}
+                        title={`נקודת איזון: ${formatCurrency(result.breakEvenPrice)}`}
+                      />
+                      <div
+                        className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-navy shadow-sm z-10"
+                        style={{ right: 'calc(100% - 10px)' }}
+                        title={`שווי צפוי: ${formatCurrency(result.projectedValue)}`}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-1.5 text-[9px] text-slate-500">
+                      <span>מחיר רכישה</span>
+                      <span className="text-amber-400">איזון</span>
+                      <span className="text-emerald-400">שווי צפוי</span>
+                    </div>
+                    {result.breakEvenPrice < result.projectedValue && (
+                      <div className="mt-3 flex items-center gap-2 text-[11px] text-emerald-400/80">
+                        <span>✅</span>
+                        <span>מרווח ביטחון: {formatCurrency(result.projectedValue - result.breakEvenPrice)} ({Math.round((1 - result.breakEvenPrice / result.projectedValue) * 100)}% מתחת לצפי)</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Financing breakdown */}
@@ -458,6 +593,12 @@ export default function Calculator() {
                             <th className="text-right py-2 font-medium">שנים</th>
                             <th className="text-center py-2 font-medium">CAGR ברוטו</th>
                             <th className="text-center py-2 font-medium">CAGR נטו</th>
+                            <th className="text-center py-2 font-medium">
+                              <span className="flex items-center justify-center gap-1">
+                                <Clock className="w-2.5 h-2.5" />
+                                עלות החזקה
+                              </span>
+                            </th>
                             {showFinancing && result.loanAmount > 0 && (
                               <th className="text-center py-2 font-medium">רווח אחרי מימון</th>
                             )}
@@ -476,6 +617,9 @@ export default function Calculator() {
                               <td className={`py-2.5 text-center font-medium ${row.netCagr >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                 {row.netCagr >= 0 ? '+' : ''}{row.netCagr}%
                               </td>
+                              <td className="py-2.5 text-center text-orange-400/70 text-[11px]">
+                                {formatCurrency(row.holdCosts)}
+                              </td>
                               {showFinancing && result.loanAmount > 0 && (
                                 <td className={`py-2.5 text-center font-medium ${row.netWithFinancing >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
                                   {formatCurrency(row.netWithFinancing)}
@@ -487,7 +631,7 @@ export default function Calculator() {
                       </table>
                     </div>
                     <p className="text-[9px] text-slate-600 mt-3">
-                      CAGR ברוטו = תשואה שנתית לפני עלויות. CAGR נטו = אחרי מסים, עו"ד והיטל השבחה.
+                      CAGR ברוטו = תשואה שנתית לפני עלויות. CAGR נטו = אחרי כל המסים, עלויות כניסה/יציאה + החזקה שנתית.
                       {showFinancing && result.loanAmount > 0 && ' רווח אחרי מימון = רווח נקי בניכוי עלויות ריבית.'}
                     </p>
                   </div>

@@ -12,6 +12,7 @@ import AnimatedNumber from './ui/AnimatedNumber'
 import NeighborhoodRadar from './ui/NeighborhoodRadar'
 import InvestmentBenchmark from './ui/InvestmentBenchmark'
 import PlotPercentileBadges from './ui/PlotPercentileBadges'
+import { calcInvestmentPnL } from '../utils/plot'
 import { usePlot, useNearbyPlots, useSimilarPlots, usePrefetchPlot, useNearbyPois } from '../hooks/usePlots'
 import MiniMap from './ui/MiniMap'
 import StreetViewPanel from './ui/StreetViewPanel'
@@ -880,23 +881,23 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
         <div class="row"><span class="label">ייעוד קרקע</span><span class="val">${zoningLabels[zoning] || zoning}</span></div>
         ${readiness ? `<div class="row"><span class="label">מוכנות לבנייה</span><span class="val">${readiness}</span></div>` : ''}
       </div>
-      <div class="section">
+      ${(() => {
+        const pnl = calcInvestmentPnL(plot, readiness && readiness.startsWith('1-3') ? 2 : readiness && readiness.startsWith('3-5') ? 4 : readiness && readiness.startsWith('5') ? 7 : 5)
+        const yrs = pnl.holdingYears
+        return `<div class="section">
         <h2>עלויות נלוות (הערכה)</h2>
-        <div class="row"><span class="label">מס רכישה (6%)</span><span class="val">${formatCurrency(Math.round(price * 0.06))}</span></div>
-        <div class="row"><span class="label">שכ״ט עו״ד (~1.75%)</span><span class="val">${formatCurrency(Math.round(price * 0.0175))}</span></div>
-        <div class="row"><span class="label">היטל השבחה משוער</span><span class="val">${formatCurrency(Math.round((proj - price) * 0.5))}</span></div>
-        <div class="row"><span class="label">סה״כ עלות כוללת</span><span class="val" style="color:#C8942A">${formatCurrency(Math.round(price * 1.0775))}</span></div>
-        ${(() => {
-          const gp = proj - price
-          const costs = Math.round(price * 0.0775)
-          const betterment = Math.round(gp * 0.5)
-          const taxable = Math.max(0, gp - betterment - costs)
-          const capGains = Math.round(taxable * 0.25)
-          const net = gp - costs - betterment - capGains
-          return `<div class="row"><span class="label">מס שבח (25%)</span><span class="val" style="color:#EF4444">-${formatCurrency(capGains)}</span></div>
-        <div class="row"><span class="label">רווח נקי (אחרי כל המיסים)</span><span class="val" style="color:#22C55E">${formatCurrency(net)}</span></div>`
-        })()}
-      </div>
+        <div class="row"><span class="label">מס רכישה (6%)</span><span class="val">${formatCurrency(pnl.transaction.purchaseTax)}</span></div>
+        <div class="row"><span class="label">שכ״ט עו״ד (~1.75%)</span><span class="val">${formatCurrency(pnl.transaction.attorneyFees)}</span></div>
+        <div class="row"><span class="label">שמאי</span><span class="val">${formatCurrency(pnl.transaction.appraiserFee)}</span></div>
+        <div class="row"><span class="label">סה״כ עלות כניסה</span><span class="val" style="color:#C8942A">${formatCurrency(pnl.transaction.totalWithPurchase)}</span></div>
+        <div class="row"><span class="label">ארנונה + ניהול (${yrs} שנים)</span><span class="val" style="color:#F97316">${formatCurrency(pnl.totalHoldingCosts)}</span></div>
+        <div class="row"><span class="label">היטל השבחה (50%)</span><span class="val" style="color:#EF4444">-${formatCurrency(pnl.exit.bettermentLevy)}</span></div>
+        <div class="row"><span class="label">מס שבח (25%)</span><span class="val" style="color:#EF4444">-${formatCurrency(pnl.exit.capitalGains)}</span></div>
+        <div class="row"><span class="label">עמלת מתווך (~1%)</span><span class="val" style="color:#EF4444">-${formatCurrency(pnl.exit.agentCommission)}</span></div>
+        <div class="row"><span class="label">רווח נקי (אחרי הכל)</span><span class="val" style="color:#22C55E;font-size:15px;font-weight:800">${formatCurrency(pnl.netProfit)}</span></div>
+        <div class="row"><span class="label">ROI נטו (אחרי הכל)</span><span class="val" style="color:#C8942A;font-weight:700">${pnl.trueRoi}%</span></div>
+      </div>`
+      })()}
       ${(() => {
         const center = plotCenter(plot.coordinates)
         if (!center) return ''
@@ -1427,32 +1428,40 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
           })()}
 
           <div className="px-6 pb-6">
-            {/* Total Investment Summary — the #1 thing investors want to see upfront */}
+            {/* Total Investment Summary — the #1 thing investors want to see upfront.
+                Uses centralized calcInvestmentPnL for consistent calculations across
+                the entire app (sidebar, compare page, calculator, print reports). */}
             {(() => {
-              const purchaseTax = Math.round(totalPrice * 0.06)
-              const attorneyFees = Math.round(totalPrice * 0.0175)
-              const totalCashNeeded = totalPrice + purchaseTax + attorneyFees
-              const grossProfit = projectedValue - totalPrice
-              const bettermentLevyAmt = Math.round(grossProfit * 0.5)
-              const costs = purchaseTax + attorneyFees
-              const taxable = Math.max(0, grossProfit - bettermentLevyAmt - costs)
-              const capGains = Math.round(taxable * 0.25)
-              const netProfit = grossProfit - costs - bettermentLevyAmt - capGains
-              const netRoi = totalPrice > 0 ? Math.round((netProfit / totalCashNeeded) * 100) : 0
+              const readiness = readinessEstimate || ''
+              // Extract holding years estimate from readiness (e.g., "1-3" → 2, "3-5" → 4, "5+" → 7)
+              const holdingYears = readiness.startsWith('1-3') ? 2 : readiness.startsWith('3-5') ? 4 : readiness.startsWith('5') ? 7 : 5
+              const pnl = calcInvestmentPnL(plot, holdingYears)
               return (
                 <div className="bg-gradient-to-r from-navy-light/60 to-navy-light/40 border border-gold/15 rounded-2xl p-4 mb-4 animate-stagger-1">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="text-center">
                       <div className="text-[10px] text-slate-500 mb-0.5">💰 סה״כ השקעה נדרשת</div>
-                      <div className="text-lg font-black text-blue-400">{formatCurrency(totalCashNeeded)}</div>
-                      <div className="text-[9px] text-slate-600">כולל מיסים ושכ״ט</div>
+                      <div className="text-lg font-black text-blue-400">{formatCurrency(pnl.totalInvestment)}</div>
+                      <div className="text-[9px] text-slate-600">כולל מיסים, שכ״ט + {holdingYears}ש׳ החזקה</div>
                     </div>
                     <div className="text-center">
                       <div className="text-[10px] text-slate-500 mb-0.5">✨ רווח נקי צפוי</div>
-                      <div className={`text-lg font-black ${netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatCurrency(netProfit)}</div>
-                      <div className="text-[9px] text-slate-600">אחרי כל המיסים · {netRoi}% ROI נטו</div>
+                      <div className={`text-lg font-black ${pnl.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatCurrency(pnl.netProfit)}</div>
+                      <div className="text-[9px] text-slate-600">אחרי הכל · {pnl.trueRoi}% ROI נטו</div>
                     </div>
                   </div>
+                  {/* Holding costs micro-detail — often overlooked, critical for true ROI */}
+                  {pnl.totalHoldingCosts > 0 && (
+                    <div className="flex items-center justify-center gap-3 mt-2.5 pt-2.5 border-t border-white/5 text-[9px]">
+                      <span className="text-slate-600">
+                        ארנונה + ניהול: {formatCurrency(pnl.annual.totalAnnual)}/שנה
+                      </span>
+                      <span className="text-slate-700">·</span>
+                      <span className="text-orange-400/60">
+                        סה״כ {holdingYears} שנים: {formatCurrency(pnl.totalHoldingCosts)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )
             })()}
