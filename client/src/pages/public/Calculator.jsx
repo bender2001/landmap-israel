@@ -12,6 +12,7 @@ export default function Calculator() {
   const [plotSize, setPlotSize] = useState('')
   const [currentZoning, setCurrentZoning] = useState('AGRICULTURAL')
   const [targetZoning, setTargetZoning] = useState('BUILDING_PERMIT')
+  const [holdingYears, setHoldingYears] = useState('5')
 
   const result = useMemo(() => {
     const price = parseFloat(purchasePrice)
@@ -51,6 +52,17 @@ export default function Calculator() {
       isTarget: i === tIdx - cIdx,
     }))
 
+    // Annualized ROI (CAGR) based on holding period
+    const years = parseFloat(holdingYears) || 5
+    const annualizedRoi = years > 0
+      ? Math.round((Math.pow((projectedValue / price), 1 / years) - 1) * 100)
+      : 0
+    const netAnnualizedRoi = years > 0 && price > 0
+      ? Math.round((Math.pow(((price + netProfit) / price), 1 / years) - 1) * 100)
+      : 0
+    // Monthly cost of holding (opportunity cost at 4% annual)
+    const monthlyCost = Math.round((price * 0.04) / 12)
+
     return {
       currentPricePerSqm,
       targetPricePerSqm,
@@ -62,8 +74,12 @@ export default function Calculator() {
       totalCosts,
       netProfit,
       stages,
+      annualizedRoi,
+      netAnnualizedRoi,
+      monthlyCost,
+      holdingYears: years,
     }
-  }, [purchasePrice, plotSize, currentZoning, targetZoning])
+  }, [purchasePrice, plotSize, currentZoning, targetZoning, holdingYears])
 
   return (
     <div className="min-h-screen bg-navy" dir="rtl">
@@ -140,6 +156,22 @@ export default function Calculator() {
                     ))}
                   </select>
                 </div>
+
+                {/* Holding period */}
+                <div>
+                  <label className="text-xs text-slate-400 mb-1.5 block">תקופת החזקה (שנים)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    placeholder="5"
+                    value={holdingYears}
+                    onChange={(e) => setHoldingYears(e.target.value)}
+                    className="w-full px-4 py-3 bg-navy-light/60 border border-white/10 rounded-xl text-slate-200 placeholder-slate-500 focus:border-gold/50 focus:outline-none transition"
+                    dir="ltr"
+                  />
+                  <p className="text-[10px] text-slate-600 mt-1">משפיע על חישוב תשואה שנתית (CAGR)</p>
+                </div>
               </div>
             </div>
 
@@ -154,7 +186,7 @@ export default function Calculator() {
               ) : (
                 <>
                   {/* KPI cards */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     <div className="glass-panel p-4 text-center">
                       <div className="text-[10px] text-slate-400 mb-1">מחיר/מ"ר נוכחי</div>
                       <div className="text-lg font-bold text-blue-400">{result.currentPricePerSqm.toLocaleString()} ₪</div>
@@ -168,8 +200,18 @@ export default function Calculator() {
                       <div className="text-lg font-bold text-gold">{formatCurrency(result.projectedValue)}</div>
                     </div>
                     <div className="glass-panel p-4 text-center">
-                      <div className="text-[10px] text-slate-400 mb-1">תשואה</div>
+                      <div className="text-[10px] text-slate-400 mb-1">תשואה כוללת</div>
                       <div className="text-lg font-bold text-emerald-400">+{result.roiPercent}%</div>
+                    </div>
+                    <div className="glass-panel p-4 text-center relative">
+                      <div className="text-[10px] text-slate-400 mb-1">תשואה שנתית (CAGR)</div>
+                      <div className="text-lg font-bold text-amber-400">+{result.annualizedRoi}%</div>
+                      <div className="text-[9px] text-slate-500 mt-0.5">על פני {result.holdingYears} שנים</div>
+                    </div>
+                    <div className="glass-panel p-4 text-center">
+                      <div className="text-[10px] text-slate-400 mb-1">עלות הזדמנות/חודש</div>
+                      <div className="text-lg font-bold text-red-400">{formatCurrency(result.monthlyCost)}</div>
+                      <div className="text-[9px] text-slate-500 mt-0.5">ריבית 4% שנתית</div>
                     </div>
                   </div>
 
@@ -241,6 +283,12 @@ export default function Calculator() {
                         <span className="text-slate-200 font-bold">רווח נקי משוער</span>
                         <span className={`font-bold text-lg ${result.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                           {formatCurrency(result.netProfit)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm mt-1">
+                        <span className="text-slate-400">תשואה נקי שנתית (CAGR)</span>
+                        <span className={`font-bold ${result.netAnnualizedRoi >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          +{result.netAnnualizedRoi}%
                         </span>
                       </div>
                     </div>
