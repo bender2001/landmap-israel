@@ -593,6 +593,15 @@ body {
   letter-spacing: 0.02em;
 }
 
+.leaflet-tooltip.price-tooltip .tooltip-score-row {
+  font-size: 8px;
+  font-weight: 600;
+  color: rgba(203, 213, 225, 0.55);
+  text-shadow: none;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
 .leaflet-tooltip.price-tooltip .tooltip-deal-badge {
   font-size: 8px;
   font-weight: 800;
@@ -626,6 +635,9 @@ body {
     font-size: 10px;
   }
   .leaflet-tooltip.price-tooltip .tooltip-sub {
+    font-size: 7px;
+  }
+  .leaflet-tooltip.price-tooltip .tooltip-score-row {
     font-size: 7px;
   }
 }

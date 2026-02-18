@@ -6,7 +6,7 @@ import PriceTrendChart from './ui/PriceTrendChart'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import ProfitWaterfall from './ui/ProfitWaterfall'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
-import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict } from '../utils/formatters'
+import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict, generatePlotSummary } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
 import NeighborhoodRadar from './ui/NeighborhoodRadar'
 import InvestmentBenchmark from './ui/InvestmentBenchmark'
@@ -430,6 +430,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
   const [showScrollTop, setShowScrollTop] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
   const [gushCopied, setGushCopied] = useState(false)
+  const [summaryCopied, setSummaryCopied] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
@@ -1891,6 +1892,26 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               title="הדפס דו״ח השקעה"
             >
               <Printer className="w-4 h-4 text-slate-400 hover:text-gold" />
+            </button>
+            <button
+              onClick={() => {
+                const summary = generatePlotSummary(plot)
+                navigator.clipboard.writeText(summary).then(() => {
+                  setSummaryCopied(true)
+                  setTimeout(() => setSummaryCopied(false), 2500)
+                }).catch(() => {})
+              }}
+              className={`flex-shrink-0 w-11 flex items-center justify-center border rounded-xl transition-all ${
+                summaryCopied
+                  ? 'bg-emerald-500/15 border-emerald-500/30'
+                  : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-gold/20'
+              }`}
+              title="העתק סיכום השקעה (לשיתוף בוואטסאפ)"
+            >
+              {summaryCopied
+                ? <Check className="w-4 h-4 text-emerald-400" />
+                : <Clipboard className="w-4 h-4 text-slate-400 hover:text-gold" />
+              }
             </button>
             <ShareMenu
               plotTitle={`גוש ${blockNumber} חלקה ${plot.number} - ${plot.city}`}

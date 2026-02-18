@@ -413,6 +413,76 @@ export function calcRiskLevel(plot, allPlots) {
 }
 
 /**
+ * Generate a WhatsApp-friendly text summary of a plot for sharing.
+ * Israeli real estate agents and investors share plot info via WhatsApp
+ * group chats constantly — this generates a clean, compact summary
+ * with key financial metrics that's easy to read on mobile.
+ *
+ * @param {Object} plot - The plot object
+ * @returns {string} Formatted multi-line text summary
+ */
+export function generatePlotSummary(plot) {
+  if (!plot) return ''
+
+  const bn = plot.block_number ?? plot.blockNumber
+  const price = plot.total_price ?? plot.totalPrice ?? 0
+  const projected = plot.projected_value ?? plot.projectedValue ?? 0
+  const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
+  const roi = price > 0 ? Math.round(((projected - price) / price) * 100) : 0
+  const readiness = plot.readiness_estimate ?? plot.readinessEstimate ?? ''
+  const zoning = plot.zoning_stage ?? plot.zoningStage ?? ''
+  const score = calcInvestmentScore(plot)
+  const cagrData = calcCAGR(roi, readiness)
+
+  // Full financial breakdown (mirrors SidebarDetails/PlotDetail calculations)
+  const purchaseTax = Math.round(price * 0.06)
+  const attorneyFees = Math.round(price * 0.0175)
+  const totalInvestment = price + purchaseTax + attorneyFees
+  const grossProfit = projected - price
+  const bettermentLevy = Math.round(grossProfit * 0.5)
+  const costs = purchaseTax + attorneyFees
+  const taxable = Math.max(0, grossProfit - bettermentLevy - costs)
+  const capGains = Math.round(taxable * 0.25)
+  const netProfit = grossProfit - costs - bettermentLevy - capGains
+
+  // Import zoningLabels would create circular dependency, so inline basic mapping
+  const zoningNames = {
+    AGRICULTURAL: 'חקלאית',
+    MASTER_PLAN_DEPOSIT: 'הפקדת מתאר',
+    MASTER_PLAN_APPROVED: 'מתאר מאושר',
+    DETAILED_PLAN_PREP: 'הכנת מפורטת',
+    DETAILED_PLAN_DEPOSIT: 'הפקדת מפורטת',
+    DETAILED_PLAN_APPROVED: 'מפורטת מאושרת',
+    DEVELOPER_TENDER: 'מכרז יזמים',
+    BUILDING_PERMIT: 'היתר בנייה',
+  }
+
+  const lines = [
+    `🏗️ *גוש ${bn} | חלקה ${plot.number}*`,
+    `📍 ${plot.city}`,
+    ``,
+    `💰 מחיר: ${formatCurrency(price)}`,
+    `📐 שטח: ${formatDunam(sizeSqM)} דונם (${sizeSqM.toLocaleString()} מ״ר)`,
+    sizeSqM > 0 ? `💵 מחיר/דונם: ${formatCurrency(Math.round(price / sizeSqM * 1000))}` : null,
+    zoning && zoningNames[zoning] ? `🗺️ ייעוד: ${zoningNames[zoning]}` : null,
+    ``,
+    `📈 תשואה צפויה: +${roi}%`,
+    cagrData ? `📊 CAGR: ${cagrData.cagr}%/שנה (${cagrData.years} שנים)` : null,
+    `⭐ ציון השקעה: ${score}/10`,
+    ``,
+    `💰 סה״כ השקעה נדרשת: ${formatCurrency(totalInvestment)}`,
+    `✨ רווח נקי (אחרי מיסים): ${formatCurrency(netProfit)}`,
+    readiness ? `⏳ מוכנות לבנייה: ${readiness}` : null,
+    ``,
+    typeof window !== 'undefined' ? `🔗 ${window.location.origin}/plot/${plot.id}` : null,
+    ``,
+    `_LandMap Israel — מפת קרקעות להשקעה_`,
+  ]
+
+  return lines.filter(line => line !== null).join('\n')
+}
+
+/**
  * Calculate percentile rank of a value within a sorted array.
  * Returns 0-100 (what percentage of values are below this one).
  * E.g., percentile=80 means "better than 80% of plots".
