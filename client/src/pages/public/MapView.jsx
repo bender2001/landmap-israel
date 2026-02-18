@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useCallback, useEffect, useRef, Suspense } from 'react'
+﻿import { useState, useMemo, useCallback, useEffect, useRef, Suspense, useDeferredValue } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAllPlots } from '../../hooks/usePlots.js'
 import { usePois } from '../../hooks/usePois.js'
@@ -149,7 +149,7 @@ export default function MapView() {
   }, [roiFilteredPlots, debouncedSearch])
 
   // Sort
-  const filteredPlots = useMemo(() => {
+  const sortedPlots = useMemo(() => {
     if (sortBy === 'default') return searchedPlots
     const sorted = [...searchedPlots]
     const getPrice = (p) => p.total_price ?? p.totalPrice ?? 0
@@ -180,6 +180,10 @@ export default function MapView() {
     }
     return sorted
   }, [searchedPlots, sortBy])
+
+  // Defer heavy plot list updates so filter inputs stay responsive
+  const filteredPlots = useDeferredValue(sortedPlots)
+  const isFilterStale = filteredPlots !== sortedPlots
 
   // URL sync: open plot from ?plot=id on load
   useEffect(() => {
@@ -274,6 +278,9 @@ export default function MapView() {
 
   const handleCloseSidebar = useCallback(() => {
     setSelectedPlot(null)
+    // Return focus to map area for keyboard users
+    const mapEl = document.getElementById('map-content')
+    if (mapEl) mapEl.focus({ preventScroll: true })
   }, [])
 
   const handleFilterChange = useCallback((key, value) => {
@@ -357,6 +364,12 @@ export default function MapView() {
 
   return (
     <div className={`relative h-screen w-screen overflow-hidden bg-navy ${selectedPlot ? 'sidebar-open' : ''}`}>
+      {/* Filter transition indicator */}
+      {isFilterStale && (
+        <div className="fixed top-0 left-0 right-0 z-[100] h-0.5">
+          <div className="h-full bg-gradient-to-r from-gold via-gold-bright to-gold animate-pulse rounded-full" />
+        </div>
+      )}
       {/* Skip navigation for accessibility */}
       <a
         href="#map-content"
