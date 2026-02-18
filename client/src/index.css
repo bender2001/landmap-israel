@@ -677,7 +677,7 @@ body {
 
 .filter-bar-container {
   position: fixed;
-  top: 16px;
+  top: 36px; /* Below MarketTicker (28px) + gap */
   left: 50%;
   transform: translateX(-50%);
   z-index: 30;

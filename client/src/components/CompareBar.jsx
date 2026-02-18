@@ -1,10 +1,12 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarChart3, X, ArrowLeft } from 'lucide-react'
+import { BarChart3, X, ArrowLeft, Share2, Check } from 'lucide-react'
 import { statusColors } from '../utils/constants'
 import { formatPriceShort } from '../utils/formatters'
 
 export default function CompareBar({ compareIds, plots, onRemove, onClear }) {
   const navigate = useNavigate()
+  const [linkCopied, setLinkCopied] = useState(false)
 
   if (!compareIds || compareIds.length === 0) return null
 
@@ -64,6 +66,22 @@ export default function CompareBar({ compareIds, plots, onRemove, onClear }) {
           >
             נקה
           </button>
+          {comparePlots.length >= 2 && (
+            <button
+              onClick={() => {
+                const url = `${window.location.origin}/compare?plots=${compareIds.join(',')}`
+                navigator.clipboard.writeText(url).then(() => {
+                  setLinkCopied(true)
+                  setTimeout(() => setLinkCopied(false), 2000)
+                }).catch(() => {})
+              }}
+              className="flex items-center gap-1 text-xs text-slate-400 hover:text-gold transition px-2 py-1 rounded-lg hover:bg-white/5"
+              title="העתק קישור להשוואה"
+            >
+              {linkCopied ? <Check className="w-3 h-3 text-green-400" /> : <Share2 className="w-3 h-3" />}
+              <span className="hidden sm:inline">{linkCopied ? 'הועתק!' : 'שתף'}</span>
+            </button>
+          )}
           <button
             onClick={() => navigate(`/compare?plots=${compareIds.join(',')}`)}
             disabled={comparePlots.length < 2}
