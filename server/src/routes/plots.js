@@ -4,6 +4,7 @@ import { getPublishedPlots, getPlotById, getPlotStats } from '../services/plotSe
 import { sanitizePlotQuery, sanitizePlotId } from '../middleware/sanitize.js'
 import { analytics } from '../services/analyticsService.js'
 import { plotCache, statsCache } from '../services/cacheService.js'
+import { supabaseAdmin } from '../config/supabase.js'
 
 const router = Router()
 
@@ -141,6 +142,42 @@ router.get('/featured', async (req, res, next) => {
   }
 })
 
+// GET /api/plots/popular - Most viewed plots (social proof, like Yad2's "הכי נצפים")
+// Returns plots sorted by view count, useful for "trending" badges and a popular section.
+router.get('/popular', async (req, res, next) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 6, 20)
+    const days = Math.min(parseInt(req.query.days) || 30, 90)
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
+
+    const cacheKey = `popular:${limit}:${days}`
+    const popular = await plotCache.wrap(cacheKey, async () => {
+      const { data, error } = await supabaseAdmin
+        .from('plots')
+        .select('id, block_number, number, city, status, total_price, projected_value, size_sqm, readiness_estimate, views, created_at, plot_images(id, url, alt)')
+        .eq('is_published', true)
+        .gt('views', 0)
+        .order('views', { ascending: false })
+        .limit(limit)
+
+      if (error) throw error
+      if (!data || data.length === 0) return []
+
+      // Enrich with computed metrics
+      return data.map(p => {
+        const price = p.total_price || 0
+        const proj = p.projected_value || 0
+        const roi = price > 0 ? Math.round(((proj - price) / price) * 100) : 0
+        return { ...p, _roi: roi }
+      })
+    }, 300_000)
+
+    res.json(popular)
+  } catch (err) {
+    next(err)
+  }
+})
+
 // GET /api/plots/:id/nearby - Find plots near a given plot (geo-proximity)
 router.get('/:id/nearby', sanitizePlotId, async (req, res, next) => {
   try {
@@ -209,7 +246,6 @@ router.post('/:id/view', sanitizePlotId, async (req, res) => {
   res.json({ ok: true })
 
   try {
-    const { supabaseAdmin } = await import('../config/supabase.js')
     // Try RPC first (atomic increment, best approach)
     const { error: rpcError } = await supabaseAdmin.rpc('increment_views', { plot_id: req.params.id })
     if (rpcError) {

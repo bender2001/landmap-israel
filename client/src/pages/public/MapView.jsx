@@ -5,6 +5,7 @@ import { usePois } from '../../hooks/usePois.js'
 import { useFavorites } from '../../hooks/useFavorites.js'
 import { useDebounce } from '../../hooks/useDebounce.js'
 import MapArea from '../../components/MapArea.jsx'
+import MapErrorBoundary from '../../components/ui/MapErrorBoundary.jsx'
 import FilterBar from '../../components/FilterBar.jsx'
 import PlotCardStrip from '../../components/PlotCardStrip.jsx'
 import CompareBar from '../../components/CompareBar.jsx'
@@ -471,17 +472,19 @@ export default function MapView() {
           <AlertSubscription filters={filters} statusFilter={statusFilter} />
         </WidgetErrorBoundary>
       </Suspense>
-      <MapArea
-        plots={filteredPlots}
-        pois={pois}
-        selectedPlot={selectedPlot}
-        onSelectPlot={handleSelectPlot}
-        statusFilter={statusFilter}
-        onToggleStatus={handleToggleStatus}
-        favorites={favorites}
-        compareIds={compareIds}
-        onToggleCompare={toggleCompare}
-      />
+      <MapErrorBoundary>
+        <MapArea
+          plots={filteredPlots}
+          pois={pois}
+          selectedPlot={selectedPlot}
+          onSelectPlot={handleSelectPlot}
+          statusFilter={statusFilter}
+          onToggleStatus={handleToggleStatus}
+          favorites={favorites}
+          compareIds={compareIds}
+          onToggleCompare={toggleCompare}
+        />
+      </MapErrorBoundary>
 
       <FilterBar
         filters={filters}

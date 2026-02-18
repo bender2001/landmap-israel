@@ -57,7 +57,9 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
   const createdAt = plot.created_at ?? plot.createdAt
   const daysSinceCreated = createdAt ? Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)) : Infinity
   const isNew = daysSinceCreated <= 7
-  const isHot = (plot.views ?? 0) >= 10
+  const viewCount = plot.views ?? 0
+  const isHot = viewCount >= 10
+  const isTrending = viewCount >= 5 && viewCount < 10
 
   return (
     <div
@@ -73,8 +75,8 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
       style={{ '--card-color': color }}
       aria-label={`גוש ${blockNum} חלקה ${plot.number}, ${plot.city}, ${formatPriceShort(price)}, תשואה +${roi}%`}
     >
-      {/* Freshness / popularity badges */}
-      {(isNew || isHot || priceChange) && (
+      {/* Freshness / popularity / trending badges */}
+      {(isNew || isHot || isTrending || priceChange) && (
         <div className="absolute top-1.5 right-1.5 z-10 flex gap-1">
           {isNew && (
             <span className="px-1.5 py-0.5 text-[8px] font-black rounded-md bg-emerald-500 text-white shadow-sm shadow-emerald-500/40 leading-none">
@@ -84,6 +86,11 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
           {isHot && !isNew && (
             <span className="px-1.5 py-0.5 text-[8px] font-black rounded-md bg-orange-500 text-white shadow-sm shadow-orange-500/40 leading-none">
               🔥 פופולרי
+            </span>
+          )}
+          {isTrending && !isHot && !isNew && (
+            <span className="px-1.5 py-0.5 text-[8px] font-black rounded-md bg-purple-500 text-white shadow-sm shadow-purple-500/40 leading-none">
+              📈 במגמה
             </span>
           )}
           {priceChange && priceChange.direction === 'down' && (
@@ -171,7 +178,11 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
               </span>
             )
           })()}
-          {(() => {
+          {viewCount > 0 ? (
+            <span className="text-[8px] text-indigo-400/60 mr-auto" title={`${viewCount} צפיות`}>
+              👁 {viewCount}
+            </span>
+          ) : (() => {
             const updatedAt = plot.updated_at ?? plot.updatedAt
             const freshness = formatRelativeTime(updatedAt)
             if (!freshness) return null

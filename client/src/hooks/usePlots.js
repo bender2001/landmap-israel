@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useCallback } from 'react'
-import { getPlots, getPlot, getNearbyPlots } from '../api/plots.js'
+import { getPlots, getPlot, getNearbyPlots, getPopularPlots } from '../api/plots.js'
 import { plots as mockPlots } from '../data/mockData.js'
 
 // Normalize mock data from camelCase to snake_case for consistency
@@ -115,6 +115,23 @@ export function useNearbyPlots(plotId) {
     enabled: !!plotId,
     staleTime: 120_000,
     retry: 1,
+  })
+}
+
+/**
+ * Fetch the most-viewed (popular) plots — social proof like Yad2's "הכי נצפים".
+ * Server returns pre-sorted by view count with computed ROI.
+ * Light query: stale for 5min, refetch every 10min.
+ */
+export function usePopularPlots(limit = 6) {
+  return useQuery({
+    queryKey: ['popularPlots', limit],
+    queryFn: () => getPopularPlots(limit),
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+    retry: 1,
+    // Don't block rendering — popular plots are supplementary
+    placeholderData: [],
   })
 }
 
