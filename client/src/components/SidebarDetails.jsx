@@ -6,7 +6,7 @@ import PriceTrendChart from './ui/PriceTrendChart'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import ProfitWaterfall from './ui/ProfitWaterfall'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
-import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict, calcRiskLevel, generatePlotSummary } from '../utils/formatters'
+import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict, calcRiskLevel, generatePlotSummary, calcDemandVelocity } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
 import NeighborhoodRadar from './ui/NeighborhoodRadar'
 import InvestmentBenchmark from './ui/InvestmentBenchmark'
@@ -915,6 +915,23 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   </span>
                 )
               })()}
+              {(() => {
+                const dv = calcDemandVelocity(plot)
+                if (!dv || dv.tier === 'low') return null
+                return (
+                  <span
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium"
+                    style={{
+                      background: `${dv.color}14`,
+                      border: `1px solid ${dv.color}35`,
+                      color: dv.color,
+                    }}
+                    title={`${dv.velocity} צפיות/יום — ${dv.label}`}
+                  >
+                    {dv.emoji} {dv.label}
+                  </span>
+                )
+              })()}
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -1019,6 +1036,15 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 return (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ background: `${dom.color}14`, border: `1px solid ${dom.color}35`, color: dom.color }}>
                     <Hourglass className="w-2.5 h-2.5" /> {dom.label}
+                  </span>
+                )
+              })()}
+              {(() => {
+                const dv = calcDemandVelocity(plot)
+                if (!dv || dv.tier === 'low') return null
+                return (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ background: `${dv.color}14`, border: `1px solid ${dv.color}35`, color: dv.color }}>
+                    {dv.emoji} {dv.label}
                   </span>
                 )
               })()}

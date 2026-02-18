@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback, useMemo, memo } from 'react'
 import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows, Share2 } from 'lucide-react'
 import PriceSparkline from './ui/PriceSparkline'
 import { statusColors, statusLabels } from '../utils/constants'
-import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcMonthlyPayment, formatMonthlyPayment } from '../utils/formatters'
+import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcMonthlyPayment, formatMonthlyPayment, calcDemandVelocity, calcBestInCategory } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
 import { whatsappShareLink } from '../utils/config'
 
@@ -105,7 +105,7 @@ function PlotCardSkeleton() {
   )
 }
 
-const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, prefetchPlot, priceChange, pricePercentile }) {
+const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, prefetchPlot, priceChange, pricePercentile, categoryBadges }) {
   const color = statusColors[plot.status]
   const price = plot.total_price ?? plot.totalPrice
   const projValue = plot.projected_value ?? plot.projectedValue
@@ -114,6 +114,9 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
   const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
   const readiness = plot.readiness_estimate ?? plot.readinessEstimate
   const pricePerDunam = sizeSqM > 0 ? formatPriceShort(Math.round(price / sizeSqM * 1000)) : null
+
+  // Demand velocity — views/day metric for urgency signaling
+  const demandVelocity = useMemo(() => calcDemandVelocity(plot), [plot])
 
   // Freshness & popularity badges (like Madlan/Yad2 "חדש!" and "פופולרי")
   const createdAt = plot.created_at ?? plot.createdAt
@@ -307,6 +310,40 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
           )
         })()}
 
+        {/* "Best in category" badges — highlight top deals in filtered results */}
+        {categoryBadges && categoryBadges.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-0.5 mb-0.5">
+            {categoryBadges.map((badge, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-0.5 px-1.5 py-[1px] text-[7px] font-black rounded-md leading-none"
+                style={{
+                  background: `${badge.color}15`,
+                  border: `1px solid ${badge.color}30`,
+                  color: badge.color,
+                }}
+                title={badge.label}
+              >
+                <span>{badge.emoji}</span>
+                <span>{badge.label}</span>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Demand velocity indicator — views/day urgency signal */}
+        {demandVelocity && demandVelocity.tier !== 'low' && (
+          <div
+            className="flex items-center gap-1 mt-0.5 text-[8px] font-medium"
+            style={{ color: demandVelocity.color }}
+            title={`${demandVelocity.velocity} צפיות/יום`}
+          >
+            <span>{demandVelocity.emoji}</span>
+            <span>{demandVelocity.label}</span>
+            <span className="text-[7px] opacity-60">({demandVelocity.velocity}/יום)</span>
+          </div>
+        )}
+
         <div className="plot-card-mini-footer">
           <div className="flex flex-col">
             <div className="flex items-center gap-1">
@@ -349,6 +386,8 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
   const prefetchPlot = usePrefetchPlot()
   const areaAverages = useAreaAverages(plots)
   const pricePercentiles = usePricePercentiles(plots)
+  // "Best in category" badges — highlight top deals in filtered results (like Madlan's deal indicators)
+  const bestInCategory = useMemo(() => calcBestInCategory(plots), [plots])
   const scrollRef = useRef(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
@@ -561,6 +600,7 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
             prefetchPlot={prefetchPlot}
             priceChange={getPriceChange ? getPriceChange(plot.id) : null}
             pricePercentile={pricePercentiles.get(plot.id) ?? null}
+            categoryBadges={bestInCategory.get(plot.id)?.badges ?? null}
           />
         ))}
       </div>

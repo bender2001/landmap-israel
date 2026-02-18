@@ -483,6 +483,95 @@ export function generatePlotSummary(plot) {
 }
 
 /**
+ * Calculate demand velocity for a plot — views per day since listing.
+ * High velocity indicates strong market interest and creates urgency.
+ * This is a key differentiator: neither Madlan nor Yad2 shows demand velocity for land.
+ *
+ * @param {Object} plot - The plot object (needs views and created_at)
+ * @returns {{ velocity: number, label: string, emoji: string, color: string, tier: string } | null}
+ */
+export function calcDemandVelocity(plot) {
+  if (!plot) return null
+
+  const views = plot.views ?? 0
+  const createdAt = plot.created_at ?? plot.createdAt
+  if (!createdAt || views <= 0) return null
+
+  const daysOnMarket = Math.max(1, Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)))
+  const velocity = views / daysOnMarket // views per day
+
+  if (velocity >= 3) {
+    return { velocity: Math.round(velocity * 10) / 10, label: 'ביקוש גבוה', emoji: '🔥', color: '#F97316', tier: 'hot' }
+  }
+  if (velocity >= 1.5) {
+    return { velocity: Math.round(velocity * 10) / 10, label: 'ביקוש גובר', emoji: '📈', color: '#22C55E', tier: 'growing' }
+  }
+  if (velocity >= 0.5) {
+    return { velocity: Math.round(velocity * 10) / 10, label: 'ביקוש יציב', emoji: '📊', color: '#3B82F6', tier: 'steady' }
+  }
+  return { velocity: Math.round(velocity * 10) / 10, label: 'ביקוש נמוך', emoji: '🔎', color: '#94A3B8', tier: 'low' }
+}
+
+/**
+ * Identify "best in category" plots from a filtered result set.
+ * Returns a Map<plotId, string[]> where each value is an array of category badges.
+ * Used by PlotCardStrip to highlight top deals — like Madlan's "best deal" indicators
+ * but more granular: cheapest/sqm, highest ROI, highest score, fastest growing demand.
+ *
+ * @param {Array} plots - Filtered plots to analyze
+ * @returns {Map<string, { badges: Array<{ label: string, emoji: string, color: string }> }>}
+ */
+export function calcBestInCategory(plots) {
+  const result = new Map()
+  if (!plots || plots.length < 3) return result
+
+  // Compute metrics for each available plot
+  const available = plots.filter(p => p.status === 'AVAILABLE')
+  if (available.length < 3) return result
+
+  let cheapestPsm = { id: null, val: Infinity }
+  let highestRoi = { id: null, val: -Infinity }
+  let bestScore = { id: null, val: -Infinity }
+  let highestVelocity = { id: null, val: -Infinity }
+
+  for (const p of available) {
+    const price = p.total_price ?? p.totalPrice ?? 0
+    const size = p.size_sqm ?? p.sizeSqM ?? 0
+    const proj = p.projected_value ?? p.projectedValue ?? 0
+    const roi = price > 0 ? ((proj - price) / price) * 100 : 0
+    const psm = size > 0 && price > 0 ? price / size : Infinity
+    const score = calcInvestmentScore(p)
+    const views = p.views ?? 0
+    const created = p.created_at ?? p.createdAt
+    const days = created ? Math.max(1, Math.floor((Date.now() - new Date(created).getTime()) / 86400000)) : 999
+    const velocity = views / days
+
+    if (psm < cheapestPsm.val) cheapestPsm = { id: p.id, val: psm }
+    if (roi > highestRoi.val) highestRoi = { id: p.id, val: roi }
+    if (score > bestScore.val) bestScore = { id: p.id, val: score }
+    if (velocity > highestVelocity.val && velocity >= 1) highestVelocity = { id: p.id, val: velocity }
+  }
+
+  const add = (id, badge) => {
+    if (!id) return
+    const entry = result.get(id) || { badges: [] }
+    entry.badges.push(badge)
+    result.set(id, entry)
+  }
+
+  add(cheapestPsm.id, { label: 'הכי זול/מ״ר', emoji: '💎', color: '#3B82F6' })
+  add(highestRoi.id, { label: 'תשואה מובילה', emoji: '🏆', color: '#22C55E' })
+  if (bestScore.id !== highestRoi.id) {
+    add(bestScore.id, { label: 'ציון מוביל', emoji: '⭐', color: '#F59E0B' })
+  }
+  if (highestVelocity.id && highestVelocity.id !== cheapestPsm.id && highestVelocity.id !== highestRoi.id) {
+    add(highestVelocity.id, { label: 'הכי מבוקש', emoji: '🔥', color: '#F97316' })
+  }
+
+  return result
+}
+
+/**
  * Calculate percentile rank of a value within a sorted array.
  * Returns 0-100 (what percentage of values are below this one).
  * E.g., percentile=80 means "better than 80% of plots".
