@@ -91,9 +91,12 @@ app.use((req, res, next) => {
   const onFinish = () => {
     res.removeListener('finish', onFinish)
     const ms = Number(process.hrtime.bigint() - start) / 1e6
-    // Set timing header (may not reach client if headers already sent, but that's fine)
+    // Set timing headers (may not reach client if headers already sent, but that's fine)
     if (!res.headersSent) {
       res.set('X-Response-Time', `${ms.toFixed(1)}ms`)
+      // W3C Server-Timing header — shows natively in Chrome/Edge DevTools "Timing" tab.
+      // Zero client-side code needed, works out of the box for performance profiling.
+      res.set('Server-Timing', `total;dur=${ms.toFixed(1)};desc="Server"`)
     }
     // Skip logging for health checks and SSE — they're too noisy
     if (req.originalUrl === '/api/health' || req.originalUrl === '/api/events') return

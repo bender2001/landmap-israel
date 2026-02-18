@@ -6,15 +6,27 @@ import { RefreshCw } from 'lucide-react'
  * Unlike the full-page ErrorBoundary, this renders an inline retry block
  * so a single crashing widget doesn't take down the entire MapView.
  *
+ * Features:
+ * - Auto-retry with exponential backoff for silent widgets (non-essential)
+ * - Manual retry button for visible widgets
+ * - Max retry limit to prevent infinite loops
+ * - Retry count tracking for debugging
+ *
  * Usage:
  *   <WidgetErrorBoundary name="DealSpotlight">
  *     <DealSpotlight ... />
+ *   </WidgetErrorBoundary>
+ *
+ *   // Silent with auto-retry (3 attempts with exponential backoff)
+ *   <WidgetErrorBoundary name="MarketTicker" silent maxRetries={3}>
+ *     <MarketTicker ... />
  *   </WidgetErrorBoundary>
  */
 export default class WidgetErrorBoundary extends Component {
   constructor(props) {
     super(props)
-    this.state = { hasError: false, error: null }
+    this.state = { hasError: false, error: null, retryCount: 0 }
+    this._retryTimer = null
   }
 
   static getDerivedStateFromError(error) {
@@ -22,17 +34,49 @@ export default class WidgetErrorBoundary extends Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.warn(`[WidgetError:${this.props.name || 'unknown'}]`, error.message, errorInfo?.componentStack?.slice(0, 200))
+    const { name = 'unknown', silent, maxRetries = 3 } = this.props
+    const { retryCount } = this.state
+    console.warn(`[WidgetError:${name}] attempt ${retryCount + 1}`, error.message, errorInfo?.componentStack?.slice(0, 200))
+
+    // Auto-retry with exponential backoff for silent widgets
+    // Silent widgets are non-essential (MarketTicker, FeaturedDeals, etc.)
+    // so retrying is low-risk and keeps the UI complete without user action.
+    if (silent && retryCount < maxRetries) {
+      const delay = Math.min(1000 * Math.pow(2, retryCount), 8000) // 1s, 2s, 4s, 8s max
+      this._retryTimer = setTimeout(() => {
+        this.setState(prev => ({
+          hasError: false,
+          error: null,
+          retryCount: prev.retryCount + 1,
+        }))
+      }, delay)
+    }
+  }
+
+  componentWillUnmount() {
+    if (this._retryTimer) {
+      clearTimeout(this._retryTimer)
+      this._retryTimer = null
+    }
   }
 
   handleRetry = () => {
-    this.setState({ hasError: false, error: null })
+    if (this._retryTimer) {
+      clearTimeout(this._retryTimer)
+      this._retryTimer = null
+    }
+    this.setState({ hasError: false, error: null, retryCount: 0 })
   }
 
   render() {
     if (this.state.hasError) {
-      // If parent wants completely silent failure (e.g., non-essential decorative widgets)
-      if (this.props.silent) return null
+      const { silent, maxRetries = 3 } = this.props
+      const { retryCount } = this.state
+
+      // Silent widgets: return null while retrying, or permanently after max retries
+      if (silent) {
+        return retryCount < maxRetries ? null : null
+      }
 
       return (
         <div
@@ -40,7 +84,10 @@ export default class WidgetErrorBoundary extends Component {
           dir="rtl"
         >
           <span className="text-orange-400/70">⚠</span>
-          <span className="truncate flex-1">{this.props.name || 'רכיב'} — שגיאה בטעינה</span>
+          <span className="truncate flex-1">
+            {this.props.name || 'רכיב'} — שגיאה בטעינה
+            {retryCount > 0 && <span className="text-slate-600"> (ניסיון {retryCount + 1})</span>}
+          </span>
           <button
             onClick={this.handleRetry}
             className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-slate-400 hover:text-slate-300 transition-colors flex-shrink-0"

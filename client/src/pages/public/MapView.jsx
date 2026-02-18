@@ -22,6 +22,7 @@ import { Phone } from 'lucide-react'
 import { whatsappLink, CONTACT, plotOgImageUrl } from '../../utils/config.js'
 import { useRealtimeUpdates } from '../../hooks/useRealtimeUpdates.js'
 import IdleRender from '../../components/ui/IdleRender.jsx'
+import { useRefreshOnReturn } from '../../hooks/usePageVisibility.js'
 
 // Lazy-load non-critical widgets — they're not needed for first paint.
 // This reduces the MapView initial JS from ~126KB to ~95KB, cutting Time to Interactive.
@@ -242,6 +243,11 @@ export default function MapView() {
 
   const { data: plots = [], isLoading, error: plotsError, refetch: refetchPlots, isPlaceholderData, dataUpdatedAt, isMockData } = useAllPlots(apiFilters)
   const { data: pois = [] } = usePois()
+
+  // Auto-refresh data when user returns to tab after being away 2+ minutes.
+  // Real estate listings change frequently — price updates, new plots, status changes.
+  // This keeps the app feeling "live" like Madlan without constant polling.
+  useRefreshOnReturn(refetchPlots, { staleDurationMs: 120_000 })
 
   // Record prices for change detection (like Yad2's "המחיר ירד!" badge)
   useEffect(() => {

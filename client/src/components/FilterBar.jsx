@@ -3,6 +3,7 @@ import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Cloc
 import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
 import SearchAutocomplete from './SearchAutocomplete'
 import SavedSearches from './SavedSearches'
+import { useHapticFeedback } from '../hooks/useHapticFeedback'
 
 // Known cities for stable ordering; any new cities found in data are appended dynamically
 const KNOWN_CITIES = ['חדרה', 'נתניה', 'קיסריה']
@@ -124,6 +125,7 @@ const quickPresetDefs = [
 ]
 
 function QuickPresets({ filters, statusFilter, onFilterChange, onToggleStatus, onClearFilters }) {
+  const haptic = useHapticFeedback()
   return (
     <div className="flex items-center gap-1.5 mb-2 overflow-x-auto scrollbar-none pb-0.5" dir="rtl">
       <Zap className="w-3 h-3 text-gold/60 flex-shrink-0" />
@@ -133,6 +135,7 @@ function QuickPresets({ filters, statusFilter, onFilterChange, onToggleStatus, o
           <button
             key={preset.id}
             onClick={() => {
+              haptic.light()
               if (active) {
                 // Deactivate: clear all filters
                 onClearFilters()
@@ -304,9 +307,11 @@ export default function FilterBar({
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+  const haptic = useHapticFeedback()
 
   const handleCopySearch = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
+      haptic.success()
       setLinkCopied(true)
       setTimeout(() => setLinkCopied(false), 2000)
     }).catch(() => {})
@@ -752,7 +757,7 @@ export default function FilterBar({
         {/* Bottom row: Clear + count */}
         {activeCount > 0 && (
           <div className="filter-actions-row">
-            <button className="filter-clear-btn" onClick={onClearFilters}>
+            <button className="filter-clear-btn" onClick={() => { haptic.heavy(); onClearFilters() }}>
               <X className="w-3 h-3" />
               נקה הכל
             </button>
