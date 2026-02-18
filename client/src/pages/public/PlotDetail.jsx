@@ -11,7 +11,7 @@ import PublicNav from '../../components/PublicNav.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import NeighborhoodRadar from '../../components/ui/NeighborhoodRadar.jsx'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../../utils/constants.js'
-import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR } from '../../utils/formatters.js'
+import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcInvestmentVerdict } from '../../utils/formatters.js'
 import PriceTrendChart from '../../components/ui/PriceTrendChart.jsx'
 import MiniMap from '../../components/ui/MiniMap.jsx'
 import { plotInquiryLink } from '../../utils/config.js'
@@ -569,6 +569,38 @@ export default function PlotDetail() {
               />
             </div>
           )}
+
+          {/* Investment Verdict — instant assessment for the full page view */}
+          {(() => {
+            const verdict = calcInvestmentVerdict(plot, [])
+            if (!verdict) return null
+            return (
+              <div
+                className={`flex items-center gap-4 rounded-2xl p-4 mb-6 border ${
+                  verdict.tier === 'hot' ? 'bg-orange-500/10 border-orange-500/20' :
+                  verdict.tier === 'excellent' ? 'bg-emerald-500/10 border-emerald-500/20' :
+                  verdict.tier === 'good' ? 'bg-lime-500/10 border-lime-500/20' :
+                  verdict.tier === 'fair' ? 'bg-amber-500/10 border-amber-500/20' :
+                  'bg-red-500/10 border-red-500/20'
+                }`}
+              >
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-xl"
+                  style={{ background: `${verdict.color}18` }}
+                >
+                  {verdict.emoji}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-base font-bold" style={{ color: verdict.color }}>
+                    {verdict.label}
+                  </div>
+                  <div className="text-sm text-slate-400">
+                    {verdict.description}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Financial cards grid */}
           <div className="grid grid-cols-3 gap-4 mb-8">

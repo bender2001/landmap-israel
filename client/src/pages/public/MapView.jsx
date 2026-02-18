@@ -14,7 +14,7 @@ import WidgetErrorBoundary from '../../components/ui/WidgetErrorBoundary.jsx'
 import ConnectionStatus from '../../components/ui/ConnectionStatus.jsx'
 import { useMetaTags } from '../../hooks/useMetaTags.js'
 import { useStructuredData } from '../../hooks/useStructuredData.js'
-import { formatCurrency, calcInvestmentScore, calcCAGR } from '../../utils/formatters.js'
+import { formatCurrency, formatPriceShort, calcInvestmentScore, calcCAGR } from '../../utils/formatters.js'
 import { useViewTracker } from '../../hooks/useViewTracker.js'
 import { usePriceTracker } from '../../hooks/usePriceTracker.js'
 import { useSavedSearches } from '../../hooks/useSavedSearches.js'
@@ -461,6 +461,16 @@ export default function MapView() {
       >
         דלג לתוכן המפה
       </a>
+      {/* Screen reader announcement for plot selection — WCAG 4.1.3 Status Messages */}
+      <div className="sr-only" role="status" aria-live="assertive" aria-atomic="true">
+        {selectedPlot ? (() => {
+          const bn = selectedPlot.block_number ?? selectedPlot.blockNumber
+          const price = selectedPlot.total_price ?? selectedPlot.totalPrice
+          const proj = selectedPlot.projected_value ?? selectedPlot.projectedValue
+          const roi = price > 0 ? Math.round((proj - price) / price * 100) : 0
+          return `נבחרה חלקה: גוש ${bn} חלקה ${selectedPlot.number}, ${selectedPlot.city}. מחיר ${formatPriceShort(price)}, תשואה ${roi} אחוז.`
+        })() : ''}
+      </div>
       <ConnectionStatus />
       {/* Data freshness indicator — shows when data was last synced (like Madlan's real-time feel) */}
       {dataUpdatedAt > 0 && (

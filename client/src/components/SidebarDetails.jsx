@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon, Download, File, FileImage, FileSpreadsheet, Printer, ExternalLink, Eye, Navigation, Clipboard } from 'lucide-react'
+import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon, Download, File, FileImage, FileSpreadsheet, Printer, ExternalLink, Eye, Navigation, Clipboard, Maximize2 } from 'lucide-react'
 import ShareMenu from './ui/ShareMenu'
 import ImageLightbox from './ui/ImageLightbox'
 import PriceTrendChart from './ui/PriceTrendChart'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import ProfitWaterfall from './ui/ProfitWaterfall'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
-import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment } from '../utils/formatters'
+import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
 import NeighborhoodRadar from './ui/NeighborhoodRadar'
 import InvestmentBenchmark from './ui/InvestmentBenchmark'
@@ -768,6 +768,17 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 />
               </button>
             )}
+            {/* Open in full page — deep link for bookmarking, sharing, SEO */}
+            <a
+              href={`/plot/${plot.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-gold/20 transition-all duration-300 flex items-center justify-center"
+              aria-label="פתח בדף מלא"
+              title="פתח בדף מלא"
+            >
+              <Maximize2 className="w-4 h-4 text-slate-400" />
+            </a>
             <button
               onClick={handleClose}
               className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:rotate-90 transition-all duration-300 flex items-center justify-center"
@@ -816,6 +827,38 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                       <div className="text-[10px] text-slate-500 mb-0.5">✨ רווח נקי צפוי</div>
                       <div className={`text-lg font-black ${netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatCurrency(netProfit)}</div>
                       <div className="text-[9px] text-slate-600">אחרי כל המיסים · {netRoi}% ROI נטו</div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Investment Verdict — instant investor assessment (like Madlan's deal badges) */}
+            {(() => {
+              const verdict = calcInvestmentVerdict(plot, allPlots)
+              if (!verdict) return null
+              return (
+                <div
+                  className={`flex items-center gap-3 rounded-2xl p-3 mb-4 border animate-stagger-1 ${
+                    verdict.tier === 'hot' ? 'bg-orange-500/10 border-orange-500/20' :
+                    verdict.tier === 'excellent' ? 'bg-emerald-500/10 border-emerald-500/20' :
+                    verdict.tier === 'good' ? 'bg-lime-500/10 border-lime-500/20' :
+                    verdict.tier === 'fair' ? 'bg-amber-500/10 border-amber-500/20' :
+                    'bg-red-500/10 border-red-500/20'
+                  }`}
+                >
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
+                    style={{ background: `${verdict.color}18` }}
+                  >
+                    {verdict.emoji}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold" style={{ color: verdict.color }}>
+                      {verdict.label}
+                    </div>
+                    <div className="text-[11px] text-slate-400 leading-snug">
+                      {verdict.description}
                     </div>
                   </div>
                 </div>

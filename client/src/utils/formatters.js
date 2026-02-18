@@ -195,6 +195,107 @@ export function formatMonthlyPayment(monthly) {
 }
 
 /**
+ * Calculate an investment verdict — a human-readable one-liner assessment.
+ * Like Madlan's deal badges and Yad2's "שווה לבדוק" — gives investors instant clarity.
+ * Combines investment score, area price benchmark, ROI, and zoning progress.
+ *
+ * @param {Object} plot - The plot to assess
+ * @param {Array} allPlots - All plots for area benchmark comparison
+ * @returns {{ emoji: string, label: string, description: string, color: string, tier: string }}
+ */
+export function calcInvestmentVerdict(plot, allPlots) {
+  if (!plot) return null
+
+  const price = plot.total_price ?? plot.totalPrice ?? 0
+  const projected = plot.projected_value ?? plot.projectedValue ?? 0
+  const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
+  const roi = price > 0 ? ((projected - price) / price) * 100 : 0
+  const score = calcInvestmentScore(plot)
+
+  // Calculate area benchmark deviation
+  let areaDeviation = 0
+  if (allPlots && allPlots.length >= 2 && sizeSqM > 0 && price > 0) {
+    const sameCityPlots = allPlots.filter(p => p.city === plot.city && p.id !== plot.id)
+    const benchPlots = sameCityPlots.length >= 2 ? sameCityPlots : allPlots.filter(p => p.id !== plot.id)
+    if (benchPlots.length > 0) {
+      const avgPsm = benchPlots.reduce((sum, p) => {
+        const pp = p.total_price ?? p.totalPrice ?? 0
+        const ps = p.size_sqm ?? p.sizeSqM ?? 1
+        return sum + (ps > 0 ? pp / ps : 0)
+      }, 0) / benchPlots.length
+      const plotPsm = price / sizeSqM
+      areaDeviation = avgPsm > 0 ? ((plotPsm - avgPsm) / avgPsm) * 100 : 0
+    }
+  }
+
+  // Determine verdict tier based on combined signals
+  const isBelowAvg = areaDeviation < -8
+  const isSignificantlyBelow = areaDeviation < -15
+  const isAboveAvg = areaDeviation > 10
+  const isHighRoi = roi >= 150
+  const isExceptionalRoi = roi >= 200
+
+  // Tier 1: Exceptional opportunity
+  if (score >= 8 && (isSignificantlyBelow || isExceptionalRoi)) {
+    return {
+      emoji: '🔥',
+      label: 'עסקה חמה!',
+      description: isSignificantlyBelow
+        ? `${Math.abs(Math.round(areaDeviation))}% מתחת לממוצע האזורי, ציון ${score}/10`
+        : `תשואה יוצאת דופן +${Math.round(roi)}%, ציון ${score}/10`,
+      color: '#F97316',
+      tier: 'hot',
+    }
+  }
+
+  // Tier 2: Excellent investment
+  if (score >= 7 && (isBelowAvg || isHighRoi)) {
+    return {
+      emoji: '⭐',
+      label: 'השקעה מצוינת',
+      description: isBelowAvg
+        ? `מחיר אטרקטיבי, ${Math.abs(Math.round(areaDeviation))}% מתחת לממוצע`
+        : `תשואה גבוהה +${Math.round(roi)}% עם ציון ${score}/10`,
+      color: '#22C55E',
+      tier: 'excellent',
+    }
+  }
+
+  // Tier 3: Good opportunity
+  if (score >= 5) {
+    return {
+      emoji: '✅',
+      label: 'הזדמנות טובה',
+      description: `ציון ${score}/10, תשואה +${Math.round(roi)}%`,
+      color: '#84CC16',
+      tier: 'good',
+    }
+  }
+
+  // Tier 4: Fair / needs research
+  if (score >= 3 && !isAboveAvg) {
+    return {
+      emoji: '📊',
+      label: 'שווה לבדוק',
+      description: `ציון ${score}/10 — מומלץ לבדוק תכנון ומיסוי`,
+      color: '#F59E0B',
+      tier: 'fair',
+    }
+  }
+
+  // Tier 5: Caution
+  return {
+    emoji: '⚠️',
+    label: 'יש לבדוק לעומק',
+    description: isAboveAvg
+      ? `מחיר ${Math.round(areaDeviation)}% מעל הממוצע — נדרשת בדיקה`
+      : `ציון ${score}/10 — השקעה בסיכון גבוה יותר`,
+    color: '#EF4444',
+    tier: 'caution',
+  }
+}
+
+/**
  * Calculate percentile rank of a value within a sorted array.
  * Returns 0-100 (what percentage of values are below this one).
  * E.g., percentile=80 means "better than 80% of plots".
