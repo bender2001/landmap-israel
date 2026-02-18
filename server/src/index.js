@@ -240,7 +240,28 @@ app.get('/api/cache-stats', (req, res) => {
 if (process.env.NODE_ENV === 'production') {
   const { sendWithOgMeta, getBaseUrl, getClientDist, sendFallback } = await import('./services/ogService.js')
   const clientDist = getClientDist()
-  app.use(express.static(clientDist))
+
+  // Serve hashed assets (JS/CSS chunks from Vite) with immutable caching.
+  // Vite generates content-hashed filenames (e.g., index-a1b2c3.js), so the
+  // same URL always returns the same content — safe to cache indefinitely.
+  // This eliminates re-download of unchanged bundles on repeat visits.
+  app.use('/assets', express.static(path.join(clientDist, 'assets'), {
+    maxAge: '365d',
+    immutable: true,
+    etag: false,        // Not needed for immutable content
+    lastModified: false, // Content-addressed, Last-Modified is irrelevant
+  }))
+
+  app.use(express.static(clientDist, {
+    maxAge: '1h',  // Non-hashed files (index.html, manifest.json) get short cache
+    setHeaders: (res, filePath) => {
+      // Service worker must always be fresh — browsers cap sw.js caching at 24h anyway,
+      // but setting no-cache ensures instant update propagation.
+      if (filePath.endsWith('sw.js')) {
+        res.set('Cache-Control', 'no-cache')
+      }
+    },
+  }))
 
   // OG meta injection for /plot/:id — enables rich social previews (WhatsApp, Telegram, Facebook)
   app.get('/plot/:id', async (req, res) => {

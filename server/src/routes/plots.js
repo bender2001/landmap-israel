@@ -98,6 +98,21 @@ router.get('/', sanitizePlotQuery, async (req, res, next) => {
 
     // Add total count header for pagination-ready responses
     res.set('X-Total-Count', String(plots.length))
+
+    // Last-Modified from most recent updated_at — enables If-Modified-Since
+    // conditional requests from CDNs, proxies, and browsers. ETag handles
+    // content-level dedup; Last-Modified covers time-based cache validation.
+    if (plots.length > 0) {
+      let maxTs = 0
+      for (const p of plots) {
+        const ts = p.updated_at ? new Date(p.updated_at).getTime() : 0
+        if (ts > maxTs) maxTs = ts
+      }
+      if (maxTs > 0) {
+        res.set('Last-Modified', new Date(maxTs).toUTCString())
+      }
+    }
+
     res.json(plots)
   } catch (err) {
     next(err)

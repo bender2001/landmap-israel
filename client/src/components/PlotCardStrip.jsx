@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback, useMemo, memo } from 'react'
-import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows, Share2 } from 'lucide-react'
+import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows, Share2, Heart } from 'lucide-react'
 import PriceSparkline from './ui/PriceSparkline'
 import ZoningProgressBar from './ui/ZoningProgressBar'
 import { statusColors, statusLabels } from '../utils/constants'
@@ -149,7 +149,7 @@ const PlotShareButtons = memo(function PlotShareButtons({ plot, blockNum, price,
   )
 })
 
-const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, prefetchPlot, priceChange, pricePercentile, categoryBadges }) {
+const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, isFavorite, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, onToggleFavorite, prefetchPlot, priceChange, pricePercentile, categoryBadges }) {
   const color = statusColors[plot.status]
   const price = plot.total_price ?? plot.totalPrice
   const projValue = plot.projected_value ?? plot.projectedValue
@@ -264,6 +264,20 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
 
       {/* Quick share — native share sheet (mobile) or WhatsApp/Telegram fallback (desktop) */}
       <PlotShareButtons plot={plot} blockNum={blockNum} price={price} roi={roi} />
+
+      {/* Favorite toggle — like Madlan/Yad2's heart on every listing card.
+          Allows one-click save without opening the sidebar. */}
+      {onToggleFavorite && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleFavorite(plot.id) }}
+          className={`plot-card-favorite-btn ${isFavorite ? 'is-active' : ''}`}
+          title={isFavorite ? 'הסר ממועדפים' : 'הוסף למועדפים'}
+          aria-label={isFavorite ? 'הסר ממועדפים' : 'הוסף למועדפים'}
+          aria-pressed={isFavorite}
+        >
+          <Heart className={`w-3.5 h-3.5 transition-transform ${isFavorite ? 'fill-current scale-110' : ''}`} />
+        </button>
+      )}
 
       {/* Compare toggle */}
       {onToggleCompare && (
@@ -461,7 +475,7 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
   )
 })
 
-export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare, isLoading = false, onClearFilters, getPriceChange }) {
+export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare, isLoading = false, onClearFilters, getPriceChange, favorites }) {
   const prefetchPlot = usePrefetchPlot()
   const areaAverages = useAreaAverages(plots)
   const pricePercentiles = usePricePercentiles(plots)
@@ -715,10 +729,12 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
             plot={plot}
             isSelected={selectedPlot?.id === plot.id}
             isCompared={compareIds.includes(plot.id)}
+            isFavorite={favorites?.isFavorite(plot.id) ?? false}
             wasViewed={recentlyViewed.has(plot.id)}
             areaAvgPsm={areaAverages[plot.city]}
             onSelectPlot={onSelectPlot}
             onToggleCompare={onToggleCompare}
+            onToggleFavorite={favorites?.toggle}
             prefetchPlot={prefetchPlot}
             priceChange={getPriceChange ? getPriceChange(plot.id) : null}
             pricePercentile={pricePercentiles.get(plot.id) ?? null}

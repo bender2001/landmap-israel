@@ -977,6 +977,7 @@ export default function MapView() {
         isLoading={isLoading}
         onClearFilters={handleClearFilters}
         getPriceChange={getMergedPriceChange}
+        favorites={favorites}
       />
 
       <Suspense fallback={null}>
