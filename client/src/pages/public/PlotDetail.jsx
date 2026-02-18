@@ -2,6 +2,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart } from 'lucide-react'
 import { usePlot, useNearbyPlots } from '../../hooks/usePlots.js'
+import { useMarketOverview } from '../../hooks/useMarketOverview.js'
 import { useFavorites } from '../../hooks/useFavorites.js'
 import { useViewTracker } from '../../hooks/useViewTracker.js'
 import LeadModal from '../../components/LeadModal.jsx'
@@ -229,6 +230,9 @@ export default function PlotDetail() {
       prev.includes(plotId) ? prev.filter((id) => id !== plotId) : prev.length < 3 ? [...prev, plotId] : prev
     )
   }, [])
+
+  // Market overview for below-market indicator (like Madlan's "מחיר נמוך ממדלן")
+  const { data: marketData } = useMarketOverview()
 
   // Track view on mount (fire-and-forget, deduped by plotId)
   useEffect(() => {
@@ -470,7 +474,7 @@ export default function PlotDetail() {
         }}
       />
 
-      <div className="relative z-10 pt-20 pb-16">
+      <div className="relative z-10 pt-20 pb-28">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
 
           {/* Breadcrumb */}
@@ -609,6 +613,43 @@ export default function PlotDetail() {
                   </div>
                   <div className="text-sm text-slate-400">
                     {verdict.description}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Below Market Price Indicator — like Madlan's "מחיר נמוך ממדלן" */}
+          {(() => {
+            if (!marketData?.cities || sizeSqM <= 0) return null
+            const cityData = marketData.cities.find(c => c.city === plot.city)
+            if (!cityData || !cityData.avgPricePerSqm || cityData.count < 3) return null
+            const plotPsm = totalPrice / sizeSqM
+            const diffPct = Math.round(((plotPsm - cityData.avgPricePerSqm) / cityData.avgPricePerSqm) * 100)
+            if (Math.abs(diffPct) < 5) return null
+            const isBelow = diffPct < 0
+            return (
+              <div
+                className={`flex items-center gap-4 rounded-2xl p-4 mb-6 border ${
+                  isBelow
+                    ? 'bg-emerald-500/8 border-emerald-500/15'
+                    : 'bg-amber-500/8 border-amber-500/15'
+                }`}
+              >
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 text-lg ${
+                  isBelow ? 'bg-emerald-500/15' : 'bg-amber-500/15'
+                }`}>
+                  {isBelow ? '📉' : '📈'}
+                </div>
+                <div className="min-w-0">
+                  <div className={`text-sm font-bold ${isBelow ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {isBelow
+                      ? `${Math.abs(diffPct)}% מתחת לממוצע ב${plot.city}`
+                      : `${diffPct}% מעל הממוצע ב${plot.city}`
+                    }
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    ממוצע אזורי: {formatCurrency(cityData.avgPricePerSqm)}/מ״ר · חלקה זו: {formatCurrency(Math.round(plotPsm))}/מ״ר
                   </div>
                 </div>
               </div>

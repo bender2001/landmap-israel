@@ -833,6 +833,53 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               )
             })()}
 
+            {/* Below Market Price Indicator — like Madlan's "מחיר נמוך ממדלן" badge */}
+            {(() => {
+              if (!allPlots || allPlots.length < 3 || sizeSqM <= 0) return null
+              // Calculate city-level average price per sqm
+              const cityPlots = allPlots.filter(p => p.city === plot.city && p.id !== plot.id)
+              if (cityPlots.length < 2) return null
+              let totalPsm = 0, count = 0
+              for (const p of cityPlots) {
+                const pp = p.total_price ?? p.totalPrice ?? 0
+                const ps = p.size_sqm ?? p.sizeSqM ?? 0
+                if (pp > 0 && ps > 0) { totalPsm += pp / ps; count++ }
+              }
+              if (count < 2) return null
+              const avgPsm = totalPsm / count
+              const plotPsm = totalPrice / sizeSqM
+              const diffPct = Math.round(((plotPsm - avgPsm) / avgPsm) * 100)
+              // Only show when meaningfully below or above (±5% threshold)
+              if (Math.abs(diffPct) < 5) return null
+              const isBelow = diffPct < 0
+              return (
+                <div
+                  className={`flex items-center gap-3 rounded-2xl p-3 mb-3 border animate-stagger-1 ${
+                    isBelow
+                      ? 'bg-emerald-500/8 border-emerald-500/15'
+                      : 'bg-amber-500/8 border-amber-500/15'
+                  }`}
+                >
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-base ${
+                    isBelow ? 'bg-emerald-500/15' : 'bg-amber-500/15'
+                  }`}>
+                    {isBelow ? '📉' : '📈'}
+                  </div>
+                  <div className="min-w-0">
+                    <div className={`text-xs font-bold ${isBelow ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {isBelow
+                        ? `${Math.abs(diffPct)}% מתחת לממוצע ב${plot.city}`
+                        : `${diffPct}% מעל הממוצע ב${plot.city}`
+                      }
+                    </div>
+                    <div className="text-[10px] text-slate-500">
+                      ממוצע אזורי: {formatCurrency(Math.round(avgPsm))}/מ״ר · חלקה זו: {formatCurrency(Math.round(plotPsm))}/מ״ר
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Investment Verdict — instant investor assessment (like Madlan's deal badges) */}
             {(() => {
               const verdict = calcInvestmentVerdict(plot, allPlots)

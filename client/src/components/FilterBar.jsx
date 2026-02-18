@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
-import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, Link2, Download } from 'lucide-react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, Link2, Download, Zap } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
 import SearchAutocomplete from './SearchAutocomplete'
 import SavedSearches from './SavedSearches'
@@ -54,6 +54,94 @@ const sortOptions = [
 ]
 
 const statusEntries = Object.entries(statusColors)
+
+/**
+ * Quick filter presets — one-click buttons for common investor searches.
+ * Inspired by Madlan/Yad2 quick filter bars that let users instantly narrow results.
+ */
+const quickPresetDefs = [
+  {
+    id: 'available',
+    label: 'זמינות בלבד',
+    emoji: '🟢',
+    apply: (onFilterChange, onToggleStatus, statusFilter) => {
+      if (!statusFilter.includes('AVAILABLE')) onToggleStatus('AVAILABLE')
+    },
+    isActive: (filters, statusFilter) => statusFilter.includes('AVAILABLE') && statusFilter.length === 1,
+  },
+  {
+    id: 'high-roi',
+    label: 'תשואה 100%+',
+    emoji: '🔥',
+    apply: (onFilterChange) => {
+      onFilterChange('minRoi', '100')
+    },
+    isActive: (filters) => filters.minRoi === '100',
+  },
+  {
+    id: 'budget',
+    label: 'עד ₪500K',
+    emoji: '💰',
+    apply: (onFilterChange) => {
+      onFilterChange('priceMin', '')
+      onFilterChange('priceMax', '500000')
+    },
+    isActive: (filters) => filters.priceMax === '500000' && !filters.priceMin,
+  },
+  {
+    id: 'large',
+    label: '3+ דונם',
+    emoji: '📐',
+    apply: (onFilterChange) => {
+      onFilterChange('sizeMin', '3')
+      onFilterChange('sizeMax', '')
+    },
+    isActive: (filters) => filters.sizeMin === '3' && !filters.sizeMax,
+  },
+  {
+    id: 'quick-flip',
+    label: 'מהיר (1-3 שנים)',
+    emoji: '⚡',
+    apply: (onFilterChange) => {
+      onFilterChange('ripeness', '1-3')
+    },
+    isActive: (filters) => filters.ripeness === '1-3',
+  },
+]
+
+function QuickPresets({ filters, statusFilter, onFilterChange, onToggleStatus, onClearFilters }) {
+  return (
+    <div className="flex items-center gap-1.5 mb-2 overflow-x-auto scrollbar-none pb-0.5" dir="rtl">
+      <Zap className="w-3 h-3 text-gold/60 flex-shrink-0" />
+      {quickPresetDefs.map(preset => {
+        const active = preset.isActive(filters, statusFilter)
+        return (
+          <button
+            key={preset.id}
+            onClick={() => {
+              if (active) {
+                // Deactivate: clear all filters
+                onClearFilters()
+              } else {
+                // Clear first, then apply preset
+                onClearFilters()
+                preset.apply(onFilterChange, onToggleStatus, statusFilter)
+              }
+            }}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+              active
+                ? 'bg-gold/15 text-gold border-gold/25 shadow-sm shadow-gold/10'
+                : 'bg-white/[0.03] text-slate-500 border-white/5 hover:bg-white/[0.06] hover:text-slate-300 hover:border-white/10'
+            }`}
+          >
+            <span>{preset.emoji}</span>
+            <span>{preset.label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 function SelectPill({ icon: Icon, label, value, displayValue, options, onChange, isActive }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -221,6 +309,15 @@ export default function FilterBar({
           <span>🕐 עודכן היום</span>
         </div>
       )}
+
+      {/* Quick filter presets — one-click common searches (like Madlan's quick filters) */}
+      <QuickPresets
+        filters={filters}
+        statusFilter={statusFilter}
+        onFilterChange={onFilterChange}
+        onToggleStatus={onToggleStatus}
+        onClearFilters={onClearFilters}
+      />
 
       {/* ── Mobile: compact row with toggle + search side by side ── */}
       <div className="flex items-center gap-2 md:hidden mb-2">
