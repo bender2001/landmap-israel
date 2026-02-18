@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useCallback } from 'react'
-import { getPlots, getPlot, getNearbyPlots, getSimilarPlots, getPopularPlots, getFeaturedPlots, getPlotsBatch } from '../api/plots.js'
+import { getPlots, getPlot, getNearbyPlots, getSimilarPlots, getPopularPlots, getFeaturedPlots, getPlotsBatch, getNearbyPois } from '../api/plots.js'
 import { plots as mockPlots } from '../data/mockData.js'
 import { useIsSlowConnection } from './useNetworkStatus.js'
 
@@ -207,6 +207,23 @@ export function usePlotsBatch(ids) {
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     retry: 1,
+  })
+}
+
+/**
+ * Fetch nearby POIs for a plot — powers the "What's Nearby" sidebar section.
+ * Returns categorized amenities with distances (schools, transit, parks, hospitals).
+ * Like Madlan's proximity indicators but with actual Haversine distances.
+ */
+export function useNearbyPois(plotId) {
+  return useQuery({
+    queryKey: ['nearbyPois', plotId],
+    queryFn: () => getNearbyPois(plotId, 3),
+    enabled: !!plotId,
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+    retry: 1,
+    placeholderData: { pois: [], categories: {}, count: 0 },
   })
 }
 

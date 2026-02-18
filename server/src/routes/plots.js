@@ -260,6 +260,94 @@ router.get('/popular', async (req, res, next) => {
   }
 })
 
+// GET /api/plots/:id/nearby-pois - Find POIs within radius of a plot's centroid.
+// Powers the "What's Nearby" section in the sidebar — like Madlan's amenity proximity
+// indicators but with actual distance calculations and categorized results.
+router.get('/:id/nearby-pois', sanitizePlotId, async (req, res, next) => {
+  try {
+    const maxKm = Math.min(parseFloat(req.query.maxKm) || 3, 10)
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50)
+    const cacheKey = `nearby-pois:${req.params.id}:${maxKm}:${limit}`
+    const cached = getCached(cacheKey)
+    if (cached) {
+      res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
+      res.set('X-Cache', 'HIT')
+      return res.json(cached)
+    }
+
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
+    res.set('X-Cache', 'MISS')
+
+    const plot = await getPlotById(req.params.id)
+    if (!plot) return res.status(404).json({ error: 'Plot not found' })
+
+    const coords = plot.coordinates
+    if (!coords || !Array.isArray(coords) || coords.length === 0) {
+      return res.json({ pois: [], categories: {} })
+    }
+
+    // Calculate plot centroid
+    const valid = coords.filter(c => Array.isArray(c) && c.length >= 2 && isFinite(c[0]) && isFinite(c[1]))
+    if (valid.length === 0) return res.json({ pois: [], categories: {} })
+    const centLat = valid.reduce((s, c) => s + c[0], 0) / valid.length
+    const centLng = valid.reduce((s, c) => s + c[1], 0) / valid.length
+
+    // Fetch all POIs (lightweight table, small dataset)
+    const { data: pois, error } = await supabaseAdmin
+      .from('points_of_interest')
+      .select('*')
+
+    if (error) throw error
+    if (!pois || pois.length === 0) {
+      return res.json({ pois: [], categories: {} })
+    }
+
+    // Haversine distance calculation + filter by radius
+    const R = 6371 // Earth radius in km
+    const nearbyPois = pois
+      .map(poi => {
+        const lat = poi.lat ?? poi.latitude
+        const lng = poi.lng ?? poi.longitude
+        if (!lat || !lng || !isFinite(lat) || !isFinite(lng)) return null
+        const dLat = (lat - centLat) * Math.PI / 180
+        const dLng = (lng - centLng) * Math.PI / 180
+        const a = Math.sin(dLat / 2) ** 2 +
+          Math.cos(centLat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) *
+          Math.sin(dLng / 2) ** 2
+        const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        if (distKm > maxKm) return null
+        return {
+          ...poi,
+          distance_km: Math.round(distKm * 100) / 100,
+          distance_m: Math.round(distKm * 1000),
+        }
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.distance_km - b.distance_km)
+      .slice(0, limit)
+
+    // Group by category for structured display
+    const categories = {}
+    for (const poi of nearbyPois) {
+      const cat = poi.category || poi.type || 'אחר'
+      if (!categories[cat]) categories[cat] = []
+      categories[cat].push(poi)
+    }
+
+    const result = {
+      pois: nearbyPois,
+      categories,
+      plotCenter: { lat: centLat, lng: centLng },
+      count: nearbyPois.length,
+    }
+
+    setCache(cacheKey, result)
+    res.json(result)
+  } catch (err) {
+    next(err)
+  }
+})
+
 // GET /api/plots/:id/similar - Find plots with similar investment characteristics
 // Unlike /nearby (geography), this matches by zoning stage, price range, size, and ROI.
 // Ideal for "חלקות דומות" — investors want similar *opportunities*, not just nearby land.

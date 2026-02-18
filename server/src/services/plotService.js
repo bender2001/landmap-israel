@@ -1,5 +1,71 @@
 import { supabaseAdmin } from '../config/supabase.js'
 
+/**
+ * Compute an investment score (1-10) for a plot — server-side equivalent
+ * of the client's calcInvestmentScore(). Running this server-side:
+ * - Eliminates redundant client computation on every render cycle
+ * - Enables server-side sort by score (new sort=score-desc option)
+ * - Makes scores available to SEO bots, OG generators, and webhooks
+ */
+function computeInvestmentScore(plot) {
+  const price = plot.total_price || 0
+  const projected = plot.projected_value || 0
+  const roi = price > 0 ? ((projected - price) / price) * 100 : 0
+  const readiness = plot.readiness_estimate || ''
+
+  // ROI component (0-4 points): 50%=1, 100%=2, 150%=3, 200%+=4
+  const roiScore = Math.min(4, roi / 50)
+
+  // Zoning progress component (0-3 points)
+  const ZONING_ORDER = [
+    'AGRICULTURAL', 'MASTER_PLAN_DEPOSIT', 'MASTER_PLAN_APPROVED',
+    'DETAILED_PLAN_PREP', 'DETAILED_PLAN_DEPOSIT', 'DETAILED_PLAN_APPROVED',
+    'DEVELOPER_TENDER', 'BUILDING_PERMIT',
+  ]
+  const zoning = plot.zoning_stage || 'AGRICULTURAL'
+  const zoningIdx = ZONING_ORDER.indexOf(zoning)
+  const zoningScore = zoningIdx >= 0 ? (zoningIdx / (ZONING_ORDER.length - 1)) * 3 : 0
+
+  // Readiness component (0-3 points): shorter = better
+  let readinessScore = 1.5
+  if (readiness.includes('1-3')) readinessScore = 3
+  else if (readiness.includes('3-5')) readinessScore = 2
+  else if (readiness.includes('5+')) readinessScore = 0.5
+
+  const raw = roiScore + zoningScore + readinessScore
+  return Math.max(1, Math.min(10, Math.round(raw)))
+}
+
+/**
+ * Convert a 1-10 score to an S&P-style letter grade.
+ */
+function computeGrade(score) {
+  if (score >= 9) return 'A+'
+  if (score >= 8) return 'A'
+  if (score >= 7) return 'A-'
+  if (score >= 6) return 'B+'
+  if (score >= 5) return 'B'
+  if (score >= 4) return 'B-'
+  if (score >= 3) return 'C+'
+  return 'C'
+}
+
+/**
+ * Enrich an array of plots with computed investment metrics.
+ * Adds _investmentScore, _grade, and _roi fields to each plot.
+ */
+function enrichPlotsWithScores(plots) {
+  if (!plots || plots.length === 0) return plots
+  for (const p of plots) {
+    const price = p.total_price || 0
+    const projected = p.projected_value || 0
+    p._investmentScore = computeInvestmentScore(p)
+    p._grade = computeGrade(p._investmentScore)
+    p._roi = price > 0 ? Math.round(((projected - price) / price) * 100) : 0
+  }
+  return plots
+}
+
 export async function getPublishedPlots(filters = {}) {
   // Support count-only mode for pagination metadata
   const countOnly = filters._countOnly === true
@@ -91,6 +157,19 @@ export async function getPublishedPlots(filters = {}) {
 
   const { data, error } = await query
   if (error) throw error
+
+  // Enrich with server-computed investment metrics
+  enrichPlotsWithScores(data)
+
+  // Post-fetch sorts for computed fields that can't be done in SQL
+  if (filters.sort === 'score-desc' && data) {
+    data.sort((a, b) => (b._investmentScore || 0) - (a._investmentScore || 0))
+  } else if (filters.sort === 'roi-desc' && data) {
+    data.sort((a, b) => (b._roi || 0) - (a._roi || 0))
+  } else if (filters.sort === 'roi-asc' && data) {
+    data.sort((a, b) => (a._roi || 0) - (b._roi || 0))
+  }
+
   return data
 }
 
@@ -107,6 +186,16 @@ export async function getPlotById(id) {
     .single()
 
   if (error) throw error
+
+  // Enrich single plot with computed metrics
+  if (data) {
+    const price = data.total_price || 0
+    const projected = data.projected_value || 0
+    data._investmentScore = computeInvestmentScore(data)
+    data._grade = computeGrade(data._investmentScore)
+    data._roi = price > 0 ? Math.round(((projected - price) / price) * 100) : 0
+  }
+
   return data
 }
 

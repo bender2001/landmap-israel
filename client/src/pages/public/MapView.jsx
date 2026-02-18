@@ -236,8 +236,8 @@ export default function MapView() {
     if (statusFilter.length > 0) f.status = statusFilter.join(',')
     // Pass search query to server for DB-level text search (faster than client-side)
     if (debouncedSearch) f.q = debouncedSearch
-    // Pass simple sorts to server for better performance
-    if (['price-asc', 'price-desc', 'size-asc', 'size-desc', 'updated-desc'].includes(sortBy)) {
+    // Pass sorts to server for better performance — includes server-computed score and ROI sorts
+    if (['price-asc', 'price-desc', 'size-asc', 'size-desc', 'updated-desc', 'score-desc', 'roi-desc', 'roi-asc'].includes(sortBy)) {
       f.sort = sortBy
     }
     return f

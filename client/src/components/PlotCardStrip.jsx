@@ -251,7 +251,8 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
           <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
           <span>{plot.city}</span>
           {(() => {
-            const score = calcInvestmentScore(plot)
+            // Prefer server-computed score when available (reduces client CPU)
+            const score = plot._investmentScore ?? calcInvestmentScore(plot)
             const { grade, color } = getInvestmentGrade(score)
             return (
               <span
@@ -259,7 +260,7 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
                 style={{ color, background: `${color}15`, borderColor: `${color}30` }}
                 title={`דירוג השקעה: ${grade} (${score}/10)`}
               >
-                {grade}
+                {plot._grade || grade}
               </span>
             )
           })()}

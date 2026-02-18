@@ -12,7 +12,7 @@ import AnimatedNumber from './ui/AnimatedNumber'
 import NeighborhoodRadar from './ui/NeighborhoodRadar'
 import InvestmentBenchmark from './ui/InvestmentBenchmark'
 import PlotPercentileBadges from './ui/PlotPercentileBadges'
-import { usePlot, useNearbyPlots, useSimilarPlots, usePrefetchPlot } from '../hooks/usePlots'
+import { usePlot, useNearbyPlots, useSimilarPlots, usePrefetchPlot, useNearbyPois } from '../hooks/usePlots'
 import MiniMap from './ui/MiniMap'
 import DueDiligenceChecklist from './ui/DueDiligenceChecklist'
 import InvestmentProjection from './ui/InvestmentProjection'
@@ -110,6 +110,7 @@ function QuickNavBar({ scrollRef }) {
     { id: 'section-zoning', label: '🗺️', title: 'תכנון' },
     { id: 'section-images', label: '📷', title: 'תמונות' },
     { id: 'section-quality', label: '🛡️', title: 'איכות' },
+    { id: 'section-nearby-pois', label: '📍', title: 'סביבה' },
     { id: 'section-dd', label: '✅', title: 'בדיקות' },
   ]
 
@@ -495,6 +496,108 @@ function PlotNavigation({ currentPlot, allPlots, onSelectPlot }) {
       >
         <ChevronLeft className="w-4 h-4 text-slate-400 group-hover:text-gold transition-colors" />
       </button>
+    </div>
+  )
+}
+
+/**
+ * What's Nearby — shows POIs (schools, transit, parks, shops) near the plot.
+ * Fetches from /api/plots/:id/nearby-pois which computes Haversine distances.
+ * Like Madlan's "מה בסביבה" section that shows amenity proximity.
+ */
+const POI_CATEGORY_CONFIG = {
+  'school': { emoji: '🏫', label: 'חינוך', color: '#3B82F6' },
+  'education': { emoji: '🏫', label: 'חינוך', color: '#3B82F6' },
+  'transit': { emoji: '🚌', label: 'תחבורה', color: '#8B5CF6' },
+  'bus': { emoji: '🚌', label: 'תחבורה', color: '#8B5CF6' },
+  'train': { emoji: '🚆', label: 'רכבת', color: '#8B5CF6' },
+  'park': { emoji: '🌳', label: 'פארקים', color: '#22C55E' },
+  'hospital': { emoji: '🏥', label: 'בריאות', color: '#EF4444' },
+  'health': { emoji: '🏥', label: 'בריאות', color: '#EF4444' },
+  'shopping': { emoji: '🛒', label: 'קניות', color: '#F59E0B' },
+  'commercial': { emoji: '🏬', label: 'מסחרי', color: '#F59E0B' },
+  'synagogue': { emoji: '🕍', label: 'בתי כנסת', color: '#C8942A' },
+  'restaurant': { emoji: '🍽️', label: 'מסעדות', color: '#F97316' },
+  'sport': { emoji: '⚽', label: 'ספורט', color: '#06B6D4' },
+  'government': { emoji: '🏛️', label: 'ממשלתי', color: '#64748B' },
+}
+
+function NearbyPoisSection({ plotId }) {
+  const { data, isLoading } = useNearbyPois(plotId)
+  const pois = data?.pois || []
+  const categories = data?.categories || {}
+
+  if (isLoading) {
+    return (
+      <div className="mt-4 p-4 rounded-xl bg-white/[0.02] border border-white/5">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-4 h-4 rounded-full bg-gold/20 animate-pulse" />
+          <div className="h-3 w-24 rounded bg-slate-700/30 animate-pulse" />
+        </div>
+        <div className="space-y-2">
+          {[1,2,3].map(i => <div key={i} className="h-8 rounded-lg bg-slate-700/15 animate-pulse" />)}
+        </div>
+      </div>
+    )
+  }
+
+  if (!pois || pois.length === 0) return null
+
+  // Group by category with config
+  const groupedEntries = Object.entries(categories)
+    .map(([cat, items]) => {
+      const config = POI_CATEGORY_CONFIG[cat.toLowerCase()] || { emoji: '📍', label: cat, color: '#94A3B8' }
+      return { key: cat, config, items: items.slice(0, 3) } // max 3 per category
+    })
+    .sort((a, b) => b.items.length - a.items.length)
+    .slice(0, 6) // max 6 categories
+
+  return (
+    <div className="mt-4" dir="rtl">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-7 h-7 rounded-lg bg-blue-500/15 flex items-center justify-center">
+          <MapPin className="w-3.5 h-3.5 text-blue-400" />
+        </div>
+        <h4 className="text-sm font-bold text-slate-200">מה בסביבה</h4>
+        <span className="text-[10px] text-slate-500 mr-auto">{pois.length} נקודות עניין</span>
+      </div>
+
+      <div className="space-y-2">
+        {groupedEntries.map(({ key, config, items }) => (
+          <div key={key} className="bg-white/[0.02] border border-white/5 rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm">{config.emoji}</span>
+              <span className="text-[11px] font-semibold" style={{ color: config.color }}>{config.label}</span>
+              <span className="text-[9px] text-slate-600">({items.length})</span>
+            </div>
+            <div className="space-y-1">
+              {items.map((poi, i) => (
+                <div key={poi.id || i} className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-400 truncate flex-1 ml-2">{poi.name}</span>
+                  <span className="text-slate-500 font-medium whitespace-nowrap flex-shrink-0">
+                    {poi.distance_m < 1000
+                      ? `${poi.distance_m} מ׳`
+                      : `${poi.distance_km} ק״מ`
+                    }
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {pois.length > 0 && data?.plotCenter && (
+        <a
+          href={`https://www.google.com/maps/search/nearby+amenities/@${data.plotCenter.lat},${data.plotCenter.lng},15z`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-1.5 mt-2 py-2 text-[10px] text-slate-500 hover:text-gold transition-colors"
+        >
+          <ExternalLink className="w-3 h-3" />
+          <span>הצג ב-Google Maps</span>
+        </a>
+      )}
     </div>
   )
 }
@@ -2286,6 +2389,11 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 <LocationScore plot={plot} allPlots={allPlots} />
               </CollapsibleSection>
             )}
+
+            {/* What's Nearby — POI proximity section like Madlan's amenity indicators */}
+            <div id="section-nearby-pois">
+              <NearbyPoisSection plotId={plot.id} />
+            </div>
 
             {/* Similar Plots */}
             <SimilarPlots currentPlot={plot} allPlots={allPlots} onSelectPlot={onSelectPlot} />

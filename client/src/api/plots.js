@@ -57,3 +57,13 @@ export function getPlotsBatch(ids) {
   if (!ids || ids.length === 0) return Promise.resolve([])
   return api.get(`/plots/batch?ids=${ids.join(',')}`)
 }
+
+/**
+ * Fetch nearby points of interest for a plot (schools, transit, hospitals, parks).
+ * Powers the "What's Nearby" section in the sidebar — like Madlan's proximity indicators.
+ * @param {string} plotId - Plot UUID
+ * @param {number} maxKm - Max radius in km (default 3)
+ */
+export function getNearbyPois(plotId, maxKm = 3) {
+  return api.get(`/plots/${plotId}/nearby-pois?maxKm=${maxKm}`)
+}
