@@ -629,7 +629,7 @@ export default function MapView() {
   }, [serverPriceChanges, getPriceChange])
 
   // Real-time updates via SSE — auto-refresh when admin changes plots
-  useRealtimeUpdates()
+  const { isConnected: sseConnected } = useRealtimeUpdates()
 
   // JSON-LD structured data for SEO (like Madlan/Yad2)
   useStructuredData(selectedPlot, filteredPlots)
@@ -810,7 +810,7 @@ export default function MapView() {
             : ''
         }
       </div>
-      <ConnectionStatus />
+      <ConnectionStatus sseConnected={sseConnected} />
       {/* Data freshness indicator — shows when data was last synced (like Madlan's real-time feel) */}
       {dataUpdatedAt > 0 && (
         <DataFreshnessIndicator updatedAt={dataUpdatedAt} onRefresh={refetchPlots} />

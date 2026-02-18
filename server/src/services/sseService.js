@@ -75,8 +75,45 @@ export function broadcastEvent(type, payload = {}) {
 }
 
 export function closeAll() {
+  stopKeepalive()
   for (const client of clients) {
     try { client.end() } catch {}
   }
   clients.clear()
+}
+
+/**
+ * SSE keepalive heartbeat — prevents proxy/LB/CDN from killing idle connections.
+ * Sends a comment ping (`:keepalive`) every 25 seconds. This is below Nginx's
+ * default `proxy_read_timeout` (60s) and Cloudflare's idle timeout (100s).
+ * SSE spec says lines starting with `:` are comments and ignored by EventSource.
+ * Without this, connections die silently on any reverse proxy, making real-time
+ * updates appear to work locally but fail in production behind Nginx/Cloudflare.
+ */
+let keepaliveTimer = null
+
+export function startKeepalive(intervalMs = 25_000) {
+  if (keepaliveTimer) return
+  keepaliveTimer = setInterval(() => {
+    const dead = []
+    for (const client of clients) {
+      try {
+        client.write(':keepalive\n\n')
+      } catch {
+        dead.push(client)
+      }
+    }
+    // Clean up dead connections discovered during keepalive
+    for (const client of dead) {
+      removeClient(client)
+    }
+  }, intervalMs)
+  keepaliveTimer.unref()
+}
+
+export function stopKeepalive() {
+  if (keepaliveTimer) {
+    clearInterval(keepaliveTimer)
+    keepaliveTimer = null
+  }
 }

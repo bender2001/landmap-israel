@@ -148,6 +148,29 @@ app.use('/api', globalLimiter)
 // Exempt from rate limiting above since monitors poll every 30-60s
 app.use('/api/health', healthRoutes)
 
+// ─── Server-Sent Events (before timeout — SSE connections are long-lived) ───
+// Must be registered before the API 404 catch-all to be reachable.
+app.get('/api/events', (req, res) => {
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no', // Nginx compatibility
+  })
+  res.flushHeaders()
+
+  // Connection limiting: reject if server or per-IP limit reached
+  const accepted = addClient(res, req.ip)
+  if (!accepted) {
+    res.write('data: {"type":"rejected","reason":"connection_limit"}\n\n')
+    res.end()
+    return
+  }
+
+  res.write('data: {"type":"connected"}\n\n')
+  req.on('close', () => removeClient(res))
+})
+
 // Request timeout — prevent hanging connections (15s for normal, 30s for chat/AI)
 app.use('/api/chat', requestTimeout(30000))
 app.use('/api', requestTimeout(15000))
@@ -330,31 +353,13 @@ app.all('/api/*', (req, res) => {
 // Error handler
 app.use(errorHandler)
 
-// ─── Server-Sent Events for real-time plot updates ───
-import { addClient, removeClient, closeAll as closeSSE, getClientCount } from './services/sseService.js'
-
-app.get('/api/events', (req, res) => {
-  res.set({
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'X-Accel-Buffering': 'no', // Nginx compatibility
-  })
-  res.flushHeaders()
-
-  // Connection limiting: reject if server or per-IP limit reached
-  const accepted = addClient(res, req.ip)
-  if (!accepted) {
-    res.write('data: {"type":"rejected","reason":"connection_limit"}\n\n')
-    res.end()
-    return
-  }
-
-  res.write('data: {"type":"connected"}\n\n')
-  req.on('close', () => removeClient(res))
-})
+// SSE service imports (used by /api/events above and shutdown below)
+import { addClient, removeClient, closeAll as closeSSE, getClientCount, startKeepalive, stopKeepalive } from './services/sseService.js'
 
 const server = app.listen(PORT, async () => {
+  // Start SSE keepalive heartbeat — prevents proxy/LB timeout on idle connections.
+  // Sends a comment ping every 25s (below Nginx's default 60s proxy_read_timeout).
+  startKeepalive()
   console.log(`[server] Running on http://localhost:${PORT}`)
 
   // Take daily price snapshot on startup (idempotent, non-blocking)
@@ -375,7 +380,8 @@ const server = app.listen(PORT, async () => {
 function gracefulShutdown(signal) {
   console.log(`[server] ${signal} received — shutting down gracefully...`)
 
-  // Close SSE connections
+  // Stop SSE keepalive and close all connections
+  stopKeepalive()
   closeSSE()
 
   server.close(() => {
