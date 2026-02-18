@@ -1,14 +1,14 @@
 {
   "name": "LandMap Israel — מפת קרקעות להשקעה",
   "short_name": "LandMap",
-  "description": "פלטפורמת השקעות קרקעות בישראל — מפה אינטראקטיבית, נתוני תכנון, ועדות, שמאות ו-AI יועץ השקעות",
+  "description": "מפת קרקעות להשקעה בישראל — חדרה, נתניה, קיסריה. מחירים, תשואות, ייעודי קרקע.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#050D1A",
-  "theme_color": "#050D1A",
-  "dir": "rtl",
-  "lang": "he",
+  "theme_color": "#C8942A",
   "orientation": "any",
+  "lang": "he",
+  "dir": "rtl",
   "categories": ["business", "finance"],
   "icons": [
     {
@@ -23,5 +23,7 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
 }

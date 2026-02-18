@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import IntroOverlay from './components/IntroOverlay'
 import CookieConsent from './components/CookieConsent'
+import InstallPrompt from './components/InstallPrompt'
 import Spinner from './components/ui/Spinner'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 
@@ -80,6 +81,7 @@ export default function App() {
       </ErrorBoundary>
 
       <CookieConsent />
+      <InstallPrompt />
     </>
   )
 }
