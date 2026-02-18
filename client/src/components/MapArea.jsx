@@ -830,7 +830,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
   }, [plots, colorMode, priceRange])
 
   return (
-    <div className="h-full w-full relative z-0">
+    <div id="map-content" tabIndex="-1" className="h-full w-full relative z-0 outline-none">
       <MapContainer
         center={[32.45, 34.87]}
         zoom={10}

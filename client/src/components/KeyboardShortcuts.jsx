@@ -4,6 +4,7 @@ const shortcuts = [
   { keys: ['Ctrl', 'K'], label: 'פתח חיפוש' },
   { keys: ['/'], label: 'פתח צ׳אט AI' },
   { keys: ['←', '→'], label: 'ניווט בין חלקות' },
+  { keys: ['Enter'], label: 'פתח חלקה בדף מלא' },
   { keys: ['Esc'], label: 'סגירת חלון / סרגל צד' },
   { keys: ['F'], label: 'הוסף/הסר ממועדפים' },
   { keys: ['C'], label: 'הוסף/הסר מהשוואה' },

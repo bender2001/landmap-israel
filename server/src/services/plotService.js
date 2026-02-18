@@ -56,6 +56,7 @@ export async function getPublishedPlots(filters = {}) {
       case 'price-desc': query = query.order('total_price', { ascending: false }); break
       case 'size-asc': query = query.order('size_sqm', { ascending: true }); break
       case 'size-desc': query = query.order('size_sqm', { ascending: false }); break
+      case 'updated-desc': query = query.order('updated_at', { ascending: false, nullsFirst: false }); break
       // ROI and price-per-sqm require computed columns — handled client-side
     }
     // Secondary sort: newest first within same price/size tier

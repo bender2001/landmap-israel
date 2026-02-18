@@ -154,7 +154,7 @@ export default function MapView() {
     // Pass search query to server for DB-level text search (faster than client-side)
     if (debouncedSearch) f.q = debouncedSearch
     // Pass simple sorts to server for better performance
-    if (['price-asc', 'price-desc', 'size-asc', 'size-desc'].includes(sortBy)) {
+    if (['price-asc', 'price-desc', 'size-asc', 'size-desc', 'updated-desc'].includes(sortBy)) {
       f.sort = sortBy
     }
     return f
@@ -238,6 +238,10 @@ export default function MapView() {
         }
         return getCagr(b) - getCagr(a)
       }); break
+      case 'updated-desc': sorted.sort((a, b) => {
+        const getTs = (p) => new Date(p.updated_at ?? p.updatedAt ?? p.created_at ?? p.createdAt ?? 0).getTime()
+        return getTs(b) - getTs(a)
+      }); break
     }
     return sorted
   }, [searchedPlots, sortBy])
@@ -318,6 +322,13 @@ export default function MapView() {
         const tag = document.activeElement?.tagName
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
         // Handled by SidebarDetails internally — we just need the shortcut documented
+      }
+      // Enter key to open selected plot in full-page detail (like Madlan's property page)
+      if (e.key === 'Enter' && selectedPlot && !e.ctrlKey && !e.metaKey) {
+        const tag = document.activeElement?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON' || tag === 'A') return
+        e.preventDefault()
+        window.open(`/plot/${selectedPlot.id}`, '_blank')
       }
       // / key to open AI chat (like Cmd+K search pattern)
       if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
