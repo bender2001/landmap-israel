@@ -1,15 +1,16 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle } from 'lucide-react'
-import { usePlot } from '../../hooks/usePlots.js'
+import { usePlot, useAllPlots } from '../../hooks/usePlots.js'
 import { useFavorites } from '../../hooks/useFavorites.js'
 import LeadModal from '../../components/LeadModal.jsx'
 import ShareMenu from '../../components/ui/ShareMenu.jsx'
 import ImageLightbox from '../../components/ui/ImageLightbox.jsx'
 import PublicNav from '../../components/PublicNav.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
+import NeighborhoodRadar from '../../components/ui/NeighborhoodRadar.jsx'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../../utils/constants.js'
-import { formatCurrency, formatDunam } from '../../utils/formatters.js'
+import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore } from '../../utils/formatters.js'
 import PriceTrendChart from '../../components/ui/PriceTrendChart.jsx'
 import MiniMap from '../../components/ui/MiniMap.jsx'
 import { plotInquiryLink } from '../../utils/config.js'
@@ -69,10 +70,149 @@ function BreadcrumbSchema({ plot }) {
   )
 }
 
+function SimilarPlotsSection({ currentPlot, allPlots }) {
+  const similar = useMemo(() => {
+    if (!currentPlot || !allPlots || allPlots.length < 2) return []
+    const price = currentPlot.total_price ?? currentPlot.totalPrice ?? 0
+    const size = currentPlot.size_sqm ?? currentPlot.sizeSqM ?? 0
+    return allPlots
+      .filter(p => p.id !== currentPlot.id)
+      .map(p => {
+        const pPrice = p.total_price ?? p.totalPrice ?? 0
+        const pSize = p.size_sqm ?? p.sizeSqM ?? 0
+        const priceDiff = price > 0 ? Math.abs(pPrice - price) / price : 1
+        const sizeDiff = size > 0 ? Math.abs(pSize - size) / size : 1
+        const cityBonus = p.city === currentPlot.city ? 0 : 0.3
+        return { ...p, _score: priceDiff + sizeDiff + cityBonus }
+      })
+      .sort((a, b) => a._score - b._score)
+      .slice(0, 4)
+  }, [currentPlot?.id, allPlots])
+
+  if (similar.length === 0) return null
+
+  return (
+    <div className="mb-8">
+      <h2 className="text-base font-bold text-slate-100 mb-4 flex items-center gap-2">
+        <span className="w-7 h-7 rounded-lg bg-gold/15 flex items-center justify-center text-sm">🔗</span>
+        חלקות דומות
+      </h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {similar.map(p => {
+          const bn = p.block_number ?? p.blockNumber
+          const price = p.total_price ?? p.totalPrice
+          const projValue = p.projected_value ?? p.projectedValue
+          const sizeSqM = p.size_sqm ?? p.sizeSqM
+          const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
+          const color = statusColors[p.status]
+          return (
+            <Link
+              key={p.id}
+              to={`/plot/${p.id}`}
+              className="bg-navy-light/40 border border-white/5 rounded-2xl p-4 hover:border-gold/20 transition-all group"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-1.5 h-8 rounded-full flex-shrink-0" style={{ background: color }} />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-slate-200 truncate">גוש {bn} | חלקה {p.number}</div>
+                  <div className="text-xs text-slate-500">{p.city} · {formatDunam(sizeSqM)} דונם</div>
+                </div>
+              </div>
+              <div className="flex justify-between items-end">
+                <div className="text-sm font-bold text-gold">{formatPriceShort(price)}</div>
+                <div className="text-xs font-bold text-emerald-400">+{roi}%</div>
+              </div>
+              <div className="mt-2 h-1 rounded-full bg-white/5 overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.min(100, Math.max(8, (price / (projValue || 1)) * 100))}%`,
+                    background: 'linear-gradient(90deg, #3B82F6, #60A5FA)',
+                  }}
+                />
+              </div>
+            </Link>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function MortgageCalcSection({ totalPrice }) {
+  const [equity, setEquity] = useState(50)
+  const [years, setYears] = useState(15)
+  const [rate, setRate] = useState(4.5)
+
+  const loanAmount = totalPrice * (1 - equity / 100)
+  const monthlyRate = rate / 100 / 12
+  const numPayments = years * 12
+  const monthlyPayment = monthlyRate > 0
+    ? Math.round(loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1))
+    : Math.round(loanAmount / numPayments)
+  const totalPayment = monthlyPayment * numPayments
+  const totalInterest = totalPayment - loanAmount
+
+  return (
+    <div className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <DollarSign className="w-4 h-4 text-gold" />
+        <h2 className="text-base font-bold text-slate-100">מחשבון מימון</h2>
+      </div>
+      <div className="space-y-4">
+        <div>
+          <div className="flex justify-between text-xs text-slate-400 mb-1">
+            <span>הון עצמי</span>
+            <span className="text-gold font-medium">{equity}% ({formatCurrency(Math.round(totalPrice * equity / 100))})</span>
+          </div>
+          <input type="range" min="20" max="100" step="5" value={equity}
+            onChange={(e) => setEquity(Number(e.target.value))}
+            className="w-full h-1.5 rounded-full appearance-none bg-white/10 accent-gold cursor-pointer" />
+        </div>
+        <div>
+          <div className="flex justify-between text-xs text-slate-400 mb-1">
+            <span>תקופה</span>
+            <span className="text-slate-300 font-medium">{years} שנים</span>
+          </div>
+          <input type="range" min="5" max="30" step="1" value={years}
+            onChange={(e) => setYears(Number(e.target.value))}
+            className="w-full h-1.5 rounded-full appearance-none bg-white/10 accent-gold cursor-pointer" />
+        </div>
+        <div>
+          <div className="flex justify-between text-xs text-slate-400 mb-1">
+            <span>ריבית</span>
+            <span className="text-slate-300 font-medium">{rate}%</span>
+          </div>
+          <input type="range" min="2" max="8" step="0.25" value={rate}
+            onChange={(e) => setRate(Number(e.target.value))}
+            className="w-full h-1.5 rounded-full appearance-none bg-white/10 accent-gold cursor-pointer" />
+        </div>
+        {equity < 100 && (
+          <div className="grid grid-cols-3 gap-3 pt-3 border-t border-white/5">
+            <div className="text-center">
+              <div className="text-xs text-slate-500">החזר חודשי</div>
+              <div className="text-sm font-bold text-gold">{formatCurrency(monthlyPayment)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-slate-500">סה״כ ריבית</div>
+              <div className="text-sm font-bold text-orange-400">{formatCurrency(totalInterest)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-slate-500">סה״כ תשלום</div>
+              <div className="text-sm font-bold text-slate-300">{formatCurrency(totalPayment)}</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function PlotDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { data: plot, isLoading, error } = usePlot(id)
+  const { data: allPlots = [] } = useAllPlots({})
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
@@ -454,8 +594,23 @@ export default function PlotDetail() {
                   <div className="flex justify-between text-sm font-medium"><span className="text-slate-300">סה"כ עלות כוללת</span><span className="text-gold">{formatCurrency(Math.round(totalPrice * 1.0775))}</span></div>
                 </div>
               </div>
+
+              {/* Neighborhood Radar */}
+              <NeighborhoodRadar
+                distanceToSea={distanceToSea}
+                distanceToPark={distanceToPark}
+                distanceToHospital={distanceToHospital}
+                roi={roi}
+                investmentScore={calcInvestmentScore(plot)}
+              />
+
+              {/* Mortgage Calculator */}
+              <MortgageCalcSection totalPrice={totalPrice} />
             </div>
           </div>
+
+          {/* Similar Plots */}
+          <SimilarPlotsSection currentPlot={plot} allPlots={allPlots} />
 
           {/* Sticky CTA */}
           <div className="fixed bottom-0 left-0 right-0 z-40 bg-navy/90 backdrop-blur-xl border-t border-white/10 px-4 py-3">
