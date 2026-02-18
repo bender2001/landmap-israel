@@ -16,6 +16,7 @@ import KeyboardShortcuts from '../../components/KeyboardShortcuts.jsx'
 import RecentlyViewed from '../../components/RecentlyViewed.jsx'
 import ConnectionStatus from '../../components/ui/ConnectionStatus.jsx'
 import { useMetaTags } from '../../hooks/useMetaTags.js'
+import { useStructuredData } from '../../hooks/useStructuredData.js'
 import { formatCurrency, calcInvestmentScore } from '../../utils/formatters.js'
 import { useSavedSearches } from '../../hooks/useSavedSearches.js'
 import { Phone } from 'lucide-react'
@@ -290,6 +291,9 @@ export default function MapView() {
       prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
     )
   }, [])
+
+  // JSON-LD structured data for SEO (like Madlan/Yad2)
+  useStructuredData(selectedPlot, filteredPlots)
 
   // Dynamic OG meta tags for social sharing
   useMetaTags(
