@@ -489,19 +489,43 @@ export function generatePlotSummary(plot) {
     ? perimeter >= 1000 ? `${(perimeter / 1000).toFixed(1)} ק״מ` : `${perimeter} מ׳`
     : null
 
+  // Investment grade for quick scan
+  const { grade } = getInvestmentGrade(score)
+
+  // Status label
+  const statusNames = {
+    AVAILABLE: '🟢 זמין',
+    RESERVED: '🟡 שמור',
+    SOLD: '🔴 נמכר',
+    IN_PROCESS: '🟠 בתהליך',
+  }
+  const statusLabel = statusNames[plot.status] || plot.status
+
+  // Distance highlights
+  const distToSea = plot.distance_to_sea ?? plot.distanceToSea
+  const distToPark = plot.distance_to_park ?? plot.distanceToPark
+
+  // Monthly payment estimate
+  const payment = calcMonthlyPayment(price)
+
   const lines = [
     `🏗️ *גוש ${bn} | חלקה ${plot.number}*`,
-    `📍 ${plot.city}`,
+    `📍 ${plot.city} · ${statusLabel} · דירוג ${grade}`,
     ``,
+    `━━━ פרטי חלקה ━━━`,
     `💰 מחיר: ${formatCurrency(price)}`,
     `📐 שטח: ${formatDunam(sizeSqM)} דונם (${sizeSqM.toLocaleString()} מ״ר)`,
     perimeterStr ? `📏 היקף: ${perimeterStr}` : null,
     sizeSqM > 0 ? `💵 מחיר/דונם: ${formatCurrency(Math.round(price / sizeSqM * 1000))}` : null,
-    zoning && zoningNames[zoning] ? `🗺️ ייעוד: ${zoningNames[zoning]}` : null,
+    payment ? `🏦 החזר חודשי: ~${formatMonthlyPayment(payment.monthly)} (${Math.round(payment.ltv * 100)}% מימון)` : null,
+    zoning && zoningNames[zoning] ? `🗺️ שלב תכנוני: ${zoningNames[zoning]}` : null,
+    distToSea != null ? `🌊 ${distToSea} מ׳ מהים` : null,
+    distToPark != null ? `🌳 ${distToPark} מ׳ מפארק` : null,
     ``,
-    `📈 תשואה צפויה: +${roi}%`,
+    `━━━ ניתוח השקעה ━━━`,
+    `📈 תשואה צפויה: +${roi}% (שווי ${formatCurrency(projected)})`,
     cagrData ? `📊 CAGR: ${cagrData.cagr}%/שנה (${cagrData.years} שנים)` : null,
-    `⭐ ציון השקעה: ${score}/10`,
+    `⭐ ציון השקעה: ${score}/10 (${grade})`,
     ``,
     `💰 סה״כ השקעה נדרשת: ${formatCurrency(totalInvestment)}`,
     `✨ רווח נקי (אחרי מיסים): ${formatCurrency(netProfit)}`,

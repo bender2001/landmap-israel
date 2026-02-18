@@ -22,6 +22,7 @@ import InvestmentBenchmark from '../../components/ui/InvestmentBenchmark.jsx'
 import InvestmentProjection from '../../components/ui/InvestmentProjection.jsx'
 import DueDiligenceChecklist from '../../components/ui/DueDiligenceChecklist.jsx'
 import MobilePlotActionBar from '../../components/ui/MobilePlotActionBar.jsx'
+import QuickInquiryTemplates from '../../components/ui/QuickInquiryTemplates.jsx'
 
 function JsonLdSchema({ plot }) {
   const blockNum = plot.block_number ?? plot.blockNumber
@@ -1577,6 +1578,11 @@ export default function PlotDetail() {
           {/* Similar Plots — lightweight: uses server-side geo-proximity API */}
           <div id="section-similar">
             <SimilarPlotsSection plotId={id} onNearbyLoaded={handleNearbyLoaded} />
+          </div>
+
+          {/* Quick Inquiry Templates — pre-built WhatsApp messages for common investor questions */}
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 mt-6 mb-20">
+            <QuickInquiryTemplates plot={plot} />
           </div>
 
           {/* Sticky CTA — enhanced with print, share, compare, and map actions (like Madlan/Yad2 bottom bars) */}

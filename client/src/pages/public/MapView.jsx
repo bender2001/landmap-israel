@@ -763,19 +763,6 @@ export default function MapView() {
           </div>
         </div>
       )}
-      {/* Mock data warning — shown when API is unreachable and fallback demo data is used */}
-      {isMockData && (
-        <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-600/90 backdrop-blur-sm text-white text-center py-1.5 px-3 text-[11px] font-medium flex items-center justify-center gap-1.5 whitespace-nowrap overflow-hidden" dir="rtl">
-          <span>⚠️</span>
-          <span className="truncate">השרת אינו זמין — נתוני הדגמה</span>
-          <button
-            onClick={() => refetchPlots()}
-            className="px-2 py-0.5 bg-white/20 hover:bg-white/30 rounded-md text-[10px] font-bold transition-colors flex-shrink-0"
-          >
-            נסה שוב
-          </button>
-        </div>
-      )}
       {/* Market Ticker — Bloomberg-style rotating market insights (desktop only).
           Wrapped in IdleRender to defer until browser is idle — not needed for first paint. */}
       <IdleRender>

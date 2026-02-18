@@ -19,6 +19,7 @@ import StreetViewPanel from './ui/StreetViewPanel'
 import DueDiligenceChecklist from './ui/DueDiligenceChecklist'
 import InvestmentProjection from './ui/InvestmentProjection'
 import LocationScore from './ui/LocationScore'
+import QuickInquiryTemplates from './ui/QuickInquiryTemplates'
 import { plotInquiryLink } from '../utils/config'
 
 function getDocIcon(mimeType) {
@@ -2701,12 +2702,20 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
           </button>
         )}
 
+        {/* Quick Inquiry Templates — pre-built WhatsApp messages for common investor questions.
+            Reduces friction from "interested" to "message sent" — like Madlan's "שאל שאלה".
+            Placed above CTA for maximum visibility without obscuring the primary action. */}
+        <div className="flex-shrink-0 px-4 pt-2 pb-0 border-t border-white/5 bg-navy/80 backdrop-blur-sm">
+          <QuickInquiryTemplates plot={plot} />
+        </div>
+
         {/* Sticky CTA footer */}
         <div className="sidebar-cta-footer">
           <div className="flex gap-2">
             <button
               onClick={onOpenLeadModal}
               className="cta-shimmer relative overflow-hidden flex-1 py-3.5 px-6 bg-gradient-to-r from-gold via-gold-bright to-gold rounded-2xl text-navy font-extrabold text-base shadow-lg shadow-gold/30 hover:shadow-xl hover:shadow-gold/40 hover:-translate-y-px transition-all duration-300"
+              aria-label="צור קשר לפרטים מלאים על החלקה"
             >
               צור קשר לפרטים מלאים
             </button>
