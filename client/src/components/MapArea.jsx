@@ -5,6 +5,7 @@ import { MapPin, Eye, Check, ArrowLeft, Navigation, Layers, Map as MapIcon } fro
 import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
 import { formatCurrency, formatPriceShort, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
+import { useAreaAverages } from '../hooks/useAreaAverages'
 import MapClusterLayer from './MapClusterLayer'
 import MapRuler from './MapRuler'
 import MapHeatLayer from './MapHeatLayer'
@@ -758,13 +759,14 @@ function SearchThisAreaButton({ onSearchArea, autoSearch, onToggleAutoSearch }) 
 }
 
 /**
- * Viewport counter — shows "X of Y plots visible" and updates as user pans/zooms.
- * Like Madlan's "X נכסים באזור זה" indicator. Uses plotBounds for efficient
- * AABB intersection test without re-rendering polygons.
+ * Viewport counter with market context — shows "X of Y plots visible"
+ * PLUS avg price/sqm and avg ROI for visible plots.
+ * Like Madlan's "X נכסים באזור זה" but with investment intelligence.
+ * Uses plotBounds for efficient AABB intersection test without re-rendering polygons.
  */
 function MapViewportCounter({ plots, totalCount }) {
   const map = useMap()
-  const [visibleCount, setVisibleCount] = useState(plots.length)
+  const [visibleIds, setVisibleIds] = useState(new Set())
 
   // Precompute bounding boxes
   const plotBounds = useMemo(() => {
@@ -783,31 +785,59 @@ function MapViewportCounter({ plots, totalCount }) {
     return result
   }, [plots])
 
-  const updateCount = useCallback(() => {
+  const updateVisibility = useCallback(() => {
     const bounds = map.getBounds()
     const north = bounds.getNorth()
     const south = bounds.getSouth()
     const east = bounds.getEast()
     const west = bounds.getWest()
 
-    let count = 0
-    for (const [, bb] of plotBounds) {
+    const visible = new Set()
+    for (const [id, bb] of plotBounds) {
       if (bb.maxLat >= south && bb.minLat <= north && bb.maxLng >= west && bb.minLng <= east) {
-        count++
+        visible.add(id)
       }
     }
-    setVisibleCount(count)
+    setVisibleIds(prev => {
+      if (prev.size === visible.size && [...visible].every(id => prev.has(id))) return prev
+      return visible
+    })
   }, [map, plotBounds])
 
   useEffect(() => {
-    updateCount()
-    map.on('moveend', updateCount)
-    map.on('zoomend', updateCount)
+    updateVisibility()
+    map.on('moveend', updateVisibility)
+    map.on('zoomend', updateVisibility)
     return () => {
-      map.off('moveend', updateCount)
-      map.off('zoomend', updateCount)
+      map.off('moveend', updateVisibility)
+      map.off('zoomend', updateVisibility)
     }
-  }, [map, updateCount])
+  }, [map, updateVisibility])
+
+  // Compute market stats for visible plots — gives investors instant context
+  const viewportStats = useMemo(() => {
+    if (visibleIds.size === 0) return null
+    let totalPrice = 0, totalArea = 0, totalProj = 0, priceCount = 0
+    for (const p of plots) {
+      if (!visibleIds.has(p.id)) continue
+      const price = p.total_price ?? p.totalPrice ?? 0
+      const size = p.size_sqm ?? p.sizeSqM ?? 0
+      const proj = p.projected_value ?? p.projectedValue ?? 0
+      if (price > 0 && size > 0) {
+        totalPrice += price
+        totalArea += size
+        totalProj += proj
+        priceCount++
+      }
+    }
+    if (priceCount === 0) return null
+    return {
+      avgPriceSqm: Math.round(totalPrice / totalArea),
+      avgRoi: totalPrice > 0 ? Math.round(((totalProj - totalPrice) / totalPrice) * 100) : 0,
+    }
+  }, [plots, visibleIds])
+
+  const visibleCount = visibleIds.size
 
   if (totalCount === 0) return null
 
@@ -824,6 +854,19 @@ function MapViewportCounter({ plots, totalCount }) {
             <>{totalCount} חלקות</>
           )}
         </span>
+        {/* Market context — avg price/sqm and ROI for visible plots */}
+        {viewportStats && visibleCount >= 2 && (
+          <>
+            <span className="text-slate-600 text-[10px]">·</span>
+            <span className="text-[10px] text-slate-400" title="ממוצע מחיר/מ״ר באזור הנצפה">
+              ₪{viewportStats.avgPriceSqm.toLocaleString()}/מ״ר
+            </span>
+            <span className="text-slate-600 text-[10px]">·</span>
+            <span className="text-[10px] text-emerald-400" title="ממוצע תשואה באזור הנצפה">
+              +{viewportStats.avgRoi}%
+            </span>
+          </>
+        )}
         {isPartial && (
           <span className="w-1.5 h-1.5 rounded-full bg-gold/60 animate-pulse" title="הזז/הקטן מפה כדי לראות יותר" />
         )}
@@ -961,25 +1004,8 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
     return { min: Math.min(...values), max: Math.max(...values) }
   }, [plots])
 
-  // Precompute area average price/sqm for deal indicators on tooltips
-  const areaAvgPsm = useMemo(() => {
-    if (!plots || plots.length === 0) return {}
-    const byCity = {}
-    plots.forEach(p => {
-      const city = p.city || 'unknown'
-      const price = p.total_price ?? p.totalPrice ?? 0
-      const size = p.size_sqm ?? p.sizeSqM ?? 1
-      if (size <= 0) return
-      if (!byCity[city]) byCity[city] = { total: 0, count: 0 }
-      byCity[city].total += price / size
-      byCity[city].count += 1
-    })
-    const result = {}
-    for (const [city, data] of Object.entries(byCity)) {
-      result[city] = Math.round(data.total / data.count)
-    }
-    return result
-  }, [plots])
+  // Area average price/sqm for deal indicators on tooltips (shared hook — DRY)
+  const areaAvgPsm = useAreaAverages(plots)
 
   // Precompute colors per plot to pass as stable props
   const plotColors = useMemo(() => {

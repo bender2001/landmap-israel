@@ -4,27 +4,8 @@ import PriceSparkline from './ui/PriceSparkline'
 import { statusColors, statusLabels } from '../utils/constants'
 import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcMonthlyPayment, formatMonthlyPayment, calcDemandVelocity, calcBestInCategory, calcBuildableValue } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
+import { useAreaAverages } from '../hooks/useAreaAverages'
 import { whatsappShareLink } from '../utils/config'
-
-function useAreaAverages(plots) {
-  return useMemo(() => {
-    if (!plots || plots.length === 0) return {}
-    const byCity = {}
-    plots.forEach(p => {
-      const city = p.city || 'unknown'
-      const price = p.total_price ?? p.totalPrice ?? 0
-      const size = p.size_sqm ?? p.sizeSqM ?? 1
-      if (!byCity[city]) byCity[city] = { total: 0, count: 0 }
-      byCity[city].total += price / size
-      byCity[city].count += 1
-    })
-    const result = {}
-    for (const [city, data] of Object.entries(byCity)) {
-      result[city] = Math.round(data.total / data.count)
-    }
-    return result
-  }, [plots])
-}
 
 /**
  * Compute price-per-sqm percentile for each plot relative to all plots.

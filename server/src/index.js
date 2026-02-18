@@ -29,6 +29,7 @@ import dataSourceRoutes from './routes/data-sources.js'
 import subscriptionRoutes from './routes/subscription.js'
 import sitemapRoutes from './routes/sitemap.js'
 import ogRoutes from './routes/og.js'
+import healthRoutes from './routes/health.js'
 import { errorHandler, requestId } from './middleware/errorHandler.js'
 import { requestTimeout } from './middleware/timeout.js'
 import { supabaseAdmin } from './config/supabase.js'
@@ -142,6 +143,10 @@ const globalLimiter = rateLimit({
   },
 })
 app.use('/api', globalLimiter)
+
+// ─── Health endpoint (before timeout — must respond fast for monitors) ───
+// Exempt from rate limiting above since monitors poll every 30-60s
+app.use('/api/health', healthRoutes)
 
 // Request timeout — prevent hanging connections (15s for normal, 30s for chat/AI)
 app.use('/api/chat', requestTimeout(30000))
