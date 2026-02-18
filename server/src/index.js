@@ -314,6 +314,19 @@ if (process.env.NODE_ENV === 'production') {
   })
 }
 
+// API 404 handler — catch unmatched /api/* routes before the frontend catch-all.
+// Without this, unmatched API requests fall through to the static file handler
+// and return index.html with 200, confusing clients and breaking error handling.
+app.all('/api/*', (req, res) => {
+  res.status(404).json({
+    error: 'נתיב API לא נמצא',
+    errorCode: 'API_NOT_FOUND',
+    path: req.originalUrl,
+    method: req.method,
+    requestId: req.id || '-',
+  })
+})
+
 // Error handler
 app.use(errorHandler)
 

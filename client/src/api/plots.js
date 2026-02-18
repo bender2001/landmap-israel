@@ -39,3 +39,13 @@ export function getPopularPlots(limit = 6) {
 export function getFeaturedPlots(limit = 3) {
   return api.get(`/plots/featured?limit=${limit}`)
 }
+
+/**
+ * Fetch multiple plots by IDs in a single request.
+ * Used by the Compare page to avoid loading the entire dataset (~90% payload reduction).
+ * @param {string[]} ids - Array of plot UUIDs (max 10)
+ */
+export function getPlotsBatch(ids) {
+  if (!ids || ids.length === 0) return Promise.resolve([])
+  return api.get(`/plots/batch?ids=${ids.join(',')}`)
+}

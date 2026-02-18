@@ -1,7 +1,7 @@
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { BarChart3, X, Map, MapPin, Waves, TreePine, Hospital, TrendingUp, Award, Clock, Trophy, Crown, Share2, Printer, Check, Copy, Download } from 'lucide-react'
-import { useAllPlots } from '../../hooks/usePlots'
+import { usePlotsBatch } from '../../hooks/usePlots'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
 import { formatCurrency, calcInvestmentScore, calcMonthlyPayment, formatMonthlyPayment } from '../../utils/formatters'
 import { useMetaTags } from '../../hooks/useMetaTags'
@@ -266,22 +266,39 @@ export default function Compare() {
   })
 
   const [searchParams, setSearchParams] = useSearchParams()
-  const plotIds = (searchParams.get('plots') || '').split(',').filter(Boolean)
-  const { data: allPlots = [], isLoading } = useAllPlots()
+  // Hydrate plot IDs from URL params, falling back to localStorage.
+  // This lets users navigate directly to /compare after adding plots on the map
+  // without needing the ?plots= URL parameter.
+  const plotIds = useMemo(() => {
+    const fromUrl = (searchParams.get('plots') || '').split(',').filter(Boolean)
+    if (fromUrl.length > 0) return fromUrl
+    try {
+      const stored = JSON.parse(localStorage.getItem('landmap_compare') || '[]')
+      return Array.isArray(stored) ? stored.filter(Boolean) : []
+    } catch { return [] }
+  }, [searchParams])
+
+  // Sync URL with localStorage IDs on mount (so shareable URL works)
+  useEffect(() => {
+    if (plotIds.length > 0 && !searchParams.get('plots')) {
+      setSearchParams({ plots: plotIds.join(',') }, { replace: true })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Batch fetch only the compared plots instead of loading ALL plots (~90% payload reduction)
+  const { data: plots = [], isLoading } = usePlotsBatch(plotIds)
   const [linkCopied, setLinkCopied] = useState(false)
 
-  const plots = useMemo(() => {
-    return plotIds.map((id) => allPlots.find((p) => p.id === id)).filter(Boolean)
-  }, [plotIds, allPlots])
-
-  const removeFromCompare = (plotId) => {
+  const removeFromCompare = useCallback((plotId) => {
     const next = plotIds.filter((id) => id !== plotId)
+    // Also update localStorage to stay in sync with MapView
+    try { localStorage.setItem('landmap_compare', JSON.stringify(next)) } catch {}
     if (next.length > 0) {
       setSearchParams({ plots: next.join(',') }, { replace: true })
     } else {
       setSearchParams({}, { replace: true })
     }
-  }
+  }, [plotIds, setSearchParams])
 
   // Helper to find best value in a row
   const bestValue = (getter, mode = 'max') => {
@@ -578,7 +595,10 @@ export default function Compare() {
                   + הוסף חלקה להשוואה
                 </Link>
                 <button
-                  onClick={() => setSearchParams({}, { replace: true })}
+                  onClick={() => {
+                    try { localStorage.setItem('landmap_compare', '[]') } catch {}
+                    setSearchParams({}, { replace: true })
+                  }}
                   className="text-sm text-red-400 hover:text-red-300 transition"
                 >
                   נקה הכל

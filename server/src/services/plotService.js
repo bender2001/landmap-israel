@@ -157,6 +157,28 @@ export async function deletePlot(id) {
   if (error) throw error
 }
 
+/**
+ * Fetch multiple plots by their IDs in a single query.
+ * Used by the Compare page to avoid loading the entire dataset.
+ * Returns full plot data with images (same as getPlotById but batched).
+ * @param {string[]} ids - Array of plot UUIDs (max 10)
+ * @returns {Promise<Array>} Array of plot objects
+ */
+export async function getPlotsByIds(ids) {
+  if (!ids || ids.length === 0) return []
+  // Limit to 10 to prevent abuse
+  const safeIds = ids.slice(0, 10)
+
+  const { data, error } = await supabaseAdmin
+    .from('plots')
+    .select('*, plot_images(id, url, alt)')
+    .eq('is_published', true)
+    .in('id', safeIds)
+
+  if (error) throw error
+  return data || []
+}
+
 // Lightweight aggregate stats for published plots
 export async function getPlotStats() {
   const { data, error } = await supabaseAdmin

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import crypto from 'crypto'
-import { getPublishedPlots, getPlotById, getPlotStats } from '../services/plotService.js'
+import { getPublishedPlots, getPlotById, getPlotsByIds, getPlotStats } from '../services/plotService.js'
 import { sanitizePlotQuery, sanitizePlotId } from '../middleware/sanitize.js'
 import { analytics } from '../services/analyticsService.js'
 import { plotCache, statsCache } from '../services/cacheService.js'
@@ -167,6 +167,44 @@ router.get('/featured', async (req, res, next) => {
     }, 300_000)
 
     res.json(featured)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// GET /api/plots/batch - Fetch multiple plots by IDs in one request.
+// Used by the Compare page to avoid loading the entire dataset (~90% payload reduction).
+// Example: GET /api/plots/batch?ids=uuid1,uuid2,uuid3
+router.get('/batch', async (req, res, next) => {
+  try {
+    const idsParam = req.query.ids
+    if (!idsParam || typeof idsParam !== 'string') {
+      return res.status(400).json({ error: 'חסר פרמטר ids', errorCode: 'MISSING_IDS' })
+    }
+    const ids = idsParam.split(',').map(id => id.trim()).filter(Boolean)
+    if (ids.length === 0) {
+      return res.status(400).json({ error: 'רשימת IDs ריקה', errorCode: 'EMPTY_IDS' })
+    }
+    if (ids.length > 10) {
+      return res.status(400).json({ error: 'עד 10 חלקות בבקשה אחת', errorCode: 'TOO_MANY_IDS' })
+    }
+    // Validate UUID format to prevent injection
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!ids.every(id => uuidRegex.test(id))) {
+      return res.status(400).json({ error: 'פורמט ID לא תקין', errorCode: 'INVALID_ID_FORMAT' })
+    }
+
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120')
+    const cacheKey = `batch:${ids.sort().join(',')}`
+    const plots = await plotCache.wrap(cacheKey, () => getPlotsByIds(ids), 60_000)
+
+    const etag = generateETag(plots)
+    res.set('ETag', etag)
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end()
+    }
+
+    res.json(plots)
   } catch (err) {
     next(err)
   }
