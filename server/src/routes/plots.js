@@ -5,7 +5,7 @@ import { sanitizePlotQuery, sanitizePlotId } from '../middleware/sanitize.js'
 import { analytics } from '../services/analyticsService.js'
 import { plotCache, statsCache } from '../services/cacheService.js'
 import { supabaseAdmin } from '../config/supabase.js'
-import { haversineKm, calcCentroid, formatDistance } from '../utils/geo.js'
+import { haversineKm, calcCentroid, formatDistance, estimateTravelTime } from '../utils/geo.js'
 
 const router = Router()
 
@@ -306,6 +306,7 @@ router.get('/:id/nearby-pois', sanitizePlotId, async (req, res, next) => {
     }
 
     // Distance calculation + filter by radius (uses shared haversine utility)
+    // Enriched with walking/driving time estimates — like Madlan's "X דקות הליכה"
     const nearbyPois = pois
       .map(poi => {
         const lat = poi.lat ?? poi.latitude
@@ -313,7 +314,8 @@ router.get('/:id/nearby-pois', sanitizePlotId, async (req, res, next) => {
         if (!lat || !lng || !isFinite(lat) || !isFinite(lng)) return null
         const dist = formatDistance(haversineKm(center.lat, center.lng, lat, lng))
         if (dist.km > maxKm) return null
-        return { ...poi, distance_km: dist.km, distance_m: dist.m }
+        const travel = estimateTravelTime(dist.m)
+        return { ...poi, distance_km: dist.km, distance_m: dist.m, walk_min: travel.walkMin, drive_min: travel.driveMin, walk_label: travel.walkLabel, drive_label: travel.driveLabel }
       })
       .filter(Boolean)
       .sort((a, b) => a.distance_km - b.distance_km)

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, Link2, Download, Zap, Layers } from 'lucide-react'
+import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, Link2, Download, Zap, Layers, Navigation } from 'lucide-react'
 import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
 import SearchAutocomplete from './SearchAutocomplete'
 import SavedSearches from './SavedSearches'
@@ -55,6 +55,7 @@ const zoningOptions = [
 
 const sortOptions = [
   { label: 'ברירת מחדל', value: 'default', icon: ArrowUpDown },
+  { label: 'הכי קרוב אליי 📍', value: 'distance-asc', icon: Navigation },
   { label: 'מחיר: נמוך לגבוה', value: 'price-asc', icon: ArrowUp },
   { label: 'מחיר: גבוה לנמוך', value: 'price-desc', icon: ArrowDown },
   { label: 'מחיר/מ״ר: נמוך לגבוה', value: 'ppsqm-asc', icon: ArrowUp },

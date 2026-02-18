@@ -14,7 +14,7 @@ import WidgetErrorBoundary from '../../components/ui/WidgetErrorBoundary.jsx'
 import ConnectionStatus from '../../components/ui/ConnectionStatus.jsx'
 import { useMetaTags } from '../../hooks/useMetaTags.js'
 import { useStructuredData } from '../../hooks/useStructuredData.js'
-import { formatCurrency, formatPriceShort, calcInvestmentScore, calcCAGR } from '../../utils/formatters.js'
+import { formatCurrency, formatPriceShort, calcInvestmentScore, calcCAGR, haversineKm, plotCenter } from '../../utils/formatters.js'
 import { useViewTracker } from '../../hooks/useViewTracker.js'
 import { usePriceTracker } from '../../hooks/usePriceTracker.js'
 import { useSavedSearches } from '../../hooks/useSavedSearches.js'
@@ -193,6 +193,10 @@ export default function MapView() {
   const { recordPrices, getPriceChange } = usePriceTracker()
   const { searches: savedSearches, save: saveSearch, remove: removeSearch } = useSavedSearches()
 
+  // User geolocation — used for "sort by distance" (like Madlan's proximity sort).
+  // Requested lazily when user selects distance sort, persisted in state for the session.
+  const [userLocation, setUserLocation] = useState(null)
+
   // Compare state (localStorage-backed via useLocalStorage, cross-tab sync)
   const [compareIds, setCompareIds] = useLocalStorage('landmap_compare', [])
   const toggleCompare = useCallback((plotId) => {
@@ -320,6 +324,21 @@ export default function MapView() {
     })
   }, [boundsFilteredPlots, filters.search, debouncedSearch])
 
+  // Request geolocation when "sort by distance" is selected — lazy permission request.
+  // Like Madlan/Airbnb: only asks for location when the user actually needs it.
+  useEffect(() => {
+    if (sortBy !== 'distance-asc' || userLocation) return
+    if (!navigator.geolocation) {
+      setSortBy('default') // Fallback if geolocation unavailable
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => setSortBy('default'), // Revert sort if user denies permission
+      { enableHighAccuracy: false, timeout: 8000 }
+    )
+  }, [sortBy, userLocation])
+
   // Sort
   const sortedPlots = useMemo(() => {
     if (sortBy === 'default') return searchedPlots
@@ -332,6 +351,22 @@ export default function MapView() {
       return price > 0 ? (proj - price) / price : 0
     }
     switch (sortBy) {
+      case 'distance-asc': {
+        // Sort by distance from user's current location — like Madlan's proximity sort.
+        // Uses the plotCenter helper (centroid of polygon) for each plot.
+        if (!userLocation) break // Still waiting for geolocation
+        sorted.sort((a, b) => {
+          const ca = plotCenter(a.coordinates)
+          const cb = plotCenter(b.coordinates)
+          if (!ca && !cb) return 0
+          if (!ca) return 1
+          if (!cb) return -1
+          const distA = haversineKm(userLocation.lat, userLocation.lng, ca.lat, ca.lng)
+          const distB = haversineKm(userLocation.lat, userLocation.lng, cb.lat, cb.lng)
+          return distA - distB
+        })
+        break
+      }
       case 'price-asc': sorted.sort((a, b) => getPrice(a) - getPrice(b)); break
       case 'price-desc': sorted.sort((a, b) => getPrice(b) - getPrice(a)); break
       case 'size-asc': sorted.sort((a, b) => getSize(a) - getSize(b)); break
@@ -366,7 +401,7 @@ export default function MapView() {
       }); break
     }
     return sorted
-  }, [searchedPlots, sortBy])
+  }, [searchedPlots, sortBy, userLocation])
 
   // Defer heavy plot list updates so filter inputs stay responsive
   const filteredPlots = useDeferredValue(sortedPlots)

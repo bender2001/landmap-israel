@@ -570,16 +570,30 @@ function NearbyPoisSection({ plotId }) {
               <span className="text-[11px] font-semibold" style={{ color: config.color }}>{config.label}</span>
               <span className="text-[9px] text-slate-600">({items.length})</span>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {items.map((poi, i) => (
-                <div key={poi.id || i} className="flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400 truncate flex-1 ml-2">{poi.name}</span>
-                  <span className="text-slate-500 font-medium whitespace-nowrap flex-shrink-0">
-                    {poi.distance_m < 1000
-                      ? `${poi.distance_m} מ׳`
-                      : `${poi.distance_km} ק״מ`
-                    }
-                  </span>
+                <div key={poi.id || i} className="flex items-center justify-between text-[11px] gap-2">
+                  <span className="text-slate-400 truncate flex-1">{poi.name}</span>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {/* Walking time — most useful metric for nearby amenities (like Madlan) */}
+                    {poi.walk_min && poi.walk_min <= 30 && (
+                      <span className="text-[9px] text-emerald-400/80 whitespace-nowrap" title={`🚶 ${poi.walk_label} הליכה`}>
+                        🚶{poi.walk_label}
+                      </span>
+                    )}
+                    {/* Driving time — shown for farther POIs (>2km) */}
+                    {poi.walk_min && poi.walk_min > 30 && poi.drive_min && (
+                      <span className="text-[9px] text-blue-400/80 whitespace-nowrap" title={`🚗 ${poi.drive_label} נסיעה`}>
+                        🚗{poi.drive_label}
+                      </span>
+                    )}
+                    <span className="text-slate-600 font-medium whitespace-nowrap text-[10px]">
+                      {poi.distance_m < 1000
+                        ? `${poi.distance_m}מ׳`
+                        : `${poi.distance_km}ק״מ`
+                      }
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>

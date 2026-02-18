@@ -50,3 +50,28 @@ export function formatDistance(km) {
   const label = km < 1 ? `${m}מ׳` : `${Math.round(km * 10) / 10} ק״מ`
   return { km: Math.round(km * 100) / 100, m, label }
 }
+
+/**
+ * Estimate travel time for a given distance.
+ * Walking: ~80m/min (4.8 km/h average pedestrian speed).
+ * Driving: ~500m/min in urban areas (30 km/h with traffic/lights).
+ * Returns walking and driving estimates with Hebrew labels.
+ * @param {number} distanceM - Distance in meters
+ * @returns {{ walkMin: number, driveMin: number, walkLabel: string, driveLabel: string }}
+ */
+export function estimateTravelTime(distanceM) {
+  const WALK_SPEED_M_PER_MIN = 80
+  const DRIVE_SPEED_M_PER_MIN = 500
+
+  const walkMin = Math.max(1, Math.round(distanceM / WALK_SPEED_M_PER_MIN))
+  const driveMin = Math.max(1, Math.round(distanceM / DRIVE_SPEED_M_PER_MIN))
+
+  const walkLabel = walkMin >= 60
+    ? `${Math.floor(walkMin / 60)} שע׳ ${walkMin % 60 > 0 ? `${walkMin % 60} דק׳` : ''}`
+    : `${walkMin} דק׳`
+  const driveLabel = driveMin >= 60
+    ? `${Math.floor(driveMin / 60)} שע׳ ${driveMin % 60 > 0 ? `${driveMin % 60} דק׳` : ''}`
+    : `${driveMin} דק׳`
+
+  return { walkMin, driveMin, walkLabel: walkLabel.trim(), driveLabel: driveLabel.trim() }
+}

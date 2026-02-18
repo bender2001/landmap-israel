@@ -890,3 +890,45 @@ export function calcAlternativeReturns(investmentAmount, expectedReturn, years) 
     },
   }
 }
+
+/**
+ * Client-side travel time estimation for POIs.
+ * Walking: ~80m/min (4.8 km/h). Driving: ~500m/min (30 km/h urban).
+ * Fallback when server doesn't provide walk_min/drive_min fields.
+ * @param {number} distanceM - Distance in meters
+ * @returns {{ walkMin: number, driveMin: number, walkLabel: string, driveLabel: string }}
+ */
+export function estimateTravelTime(distanceM) {
+  const walkMin = Math.max(1, Math.round(distanceM / 80))
+  const driveMin = Math.max(1, Math.round(distanceM / 500))
+  const walkLabel = walkMin >= 60
+    ? `${Math.floor(walkMin / 60)} שע׳ ${walkMin % 60 > 0 ? `${walkMin % 60} דק׳` : ''}`.trim()
+    : `${walkMin} דק׳`
+  const driveLabel = driveMin >= 60
+    ? `${Math.floor(driveMin / 60)} שע׳ ${driveMin % 60 > 0 ? `${driveMin % 60} דק׳` : ''}`.trim()
+    : `${driveMin} דק׳`
+  return { walkMin, driveMin, walkLabel, driveLabel }
+}
+
+/**
+ * Client-side Haversine distance — calculate distance between two lat/lng points.
+ * Used for "sort by distance from me" when geolocation is active.
+ * Like Madlan/Yad2's proximity sorting — investors want to see nearby plots first
+ * when browsing from a specific location (e.g., driving around an area).
+ *
+ * @param {number} lat1 - Latitude of point 1
+ * @param {number} lng1 - Longitude of point 1
+ * @param {number} lat2 - Latitude of point 2
+ * @param {number} lng2 - Longitude of point 2
+ * @returns {number} Distance in kilometers
+ */
+export function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
