@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Calculator as CalcIcon, TrendingUp, DollarSign, Percent, ArrowDown } from 'lucide-react'
+import { Calculator as CalcIcon, TrendingUp, DollarSign, Percent, ArrowDown, Landmark, Table2, PiggyBank } from 'lucide-react'
 import { roiStages, zoningLabels, ZoningStage } from '../../utils/constants'
 import { formatCurrency } from '../../utils/formatters'
 import PublicNav from '../../components/PublicNav'
@@ -7,12 +7,25 @@ import PublicFooter from '../../components/PublicFooter'
 
 const zoningOptions = Object.entries(zoningLabels)
 
+/** Calculate monthly mortgage payment using standard amortization formula */
+function calcMonthlyPayment(principal, annualRate, years) {
+  if (principal <= 0 || annualRate <= 0 || years <= 0) return 0
+  const r = annualRate / 100 / 12
+  const n = years * 12
+  return Math.round(principal * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1))
+}
+
 export default function Calculator() {
   const [purchasePrice, setPurchasePrice] = useState('')
   const [plotSize, setPlotSize] = useState('')
   const [currentZoning, setCurrentZoning] = useState('AGRICULTURAL')
   const [targetZoning, setTargetZoning] = useState('BUILDING_PERMIT')
   const [holdingYears, setHoldingYears] = useState('5')
+  // Financing inputs
+  const [downPaymentPct, setDownPaymentPct] = useState('30')
+  const [interestRate, setInterestRate] = useState('4.5')
+  const [loanYears, setLoanYears] = useState('15')
+  const [showFinancing, setShowFinancing] = useState(false)
 
   const result = useMemo(() => {
     const price = parseFloat(purchasePrice)
@@ -63,6 +76,26 @@ export default function Calculator() {
     // Monthly cost of holding (opportunity cost at 4% annual)
     const monthlyCost = Math.round((price * 0.04) / 12)
 
+    // Financing calculations
+    const dpPct = parseFloat(downPaymentPct) || 30
+    const downPayment = Math.round(price * dpPct / 100)
+    const loanAmount = price - downPayment
+    const rate = parseFloat(interestRate) || 4.5
+    const loanDuration = parseInt(loanYears) || 15
+    const monthlyPayment = calcMonthlyPayment(loanAmount, rate, loanDuration)
+    const totalLoanPayments = monthlyPayment * loanDuration * 12
+    const totalInterest = totalLoanPayments - loanAmount
+
+    // Sensitivity analysis: ROI across different holding periods
+    const sensitivityYears = [3, 5, 7, 10, 15]
+    const sensitivity = sensitivityYears.map(y => {
+      const cagr = y > 0 ? Math.round((Math.pow(projectedValue / price, 1 / y) - 1) * 100) : 0
+      const netCagr = y > 0 && price > 0 ? Math.round((Math.pow((price + netProfit) / price, 1 / y) - 1) * 100) : 0
+      const totalFinancingCost = calcMonthlyPayment(loanAmount, rate, Math.min(loanDuration, y)) * Math.min(loanDuration, y) * 12
+      const netWithFinancing = netProfit - (totalFinancingCost - loanAmount)
+      return { years: y, cagr, netCagr, netWithFinancing, isSelected: y === years }
+    })
+
     return {
       currentPricePerSqm,
       targetPricePerSqm,
@@ -78,8 +111,16 @@ export default function Calculator() {
       netAnnualizedRoi,
       monthlyCost,
       holdingYears: years,
+      // Financing
+      downPayment,
+      loanAmount,
+      monthlyPayment,
+      totalInterest,
+      totalLoanPayments,
+      // Sensitivity
+      sensitivity,
     }
-  }, [purchasePrice, plotSize, currentZoning, targetZoning, holdingYears])
+  }, [purchasePrice, plotSize, currentZoning, targetZoning, holdingYears, downPaymentPct, interestRate, loanYears])
 
   return (
     <div className="min-h-screen bg-navy" dir="rtl">
@@ -172,6 +213,60 @@ export default function Calculator() {
                   />
                   <p className="text-[10px] text-slate-600 mt-1">משפיע על חישוב תשואה שנתית (CAGR)</p>
                 </div>
+
+                {/* Financing toggle */}
+                <button
+                  onClick={() => setShowFinancing(prev => !prev)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-navy-light/40 border border-white/10 rounded-xl text-sm text-slate-300 hover:border-gold/30 transition-all"
+                >
+                  <span className="flex items-center gap-2">
+                    <Landmark className="w-4 h-4 text-gold" />
+                    סימולציית מימון
+                  </span>
+                  <ArrowDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${showFinancing ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showFinancing && (
+                  <div className="space-y-4 pt-1 animate-fade-in">
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1.5 block">הון עצמי (%)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={downPaymentPct}
+                        onChange={(e) => setDownPaymentPct(e.target.value)}
+                        className="w-full px-4 py-3 bg-navy-light/60 border border-white/10 rounded-xl text-slate-200 placeholder-slate-500 focus:border-gold/50 focus:outline-none transition"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1.5 block">ריבית שנתית (%)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="20"
+                        step="0.1"
+                        value={interestRate}
+                        onChange={(e) => setInterestRate(e.target.value)}
+                        className="w-full px-4 py-3 bg-navy-light/60 border border-white/10 rounded-xl text-slate-200 placeholder-slate-500 focus:border-gold/50 focus:outline-none transition"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1.5 block">תקופת הלוואה (שנים)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={loanYears}
+                        onChange={(e) => setLoanYears(e.target.value)}
+                        className="w-full px-4 py-3 bg-navy-light/60 border border-white/10 rounded-xl text-slate-200 placeholder-slate-500 focus:border-gold/50 focus:outline-none transition"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -292,6 +387,76 @@ export default function Calculator() {
                         </span>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Financing breakdown */}
+                  {showFinancing && result.loanAmount > 0 && (
+                    <div className="glass-panel p-5">
+                      <h3 className="text-sm font-bold text-slate-100 mb-4 flex items-center gap-2">
+                        <Landmark className="w-4 h-4 text-gold" />
+                        סימולציית מימון
+                      </h3>
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <div className="bg-navy-light/40 rounded-xl p-3 text-center">
+                          <div className="text-[10px] text-slate-400 mb-1">הון עצמי</div>
+                          <div className="text-base font-bold text-blue-400">{formatCurrency(result.downPayment)}</div>
+                        </div>
+                        <div className="bg-navy-light/40 rounded-xl p-3 text-center">
+                          <div className="text-[10px] text-slate-400 mb-1">סכום הלוואה</div>
+                          <div className="text-base font-bold text-slate-200">{formatCurrency(result.loanAmount)}</div>
+                        </div>
+                        <div className="bg-navy-light/40 rounded-xl p-3 text-center">
+                          <div className="text-[10px] text-slate-400 mb-1">החזר חודשי</div>
+                          <div className="text-lg font-black text-gold">{formatCurrency(result.monthlyPayment)}</div>
+                        </div>
+                        <div className="bg-navy-light/40 rounded-xl p-3 text-center">
+                          <div className="text-[10px] text-slate-400 mb-1">סה"כ ריבית</div>
+                          <div className="text-base font-bold text-red-400">{formatCurrency(result.totalInterest)}</div>
+                        </div>
+                      </div>
+                      <div className="flex justify-between text-sm border-t border-white/5 pt-3">
+                        <span className="text-slate-400">סה"כ החזרים</span>
+                        <span className="text-slate-200 font-bold">{formatCurrency(result.totalLoanPayments)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sensitivity analysis */}
+                  <div className="glass-panel p-5">
+                    <h3 className="text-sm font-bold text-slate-100 mb-4 flex items-center gap-2">
+                      <Table2 className="w-4 h-4 text-gold" />
+                      ניתוח רגישות — תשואה לפי תקופת החזקה
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-[10px] text-slate-500 border-b border-white/5">
+                            <th className="text-right py-2 font-medium">שנים</th>
+                            <th className="text-center py-2 font-medium">CAGR ברוטו</th>
+                            <th className="text-center py-2 font-medium">CAGR נטו</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {result.sensitivity.map(row => (
+                            <tr
+                              key={row.years}
+                              className={`border-b border-white/5 ${row.isSelected ? 'bg-gold/5' : ''}`}
+                            >
+                              <td className={`py-2.5 text-right ${row.isSelected ? 'text-gold font-bold' : 'text-slate-300'}`}>
+                                {row.years} שנים {row.isSelected && '←'}
+                              </td>
+                              <td className="py-2.5 text-center text-emerald-400 font-medium">+{row.cagr}%</td>
+                              <td className={`py-2.5 text-center font-medium ${row.netCagr >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {row.netCagr >= 0 ? '+' : ''}{row.netCagr}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="text-[9px] text-slate-600 mt-3">
+                      CAGR ברוטו = תשואה שנתית לפני עלויות. CAGR נטו = אחרי מסים, עו"ד והיטל השבחה.
+                    </p>
                   </div>
 
                   {/* Disclaimer */}
