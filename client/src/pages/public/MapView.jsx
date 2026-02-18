@@ -17,6 +17,7 @@ import KeyboardShortcuts from '../../components/KeyboardShortcuts.jsx'
 import RecentlyViewed from '../../components/RecentlyViewed.jsx'
 import ConnectionStatus from '../../components/ui/ConnectionStatus.jsx'
 import MarketStatsWidget from '../../components/MarketStatsWidget.jsx'
+import DealAlerts from '../../components/DealAlerts.jsx'
 import { useMetaTags } from '../../hooks/useMetaTags.js'
 import { useStructuredData } from '../../hooks/useStructuredData.js'
 import { formatCurrency, calcInvestmentScore, calcCAGR } from '../../utils/formatters.js'
@@ -397,6 +398,7 @@ export default function MapView() {
       </a>
       <ConnectionStatus />
       <MarketStatsWidget plots={filteredPlots} />
+      <DealAlerts plots={filteredPlots} onSelectPlot={handleSelectPlot} />
       <MapArea
         plots={filteredPlots}
         pois={pois}

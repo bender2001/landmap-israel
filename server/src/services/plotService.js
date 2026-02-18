@@ -176,6 +176,24 @@ export async function getPlotStats() {
 
   const avgRoi = totalPrice > 0 ? Math.round(((totalProj - totalPrice) / totalPrice) * 100) : 0
 
+  // Per-city breakdown with avg price/sqm
+  const byCity = {}
+  for (const p of data) {
+    const city = p.city || 'אחר'
+    if (!byCity[city]) byCity[city] = { count: 0, totalPrice: 0, totalArea: 0, totalProj: 0 }
+    byCity[city].count += 1
+    byCity[city].totalPrice += p.total_price || 0
+    byCity[city].totalArea += p.size_sqm || 0
+    byCity[city].totalProj += p.projected_value || 0
+  }
+  const cityStats = Object.entries(byCity).map(([city, s]) => ({
+    city,
+    count: s.count,
+    avgPricePerSqm: s.totalArea > 0 ? Math.round(s.totalPrice / s.totalArea) : 0,
+    avgRoi: s.totalPrice > 0 ? Math.round(((s.totalProj - s.totalPrice) / s.totalPrice) * 100) : 0,
+    totalArea: s.totalArea,
+  })).sort((a, b) => b.count - a.count)
+
   return {
     total: data.length,
     cities: [...citySet].sort(),
@@ -183,5 +201,6 @@ export async function getPlotStats() {
     avgRoi,
     totalArea,
     totalValue: totalPrice,
+    cityStats,
   }
 }
