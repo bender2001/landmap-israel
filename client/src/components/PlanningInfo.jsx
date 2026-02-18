@@ -5,8 +5,8 @@
  * links to GovMap, and a timeline of planning progress.
  */
 
-import { useState, useEffect } from 'react'
-import { MapPin, ExternalLink, AlertCircle, Clock, CheckCircle2, FileText, Building2 } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { MapPin, ExternalLink, AlertCircle, Clock, CheckCircle2, FileText, Building2, RefreshCw } from 'lucide-react'
 import { API_BASE } from '../utils/config'
 
 const STATUS_CONFIG = {
@@ -239,32 +239,44 @@ export default function PlanningInfo({ plotId, city, className = '' }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
+  const abortRef = useRef(null)
+
+  const fetchData = useCallback(async (signal) => {
+    if (!plotId && !city) return
+    setLoading(true)
+    setError(null)
+    try {
+      const url = plotId
+        ? `${API_BASE}/api/data/plans/plot/${plotId}`
+        : `${API_BASE}/api/data/plans?city=${encodeURIComponent(city)}`
+
+      const res = await fetch(url, { signal })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setPlans(data.plans || [])
+    } catch (err) {
+      if (err.name === 'AbortError') return
+      setError('לא הצלחנו לטעון נתוני תכנון. נסה שוב מאוחר יותר.')
+    } finally {
+      setLoading(false)
+    }
+  }, [plotId, city])
 
   useEffect(() => {
     if (!plotId && !city) return
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    fetchData(controller.signal)
+    return () => controller.abort()
+  }, [plotId, city, fetchData])
 
-    const fetchData = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const url = plotId
-          ? `${API_BASE}/api/data/plans/plot/${plotId}`
-          : `${API_BASE}/api/data/plans?city=${encodeURIComponent(city)}`
-
-        const res = await fetch(url)
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json()
-        setPlans(data.plans || [])
-      } catch (err) {
-        console.error('[PlanningInfo] Fetch error:', err)
-        setError('לא הצלחנו לטעון נתוני תכנון. נסה שוב מאוחר יותר.')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [plotId, city])
+  const handleRetry = useCallback(() => {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    fetchData(controller.signal)
+  }, [fetchData])
 
   // Status summary
   const statusCounts = plans.reduce((acc, p) => {
@@ -294,9 +306,18 @@ export default function PlanningInfo({ plotId, city, className = '' }) {
   if (error) {
     return (
       <div className={`${className}`}>
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
-          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-          <span className="text-xs text-red-300">{error}</span>
+        <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+            <span className="text-xs text-red-300">{error}</span>
+          </div>
+          <button
+            onClick={handleRetry}
+            className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg hover:bg-red-500/20 hover:text-red-200 transition-all flex-shrink-0"
+          >
+            <RefreshCw className="w-3 h-3" />
+            נסה שוב
+          </button>
         </div>
       </div>
     )

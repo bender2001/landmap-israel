@@ -5,8 +5,8 @@
  * with average price calculations and government data attribution.
  */
 
-import { useState, useEffect, useMemo } from 'react'
-import { TrendingUp, TrendingDown, ArrowUpDown, ExternalLink, AlertCircle, Database } from 'lucide-react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { TrendingUp, TrendingDown, ArrowUpDown, ExternalLink, AlertCircle, Database, RefreshCw, ChevronDown } from 'lucide-react'
 import { API_BASE } from '../utils/config'
 
 function formatPrice(amount) {
@@ -51,32 +51,46 @@ export default function RealTransactions({ plotId, city, className = '' }) {
   const [sortField, setSortField] = useState('deal_date')
   const [sortAsc, setSortAsc] = useState(false)
   const [filterType, setFilterType] = useState('all')
+  const [showAll, setShowAll] = useState(false)
+  const abortRef = useRef(null)
+
+  const fetchData = useCallback(async (signal) => {
+    if (!plotId && !city) return
+    setLoading(true)
+    setError(null)
+    try {
+      const url = plotId
+        ? `${API_BASE}/api/data/transactions/nearby/${plotId}?radius=2000`
+        : `${API_BASE}/api/data/transactions?city=${encodeURIComponent(city)}&months=24`
+
+      const res = await fetch(url, { signal })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setTransactions(data.transactions || [])
+    } catch (err) {
+      if (err.name === 'AbortError') return // component unmounted or params changed
+      setError('לא הצלחנו לטעון נתוני עסקאות. נסה שוב מאוחר יותר.')
+    } finally {
+      setLoading(false)
+    }
+  }, [plotId, city])
 
   useEffect(() => {
     if (!plotId && !city) return
+    // Abort any in-flight request when plotId/city changes or on unmount
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    fetchData(controller.signal)
+    return () => controller.abort()
+  }, [plotId, city, fetchData])
 
-    const fetchData = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const url = plotId
-          ? `${API_BASE}/api/data/transactions/nearby/${plotId}?radius=2000`
-          : `${API_BASE}/api/data/transactions?city=${encodeURIComponent(city)}&months=24`
-
-        const res = await fetch(url)
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json()
-        setTransactions(data.transactions || [])
-      } catch (err) {
-        console.error('[RealTransactions] Fetch error:', err)
-        setError('לא הצלחנו לטעון נתוני עסקאות. נסה שוב מאוחר יותר.')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [plotId, city])
+  const handleRetry = useCallback(() => {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    fetchData(controller.signal)
+  }, [fetchData])
 
   // Filter and sort
   const processedTx = useMemo(() => {
@@ -149,9 +163,18 @@ export default function RealTransactions({ plotId, city, className = '' }) {
   if (error) {
     return (
       <div className={`${className}`}>
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
-          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-          <span className="text-xs text-red-300">{error}</span>
+        <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+            <span className="text-xs text-red-300">{error}</span>
+          </div>
+          <button
+            onClick={handleRetry}
+            className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg hover:bg-red-500/20 hover:text-red-200 transition-all flex-shrink-0"
+          >
+            <RefreshCw className="w-3 h-3" />
+            נסה שוב
+          </button>
         </div>
       </div>
     )
@@ -271,7 +294,7 @@ export default function RealTransactions({ plotId, city, className = '' }) {
             </tr>
           </thead>
           <tbody>
-            {processedTx.slice(0, 20).map((tx, i) => {
+            {processedTx.slice(0, showAll ? processedTx.length : 20).map((tx, i) => {
               const priceSqm = tx.size_sqm > 0 ? Math.round(tx.deal_amount / tx.size_sqm) : null
               const isAboveAvg = stats && priceSqm && priceSqm > stats.avg
 
@@ -308,12 +331,23 @@ export default function RealTransactions({ plotId, city, className = '' }) {
         </table>
       </div>
 
-      {processedTx.length > 20 && (
-        <div className="text-center py-2">
-          <span className="text-[9px] text-slate-500">
-            מציג 20 מתוך {processedTx.length} עסקאות
-          </span>
-        </div>
+      {processedTx.length > 20 && !showAll && (
+        <button
+          onClick={() => setShowAll(true)}
+          className="w-full flex items-center justify-center gap-1.5 py-2 mt-1 text-[10px] text-gold/70 hover:text-gold transition-colors rounded-lg hover:bg-gold/5"
+        >
+          <ChevronDown className="w-3 h-3" />
+          <span>הצג את כל {processedTx.length} העסקאות</span>
+        </button>
+      )}
+      {showAll && processedTx.length > 20 && (
+        <button
+          onClick={() => setShowAll(false)}
+          className="w-full flex items-center justify-center gap-1.5 py-2 mt-1 text-[10px] text-slate-500 hover:text-slate-300 transition-colors rounded-lg hover:bg-white/5"
+        >
+          <ChevronDown className="w-3 h-3 rotate-180" />
+          <span>הצג פחות</span>
+        </button>
       )}
 
       {/* Attribution */}
