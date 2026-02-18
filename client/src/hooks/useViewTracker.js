@@ -1,15 +1,13 @@
 import { useCallback, useMemo } from 'react'
+import { trackPlotView } from '../api/plots.js'
 
 const STORAGE_KEY = 'landmap_view_counts'
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
 /**
- * Tracks plot view counts in localStorage.
- * Provides a way to mark plots as "popular" / "trending"
- * based on how many times they've been viewed recently.
- * 
- * This is a client-side approximation. In production,
- * this would be backed by an analytics service.
+ * Tracks plot view counts both client-side (localStorage) and server-side.
+ * Server tracking enables real "X people viewed this" indicators.
+ * Client tracking provides instant local popular/trending badges.
  */
 export function useViewTracker() {
   const getStore = useCallback(() => {
@@ -42,6 +40,8 @@ export function useViewTracker() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(store))
     } catch { /* quota exceeded — ignore */ }
+    // Fire-and-forget server-side tracking
+    trackPlotView(plotId)
   }, [getStore])
 
   const getViewCount = useCallback((plotId) => {

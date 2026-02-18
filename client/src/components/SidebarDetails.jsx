@@ -635,6 +635,21 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   </span>
                 )
               })()}
+              {/* View count badge — social proof like Madlan */}
+              {plot.views > 0 && (
+                <span
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium"
+                  style={{
+                    background: 'rgba(99,102,241,0.12)',
+                    border: '1px solid rgba(99,102,241,0.25)',
+                    color: '#A5B4FC',
+                  }}
+                  title={`${plot.views} צפיות`}
+                >
+                  <Eye className="w-2.5 h-2.5" />
+                  {plot.views} צפו
+                </span>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">

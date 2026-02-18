@@ -10,7 +10,7 @@ import PublicNav from '../../components/PublicNav.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import NeighborhoodRadar from '../../components/ui/NeighborhoodRadar.jsx'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../../utils/constants.js'
-import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore } from '../../utils/formatters.js'
+import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, formatRelativeTime, getFreshnessColor } from '../../utils/formatters.js'
 import PriceTrendChart from '../../components/ui/PriceTrendChart.jsx'
 import MiniMap from '../../components/ui/MiniMap.jsx'
 import { plotInquiryLink } from '../../utils/config.js'
@@ -371,6 +371,24 @@ export default function PlotDetail() {
                   <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: statusColor }} />
                   {statusLabels[plot.status]}
                 </span>
+                {/* Freshness & views — social proof indicators like Madlan */}
+                {(() => {
+                  const updatedAt = plot.updated_at ?? plot.updatedAt
+                  const freshness = formatRelativeTime(updatedAt)
+                  if (!freshness) return null
+                  const colorClass = getFreshnessColor(updatedAt)
+                  return (
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs ${colorClass} bg-white/5`}>
+                      <Clock className="w-3 h-3" />
+                      עודכן {freshness}
+                    </span>
+                  )
+                })()}
+                {plot.views > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs text-indigo-300 bg-indigo-500/10 border border-indigo-500/20">
+                    👁 {plot.views} צפיות
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">

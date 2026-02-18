@@ -16,3 +16,11 @@ export function getPlot(id) {
 export function getNearbyPlots(id, limit = 5) {
   return api.get(`/plots/${id}/nearby?limit=${limit}`)
 }
+
+/**
+ * Track a plot view (fire-and-forget).
+ * Server increments a views counter for popularity indicators.
+ */
+export function trackPlotView(id) {
+  return api.post(`/plots/${id}/view`, {}).catch(() => {})
+}

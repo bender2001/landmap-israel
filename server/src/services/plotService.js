@@ -1,9 +1,12 @@
 import { supabaseAdmin } from '../config/supabase.js'
 
 export async function getPublishedPlots(filters = {}) {
+  // Support count-only mode for pagination metadata
+  const countOnly = filters._countOnly === true
+
   let query = supabaseAdmin
     .from('plots')
-    .select('*, plot_images(id, url, alt)')
+    .select(countOnly ? 'id' : '*, plot_images(id, url, alt)', countOnly ? { count: 'exact', head: true } : undefined)
     .eq('is_published', true)
     .order('created_at', { ascending: false })
 
@@ -53,6 +56,19 @@ export async function getPublishedPlots(filters = {}) {
       case 'size-desc': query = query.order('size_sqm', { ascending: false }); break
       // ROI and price-per-sqm require computed columns — handled client-side
     }
+  }
+
+  // Pagination support
+  if (filters.limit) {
+    const limit = Math.min(parseInt(filters.limit) || 50, 200)
+    const offset = parseInt(filters.offset) || 0
+    query = query.range(offset, offset + limit - 1)
+  }
+
+  if (countOnly) {
+    const { count, error } = await query
+    if (error) throw error
+    return count
   }
 
   const { data, error } = await query

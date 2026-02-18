@@ -91,6 +91,31 @@ router.get('/:id/nearby', async (req, res, next) => {
   }
 })
 
+// POST /api/plots/:id/view - Track a plot view (fire-and-forget, no auth needed)
+router.post('/:id/view', async (req, res) => {
+  try {
+    // Increment view count in Supabase (upsert a counter)
+    // We use a simple approach: update a views column on the plot
+    const { supabaseAdmin } = await import('../config/supabase.js')
+    const { data: plot } = await supabaseAdmin
+      .from('plots')
+      .select('views')
+      .eq('id', req.params.id)
+      .single()
+
+    if (plot) {
+      await supabaseAdmin
+        .from('plots')
+        .update({ views: (plot.views || 0) + 1 })
+        .eq('id', req.params.id)
+    }
+    res.json({ ok: true })
+  } catch {
+    // Non-critical — don't fail the request
+    res.json({ ok: true })
+  }
+})
+
 // GET /api/plots/:id - Single plot with documents & images
 router.get('/:id', async (req, res, next) => {
   try {
