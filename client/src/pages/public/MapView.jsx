@@ -137,6 +137,9 @@ export default function MapView() {
     setSearchParams(params, { replace: true })
   }, [filters, statusFilter, sortBy, selectedPlot?.id])
 
+  // Debounce search for performance — must be declared before apiFilters which depends on it
+  const debouncedSearch = useDebounce(filters.search, 250)
+
   // Build API filter params
   const apiFilters = useMemo(() => {
     const f = {}
@@ -163,9 +166,6 @@ export default function MapView() {
   useEffect(() => {
     if (plots.length > 0) recordPrices(plots)
   }, [plots, recordPrices])
-
-  // Debounce search for performance
-  const debouncedSearch = useDebounce(filters.search, 250)
 
   // Client-side ROI filter
   const roiFilteredPlots = useMemo(() => {

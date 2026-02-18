@@ -42,5 +42,21 @@ export function useMetaTags({ title, description, url, image }) {
     setMeta('twitter:title', title)
     setMeta('twitter:description', description)
     if (image) setMeta('twitter:image', image)
+
+    // Canonical URL — critical for SEO deduplication (like Madlan/Yad2)
+    const canonicalUrl = url || window.location.href.split('?')[0]
+    let canonicalEl = document.querySelector('link[rel="canonical"]')
+    if (!canonicalEl) {
+      canonicalEl = document.createElement('link')
+      canonicalEl.setAttribute('rel', 'canonical')
+      document.head.appendChild(canonicalEl)
+    }
+    canonicalEl.setAttribute('href', canonicalUrl)
+
+    // Cleanup: remove canonical on unmount to prevent stale tags
+    return () => {
+      const el = document.querySelector('link[rel="canonical"]')
+      if (el) el.remove()
+    }
   }, [title, description, url, image])
 }

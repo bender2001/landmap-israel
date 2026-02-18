@@ -73,6 +73,74 @@ router.get('/stats', async (req, res, next) => {
   }
 })
 
+// GET /api/plots/featured - Top investment opportunities (server-computed scoring)
+// Like Madlan's "הזדמנויות חמות" — cached 5min, avoids heavy client-side computation
+router.get('/featured', async (req, res, next) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 3, 10)
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
+
+    const cacheKey = `featured:${limit}`
+    const featured = await plotCache.wrap(cacheKey, async () => {
+      const allPlots = await getPublishedPlots({})
+      if (!allPlots || allPlots.length < 3) return allPlots || []
+
+      // Compute area average price/sqm
+      let totalPsm = 0, count = 0
+      for (const p of allPlots) {
+        const price = p.total_price || 0
+        const size = p.size_sqm || 0
+        if (price > 0 && size > 0) { totalPsm += price / size; count++ }
+      }
+      const avgPsm = count > 0 ? totalPsm / count : 0
+
+      // Score each available plot
+      const scored = allPlots
+        .filter(p => p.status === 'AVAILABLE' && (p.total_price || 0) > 0)
+        .map(p => {
+          const price = p.total_price || 0
+          const size = p.size_sqm || 0
+          const proj = p.projected_value || 0
+          const roi = price > 0 ? ((proj - price) / price) * 100 : 0
+          const priceSqm = size > 0 ? price / size : Infinity
+
+          // Deal factor: below-average price (0-3 pts)
+          const dealFactor = avgPsm > 0
+            ? Math.max(0, Math.min(3, ((avgPsm - priceSqm) / avgPsm) * 10))
+            : 0
+
+          // ROI bonus (0-3 pts)
+          const roiBonus = Math.min(3, roi / 80)
+
+          // Freshness (0-1 pt)
+          const daysOld = p.created_at
+            ? Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000)
+            : 999
+          const freshBonus = daysOld <= 7 ? 1 : daysOld <= 14 ? 0.5 : 0
+
+          // Views popularity (0-1 pt)
+          const popBonus = (p.views || 0) >= 10 ? 1 : (p.views || 0) >= 5 ? 0.5 : 0
+
+          const score = dealFactor + roiBonus + freshBonus + popBonus
+          return {
+            ...p,
+            _score: Math.round(score * 100) / 100,
+            _roi: Math.round(roi),
+            _dealPct: Math.round(((avgPsm - priceSqm) / avgPsm) * 100),
+          }
+        })
+        .sort((a, b) => b._score - a._score)
+        .slice(0, limit)
+
+      return scored
+    }, 300_000)
+
+    res.json(featured)
+  } catch (err) {
+    next(err)
+  }
+})
+
 // GET /api/plots/:id/nearby - Find plots near a given plot (geo-proximity)
 router.get('/:id/nearby', sanitizePlotId, async (req, res, next) => {
   try {
