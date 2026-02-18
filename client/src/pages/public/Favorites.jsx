@@ -1,9 +1,10 @@
-import { Link } from 'react-router-dom'
-import { Heart, Map, MapPin, TrendingUp, Trash2, Clock } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Heart, Map, MapPin, TrendingUp, Trash2, Clock, GitCompareArrows, Share2, Printer, Copy, Check, Download } from 'lucide-react'
 import { useAllPlots } from '../../hooks/usePlots'
 import { useFavorites } from '../../hooks/useFavorites'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
-import { formatCurrency } from '../../utils/formatters'
+import { formatCurrency, formatPriceShort, calcInvestmentScore, getScoreLabel } from '../../utils/formatters'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
 import Spinner from '../../components/ui/Spinner'
@@ -11,8 +12,72 @@ import Spinner from '../../components/ui/Spinner'
 export default function Favorites() {
   const { favorites, toggle } = useFavorites()
   const { data: allPlots = [], isLoading } = useAllPlots()
+  const navigate = useNavigate()
+  const [linkCopied, setLinkCopied] = useState(false)
 
   const favoritePlots = allPlots.filter((p) => favorites.includes(p.id))
+
+  // Navigate to compare page with first 3 favorites
+  const handleCompare = useCallback(() => {
+    const ids = favoritePlots.slice(0, 3).map(p => p.id).join(',')
+    if (ids) navigate(`/compare?plots=${ids}`)
+  }, [favoritePlots, navigate])
+
+  // Share favorites list via WhatsApp
+  const handleShare = useCallback(() => {
+    const lines = ['❤️ חלקות מועדפות — LandMap Israel\n']
+    favoritePlots.forEach((p, i) => {
+      const bn = p.block_number ?? p.blockNumber
+      const price = p.total_price ?? p.totalPrice
+      const proj = p.projected_value ?? p.projectedValue
+      const roi = price > 0 ? Math.round((proj - price) / price * 100) : 0
+      lines.push(`${i + 1}. גוש ${bn} חלקה ${p.number} (${p.city})`)
+      lines.push(`   ${formatPriceShort(price)} · +${roi}% ROI`)
+    })
+    lines.push(`\n🔗 ${window.location.origin}`)
+    window.open(`https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`, '_blank')
+  }, [favoritePlots])
+
+  // Print favorites report
+  const handlePrint = useCallback(() => {
+    const pw = window.open('', '_blank')
+    if (!pw) return
+    const rows = favoritePlots.map(p => {
+      const bn = p.block_number ?? p.blockNumber
+      const price = p.total_price ?? p.totalPrice ?? 0
+      const proj = p.projected_value ?? p.projectedValue ?? 0
+      const size = p.size_sqm ?? p.sizeSqM ?? 0
+      const roi = price > 0 ? Math.round((proj - price) / price * 100) : 0
+      const score = calcInvestmentScore(p)
+      return { bn, number: p.number, city: p.city, price, proj, size, roi, score, status: statusLabels[p.status] || p.status }
+    })
+    pw.document.write(`<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8">
+      <title>חלקות מועדפות — LandMap Israel</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a2e; padding: 40px; max-width: 800px; margin: 0 auto; line-height: 1.5; }
+        h1 { font-size: 22px; margin-bottom: 4px; }
+        .subtitle { color: #666; font-size: 13px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f0f0f0; padding: 8px 10px; text-align: right; font-size: 12px; border: 1px solid #ddd; }
+        td { padding: 8px 10px; text-align: right; font-size: 13px; border: 1px solid #eee; }
+        tr:nth-child(even) { background: #fafafa; }
+        .footer { margin-top: 30px; text-align: center; color: #aaa; font-size: 10px; border-top: 1px solid #eee; padding-top: 12px; }
+        @media print { body { padding: 20px; } }
+      </style></head><body>
+      <h1>❤️ חלקות מועדפות</h1>
+      <div class="subtitle">${rows.length} חלקות • ${new Date().toLocaleDateString('he-IL')}</div>
+      <table><thead><tr><th>#</th><th>חלקה</th><th>עיר</th><th>מחיר</th><th>שטח</th><th>תשואה</th><th>ציון</th></tr></thead>
+      <tbody>${rows.map((r, i) => `<tr>
+        <td>${i + 1}</td><td>גוש ${r.bn} / ${r.number}</td><td>${r.city}</td>
+        <td>${formatCurrency(r.price)}</td><td>${(r.size / 1000).toFixed(1)} דונם</td>
+        <td>+${r.roi}%</td><td>${r.score}/10</td>
+      </tr>`).join('')}</tbody></table>
+      <div class="footer">LandMap Israel — מפת קרקעות להשקעה • ${new Date().toLocaleDateString('he-IL')}</div>
+    </body></html>`)
+    pw.document.close()
+    setTimeout(() => pw.print(), 300)
+  }, [favoritePlots])
 
   return (
     <div className="min-h-screen bg-navy" dir="rtl">
@@ -34,6 +99,46 @@ export default function Favorites() {
               </p>
             </div>
           </div>
+
+          {/* Action toolbar — shown when favorites exist */}
+          {!isLoading && favoritePlots.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mb-6">
+              {/* Compare — like Madlan's "השווה נכסים שמורים" */}
+              {favoritePlots.length >= 2 && (
+                <button
+                  onClick={handleCompare}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gold/10 border border-gold/20 rounded-xl text-sm text-gold font-medium hover:bg-gold/20 transition-all"
+                >
+                  <GitCompareArrows className="w-4 h-4" />
+                  השווה {Math.min(favoritePlots.length, 3)} חלקות
+                </button>
+              )}
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-2 px-4 py-2.5 bg-[#25D366]/10 border border-[#25D366]/20 rounded-xl text-sm text-[#25D366] hover:bg-[#25D366]/20 transition-all"
+              >
+                <Share2 className="w-4 h-4" />
+                שתף ב-WhatsApp
+              </button>
+              <button
+                onClick={handlePrint}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white/[0.05] border border-white/10 rounded-xl text-sm text-slate-300 hover:border-gold/30 hover:text-gold transition-all"
+              >
+                <Printer className="w-4 h-4" />
+                הדפס
+              </button>
+              {/* Quick stats summary */}
+              <div className="mr-auto flex items-center gap-3 text-[11px] text-slate-500">
+                <span>💰 סה״כ {formatPriceShort(favoritePlots.reduce((s, p) => s + (p.total_price ?? p.totalPrice ?? 0), 0))}</span>
+                <span className="w-px h-3 bg-white/10" />
+                <span>📈 ממוצע +{favoritePlots.length > 0 ? Math.round(favoritePlots.reduce((s, p) => {
+                  const pr = p.total_price ?? p.totalPrice ?? 0
+                  const pj = p.projected_value ?? p.projectedValue ?? 0
+                  return s + (pr > 0 ? ((pj - pr) / pr) * 100 : 0)
+                }, 0) / favoritePlots.length) : 0}% ROI</span>
+              </div>
+            </div>
+          )}
 
           {isLoading ? (
             <div className="flex items-center justify-center py-20">

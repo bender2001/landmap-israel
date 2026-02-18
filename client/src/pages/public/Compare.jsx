@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { BarChart3, X, Map, MapPin, Waves, TreePine, Hospital, TrendingUp, Award, Clock, Trophy, Crown } from 'lucide-react'
+import { BarChart3, X, Map, MapPin, Waves, TreePine, Hospital, TrendingUp, Award, Clock, Trophy, Crown, Share2, Printer, Check, Copy, Download } from 'lucide-react'
 import { useAllPlots } from '../../hooks/usePlots'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
 import { formatCurrency, calcInvestmentScore, calcMonthlyPayment, formatMonthlyPayment } from '../../utils/formatters'
@@ -261,6 +261,7 @@ export default function Compare() {
   const [searchParams, setSearchParams] = useSearchParams()
   const plotIds = (searchParams.get('plots') || '').split(',').filter(Boolean)
   const { data: allPlots = [], isLoading } = useAllPlots()
+  const [linkCopied, setLinkCopied] = useState(false)
 
   const plots = useMemo(() => {
     return plotIds.map((id) => allPlots.find((p) => p.id === id)).filter(Boolean)
@@ -576,6 +577,112 @@ export default function Compare() {
                   נקה הכל
                 </button>
               </div>
+            </div>
+
+            {/* Share, Print, Export toolbar — like Madlan's comparison sharing */}
+            <div className="flex items-center justify-center gap-3 mt-6">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href).then(() => {
+                    setLinkCopied(true)
+                    setTimeout(() => setLinkCopied(false), 2000)
+                  }).catch(() => {})
+                }}
+                className={`flex items-center gap-2 px-5 py-2.5 border rounded-xl text-sm transition-all ${
+                  linkCopied
+                    ? 'bg-green-500/15 border-green-500/30 text-green-400'
+                    : 'bg-white/[0.05] border-white/10 text-slate-300 hover:border-gold/30 hover:text-gold'
+                }`}
+              >
+                {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {linkCopied ? 'הועתק!' : 'שתף השוואה'}
+              </button>
+              <button
+                onClick={() => {
+                  // Build WhatsApp share text
+                  const lines = ['📊 השוואת חלקות — LandMap Israel\n']
+                  plots.forEach((p, i) => {
+                    const bn = p.block_number ?? p.blockNumber
+                    const price = p.total_price ?? p.totalPrice
+                    const proj = p.projected_value ?? p.projectedValue
+                    const size = p.size_sqm ?? p.sizeSqM
+                    const roi = price > 0 ? Math.round((proj - price) / price * 100) : 0
+                    lines.push(`${i + 1}. גוש ${bn} חלקה ${p.number} (${p.city})`)
+                    lines.push(`   💰 ${formatCurrency(price)} | 📐 ${(size / 1000).toFixed(1)} דונם | 📈 +${roi}%`)
+                  })
+                  lines.push(`\n🔗 ${window.location.href}`)
+                  const text = encodeURIComponent(lines.join('\n'))
+                  window.open(`https://wa.me/?text=${text}`, '_blank')
+                }}
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#25D366]/10 border border-[#25D366]/20 rounded-xl text-sm text-[#25D366] hover:bg-[#25D366]/20 transition-all"
+              >
+                <Share2 className="w-4 h-4" />
+                WhatsApp
+              </button>
+              <button
+                onClick={() => {
+                  // Generate printable comparison report
+                  const pw = window.open('', '_blank')
+                  if (!pw) return
+                  const rows = plots.map(p => {
+                    const bn = p.block_number ?? p.blockNumber
+                    const price = p.total_price ?? p.totalPrice ?? 0
+                    const proj = p.projected_value ?? p.projectedValue ?? 0
+                    const size = p.size_sqm ?? p.sizeSqM ?? 0
+                    const roi = price > 0 ? Math.round((proj - price) / price * 100) : 0
+                    const score = calcInvestmentScore(p)
+                    return { bn, number: p.number, city: p.city, price, proj, size, roi, score, status: statusLabels[p.status] || p.status, zoning: zoningLabels[p.zoning_stage ?? p.zoningStage] || '' }
+                  })
+                  const winner = rows.length >= 2 ? rows.reduce((best, r) => r.score > best.score ? r : best, rows[0]) : null
+                  pw.document.write(`<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8">
+                    <title>השוואת חלקות — LandMap Israel</title>
+                    <style>
+                      * { margin: 0; padding: 0; box-sizing: border-box; }
+                      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a2e; padding: 40px; max-width: 900px; margin: 0 auto; line-height: 1.5; }
+                      h1 { font-size: 22px; margin-bottom: 4px; }
+                      .subtitle { color: #666; font-size: 13px; margin-bottom: 24px; }
+                      table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+                      th { background: #f0f0f0; padding: 10px 12px; text-align: right; font-size: 12px; border: 1px solid #ddd; }
+                      td { padding: 10px 12px; text-align: right; font-size: 13px; border: 1px solid #eee; }
+                      tr:nth-child(even) { background: #fafafa; }
+                      .highlight { background: #FFFBEB !important; font-weight: 700; }
+                      .winner { background: #F0FDF4; border: 2px solid #22C55E; border-radius: 8px; padding: 12px; margin-bottom: 20px; }
+                      .footer { margin-top: 30px; text-align: center; color: #aaa; font-size: 10px; border-top: 1px solid #eee; padding-top: 12px; }
+                      @media print { body { padding: 20px; } }
+                    </style></head><body>
+                    <h1>📊 השוואת חלקות — LandMap Israel</h1>
+                    <div class="subtitle">${rows.length} חלקות להשוואה • ${new Date().toLocaleDateString('he-IL')}</div>
+                    ${winner ? `<div class="winner">🏆 <strong>המנצחת:</strong> גוש ${winner.bn} חלקה ${winner.number} (${winner.city}) — ציון השקעה ${winner.score}/10, תשואה +${winner.roi}%</div>` : ''}
+                    <table>
+                      <thead><tr>
+                        <th>חלקה</th><th>עיר</th><th>מחיר</th><th>שטח</th><th>שווי צפוי</th><th>תשואה</th><th>ציון</th><th>ייעוד</th><th>סטטוס</th>
+                      </tr></thead>
+                      <tbody>${rows.map(r => `<tr${winner && r.score === winner.score ? ' class="highlight"' : ''}>
+                        <td>גוש ${r.bn} / ${r.number}</td>
+                        <td>${r.city}</td>
+                        <td>${formatCurrency(r.price)}</td>
+                        <td>${(r.size / 1000).toFixed(1)} דונם</td>
+                        <td>${formatCurrency(r.proj)}</td>
+                        <td>+${r.roi}%</td>
+                        <td>${r.score}/10</td>
+                        <td>${r.zoning}</td>
+                        <td>${r.status}</td>
+                      </tr>`).join('')}</tbody>
+                    </table>
+                    <div class="footer">
+                      <div>LandMap Israel — מפת קרקעות להשקעה</div>
+                      <div>${window.location.href}</div>
+                      <div style="margin-top:6px">⚠️ מסמך זה הינו לצרכי מידע בלבד ואינו מהווה ייעוץ השקעות</div>
+                    </div>
+                  </body></html>`)
+                  pw.document.close()
+                  setTimeout(() => pw.print(), 300)
+                }}
+                className="flex items-center gap-2 px-5 py-2.5 bg-white/[0.05] border border-white/10 rounded-xl text-sm text-slate-300 hover:border-gold/30 hover:text-gold transition-all"
+              >
+                <Printer className="w-4 h-4" />
+                הדפס דוח
+              </button>
             </div>
             </>
           )}

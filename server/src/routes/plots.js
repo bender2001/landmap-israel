@@ -8,6 +8,36 @@ import { supabaseAdmin } from '../config/supabase.js'
 
 const router = Router()
 
+// ─── View tracking rate limiter ────────────────────────────────────────
+// Prevents bots from inflating view counts. Allows 1 view per IP+plotId per 5 minutes.
+// Uses a compact Map with automatic cleanup every 10 minutes to prevent memory leaks.
+const viewRateMap = new Map()
+const VIEW_RATE_TTL = 5 * 60 * 1000 // 5 min cooldown per IP+plot
+const VIEW_RATE_MAX = 5000 // max entries before forced cleanup
+
+function isViewRateLimited(ip, plotId) {
+  const key = `${ip}:${plotId}`
+  const entry = viewRateMap.get(key)
+  const now = Date.now()
+  if (entry && now - entry < VIEW_RATE_TTL) return true
+  // Cleanup if map is getting too large
+  if (viewRateMap.size >= VIEW_RATE_MAX) {
+    for (const [k, ts] of viewRateMap) {
+      if (now - ts > VIEW_RATE_TTL) viewRateMap.delete(k)
+    }
+  }
+  viewRateMap.set(key, now)
+  return false
+}
+
+// Periodic cleanup every 10 minutes to reclaim memory
+setInterval(() => {
+  const now = Date.now()
+  for (const [k, ts] of viewRateMap) {
+    if (now - ts > VIEW_RATE_TTL) viewRateMap.delete(k)
+  }
+}, 10 * 60 * 1000).unref()
+
 // Simple in-memory cache for nearby queries (TTL: 5 min, max 50 entries)
 const nearbyCache = new Map()
 const NEARBY_TTL = 5 * 60 * 1000
@@ -239,27 +269,36 @@ router.get('/:id/nearby', sanitizePlotId, async (req, res, next) => {
 })
 
 // POST /api/plots/:id/view - Track a plot view (fire-and-forget, no auth needed)
+// Rate-limited: 1 view per IP+plotId per 5 minutes to prevent inflation
 router.post('/:id/view', sanitizePlotId, async (req, res) => {
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown'
+  const plotId = req.params.id
+
+  // Check rate limit — if already counted recently, respond OK but don't increment
+  if (isViewRateLimited(clientIp, plotId)) {
+    return res.json({ ok: true, cached: true })
+  }
+
   // Track in analytics
-  analytics.trackPlotClick(req.params.id)
+  analytics.trackPlotClick(plotId)
   // Always respond immediately — view tracking is non-critical
   res.json({ ok: true })
 
   try {
     // Try RPC first (atomic increment, best approach)
-    const { error: rpcError } = await supabaseAdmin.rpc('increment_views', { plot_id: req.params.id })
+    const { error: rpcError } = await supabaseAdmin.rpc('increment_views', { plot_id: plotId })
     if (rpcError) {
       // Fallback: read-then-write (acceptable race condition for view counts)
       const { data: plot } = await supabaseAdmin
         .from('plots')
         .select('views')
-        .eq('id', req.params.id)
+        .eq('id', plotId)
         .single()
       if (plot) {
         await supabaseAdmin
           .from('plots')
           .update({ views: (plot.views || 0) + 1 })
-          .eq('id', req.params.id)
+          .eq('id', plotId)
       }
     }
   } catch {
