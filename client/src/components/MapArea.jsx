@@ -296,12 +296,110 @@ function ColorModeToggle({ colorMode, onChangeColorMode }) {
   )
 }
 
+function GeoSearch() {
+  const map = useMap()
+  const [query, setQuery] = useState('')
+  const [isOpen, setIsOpen] = useState(false)
+  const [results, setResults] = useState([])
+  const [isSearching, setIsSearching] = useState(false)
+  const inputRef = useRef(null)
+  const debounceRef = useRef(null)
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) inputRef.current.focus()
+  }, [isOpen])
+
+  const search = useCallback(async (q) => {
+    if (!q || q.length < 2) { setResults([]); return }
+    setIsSearching(true)
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + ' Israel')}&limit=5&accept-language=he`)
+      const data = await res.json()
+      setResults(data.map(r => ({ name: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon) })))
+    } catch { setResults([]) }
+    setIsSearching(false)
+  }, [])
+
+  const handleInput = (val) => {
+    setQuery(val)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => search(val), 400)
+  }
+
+  const handleSelect = (result) => {
+    map.flyTo([result.lat, result.lng], 15, { duration: 1.2 })
+    setIsOpen(false)
+    setQuery('')
+    setResults([])
+  }
+
+  if (!isOpen) {
+    return (
+      <div className="absolute top-28 right-4 z-[1000] pointer-events-none">
+        <button
+          onClick={() => setIsOpen(true)}
+          className="glass-panel w-9 h-9 flex items-center justify-center pointer-events-auto hover:border-gold/20 transition-colors"
+          style={{ minWidth: 44, minHeight: 44 }}
+          title="חפש כתובת במפה"
+          aria-label="חפש כתובת"
+        >
+          <MapPin className="w-4 h-4 text-gold" />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="absolute top-28 right-4 z-[1000] pointer-events-none">
+      <div className="pointer-events-auto glass-panel p-2 min-w-[220px]" dir="rtl">
+        <div className="flex items-center gap-2 mb-1">
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => handleInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Escape') { setIsOpen(false); setQuery(''); setResults([]) } }}
+            placeholder="חפש כתובת, עיר..."
+            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-gold/30"
+          />
+          <button onClick={() => { setIsOpen(false); setQuery(''); setResults([]) }} className="text-slate-500 hover:text-slate-300 text-xs">✕</button>
+        </div>
+        {isSearching && <div className="text-[10px] text-slate-500 px-1">מחפש...</div>}
+        {results.length > 0 && (
+          <div className="space-y-0.5 max-h-40 overflow-y-auto">
+            {results.map((r, i) => (
+              <button
+                key={i}
+                onClick={() => handleSelect(r)}
+                className="w-full text-right text-[11px] text-slate-300 hover:text-gold hover:bg-white/5 px-2 py-1.5 rounded-lg transition-colors truncate"
+              >
+                📍 {r.name.split(',').slice(0, 3).join(', ')}
+              </button>
+            ))}
+          </div>
+        )}
+        {query.length >= 2 && !isSearching && results.length === 0 && (
+          <div className="text-[10px] text-slate-500 px-1">לא נמצאו תוצאות</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites }) {
   const [hoveredId, setHoveredId] = useState(null)
   const [activeLayerId, setActiveLayerId] = useState('satellite')
   const [colorMode, setColorMode] = useState('status')
   const prefetchPlot = usePrefetchPlot()
   const activeLayer = MAP_LAYERS.find(l => l.id === activeLayerId) || MAP_LAYERS[0]
+
+  // Count plots per status for legend
+  const statusCounts = useMemo(() => {
+    if (!plots || plots.length === 0) return {}
+    const counts = {}
+    plots.forEach(p => { counts[p.status] = (counts[p.status] || 0) + 1 })
+    return counts
+  }, [plots])
 
   // Precompute price/sqm range for heatmap
   const priceRange = useMemo(() => {
@@ -367,6 +465,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         <MapClusterLayer plots={plots} onSelectPlot={onSelectPlot} />
         <MapRuler />
         <MapHeatLayer plots={plots} visible={colorMode === 'heatmap'} metric="priceSqm" />
+        <GeoSearch />
 
         {plots.map((plot) => {
           // Validate coordinates before rendering polygon
@@ -415,7 +514,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
             >
               <Tooltip permanent direction="center" className="price-tooltip">
                 <span className="tooltip-main-price">{favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{plot.plot_images?.length > 0 ? '📷 ' : ''}{formatPriceShort(price)}</span>
-                <span className="tooltip-sub">{formatDunam(sizeSqM)} דונם · +{roi}% · ₪{sizeSqM > 0 ? Math.round(price / sizeSqM).toLocaleString() : '—'}/מ״ר</span>
+                <span className="tooltip-sub">{formatDunam(sizeSqM)} דונם · +{roi}% · ⭐{calcInvestmentScore(plot)}</span>
                 {(() => {
                   const avg = areaAvgPsm[plot.city]
                   if (!avg || sizeSqM <= 0) return null
@@ -569,6 +668,9 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
                       {isActive && <Check className="w-2.5 h-2.5" />}
                     </div>
                     <span className="text-slate-300">{statusLabels[status]}</span>
+                    {statusCounts[status] > 0 && (
+                      <span className="text-[9px] text-slate-500 mr-auto tabular-nums">{statusCounts[status]}</span>
+                    )}
                   </div>
                 )
               })}
