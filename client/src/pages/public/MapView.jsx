@@ -25,6 +25,7 @@ import IdleRender from '../../components/ui/IdleRender.jsx'
 import { useRefreshOnReturn } from '../../hooks/usePageVisibility.js'
 import { useLocalStorage } from '../../hooks/useLocalStorage.js'
 import { usePriceChanges } from '../../hooks/usePriceChanges.js'
+import { useVisibilityInterval } from '../../hooks/useVisibilityInterval.js'
 
 // Lazy-load non-critical widgets — they're not needed for first paint.
 // This reduces the MapView initial JS from ~126KB to ~95KB, cutting Time to Interactive.
@@ -50,11 +51,10 @@ const plotDetailPreload = () => import('../../pages/public/PlotDetail.jsx')
 function DataFreshnessIndicator({ updatedAt, onRefresh }) {
   const [, setTick] = useState(0)
 
-  // Re-render every 30s to update relative time
-  useEffect(() => {
-    const interval = setInterval(() => setTick(t => t + 1), 30_000)
-    return () => clearInterval(interval)
-  }, [])
+  // Re-render every 30s to update relative time — pauses when tab is hidden.
+  // Standard setInterval wastes CPU ticking in background tabs; useVisibilityInterval
+  // stops and restarts automatically, catching up when the user returns.
+  useVisibilityInterval(() => setTick(t => t + 1), 30_000)
 
   const ago = Math.round((Date.now() - updatedAt) / 1000)
   const label = ago < 60 ? 'עכשיו' : ago < 3600 ? `לפני ${Math.floor(ago / 60)} דק׳` : `לפני ${Math.floor(ago / 3600)} שע׳`
@@ -275,79 +275,89 @@ export default function MapView() {
     if (plots.length > 0) recordPrices(plots)
   }, [plots, recordPrices])
 
-  // Client-side ROI filter
-  const roiFilteredPlots = useMemo(() => {
-    if (!filters.minRoi || filters.minRoi === 'all') return plots
-    const minRoi = parseInt(filters.minRoi, 10)
+  // ── Consolidated client-side filter pipeline ────────────────────────
+  // Previously this was 5 separate useMemo hooks chained sequentially:
+  //   roiFilteredPlots → freshnessFilteredPlots → affordabilityFilteredPlots
+  //   → boundsFilteredPlots → searchedPlots
+  //
+  // Problem: each useMemo creates an intermediate array, and React schedules
+  // a separate comparison phase for each — 4 unnecessary allocations per render.
+  // With 200+ plots, that's 800+ array slots created and immediately discarded.
+  //
+  // Consolidated into a single pass: one allocation, one filter loop, all predicates
+  // evaluated per plot in sequence (short-circuits on first failure).
+  const searchedPlots = useMemo(() => {
+    // Pre-compute filter params once (avoid parseInt inside the loop)
+    const hasRoiFilter = filters.minRoi && filters.minRoi !== 'all'
+    const minRoi = hasRoiFilter ? parseInt(filters.minRoi, 10) : 0
+
+    const hasMaxDays = !!filters.maxDays
+    const maxDays = hasMaxDays ? parseInt(filters.maxDays, 10) : 0
+    const freshnessCutoff = hasMaxDays && maxDays > 0 ? Date.now() - maxDays * 86400000 : 0
+
+    const hasMaxMonthly = !!filters.maxMonthly
+    const maxMonthly = hasMaxMonthly ? parseInt(filters.maxMonthly, 10) : 0
+
+    const hasBounds = !!boundsFilter
+
+    // Client-side search — only applies during the brief moment between typing and debounce.
+    // Once debouncedSearch catches up, server already filtered via the API q param.
+    const activeSearch = filters.search && filters.search !== debouncedSearch ? filters.search.toLowerCase() : ''
+    const hasSearch = !!activeSearch
+
+    // Fast path: no client-side filters active — return server results as-is
+    if (!hasRoiFilter && !hasMaxDays && !hasMaxMonthly && !hasBounds && !hasSearch) {
+      return plots
+    }
+
     return plots.filter((p) => {
       const price = p.total_price ?? p.totalPrice ?? 0
-      const proj = p.projected_value ?? p.projectedValue ?? 0
-      if (price <= 0) return false
-      const roi = ((proj - price) / price) * 100
-      return roi >= minRoi
-    })
-  }, [plots, filters.minRoi])
 
-  // Client-side freshness filter — "new listings" (last N days).
-  // Like Yad2/Madlan's "חדש באתר" — investors check daily for fresh opportunities.
-  const freshnessFilteredPlots = useMemo(() => {
-    if (!filters.maxDays) return roiFilteredPlots
-    const maxDays = parseInt(filters.maxDays, 10)
-    if (!maxDays || maxDays <= 0) return roiFilteredPlots
-    const cutoff = Date.now() - maxDays * 86400000
-    return roiFilteredPlots.filter((p) => {
-      const created = p.created_at ?? p.createdAt
-      if (!created) return false
-      return new Date(created).getTime() >= cutoff
-    })
-  }, [roiFilteredPlots, filters.maxDays])
+      // ROI filter — minimum return threshold
+      if (hasRoiFilter) {
+        const proj = p.projected_value ?? p.projectedValue ?? 0
+        if (price <= 0) return false
+        const roi = ((proj - price) / price) * 100
+        if (roi < minRoi) return false
+      }
 
-  // Monthly payment affordability filter — "how much can I pay per month?" (like Madlan's affordability filter).
-  // Uses calcMonthlyPayment with default terms (50% LTV, 6%, 15yr) to filter by max monthly payment.
-  // Investors think in monthly cash flow, not just total price — this bridges the gap.
-  const affordabilityFilteredPlots = useMemo(() => {
-    if (!filters.maxMonthly) return freshnessFilteredPlots
-    const maxMonthly = parseInt(filters.maxMonthly, 10)
-    if (!maxMonthly || maxMonthly <= 0) return freshnessFilteredPlots
-    return freshnessFilteredPlots.filter((p) => {
-      const price = p.total_price ?? p.totalPrice ?? 0
-      if (price <= 0) return false
-      const payment = calcMonthlyPayment(price)
-      return payment && payment.monthly <= maxMonthly
-    })
-  }, [freshnessFilteredPlots, filters.maxMonthly])
+      // Freshness filter — "new listings" (last N days, like Yad2/Madlan "חדש באתר")
+      if (hasMaxDays && maxDays > 0) {
+        const created = p.created_at ?? p.createdAt
+        if (!created) return false
+        if (new Date(created).getTime() < freshnessCutoff) return false
+      }
 
-  // Bounds filter — "Search this area" (like Madlan's "חפש באזור זה")
-  // Filters plots to only those within the map viewport bounds the user selected
-  const boundsFilteredPlots = useMemo(() => {
-    if (!boundsFilter) return affordabilityFilteredPlots
-    return affordabilityFilteredPlots.filter((p) => {
-      if (!p.coordinates || !Array.isArray(p.coordinates) || p.coordinates.length < 3) return false
-      // Check if any coordinate falls within bounds (inclusive check)
-      return p.coordinates.some(c =>
-        Array.isArray(c) && c.length >= 2 &&
-        c[0] >= boundsFilter.south && c[0] <= boundsFilter.north &&
-        c[1] >= boundsFilter.west && c[1] <= boundsFilter.east
-      )
-    })
-  }, [affordabilityFilteredPlots, boundsFilter])
+      // Affordability filter — max monthly payment (like Madlan's affordability filter)
+      if (hasMaxMonthly && maxMonthly > 0) {
+        if (price <= 0) return false
+        const payment = calcMonthlyPayment(price)
+        if (!payment || payment.monthly > maxMonthly) return false
+      }
 
-  // Client-side search filter — acts as secondary filter for instant feedback
-  // while server-side q param handles the primary DB-level search
-  const searchedPlots = useMemo(() => {
-    // When search is passed to API (debouncedSearch), server already filtered — skip client filter
-    // Only apply client-side filter for the brief moment between typing and debounce
-    const activeSearch = filters.search && filters.search !== debouncedSearch ? filters.search : ''
-    if (!activeSearch) return boundsFilteredPlots
-    const q = activeSearch.toLowerCase()
-    return boundsFilteredPlots.filter((p) => {
-      const bn = (p.block_number ?? p.blockNumber ?? '').toString()
-      const num = (p.number ?? '').toString()
-      const city = (p.city ?? '').toLowerCase()
-      const desc = (p.description ?? '').toLowerCase()
-      return bn.includes(q) || num.includes(q) || city.includes(q) || desc.includes(q)
+      // Bounds filter — "Search this area" (like Madlan's "חפש באזור זה")
+      if (hasBounds) {
+        if (!p.coordinates || !Array.isArray(p.coordinates) || p.coordinates.length < 3) return false
+        const inBounds = p.coordinates.some(c =>
+          Array.isArray(c) && c.length >= 2 &&
+          c[0] >= boundsFilter.south && c[0] <= boundsFilter.north &&
+          c[1] >= boundsFilter.west && c[1] <= boundsFilter.east
+        )
+        if (!inBounds) return false
+      }
+
+      // Instant search (pre-debounce) — secondary filter for responsive typing feel
+      if (hasSearch) {
+        const bn = (p.block_number ?? p.blockNumber ?? '').toString()
+        const num = (p.number ?? '').toString()
+        const city = (p.city ?? '').toLowerCase()
+        const desc = (p.description ?? '').toLowerCase()
+        if (!bn.includes(activeSearch) && !num.includes(activeSearch) && !city.includes(activeSearch) && !desc.includes(activeSearch)) return false
+      }
+
+      return true
     })
-  }, [boundsFilteredPlots, filters.search, debouncedSearch])
+  }, [plots, filters.minRoi, filters.maxDays, filters.maxMonthly, filters.search, debouncedSearch, boundsFilter])
 
   // Request geolocation when "sort by distance" is selected — lazy permission request.
   // Like Madlan/Airbnb: only asks for location when the user actually needs it.

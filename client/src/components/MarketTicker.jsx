@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, Zap, Clock, MapPin } from 'lucide-react'
 import { formatPriceShort } from '../utils/formatters'
+import { useVisibilityInterval } from '../hooks/useVisibilityInterval'
 
 /**
  * Animated market ticker bar — cycles through real-time market insights.
@@ -114,14 +115,13 @@ export default function MarketTicker({ plots }) {
     return result
   }, [plots])
 
-  // Auto-cycle through items
-  useEffect(() => {
-    if (items.length <= 1) return
-    const interval = setInterval(() => {
-      setActiveIndex(prev => (prev + 1) % items.length)
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [items.length])
+  // Auto-cycle through items — pauses when tab is hidden to avoid
+  // wasting cycles and showing stale animations when user returns.
+  useVisibilityInterval(
+    () => setActiveIndex(prev => (prev + 1) % items.length),
+    5000,
+    { enabled: items.length > 1, catchUp: false }
+  )
 
   if (items.length === 0) return null
 
