@@ -7,6 +7,7 @@ import { formatCurrency, calcInvestmentScore, calcMonthlyPayment, formatMonthlyP
 import { useMetaTags } from '../../hooks/useMetaTags'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
+import BackToTopButton from '../../components/ui/BackToTopButton'
 import Spinner from '../../components/ui/Spinner'
 
 /**
@@ -933,6 +934,7 @@ export default function Compare() {
         </div>
       </div>
 
+      <BackToTopButton />
       <PublicFooter />
     </div>
   )

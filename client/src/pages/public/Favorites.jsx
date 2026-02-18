@@ -8,6 +8,7 @@ import { formatCurrency, formatPriceShort, calcInvestmentScore, getScoreLabel } 
 import { useMetaTags } from '../../hooks/useMetaTags'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
+import BackToTopButton from '../../components/ui/BackToTopButton'
 
 const sortOptions = [
   { value: 'added', label: 'סדר הוספה', icon: ArrowUpDown },
@@ -349,6 +350,7 @@ export default function Favorites() {
         </div>
       </div>
 
+      <BackToTopButton />
       <PublicFooter />
     </div>
   )

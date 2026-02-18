@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Map, Shield, Brain, Eye, ArrowLeft, Compass, TrendingUp, Lock } from 'lucide-react'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
+import BackToTopButton from '../../components/ui/BackToTopButton'
 import { useMetaTags } from '../../hooks/useMetaTags'
 
 const steps = [
@@ -143,6 +144,7 @@ export default function About() {
         </div>
       </section>
 
+      <BackToTopButton />
       <PublicFooter />
     </div>
   )

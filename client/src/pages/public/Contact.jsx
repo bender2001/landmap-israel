@@ -3,6 +3,7 @@ import { User, Phone, Mail, MessageSquare, Lock, Send, CheckCircle2 } from 'luci
 import { useCreateLead } from '../../hooks/useLeads'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
+import BackToTopButton from '../../components/ui/BackToTopButton'
 import { useMetaTags } from '../../hooks/useMetaTags'
 
 // Accept Israeli numbers: 05X, +972-5X, 972-5X, with optional dashes/spaces
@@ -300,6 +301,7 @@ export default function Contact() {
         </div>
       </div>
 
+      <BackToTopButton />
       <PublicFooter />
     </div>
   )

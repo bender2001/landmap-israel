@@ -7,6 +7,7 @@ import { useMetaTags } from '../../hooks/useMetaTags.js'
 import PublicNav from '../../components/PublicNav.jsx'
 import PublicFooter from '../../components/PublicFooter.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
+import BackToTopButton from '../../components/ui/BackToTopButton.jsx'
 import { formatCurrency, formatDunam } from '../../utils/formatters.js'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants.js'
 
@@ -432,6 +433,7 @@ export default function Areas() {
         )}
       </main>
 
+      <BackToTopButton />
       <PublicFooter />
     </div>
   )

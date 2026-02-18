@@ -21,6 +21,7 @@ import { useSavedSearches } from '../../hooks/useSavedSearches.js'
 import { Phone } from 'lucide-react'
 import { whatsappLink, CONTACT, plotOgImageUrl } from '../../utils/config.js'
 import { useRealtimeUpdates } from '../../hooks/useRealtimeUpdates.js'
+import IdleRender from '../../components/ui/IdleRender.jsx'
 
 // Lazy-load non-critical widgets — they're not needed for first paint.
 // This reduces the MapView initial JS from ~126KB to ~95KB, cutting Time to Interactive.
@@ -578,12 +579,15 @@ export default function MapView() {
           </button>
         </div>
       )}
-      {/* Market Ticker — Bloomberg-style rotating market insights (desktop only) */}
-      <Suspense fallback={null}>
-        <WidgetErrorBoundary name="MarketTicker" silent>
-          <MarketTicker plots={filteredPlots} />
-        </WidgetErrorBoundary>
-      </Suspense>
+      {/* Market Ticker — Bloomberg-style rotating market insights (desktop only).
+          Wrapped in IdleRender to defer until browser is idle — not needed for first paint. */}
+      <IdleRender>
+        <Suspense fallback={null}>
+          <WidgetErrorBoundary name="MarketTicker" silent>
+            <MarketTicker plots={filteredPlots} />
+          </WidgetErrorBoundary>
+        </Suspense>
+      </IdleRender>
       {/* Skip navigation for accessibility */}
       <a
         href="#map-content"
@@ -606,12 +610,15 @@ export default function MapView() {
       {dataUpdatedAt > 0 && (
         <DataFreshnessIndicator updatedAt={dataUpdatedAt} onRefresh={refetchPlots} />
       )}
-      {/* Secondary widgets: only essential ones to avoid overlapping clutter */}
-      <Suspense fallback={null}>
-        <WidgetErrorBoundary name="AlertSubscription" silent>
-          <AlertSubscription filters={filters} statusFilter={statusFilter} />
-        </WidgetErrorBoundary>
-      </Suspense>
+      {/* Secondary widgets: only essential ones to avoid overlapping clutter.
+          Deferred via IdleRender — these are interactive add-ons, not core functionality. */}
+      <IdleRender>
+        <Suspense fallback={null}>
+          <WidgetErrorBoundary name="AlertSubscription" silent>
+            <AlertSubscription filters={filters} statusFilter={statusFilter} />
+          </WidgetErrorBoundary>
+        </Suspense>
+      </IdleRender>
       <MapErrorBoundary>
         <MapArea
           plots={filteredPlots}
@@ -679,15 +686,17 @@ export default function MapView() {
         </Suspense>
       )}
 
-      <Suspense fallback={null}>
-        <WidgetErrorBoundary name="RecentlyViewed" silent>
-          <RecentlyViewed
-            plots={filteredPlots}
-            selectedPlot={selectedPlot}
-            onSelectPlot={handleSelectPlot}
-          />
-        </WidgetErrorBoundary>
-      </Suspense>
+      <IdleRender>
+        <Suspense fallback={null}>
+          <WidgetErrorBoundary name="RecentlyViewed" silent>
+            <RecentlyViewed
+              plots={filteredPlots}
+              selectedPlot={selectedPlot}
+              onSelectPlot={handleSelectPlot}
+            />
+          </WidgetErrorBoundary>
+        </Suspense>
+      </IdleRender>
 
       <Suspense fallback={null}>
         <WidgetErrorBoundary name="AIChat" silent>
@@ -732,18 +741,23 @@ export default function MapView() {
         />
       </Suspense>
 
-      <Suspense fallback={null}>
-        <WidgetErrorBoundary name="FirstVisitHints" silent>
-          <FirstVisitHints />
-        </WidgetErrorBoundary>
-      </Suspense>
+      <IdleRender>
+        <Suspense fallback={null}>
+          <WidgetErrorBoundary name="FirstVisitHints" silent>
+            <FirstVisitHints />
+          </WidgetErrorBoundary>
+        </Suspense>
+      </IdleRender>
 
-      {/* Featured Deals widget — shows server-scored top investment opportunities (like Madlan's "הזדמנויות חמות") */}
-      <Suspense fallback={null}>
-        <WidgetErrorBoundary name="FeaturedDeals" silent>
-          <FeaturedDeals onSelectPlot={handleSelectPlot} selectedPlot={selectedPlot} />
-        </WidgetErrorBoundary>
-      </Suspense>
+      {/* Featured Deals widget — shows server-scored top investment opportunities (like Madlan's "הזדמנויות חמות").
+          Deferred via IdleRender for faster initial paint — loads after map & filters are ready. */}
+      <IdleRender>
+        <Suspense fallback={null}>
+          <WidgetErrorBoundary name="FeaturedDeals" silent>
+            <FeaturedDeals onSelectPlot={handleSelectPlot} selectedPlot={selectedPlot} />
+          </WidgetErrorBoundary>
+        </Suspense>
+      </IdleRender>
 
       {/* Floating contact CTA — desktop: full buttons, mobile: single expandable FAB */}
       {/* Desktop version */}

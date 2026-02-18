@@ -156,6 +156,11 @@ app.use('/api/alerts', alertRoutes)
 app.use('/api/og', ogRoutes)
 
 // ─── Admin routes ───
+// Prevent search engines from indexing admin API responses
+app.use('/api/admin', (req, res, next) => {
+  res.set('X-Robots-Tag', 'noindex, nofollow')
+  next()
+})
 app.use('/api/admin/plots', adminPlotRoutes)
 app.use('/api/admin/leads', adminLeadRoutes)
 app.use('/api/admin/dashboard', adminDashboardRoutes)

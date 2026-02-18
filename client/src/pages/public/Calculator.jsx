@@ -5,6 +5,7 @@ import { roiStages, zoningLabels, ZoningStage } from '../../utils/constants'
 import { formatCurrency } from '../../utils/formatters'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
+import BackToTopButton from '../../components/ui/BackToTopButton'
 import { useMetaTags } from '../../hooks/useMetaTags'
 
 const zoningOptions = Object.entries(zoningLabels)
@@ -534,6 +535,7 @@ export default function Calculator() {
         </div>
       </div>
 
+      <BackToTopButton />
       <PublicFooter />
     </div>
   )
