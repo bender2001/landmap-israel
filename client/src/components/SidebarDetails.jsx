@@ -1005,8 +1005,6 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
               </a>
             </div>
-              )
-            })()}
 
             {/* Price Change Alert — like Yad2's "המחיר השתנה!" */}
             {priceChange && (
