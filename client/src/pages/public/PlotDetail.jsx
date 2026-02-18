@@ -688,19 +688,27 @@ export default function PlotDetail() {
       <div className="relative z-10 pt-20 pb-28">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
 
-          {/* Breadcrumb — uses history.back() when possible to preserve filter state from MapView */}
-          <nav className="flex items-center gap-2 text-xs text-slate-500 mb-6" aria-label="ניווט">
-            <button
-              onClick={() => window.history.length > 2 ? navigate(-1) : navigate('/')}
-              className="hover:text-gold transition-colors flex items-center gap-1"
-            >
-              <ArrowRight className="w-3 h-3" />
-              מפת קרקעות
-            </button>
-            <span>/</span>
-            <Link to={`/?city=${plot.city}`} className="hover:text-gold transition-colors">{plot.city}</Link>
-            <span>/</span>
-            <span className="text-slate-300">גוש {blockNumber} חלקה {plot.number}</span>
+          {/* Breadcrumb — semantic <ol> for SEO & a11y, history.back() to preserve filter state */}
+          <nav aria-label="ניווט" className="mb-6">
+            <ol className="flex items-center gap-2 text-xs text-slate-500 list-none p-0 m-0">
+              <li className="flex items-center gap-2">
+                <button
+                  onClick={() => window.history.length > 2 ? navigate(-1) : navigate('/')}
+                  className="hover:text-gold transition-colors flex items-center gap-1"
+                >
+                  <ArrowRight className="w-3 h-3" />
+                  מפת קרקעות
+                </button>
+                <span aria-hidden="true">/</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <Link to={`/?city=${plot.city}`} className="hover:text-gold transition-colors">{plot.city}</Link>
+                <span aria-hidden="true">/</span>
+              </li>
+              <li aria-current="page">
+                <span className="text-slate-300">גוש {blockNumber} חלקה {plot.number}</span>
+              </li>
+            </ol>
           </nav>
 
           {/* Hero header */}

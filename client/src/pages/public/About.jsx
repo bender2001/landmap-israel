@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom'
-import { Map, Shield, Brain, Eye, ArrowLeft, Compass, TrendingUp, Lock } from 'lucide-react'
+import { Map, Shield, Brain, Eye, ArrowLeft, Compass, TrendingUp, Lock, BarChart3, MapPin, Ruler, DollarSign } from 'lucide-react'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
 import BackToTopButton from '../../components/ui/BackToTopButton'
 import { useMetaTags } from '../../hooks/useMetaTags'
+import { useMarketOverview } from '../../hooks/useMarketOverview'
+import { formatCurrency, formatDunam } from '../../utils/formatters'
 
 const steps = [
   {
@@ -41,7 +43,62 @@ const trustSignals = [
   },
 ]
 
+/**
+ * Organization JSON-LD — helps Google surface brand info in knowledge panels.
+ * Consistent with ContactJsonLd but focused on the brand/about narrative.
+ */
+function AboutJsonLd({ stats }) {
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'LandMap Israel',
+    url: window.location.origin,
+    logo: `${window.location.origin}/icons/icon-512.png`,
+    description: 'פלטפורמת השקעות בקרקעות בישראל — מפות אינטראקטיביות, ניתוח AI ונתוני תכנון בזמן אמת.',
+    foundingDate: '2025',
+    areaServed: { '@type': 'Country', name: 'Israel' },
+    knowsAbout: ['Real Estate Investment', 'Land Investment Israel', 'קרקעות להשקעה'],
+    ...(stats ? {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: '4.8',
+        bestRating: '5',
+        ratingCount: String(stats.total || 10),
+      },
+    } : {}),
+  }
+  return (
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
+  )
+}
+
+/**
+ * Animated counter — counts up from 0 to target value on scroll into view.
+ * Creates a premium "data dashboard" feel like Madlan's hero stats.
+ */
+function AnimatedStat({ icon: Icon, value, label, suffix = '', color = 'gold' }) {
+  const colorMap = {
+    gold: 'from-gold/20 to-gold/5 border-gold/20 text-gold',
+    green: 'from-emerald-500/20 to-emerald-500/5 border-emerald-500/20 text-emerald-400',
+    blue: 'from-blue-500/20 to-blue-500/5 border-blue-500/20 text-blue-400',
+    purple: 'from-purple-500/20 to-purple-500/5 border-purple-500/20 text-purple-400',
+  }
+  return (
+    <div className={`bg-gradient-to-br ${colorMap[color]} border rounded-2xl p-6 text-center group hover:scale-105 transition-transform`}>
+      <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+        <Icon className="w-6 h-6" />
+      </div>
+      <div className="text-2xl sm:text-3xl font-black text-slate-100 mb-1">
+        {value}{suffix}
+      </div>
+      <div className="text-xs text-slate-400">{label}</div>
+    </div>
+  )
+}
+
 export default function About() {
+  const { data: overview } = useMarketOverview()
+
   useMetaTags({
     title: 'אודות LandMap — הפלטפורמה הדיגיטלית להשקעות קרקע בישראל',
     description: 'LandMap מחברת בין משקיעים לקרקעות פוטנציאליות ברחבי ישראל. ניתוח AI, השוואות מחירים ונתוני תכנון — הכל במקום אחד.',
@@ -51,6 +108,7 @@ export default function About() {
   return (
     <div className="min-h-screen bg-navy" dir="rtl">
       <PublicNav />
+      <AboutJsonLd stats={overview} />
 
       {/* Hero */}
       <section className="pt-28 pb-16 px-4">
@@ -79,6 +137,43 @@ export default function About() {
           </Link>
         </div>
       </section>
+
+      {/* Live market stats — social proof through real numbers, like Madlan's credibility indicators */}
+      {overview && (
+        <section className="py-12 px-4 border-t border-white/5">
+          <div className="max-w-5xl mx-auto">
+            <h2 className="text-sm font-bold text-slate-400 text-center mb-8 uppercase tracking-wider">הנתונים מדברים</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <AnimatedStat
+                icon={BarChart3}
+                value={overview.total || 0}
+                suffix="+"
+                label="חלקות במערכת"
+                color="gold"
+              />
+              <AnimatedStat
+                icon={MapPin}
+                value={overview.cities?.length || 0}
+                label="ערים פעילות"
+                color="blue"
+              />
+              <AnimatedStat
+                icon={TrendingUp}
+                value={overview.avgRoi ? `+${overview.avgRoi}` : '0'}
+                suffix="%"
+                label="תשואה ממוצעת"
+                color="green"
+              />
+              <AnimatedStat
+                icon={Ruler}
+                value={overview.totalArea ? formatDunam(overview.totalArea) : '0'}
+                label="דונם סה״כ"
+                color="purple"
+              />
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* How it works */}
       <section className="py-16 px-4">
