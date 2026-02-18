@@ -7,6 +7,7 @@ import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStag
 import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
 import { usePlot } from '../hooks/usePlots'
+import MiniMap from './ui/MiniMap'
 
 function getDocIcon(mimeType) {
   if (!mimeType) return File
@@ -602,29 +603,37 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
           onTouchMove={handleDragMove}
           onTouchEnd={handleDragEnd}
         >
-          {/* Map preview area */}
-          <div className="h-36 bg-navy-mid relative overflow-hidden">
-            <div
-              className="absolute inset-0 opacity-10"
-              style={{
-                backgroundImage: 'linear-gradient(rgba(200,148,42,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(200,148,42,0.3) 1px, transparent 1px)',
-                backgroundSize: '40px 40px',
-              }}
-            />
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <div className="w-3 h-3 rounded-full bg-gold animate-pulse-gold" />
-              <span className="text-xs text-gold/80 mt-2">
-                גוש {blockNumber} | {plot.city}
-              </span>
+          {/* Map preview area — real satellite map like Madlan */}
+          {plot.coordinates && plot.coordinates.length >= 3 ? (
+            <div className="h-36 relative overflow-hidden">
+              <MiniMap
+                coordinates={plot.coordinates}
+                status={plot.status}
+                city={plot.city}
+                height="144px"
+                className="rounded-none border-0"
+              />
+              {/* Mobile: tap-to-expand hint */}
+              <div className="sidebar-expand-hint">
+                <ChevronDown className="w-4 h-4 text-gold/50 rotate-180" />
+                <span>גרור למעלה לפרטים</span>
+              </div>
             </div>
-            <div className="absolute bottom-0 w-full h-12 bg-gradient-to-t from-navy to-transparent" />
-
-            {/* Mobile: tap-to-expand hint */}
-            <div className="sidebar-expand-hint">
-              <ChevronDown className="w-4 h-4 text-gold/50 rotate-180" />
-              <span>גרור למעלה לפרטים</span>
+          ) : (
+            <div className="h-36 bg-navy-mid relative overflow-hidden">
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <div className="w-3 h-3 rounded-full bg-gold animate-pulse-gold" />
+                <span className="text-xs text-gold/80 mt-2">
+                  גוש {blockNumber} | {plot.city}
+                </span>
+              </div>
+              <div className="absolute bottom-0 w-full h-12 bg-gradient-to-t from-navy to-transparent" />
+              <div className="sidebar-expand-hint">
+                <ChevronDown className="w-4 h-4 text-gold/50 rotate-180" />
+                <span>גרור למעלה לפרטים</span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Header */}
           <div className="flex justify-between items-start p-5 pb-3">

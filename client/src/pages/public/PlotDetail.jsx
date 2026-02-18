@@ -11,6 +11,7 @@ import Spinner from '../../components/ui/Spinner.jsx'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../../utils/constants.js'
 import { formatCurrency, formatDunam } from '../../utils/formatters.js'
 import PriceTrendChart from '../../components/ui/PriceTrendChart.jsx'
+import MiniMap from '../../components/ui/MiniMap.jsx'
 
 function JsonLdSchema({ plot }) {
   const blockNum = plot.block_number ?? plot.blockNumber
@@ -242,6 +243,23 @@ export default function PlotDetail() {
                   />
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* Location mini-map — like Madlan always shows location context */}
+          {plot.coordinates && plot.coordinates.length >= 3 && (
+            <div className="mb-8">
+              <h2 className="text-base font-bold text-slate-100 mb-3 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-gold" />
+                מיקום החלקה
+              </h2>
+              <MiniMap
+                coordinates={plot.coordinates}
+                status={plot.status}
+                city={plot.city}
+                height="280px"
+                interactive={true}
+              />
             </div>
           )}
 
