@@ -8,7 +8,6 @@ export async function getPublishedPlots(filters = {}) {
     .from('plots')
     .select(countOnly ? 'id' : '*, plot_images(id, url, alt)', countOnly ? { count: 'exact', head: true } : undefined)
     .eq('is_published', true)
-    .order('created_at', { ascending: false })
 
   if (filters.city && filters.city !== 'all') {
     query = query.eq('city', filters.city)
@@ -47,7 +46,10 @@ export async function getPublishedPlots(filters = {}) {
     }
   }
 
-  // Server-side sorting
+  // Server-side sorting — apply user's sort as PRIMARY order.
+  // Previously, `order('created_at')` was applied first, making user sort a secondary
+  // (invisible) tiebreaker since created_at is unique. Now user sort comes first,
+  // with created_at as a stable secondary sort for ties.
   if (filters.sort) {
     switch (filters.sort) {
       case 'price-asc': query = query.order('total_price', { ascending: true }); break
@@ -56,6 +58,11 @@ export async function getPublishedPlots(filters = {}) {
       case 'size-desc': query = query.order('size_sqm', { ascending: false }); break
       // ROI and price-per-sqm require computed columns — handled client-side
     }
+    // Secondary sort: newest first within same price/size tier
+    query = query.order('created_at', { ascending: false })
+  } else {
+    // Default: newest listings first
+    query = query.order('created_at', { ascending: false })
   }
 
   // Pagination support

@@ -469,30 +469,10 @@ export default function MapView() {
       {dataUpdatedAt > 0 && (
         <DataFreshnessIndicator updatedAt={dataUpdatedAt} onRefresh={refetchPlots} />
       )}
-      {/* Secondary widgets: lazy-loaded + error-isolated so a crash in one doesn't kill the map */}
-      <Suspense fallback={null}>
-        <WidgetErrorBoundary name="MarketTicker" silent>
-          <MarketTicker plots={filteredPlots} />
-        </WidgetErrorBoundary>
-      </Suspense>
+      {/* Secondary widgets: only essential ones to avoid overlapping clutter */}
       <Suspense fallback={null}>
         <WidgetErrorBoundary name="AlertSubscription" silent>
           <AlertSubscription filters={filters} statusFilter={statusFilter} />
-        </WidgetErrorBoundary>
-      </Suspense>
-      <Suspense fallback={null}>
-        <WidgetErrorBoundary name="MarketStatsWidget" silent>
-          <MarketStatsWidget plots={filteredPlots} />
-        </WidgetErrorBoundary>
-      </Suspense>
-      <Suspense fallback={null}>
-        <WidgetErrorBoundary name="DealAlerts" silent>
-          <DealAlerts plots={filteredPlots} onSelectPlot={handleSelectPlot} />
-        </WidgetErrorBoundary>
-      </Suspense>
-      <Suspense fallback={null}>
-        <WidgetErrorBoundary name="DealSpotlight" silent>
-          <DealSpotlight plots={filteredPlots} onSelectPlot={handleSelectPlot} />
         </WidgetErrorBoundary>
       </Suspense>
       <MapArea

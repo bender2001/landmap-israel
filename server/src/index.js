@@ -8,7 +8,6 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 import helmet from 'helmet'
 import compression from 'compression'
-import morgan from 'morgan'
 import { rateLimit } from 'express-rate-limit'
 import plotRoutes from './routes/plots.js'
 import leadRoutes from './routes/leads.js'
@@ -57,12 +56,22 @@ const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
 
 app.use(cors({
   origin: (origin, cb) => {
+    // Allow requests with no origin (curl, server-to-server, mobile apps)
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true)
-    cb(new Error('Not allowed by CORS'))
+    // Return false instead of throwing — avoids 500 errors, returns clean 403 CORS block.
+    // The browser handles the rejection via missing Access-Control-Allow-Origin header.
+    cb(null, false)
   },
   credentials: true,
   maxAge: 86400, // Cache preflight for 24h — reduces OPTIONS round-trips
 }))
+
+// Vary header for correct CDN/proxy caching with CORS + compression
+app.use((req, res, next) => {
+  res.vary('Origin')
+  res.vary('Accept-Encoding')
+  next()
+})
 
 // Request tracing
 app.use(requestId)
@@ -70,16 +79,43 @@ app.use(requestId)
 // Compression
 app.use(compression())
 
-// Request logging
-app.use(morgan('short'))
-
-// Response time header for monitoring
+// Structured access logging — JSON format for monitoring/observability.
+// Replaces basic morgan 'short' with a single middleware that:
+// 1. Sets X-Response-Time header (useful for client-side perf budgets)
+// 2. Logs method, URL, status, response time, and content length
+// 3. Skips noisy health checks and SSE keep-alives
 app.use((req, res, next) => {
   const start = process.hrtime.bigint()
-  res.on('finish', () => {
+  const onFinish = () => {
+    res.removeListener('finish', onFinish)
     const ms = Number(process.hrtime.bigint() - start) / 1e6
-    res.set('X-Response-Time', `${ms.toFixed(1)}ms`)
-  })
+    // Set timing header (may not reach client if headers already sent, but that's fine)
+    if (!res.headersSent) {
+      res.set('X-Response-Time', `${ms.toFixed(1)}ms`)
+    }
+    // Skip logging for health checks and SSE — they're too noisy
+    if (req.originalUrl === '/api/health' || req.originalUrl === '/api/events') return
+    // Log slow requests at warn level (>2s), others at info
+    const level = ms > 2000 ? 'warn' : 'info'
+    const cacheHit = res.getHeader('X-Cache')
+    const entry = {
+      level,
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      ms: Math.round(ms * 10) / 10,
+      size: res.getHeader('content-length') || '-',
+      ...(cacheHit ? { cache: cacheHit } : {}),
+      ...(req.id ? { reqId: req.id } : {}),
+    }
+    // Compact single-line JSON — easy to grep/parse, doesn't flood console
+    if (level === 'warn') {
+      console.warn(JSON.stringify(entry))
+    } else {
+      console.log(JSON.stringify(entry))
+    }
+  }
+  res.on('finish', onFinish)
   next()
 })
 
