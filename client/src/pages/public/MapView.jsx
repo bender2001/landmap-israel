@@ -25,6 +25,7 @@ import { useViewTracker } from '../../hooks/useViewTracker.js'
 import { usePriceTracker } from '../../hooks/usePriceTracker.js'
 import { useSavedSearches } from '../../hooks/useSavedSearches.js'
 import { Phone } from 'lucide-react'
+import { whatsappLink, CONTACT, plotOgImageUrl } from '../../utils/config.js'
 import FirstVisitHints from '../../components/FirstVisitHints.jsx'
 import MarketTicker from '../../components/MarketTicker.jsx'
 import AlertSubscription from '../../components/AlertSubscription.jsx'
@@ -373,6 +374,7 @@ export default function MapView() {
           title: `גוש ${selectedPlot.block_number ?? selectedPlot.blockNumber} חלקה ${selectedPlot.number} | LandMap Israel`,
           description: `${selectedPlot.city} · ${formatCurrency(selectedPlot.total_price ?? selectedPlot.totalPrice)} · ${((selectedPlot.size_sqm ?? selectedPlot.sizeSqM) / 1000).toFixed(1)} דונם`,
           url: window.location.href,
+          image: plotOgImageUrl(selectedPlot.id),
         }
       : {
           title: `LandMap Israel — ${filteredPlots.length} חלקות להשקעה`,
@@ -554,8 +556,8 @@ export default function MapView() {
         {/* WhatsApp quick contact */}
         <a
           href={selectedPlot
-            ? `https://wa.me/972500000000?text=${encodeURIComponent(`שלום, אני מעוניין בפרטים על גוש ${selectedPlot.block_number ?? selectedPlot.blockNumber} חלקה ${selectedPlot.number} ב${selectedPlot.city}`)}`
-            : 'https://wa.me/972500000000?text=%D7%A9%D7%9C%D7%95%D7%9D%2C%20%D7%90%D7%A0%D7%99%20%D7%9E%D7%A2%D7%95%D7%A0%D7%99%D7%99%D7%9F%20%D7%91%D7%A7%D7%A8%D7%A7%D7%A2%D7%95%D7%AA%20%D7%9C%D7%94%D7%A9%D7%A7%D7%A2%D7%94'
+            ? whatsappLink(`שלום, אני מעוניין בפרטים על גוש ${selectedPlot.block_number ?? selectedPlot.blockNumber} חלקה ${selectedPlot.number} ב${selectedPlot.city}`)
+            : whatsappLink('שלום, אני מעוניין בקרקעות להשקעה')
           }
           target="_blank"
           rel="noopener noreferrer"

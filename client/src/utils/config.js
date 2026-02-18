@@ -3,6 +3,17 @@
  * All magic numbers and contact info live here — not scattered across components.
  */
 
+// API base URL (auto-detect from environment or current origin)
+export const API_BASE = import.meta.env.VITE_API_URL || ''
+
+/**
+ * Build an OG image URL for a plot (used in social sharing meta tags).
+ */
+export function plotOgImageUrl(plotId) {
+  const base = API_BASE || window.location.origin
+  return `${base}/api/og/${plotId}`
+}
+
 // Business contact — change this once, updates everywhere
 export const CONTACT = {
   whatsappNumber: '972500000000', // TODO: Replace with real number

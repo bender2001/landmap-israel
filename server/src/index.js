@@ -27,6 +27,7 @@ import adminSettingsRoutes from './routes/admin/settings.js'
 import adminAnalyticsRoutes from './routes/admin/analytics.js'
 import alertRoutes from './routes/alerts.js'
 import sitemapRoutes from './routes/sitemap.js'
+import ogRoutes from './routes/og.js'
 import { errorHandler, requestId } from './middleware/errorHandler.js'
 import { requestTimeout } from './middleware/timeout.js'
 import { supabaseAdmin } from './config/supabase.js'
@@ -99,6 +100,7 @@ app.use('/api/pois', poiRoutes)
 app.use('/api/market', marketRoutes)
 app.use('/api/export', exportRoutes)
 app.use('/api/alerts', alertRoutes)
+app.use('/api/og', ogRoutes)
 
 // ─── Admin routes ───
 app.use('/api/admin/plots', adminPlotRoutes)

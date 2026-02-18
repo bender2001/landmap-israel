@@ -270,10 +270,14 @@ export default function PlotDetail() {
       setMeta('property', 'og:description', desc)
       setMeta('property', 'og:url', window.location.href)
       setMeta('property', 'og:type', 'product')
-      // OG image from first plot image — improves social sharing like Madlan
+      // OG image from first plot image, fallback to dynamic SVG — improves social sharing like Madlan
       const images = plot.plot_images || []
       if (images.length > 0 && images[0].url) {
         setMeta('property', 'og:image', images[0].url)
+      } else {
+        // Dynamic OG image from server (SVG with plot stats)
+        const ogBase = import.meta.env.VITE_API_URL || window.location.origin
+        setMeta('property', 'og:image', `${ogBase}/api/og/${plot.id}`)
       }
       // Twitter card
       setMeta('name', 'twitter:card', 'summary_large_image')
