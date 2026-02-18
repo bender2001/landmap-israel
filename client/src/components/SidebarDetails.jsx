@@ -23,6 +23,8 @@ import QuickInquiryTemplates from './ui/QuickInquiryTemplates'
 import InvestmentScoreBreakdown from './ui/InvestmentScoreBreakdown'
 import AreaComparisonWidget from './ui/AreaComparisonWidget'
 import ZoningProgressBar from './ui/ZoningProgressBar'
+import RealTransactions from './RealTransactions'
+import PlanningInfo from './PlanningInfo'
 import { plotInquiryLink } from '../utils/config'
 
 function getDocIcon(mimeType) {
@@ -114,6 +116,8 @@ function QuickNavBar({ scrollRef }) {
     { id: 'section-financial', label: '💰', title: 'פיננסי' },
     { id: 'section-area-comparison', label: '📊', title: 'ביחס לאזור' },
     { id: 'section-roi-stages', label: '📈', title: 'השבחה' },
+    { id: 'section-transactions', label: '🏠', title: 'עסקאות' },
+    { id: 'section-planning', label: '📐', title: 'תב"עות' },
     { id: 'section-zoning', label: '🗺️', title: 'תכנון' },
     { id: 'section-images', label: '📷', title: 'תמונות' },
     { id: 'section-quality', label: '🛡️', title: 'איכות' },
@@ -2411,6 +2415,30 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   <div className="text-[9px] text-slate-500 text-left mt-1">* ש&quot;ח למ&quot;ר (הערכה ממוצעת)</div>
                 </div>
               </div>
+            </CollapsibleSection>
+
+            {/* Real Transactions — nearby deals from nadlan.gov.il (government data) */}
+            <CollapsibleSection
+              number={`0${++sectionNum}`}
+              icon={BarChart3}
+              title="עסקאות באזור"
+              animClass="animate-stagger-7"
+              sectionId="section-transactions"
+              defaultOpen={false}
+            >
+              <RealTransactions plotId={plot.id} city={plot.city} />
+            </CollapsibleSection>
+
+            {/* Planning Info — תב"ע plans from govmap.gov.il */}
+            <CollapsibleSection
+              number={`0${++sectionNum}`}
+              icon={FileText}
+              title="תכנון ותב&quot;עות"
+              animClass="animate-stagger-7"
+              sectionId="section-planning"
+              defaultOpen={false}
+            >
+              <PlanningInfo plotId={plot.id} city={plot.city} />
             </CollapsibleSection>
 
             {/* Divider */}
