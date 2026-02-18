@@ -159,7 +159,7 @@ export default function MapView() {
     return f
   }, [filters, statusFilter, sortBy, debouncedSearch])
 
-  const { data: plots = [], isLoading, error: plotsError, refetch: refetchPlots, isPlaceholderData, dataUpdatedAt } = useAllPlots(apiFilters)
+  const { data: plots = [], isLoading, error: plotsError, refetch: refetchPlots, isPlaceholderData, dataUpdatedAt, isMockData } = useAllPlots(apiFilters)
   const { data: pois = [] } = usePois()
 
   // Record prices for change detection (like Yad2's "המחיר ירד!" badge)
@@ -439,6 +439,19 @@ export default function MapView() {
       {(isFilterStale || isPlaceholderData) && (
         <div className="fixed top-0 left-0 right-0 z-[100] h-0.5">
           <div className="h-full bg-gradient-to-r from-gold via-gold-bright to-gold animate-pulse rounded-full" />
+        </div>
+      )}
+      {/* Mock data warning — shown when API is unreachable and fallback demo data is used */}
+      {isMockData && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-600/90 backdrop-blur-sm text-white text-center py-2 px-4 text-xs font-medium flex items-center justify-center gap-2" dir="rtl">
+          <span>⚠️</span>
+          <span>השרת אינו זמין — מוצגים נתוני הדגמה. הנתונים עשויים להיות לא מעודכנים.</span>
+          <button
+            onClick={() => refetchPlots()}
+            className="px-2.5 py-0.5 bg-white/20 hover:bg-white/30 rounded-md text-[11px] font-bold transition-colors mr-2"
+          >
+            נסה שוב
+          </button>
         </div>
       )}
       {/* Skip navigation for accessibility */}

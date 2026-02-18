@@ -30,7 +30,11 @@ function normalizeMock(plot) {
 async function fetchPlotsWithFallback(filters) {
   try {
     const data = await getPlots(filters)
-    if (data && data.length > 0) return data
+    if (data && data.length > 0) {
+      // Tag response as live API data
+      data._source = 'api'
+      return data
+    }
     // API returned empty — fall through to mock
   } catch {
     // API unavailable — use mock data
@@ -50,6 +54,8 @@ async function fetchPlotsWithFallback(filters) {
     const statuses = filters.status.split(',')
     result = result.filter((p) => statuses.includes(p.status))
   }
+  // Tag response as mock/demo data so UI can warn the user
+  result._source = 'mock'
   return result
 }
 
@@ -79,10 +85,14 @@ export function useAllPlots(filters) {
     // Refetch when window regains focus after being away
     refetchOnWindowFocus: 'always',
   })
+  // Detect if data came from mock fallback (API was unreachable)
+  const isMockData = query.data?._source === 'mock'
+
   return {
     ...query,
     isPlaceholderData: query.isPlaceholderData,
     dataUpdatedAt: query.dataUpdatedAt,
+    isMockData,
   }
 }
 

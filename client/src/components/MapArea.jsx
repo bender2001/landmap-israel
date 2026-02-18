@@ -542,6 +542,96 @@ function hasValidCoordinates(plot) {
   )
 }
 
+/**
+ * Viewport-culled polygon renderer — only renders polygons whose bounding box
+ * intersects the current map viewport. This is a significant performance win
+ * when there are many plots (50+), as Leaflet doesn't need to manage off-screen SVG paths.
+ * Re-evaluates on map move/zoom events with debounced updates.
+ */
+function ViewportCulledPolygons({ plots, plotColors, hoveredId, onSelectPlot, onHover, onHoverEnd, prefetchPlot, favorites, compareIds, onToggleCompare, areaAvgPsm }) {
+  const map = useMap()
+  const [visiblePlotIds, setVisiblePlotIds] = useState(new Set())
+  const boundsRef = useRef(null)
+
+  // Precompute plot bounding boxes (lat/lng) — only recalculate when plots change
+  const plotBounds = useMemo(() => {
+    const result = new Map()
+    for (const plot of plots) {
+      if (!hasValidCoordinates(plot)) continue
+      let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity
+      for (const c of plot.coordinates) {
+        if (c[0] < minLat) minLat = c[0]
+        if (c[0] > maxLat) maxLat = c[0]
+        if (c[1] < minLng) minLng = c[1]
+        if (c[1] > maxLng) maxLng = c[1]
+      }
+      result.set(plot.id, { minLat, maxLat, minLng, maxLng })
+    }
+    return result
+  }, [plots])
+
+  const updateVisibility = useCallback(() => {
+    const bounds = map.getBounds()
+    // Pad bounds by 20% to preload plots just outside viewport for smoother panning
+    const padLat = (bounds.getNorth() - bounds.getSouth()) * 0.2
+    const padLng = (bounds.getEast() - bounds.getWest()) * 0.2
+    const north = bounds.getNorth() + padLat
+    const south = bounds.getSouth() - padLat
+    const east = bounds.getEast() + padLng
+    const west = bounds.getWest() - padLng
+
+    const visible = new Set()
+    for (const [id, bb] of plotBounds) {
+      // AABB intersection test
+      if (bb.maxLat >= south && bb.minLat <= north && bb.maxLng >= west && bb.minLng <= east) {
+        visible.add(id)
+      }
+    }
+
+    // Also always include hovered plot to prevent flickering
+    if (hoveredId) visible.add(hoveredId)
+
+    setVisiblePlotIds(prev => {
+      // Only update state if the set actually changed (avoid re-renders)
+      if (prev.size === visible.size && [...visible].every(id => prev.has(id))) return prev
+      return visible
+    })
+    boundsRef.current = bounds
+  }, [map, plotBounds, hoveredId])
+
+  useEffect(() => {
+    updateVisibility()
+    map.on('moveend', updateVisibility)
+    map.on('zoomend', updateVisibility)
+    return () => {
+      map.off('moveend', updateVisibility)
+      map.off('zoomend', updateVisibility)
+    }
+  }, [map, updateVisibility])
+
+  // Filter to only visible plots
+  const visiblePlots = useMemo(() => {
+    return plots.filter(p => visiblePlotIds.has(p.id))
+  }, [plots, visiblePlotIds])
+
+  return visiblePlots.map((plot) => (
+    <PlotPolygon
+      key={plot.id}
+      plot={plot}
+      color={plotColors[plot.id] || statusColors[plot.status]}
+      isHovered={hoveredId === plot.id}
+      onSelectPlot={onSelectPlot}
+      onHover={onHover}
+      onHoverEnd={onHoverEnd}
+      prefetchPlot={prefetchPlot}
+      favorites={favorites}
+      compareIds={compareIds}
+      onToggleCompare={onToggleCompare}
+      areaAvgPsm={areaAvgPsm}
+    />
+  ))
+}
+
 export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites, compareIds = [], onToggleCompare }) {
   const [hoveredId, setHoveredId] = useState(null)
   const [activeLayerId, setActiveLayerId] = useState('satellite')
@@ -645,25 +735,21 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         <MapHeatLayer plots={plots} visible={colorMode === 'heatmap'} metric="priceSqm" />
         <GeoSearch />
 
-        {plots.map((plot) => {
-          if (!hasValidCoordinates(plot)) return null
-          return (
-            <PlotPolygon
-              key={plot.id}
-              plot={plot}
-              color={plotColors[plot.id] || statusColors[plot.status]}
-              isHovered={hoveredId === plot.id}
-              onSelectPlot={onSelectPlot}
-              onHover={handleHover}
-              onHoverEnd={handleHoverEnd}
-              prefetchPlot={prefetchPlot}
-              favorites={favorites}
-              compareIds={compareIds}
-              onToggleCompare={onToggleCompare}
-              areaAvgPsm={areaAvgPsm}
-            />
-          )
-        })}
+        {/* Viewport-culled polygons: only renders plots visible in the current map viewport.
+            Dramatically improves performance with many plots by avoiding off-screen SVG paths. */}
+        <ViewportCulledPolygons
+          plots={plots}
+          plotColors={plotColors}
+          hoveredId={hoveredId}
+          onSelectPlot={onSelectPlot}
+          onHover={handleHover}
+          onHoverEnd={handleHoverEnd}
+          prefetchPlot={prefetchPlot}
+          favorites={favorites}
+          compareIds={compareIds}
+          onToggleCompare={onToggleCompare}
+          areaAvgPsm={areaAvgPsm}
+        />
 
         {pois.map((poi, idx) => (
           <Marker key={idx} position={poi.coordinates} icon={poiIcon(poi)} />
