@@ -53,6 +53,12 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
   const readiness = plot.readiness_estimate ?? plot.readinessEstimate
   const pricePerDunam = sizeSqM > 0 ? formatPriceShort(Math.round(price / sizeSqM * 1000)) : null
 
+  // Freshness & popularity badges (like Madlan/Yad2 "חדש!" and "פופולרי")
+  const createdAt = plot.created_at ?? plot.createdAt
+  const daysSinceCreated = createdAt ? Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)) : Infinity
+  const isNew = daysSinceCreated <= 7
+  const isHot = (plot.views ?? 0) >= 10
+
   return (
     <div
       data-plot-id={plot.id}
@@ -67,6 +73,21 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
       style={{ '--card-color': color }}
       aria-label={`גוש ${blockNum} חלקה ${plot.number}, ${plot.city}, ${formatPriceShort(price)}, תשואה +${roi}%`}
     >
+      {/* Freshness / popularity badges */}
+      {(isNew || isHot) && (
+        <div className="absolute top-1.5 right-1.5 z-10 flex gap-1">
+          {isNew && (
+            <span className="px-1.5 py-0.5 text-[8px] font-black rounded-md bg-emerald-500 text-white shadow-sm shadow-emerald-500/40 leading-none">
+              חדש!
+            </span>
+          )}
+          {isHot && !isNew && (
+            <span className="px-1.5 py-0.5 text-[8px] font-black rounded-md bg-orange-500 text-white shadow-sm shadow-orange-500/40 leading-none">
+              🔥 פופולרי
+            </span>
+          )}
+        </div>
+      )}
       {/* Thumbnail image */}
       {(() => {
         const images = plot.plot_images

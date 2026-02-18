@@ -5,6 +5,24 @@ import { sanitizePlotQuery, sanitizePlotId } from '../middleware/sanitize.js'
 
 const router = Router()
 
+// Simple in-memory cache for nearby queries (TTL: 5 min, max 50 entries)
+const nearbyCache = new Map()
+const NEARBY_TTL = 5 * 60 * 1000
+const NEARBY_MAX = 50
+function getCached(key) {
+  const entry = nearbyCache.get(key)
+  if (!entry) return null
+  if (Date.now() - entry.ts > NEARBY_TTL) { nearbyCache.delete(key); return null }
+  return entry.data
+}
+function setCache(key, data) {
+  if (nearbyCache.size >= NEARBY_MAX) {
+    const oldest = nearbyCache.keys().next().value
+    nearbyCache.delete(oldest)
+  }
+  nearbyCache.set(key, { data, ts: Date.now() })
+}
+
 function generateETag(data) {
   return '"' + crypto.createHash('md5').update(JSON.stringify(data)).digest('hex').slice(0, 16) + '"'
 }
@@ -45,7 +63,18 @@ router.get('/stats', async (req, res, next) => {
 // GET /api/plots/:id/nearby - Find plots near a given plot (geo-proximity)
 router.get('/:id/nearby', sanitizePlotId, async (req, res, next) => {
   try {
+    const limit = Math.min(parseInt(req.query.limit) || 5, 10)
+    const maxKm = parseFloat(req.query.maxKm) || 10
+    const cacheKey = `${req.params.id}:${limit}:${maxKm}`
+    const cached = getCached(cacheKey)
+    if (cached) {
+      res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300')
+      res.set('X-Cache', 'HIT')
+      return res.json(cached)
+    }
+
     res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300')
+    res.set('X-Cache', 'MISS')
     const plot = await getPlotById(req.params.id)
     if (!plot) return res.status(404).json({ error: 'Plot not found' })
 
@@ -62,8 +91,6 @@ router.get('/:id/nearby', sanitizePlotId, async (req, res, next) => {
 
     // Get all plots and compute distance
     const allPlots = await getPublishedPlots({})
-    const limit = Math.min(parseInt(req.query.limit) || 5, 10)
-    const maxKm = parseFloat(req.query.maxKm) || 10
 
     const nearby = allPlots
       .filter(p => p.id !== req.params.id && p.coordinates && p.coordinates.length > 0)
@@ -86,6 +113,7 @@ router.get('/:id/nearby', sanitizePlotId, async (req, res, next) => {
       .sort((a, b) => a.distance_km - b.distance_km)
       .slice(0, limit)
 
+    setCache(cacheKey, nearby)
     res.json(nearby)
   } catch (err) {
     next(err)

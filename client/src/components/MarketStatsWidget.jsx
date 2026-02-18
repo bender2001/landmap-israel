@@ -54,6 +54,28 @@ export default function MarketStatsWidget({ plots }) {
     // Top city
     const topCity = Object.entries(byCity).sort((a, b) => b[1] - a[1])[0]
 
+    // Per-city investment breakdown for comparison bars
+    const cityInvestment = {}
+    for (const p of plots) {
+      const city = p.city || 'אחר'
+      const price = p.total_price ?? p.totalPrice ?? 0
+      const proj = p.projected_value ?? p.projectedValue ?? 0
+      const size = p.size_sqm ?? p.sizeSqM ?? 0
+      if (!cityInvestment[city]) cityInvestment[city] = { totalPrice: 0, totalProj: 0, totalSize: 0, count: 0 }
+      cityInvestment[city].totalPrice += price
+      cityInvestment[city].totalProj += proj
+      cityInvestment[city].totalSize += size
+      cityInvestment[city].count += 1
+    }
+    const cityComparison = Object.entries(cityInvestment)
+      .map(([city, d]) => ({
+        city,
+        count: d.count,
+        avgPricePerDunam: d.totalSize > 0 ? Math.round(d.totalPrice / d.totalSize * 1000) : 0,
+        avgRoi: d.totalPrice > 0 ? Math.round(((d.totalProj - d.totalPrice) / d.totalPrice) * 100) : 0,
+      }))
+      .sort((a, b) => b.avgRoi - a.avgRoi)
+
     return {
       count: plots.length,
       avgPrice,
@@ -66,6 +88,7 @@ export default function MarketStatsWidget({ plots }) {
       byCity,
       byStatus,
       topCity: topCity ? { name: topCity[0], count: topCity[1] } : null,
+      cityComparison,
     }
   }, [plots])
 
@@ -169,6 +192,36 @@ export default function MarketStatsWidget({ plots }) {
                 </span>
               ))}
             </div>
+
+            {/* City ROI comparison bars — like Madlan area insights */}
+            {stats.cityComparison && stats.cityComparison.length > 1 && (
+              <div>
+                <div className="text-[10px] text-slate-400 mb-1.5 font-medium">השוואת תשואות לפי עיר</div>
+                <div className="space-y-1.5">
+                  {stats.cityComparison.map(c => {
+                    const maxRoiCity = stats.cityComparison[0].avgRoi || 1
+                    const barPct = Math.max(8, (c.avgRoi / maxRoiCity) * 100)
+                    return (
+                      <div key={c.city} className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-300 w-14 flex-shrink-0 truncate">{c.city}</span>
+                        <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${barPct}%`,
+                              background: c.avgRoi >= stats.avgRoi
+                                ? 'linear-gradient(90deg, #22C55E, #4ADE80)'
+                                : 'linear-gradient(90deg, #F59E0B, #FBBF24)',
+                            }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-bold text-emerald-400 w-10 text-left">+{c.avgRoi}%</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Best deal highlight */}
             <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
