@@ -487,7 +487,7 @@ export default function PlotDetail() {
 
           {/* Price trend chart — like Madlan area trends */}
           <div className="mb-8">
-            <PriceTrendChart totalPrice={totalPrice} sizeSqM={sizeSqM} city={plot.city} />
+            <PriceTrendChart totalPrice={totalPrice} sizeSqM={sizeSqM} city={plot.city} plotId={plot.id} />
           </div>
 
           {/* Two-column layout for details */}

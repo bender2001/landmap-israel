@@ -28,10 +28,15 @@ function SectionIcon({ icon: Icon, className = '' }) {
   )
 }
 
-function CollapsibleSection({ number, icon, title, children, animClass = '', sectionId }) {
-  const [isOpen, setIsOpen] = useState(true)
+function CollapsibleSection({ number, icon, title, children, animClass = '', sectionId, defaultOpen = true }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen)
+  const [hasBeenOpened, setHasBeenOpened] = useState(defaultOpen)
   const contentRef = useRef(null)
   const [maxHeight, setMaxHeight] = useState('2000px')
+
+  useEffect(() => {
+    if (isOpen && !hasBeenOpened) setHasBeenOpened(true)
+  }, [isOpen, hasBeenOpened])
 
   useEffect(() => {
     if (!contentRef.current) return
@@ -57,7 +62,7 @@ function CollapsibleSection({ number, icon, title, children, animClass = '', sec
         className="section-collapse"
         style={{ maxHeight: isOpen ? maxHeight : '0px', opacity: isOpen ? 1 : 0 }}
       >
-        <div className="pb-2">{children}</div>
+        <div className="pb-2">{hasBeenOpened ? children : null}</div>
       </div>
     </div>
   )
@@ -1246,7 +1251,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
 
               {/* Associated Costs */}
               {/* Price Trend Chart — like Madlan's area price trends */}
-              <PriceTrendChart totalPrice={totalPrice} sizeSqM={sizeSqM} city={plot.city} />
+              <PriceTrendChart totalPrice={totalPrice} sizeSqM={sizeSqM} city={plot.city} plotId={plot.id} />
 
               <div className="bg-navy-light/40 border border-white/5 rounded-xl p-3 mb-3">
                 <div className="flex items-center gap-2 mb-2">
