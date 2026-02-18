@@ -1462,13 +1462,19 @@ body {
 
 /* ── Draggable header zone ── */
 .sidebar-header-drag-zone {
-  touch-action: none;
+  touch-action: pan-x;
   cursor: grab;
   user-select: none;
 }
 
 .sidebar-header-drag-zone:active {
   cursor: grabbing;
+}
+
+/* Buttons inside header zone must be tappable */
+.sidebar-header-drag-zone button,
+.sidebar-header-drag-zone a {
+  touch-action: manipulation;
 }
 
 /* Only on desktop, don't show grab cursor */
@@ -1561,17 +1567,18 @@ body {
    ═══════════════════════════════════════════ */
 
 @media (max-width: 639px) {
-  /* ── Sidebar: map preview shorter on mobile ── */
+  /* ── Sidebar: hide map preview on mobile (badges moved to scroll area) ── */
   .sidebar-panel .h-36 {
-    height: 64px !important;
+    height: 0px !important;
+    overflow: hidden !important;
   }
 
   /* ── Sidebar: header compact ── */
   .sidebar-panel .text-2xl {
-    font-size: 1.1rem !important;
+    font-size: 1.05rem !important;
   }
   .sidebar-panel .p-5 {
-    padding: 10px 14px !important;
+    padding: 8px 14px !important;
   }
   .sidebar-panel .px-6 {
     padding-left: 14px !important;
@@ -1595,11 +1602,15 @@ body {
 
   /* ── Sidebar: CTA footer with safe area ── */
   .sidebar-cta-footer {
-    padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
   }
   .sidebar-cta-footer .py-3\.5 {
-    padding-top: 10px !important;
-    padding-bottom: 10px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+  /* Hide secondary CTA row on mobile to save space */
+  .sidebar-cta-footer .mt-2\.5 {
+    display: none !important;
   }
 
   /* ── Sidebar: distance chips wrap tighter ── */

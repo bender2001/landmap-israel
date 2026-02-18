@@ -436,8 +436,8 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
     const dx = touch.clientX - state.startX
     const dy = touch.clientY - state.startY
 
-    // Determine drag direction on first significant movement
-    if (!state.direction && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+    // Determine drag direction on first significant movement (higher threshold to avoid capturing taps)
+    if (!state.direction && (Math.abs(dx) > 15 || Math.abs(dy) > 15)) {
       state.direction = Math.abs(dy) >= Math.abs(dx) ? 'vertical' : 'horizontal'
       state.active = true
       setIsDragging(true)
