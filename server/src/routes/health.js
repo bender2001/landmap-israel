@@ -93,6 +93,57 @@ router.get('/ping', (req, res) => {
   res.json({ pong: true, ts: Date.now() })
 })
 
+// ─── Client Error Reporting ────────────────────────────────────────────
+// POST /api/health/client-error
+// Receives client-side errors from ErrorBoundary / window.onerror for server-side logging.
+// Rate-limited: 5 reports per IP per minute to prevent abuse.
+// Like Google's Error Reporting — knowing what breaks in production is essential.
+const errorRateMap = new Map()
+const ERROR_RATE_TTL = 60_000
+const ERROR_RATE_LIMIT = 5
+
+router.post('/client-error', (req, res) => {
+  // Rate limit per IP
+  const ip = req.ip || req.connection?.remoteAddress || 'unknown'
+  const now = Date.now()
+  const entry = errorRateMap.get(ip) || { count: 0, resetAt: now + ERROR_RATE_TTL }
+  if (now > entry.resetAt) {
+    entry.count = 0
+    entry.resetAt = now + ERROR_RATE_TTL
+  }
+  entry.count++
+  errorRateMap.set(ip, entry)
+  if (entry.count > ERROR_RATE_LIMIT) {
+    return res.status(429).json({ error: 'Too many error reports' })
+  }
+
+  const { message, stack, componentStack, url, userAgent, timestamp } = req.body || {}
+  if (!message || typeof message !== 'string') {
+    return res.status(400).json({ error: 'Missing error message' })
+  }
+
+  // Log to server console with structured format for log aggregation
+  console.error('[CLIENT_ERROR]', JSON.stringify({
+    message: message.slice(0, 500),
+    stack: (stack || '').slice(0, 1000),
+    componentStack: (componentStack || '').slice(0, 500),
+    url: (url || '').slice(0, 200),
+    userAgent: (userAgent || '').slice(0, 200),
+    ip,
+    timestamp: timestamp || new Date().toISOString(),
+  }))
+
+  res.status(204).end()
+})
+
+// Periodic cleanup for error rate limiter
+setInterval(() => {
+  const now = Date.now()
+  for (const [k, v] of errorRateMap) {
+    if (now > v.resetAt) errorRateMap.delete(k)
+  }
+}, 120_000).unref()
+
 function getCacheStats(cache) {
   if (!cache || typeof cache.getStats !== 'function') {
     // Cache service may not expose stats — return basic info

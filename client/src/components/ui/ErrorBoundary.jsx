@@ -15,6 +15,26 @@ export default class ErrorBoundary extends Component {
     this.setState({ errorInfo })
     // Log to console for debugging
     console.error('[ErrorBoundary]', error, errorInfo)
+
+    // Report to server for production monitoring (fire-and-forget).
+    // Like Google's Error Reporting — knowing what breaks in production is critical.
+    try {
+      const payload = {
+        message: error?.message || String(error),
+        stack: error?.stack || '',
+        componentStack: errorInfo?.componentStack || '',
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString(),
+      }
+      fetch('/api/health/client-error', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => {}) // swallow network errors — don't throw in error handler
+    } catch {
+      // Swallow — reporting failure shouldn't cause more errors
+    }
   }
 
   render() {

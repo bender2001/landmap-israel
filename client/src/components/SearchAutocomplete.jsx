@@ -15,8 +15,9 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
   const inputRef = useRef(null)
   const listRef = useRef(null)
 
-  // Filter plots based on search query
-  const suggestions = (() => {
+  // Filter plots based on search query — memoized to avoid recomputing on every render.
+  // Without useMemo this IIFE ran on every keystroke AND on unrelated state changes (focus, highlight).
+  const suggestions = useMemo(() => {
     if (!value || value.length < 1) return []
     const q = value.toLowerCase()
     return plots
@@ -28,7 +29,7 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
         return bn.includes(q) || num.includes(q) || city.includes(q) || desc.includes(q)
       })
       .slice(0, 6) // max 6 suggestions
-  })()
+  }, [value, plots])
 
   const showDropdown = isFocused && (value?.length >= 1 || true) // show on focus even without query
   const hasQuery = value && value.length >= 1

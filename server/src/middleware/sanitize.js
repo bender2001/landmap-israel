@@ -7,7 +7,19 @@
 const ALLOWED_CITIES = new Set(['all', 'חדרה', 'נתניה', 'קיסריה'])
 const ALLOWED_STATUSES = new Set(['AVAILABLE', 'RESERVED', 'SOLD', 'IN_PROGRESS', 'PENDING'])
 const ALLOWED_RIPENESS = new Set(['all', '1-3', '3-5', '5+'])
-const ALLOWED_SORTS = new Set(['default', 'price-asc', 'price-desc', 'size-asc', 'size-desc'])
+const ALLOWED_SORTS = new Set([
+  'default',
+  'price-asc', 'price-desc',
+  'size-asc', 'size-desc',
+  'roi-desc', 'roi-asc',
+  'ppsqm-asc', 'ppsqm-desc',
+  'score-desc',
+  'cagr-desc',
+  'updated-desc',
+  'newest-first',
+  'monthly-asc',
+  'distance-asc',
+])
 const MAX_SEARCH_LENGTH = 100
 
 /**

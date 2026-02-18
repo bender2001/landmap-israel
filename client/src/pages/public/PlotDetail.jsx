@@ -24,6 +24,7 @@ import DueDiligenceChecklist from '../../components/ui/DueDiligenceChecklist.jsx
 import MobilePlotActionBar from '../../components/ui/MobilePlotActionBar.jsx'
 import QuickInquiryTemplates from '../../components/ui/QuickInquiryTemplates.jsx'
 import ZoningProgressBar from '../../components/ui/ZoningProgressBar.jsx'
+import BackToTopButton from '../../components/ui/BackToTopButton.jsx'
 
 function JsonLdSchema({ plot }) {
   const blockNum = plot.block_number ?? plot.blockNumber
@@ -1725,6 +1726,8 @@ export default function PlotDetail() {
           onClose={() => setLightboxOpen(false)}
         />
       )}
+
+      <BackToTopButton />
     </div>
   )
 }
