@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
+import { useRef, useEffect, useState, useCallback, useMemo, memo } from 'react'
 import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows, Share2 } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
 import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor } from '../utils/formatters'
@@ -41,6 +41,162 @@ function PlotCardSkeleton() {
     </div>
   )
 }
+
+const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, prefetchPlot }) {
+  const color = statusColors[plot.status]
+  const price = plot.total_price ?? plot.totalPrice
+  const projValue = plot.projected_value ?? plot.projectedValue
+  const roi = price ? Math.round((projValue - price) / price * 100) : 0
+  const blockNum = plot.block_number ?? plot.blockNumber
+  const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
+  const readiness = plot.readiness_estimate ?? plot.readinessEstimate
+  const pricePerDunam = sizeSqM > 0 ? formatPriceShort(Math.round(price / sizeSqM * 1000)) : null
+
+  return (
+    <div
+      data-plot-id={plot.id}
+      onClick={() => onSelectPlot(plot)}
+      onMouseEnter={() => prefetchPlot(plot.id)}
+      className={`plot-card-mini ${isSelected ? 'plot-card-mini-selected' : ''} ${isCompared ? 'plot-card-mini-compared' : ''}`}
+      style={{ '--card-color': color }}
+    >
+      {/* Thumbnail image */}
+      {(() => {
+        const images = plot.plot_images
+        const thumbUrl = images && images.length > 0 ? images[0].url : null
+        if (!thumbUrl) return (
+          <div className="plot-card-mini-accent" style={{ background: isCompared ? '#8B5CF6' : color }} />
+        )
+        return (
+          <div className="plot-card-mini-thumb">
+            <img
+              src={thumbUrl}
+              alt={images[0].alt || `גוש ${blockNum}`}
+              className="plot-card-mini-thumb-img"
+              loading="lazy"
+            />
+            <div className="plot-card-mini-thumb-overlay" />
+            <div className="plot-card-mini-accent" style={{ background: isCompared ? '#8B5CF6' : color, position: 'absolute', bottom: 0, left: 0, right: 0 }} />
+          </div>
+        )
+      })()}
+
+      {/* Quick share (WhatsApp) */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          const url = `${window.location.origin}/plot/${plot.id}`
+          const text = `גוש ${blockNum} חלקה ${plot.number} | ${plot.city}\n${formatPriceShort(price)} · +${roi}% ROI\n${url}`
+          window.open(whatsappShareLink(text), '_blank')
+        }}
+        className="plot-card-share-btn"
+        title="שתף ב-WhatsApp"
+      >
+        <Share2 className="w-3 h-3" />
+      </button>
+
+      {/* Compare toggle */}
+      {onToggleCompare && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleCompare(plot.id) }}
+          className={`plot-card-compare-btn ${isCompared ? 'is-active' : ''}`}
+          title={isCompared ? 'הסר מהשוואה' : 'הוסף להשוואה'}
+        >
+          <GitCompareArrows className="w-3 h-3" />
+        </button>
+      )}
+
+      <div className="plot-card-mini-body">
+        <div className="plot-card-mini-header">
+          <span className="plot-card-mini-title">
+            {wasViewed && !isSelected && <span className="plot-card-viewed-dot" title="נצפה לאחרונה" />}
+            גוש {blockNum} | חלקה {plot.number}
+          </span>
+          <span className="plot-card-mini-status" style={{ background: `${color}20`, color }}>
+            {statusLabels[plot.status]}
+          </span>
+        </div>
+
+        <div className="plot-card-mini-city">
+          <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
+          <span>{plot.city}</span>
+          {(() => {
+            const score = calcInvestmentScore(plot)
+            const { color } = getScoreLabel(score)
+            return (
+              <span
+                className="plot-card-mini-score"
+                style={{ color, background: `${color}15`, borderColor: `${color}30` }}
+                title={`ציון השקעה: ${score}/10`}
+              >
+                {score}/10
+              </span>
+            )
+          })()}
+          {(() => {
+            const updatedAt = plot.updated_at ?? plot.updatedAt
+            const freshness = formatRelativeTime(updatedAt)
+            if (!freshness) return null
+            const colorClass = getFreshnessColor(updatedAt)
+            return (
+              <span className={`text-[8px] ${colorClass} mr-auto opacity-70`} title={`עודכן ${freshness}`}>
+                {freshness}
+              </span>
+            )
+          })()}
+        </div>
+
+        <div className="plot-card-mini-roi-bar">
+          <div
+            className="plot-card-mini-roi-bar-fill"
+            style={{
+              width: `${Math.min(100, Math.max(8, (price / (projValue || 1)) * 100))}%`,
+              background: 'linear-gradient(90deg, #3B82F6, #60A5FA)',
+            }}
+          />
+          <div
+            className="plot-card-mini-roi-bar-proj"
+            style={{
+              width: '100%',
+              background: 'linear-gradient(90deg, rgba(34,197,94,0.15), rgba(34,197,94,0.08))',
+            }}
+          />
+          <span className="plot-card-mini-roi-bar-label">{formatPriceShort(price)}</span>
+          <span className="plot-card-mini-roi-bar-target">→ {formatPriceShort(projValue)}</span>
+        </div>
+
+        {/* Deal badge */}
+        {(() => {
+          if (!areaAvgPsm || sizeSqM <= 0) return null
+          const plotPsm = price / sizeSqM
+          const diffPct = Math.round(((plotPsm - areaAvgPsm) / areaAvgPsm) * 100)
+          if (diffPct >= -3) return null
+          return (
+            <div className="plot-card-mini-deal">
+              🔥 {Math.abs(diffPct)}% מתחת לממוצע
+            </div>
+          )
+        })()}
+
+        <div className="plot-card-mini-footer">
+          <div className="flex flex-col">
+            <span className="plot-card-mini-price">{formatPriceShort(price)}</span>
+            {pricePerDunam && <span className="text-[9px] text-slate-500">{pricePerDunam}/דונם</span>}
+          </div>
+          <div className="plot-card-mini-tags">
+            <span className="plot-card-mini-roi">+{roi}%</span>
+            {readiness && (
+              <span className="plot-card-mini-time">
+                <Clock className="w-2.5 h-2.5" />
+                {readiness}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+})
 
 export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare, isLoading = false }) {
   const prefetchPlot = usePrefetchPlot()
@@ -190,177 +346,19 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
         ref={scrollRef}
         className="plot-strip-scroll"
       >
-        {plots.map((plot) => {
-          const color = statusColors[plot.status]
-          const price = plot.total_price ?? plot.totalPrice
-          const projValue = plot.projected_value ?? plot.projectedValue
-          const roi = price ? Math.round((projValue - price) / price * 100) : 0
-          const blockNum = plot.block_number ?? plot.blockNumber
-          const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
-          const readiness = plot.readiness_estimate ?? plot.readinessEstimate
-          const pricePerDunam = sizeSqM > 0 ? formatPriceShort(Math.round(price / sizeSqM * 1000)) : null
-          const isSelected = selectedPlot?.id === plot.id
-
-          const wasViewed = recentlyViewed.has(plot.id)
-          const isCompared = compareIds.includes(plot.id)
-
-          return (
-            <div
-              key={plot.id}
-              data-plot-id={plot.id}
-              onClick={() => onSelectPlot(plot)}
-              onMouseEnter={() => prefetchPlot(plot.id)}
-              className={`plot-card-mini ${isSelected ? 'plot-card-mini-selected' : ''} ${isCompared ? 'plot-card-mini-compared' : ''}`}
-              style={{ '--card-color': color }}
-            >
-              {/* Thumbnail image */}
-              {(() => {
-                const images = plot.plot_images
-                const thumbUrl = images && images.length > 0 ? images[0].url : null
-                if (!thumbUrl) return (
-                  <>
-                    <div className="plot-card-mini-accent" style={{ background: isCompared ? '#8B5CF6' : color }} />
-                  </>
-                )
-                return (
-                  <div className="plot-card-mini-thumb">
-                    <img
-                      src={thumbUrl}
-                      alt={images[0].alt || `גוש ${blockNum}`}
-                      className="plot-card-mini-thumb-img"
-                      loading="lazy"
-                    />
-                    <div className="plot-card-mini-thumb-overlay" />
-                    <div className="plot-card-mini-accent" style={{ background: isCompared ? '#8B5CF6' : color, position: 'absolute', bottom: 0, left: 0, right: 0 }} />
-                  </div>
-                )
-              })()}
-              {/* Top color line (no-image fallback handled above) */}
-
-              {/* Quick share (WhatsApp) */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  const url = `${window.location.origin}/plot/${plot.id}`
-                  const text = `גוש ${blockNum} חלקה ${plot.number} | ${plot.city}\n${formatPriceShort(price)} · +${roi}% ROI\n${url}`
-                  window.open(whatsappShareLink(text), '_blank')
-                }}
-                className="plot-card-share-btn"
-                title="שתף ב-WhatsApp"
-              >
-                <Share2 className="w-3 h-3" />
-              </button>
-
-              {/* Compare toggle */}
-              {onToggleCompare && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onToggleCompare(plot.id) }}
-                  className={`plot-card-compare-btn ${isCompared ? 'is-active' : ''}`}
-                  title={isCompared ? 'הסר מהשוואה' : 'הוסף להשוואה'}
-                >
-                  <GitCompareArrows className="w-3 h-3" />
-                </button>
-              )}
-
-              <div className="plot-card-mini-body">
-                {/* Title row */}
-                <div className="plot-card-mini-header">
-                  <span className="plot-card-mini-title">
-                    {wasViewed && !isSelected && <span className="plot-card-viewed-dot" title="נצפה לאחרונה" />}
-                    גוש {blockNum} | חלקה {plot.number}
-                  </span>
-                  <span
-                    className="plot-card-mini-status"
-                    style={{ background: `${color}20`, color }}
-                  >
-                    {statusLabels[plot.status]}
-                  </span>
-                </div>
-
-                {/* City + Score + Freshness */}
-                <div className="plot-card-mini-city">
-                  <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
-                  <span>{plot.city}</span>
-                  {(() => {
-                    const score = calcInvestmentScore(plot)
-                    const { label, color } = getScoreLabel(score)
-                    return (
-                      <span
-                        className="plot-card-mini-score"
-                        style={{ color, background: `${color}15`, borderColor: `${color}30` }}
-                        title={`ציון השקעה: ${score}/10`}
-                      >
-                        {score}/10
-                      </span>
-                    )
-                  })()}
-                  {(() => {
-                    const updatedAt = plot.updated_at ?? plot.updatedAt
-                    const freshness = formatRelativeTime(updatedAt)
-                    if (!freshness) return null
-                    const colorClass = getFreshnessColor(updatedAt)
-                    return (
-                      <span className={`text-[8px] ${colorClass} mr-auto opacity-70`} title={`עודכן ${freshness}`}>
-                        {freshness}
-                      </span>
-                    )
-                  })()}
-                </div>
-
-                {/* ROI visual bar */}
-                <div className="plot-card-mini-roi-bar">
-                  <div
-                    className="plot-card-mini-roi-bar-fill"
-                    style={{
-                      width: `${Math.min(100, Math.max(8, (price / (projValue || 1)) * 100))}%`,
-                      background: 'linear-gradient(90deg, #3B82F6, #60A5FA)',
-                    }}
-                  />
-                  <div
-                    className="plot-card-mini-roi-bar-proj"
-                    style={{
-                      width: '100%',
-                      background: 'linear-gradient(90deg, rgba(34,197,94,0.15), rgba(34,197,94,0.08))',
-                    }}
-                  />
-                  <span className="plot-card-mini-roi-bar-label">{formatPriceShort(price)}</span>
-                  <span className="plot-card-mini-roi-bar-target">→ {formatPriceShort(projValue)}</span>
-                </div>
-
-                {/* Deal badge — shows when plot is below area average */}
-                {(() => {
-                  const avgPsm = areaAverages[plot.city]
-                  if (!avgPsm || sizeSqM <= 0) return null
-                  const plotPsm = price / sizeSqM
-                  const diffPct = Math.round(((plotPsm - avgPsm) / avgPsm) * 100)
-                  if (diffPct >= -3) return null // only show if meaningfully below
-                  return (
-                    <div className="plot-card-mini-deal">
-                      🔥 {Math.abs(diffPct)}% מתחת לממוצע
-                    </div>
-                  )
-                })()}
-
-                {/* Price + ROI row */}
-                <div className="plot-card-mini-footer">
-                  <div className="flex flex-col">
-                    <span className="plot-card-mini-price">{formatPriceShort(price)}</span>
-                    {pricePerDunam && <span className="text-[9px] text-slate-500">{pricePerDunam}/דונם</span>}
-                  </div>
-                  <div className="plot-card-mini-tags">
-                    <span className="plot-card-mini-roi">+{roi}%</span>
-                    {readiness && (
-                      <span className="plot-card-mini-time">
-                        <Clock className="w-2.5 h-2.5" />
-                        {readiness}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        })}
+        {plots.map((plot) => (
+          <PlotCardItem
+            key={plot.id}
+            plot={plot}
+            isSelected={selectedPlot?.id === plot.id}
+            isCompared={compareIds.includes(plot.id)}
+            wasViewed={recentlyViewed.has(plot.id)}
+            areaAvgPsm={areaAverages[plot.city]}
+            onSelectPlot={onSelectPlot}
+            onToggleCompare={onToggleCompare}
+            prefetchPlot={prefetchPlot}
+          />
+        ))}
       </div>
     </div>
   )

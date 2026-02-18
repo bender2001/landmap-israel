@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+﻿import { useState, useMemo, useCallback, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAllPlots } from '../../hooks/usePlots.js'
 import { usePois } from '../../hooks/usePois.js'
@@ -6,7 +6,8 @@ import { useFavorites } from '../../hooks/useFavorites.js'
 import { useDebounce } from '../../hooks/useDebounce.js'
 import MapArea from '../../components/MapArea.jsx'
 import FilterBar from '../../components/FilterBar.jsx'
-import SidebarDetails from '../../components/SidebarDetails.jsx'
+import { lazy } from 'react'
+const SidebarDetails = lazy(() => import('../../components/SidebarDetails.jsx'))
 import PlotCardStrip from '../../components/PlotCardStrip.jsx'
 import AIChat from '../../components/AIChat.jsx'
 import LeadModal from '../../components/LeadModal.jsx'
@@ -367,16 +368,20 @@ export default function MapView() {
         onRemoveSearch={removeSearch}
       />
 
-      <SidebarDetails
-        plot={selectedPlot}
-        onClose={handleCloseSidebar}
-        onOpenLeadModal={() => setIsLeadModalOpen(true)}
-        favorites={favorites}
-        compareIds={compareIds}
-        onToggleCompare={toggleCompare}
-        allPlots={filteredPlots}
-        onSelectPlot={handleSelectPlot}
-      />
+      {selectedPlot && (
+        <Suspense fallback={null}>
+          <SidebarDetails
+            plot={selectedPlot}
+            onClose={handleCloseSidebar}
+            onOpenLeadModal={() => setIsLeadModalOpen(true)}
+            favorites={favorites}
+            compareIds={compareIds}
+            onToggleCompare={toggleCompare}
+            allPlots={filteredPlots}
+            onSelectPlot={handleSelectPlot}
+          />
+        </Suspense>
+      )}
 
       <RecentlyViewed
         plots={filteredPlots}
