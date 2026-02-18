@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Heart, Map, MapPin, TrendingUp, Trash2, Clock, GitCompareArrows, Share2, Printer, Copy, Check, Download } from 'lucide-react'
+import { Heart, Map, MapPin, TrendingUp, Trash2, Clock, GitCompareArrows, Share2, Printer, Copy, Check, Download, ArrowUpDown, ArrowDown, ArrowUp, FileSpreadsheet } from 'lucide-react'
 import { useAllPlots } from '../../hooks/usePlots'
 import { useFavorites } from '../../hooks/useFavorites'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
@@ -8,6 +8,15 @@ import { formatCurrency, formatPriceShort, calcInvestmentScore, getScoreLabel } 
 import { useMetaTags } from '../../hooks/useMetaTags'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
+
+const sortOptions = [
+  { value: 'added', label: 'סדר הוספה', icon: ArrowUpDown },
+  { value: 'price-asc', label: 'מחיר ↑', icon: ArrowUp },
+  { value: 'price-desc', label: 'מחיר ↓', icon: ArrowDown },
+  { value: 'roi-desc', label: 'תשואה ↓', icon: ArrowDown },
+  { value: 'size-desc', label: 'שטח ↓', icon: ArrowDown },
+  { value: 'score-desc', label: 'ציון ↓', icon: ArrowDown },
+]
 import Spinner from '../../components/ui/Spinner'
 
 export default function Favorites() {
@@ -20,8 +29,30 @@ export default function Favorites() {
   const { data: allPlots = [], isLoading } = useAllPlots()
   const navigate = useNavigate()
   const [linkCopied, setLinkCopied] = useState(false)
+  const [sortBy, setSortBy] = useState('added')
 
-  const favoritePlots = allPlots.filter((p) => favorites.includes(p.id))
+  const favoritePlotsUnsorted = allPlots.filter((p) => favorites.includes(p.id))
+
+  // Sort favorites — like Madlan's sortable saved properties
+  const favoritePlots = useMemo(() => {
+    if (sortBy === 'added') return favoritePlotsUnsorted
+    const sorted = [...favoritePlotsUnsorted]
+    const getPrice = (p) => p.total_price ?? p.totalPrice ?? 0
+    const getSize = (p) => p.size_sqm ?? p.sizeSqM ?? 0
+    const getRoi = (p) => {
+      const price = getPrice(p)
+      const proj = p.projected_value ?? p.projectedValue ?? 0
+      return price > 0 ? ((proj - price) / price) * 100 : 0
+    }
+    switch (sortBy) {
+      case 'price-asc': sorted.sort((a, b) => getPrice(a) - getPrice(b)); break
+      case 'price-desc': sorted.sort((a, b) => getPrice(b) - getPrice(a)); break
+      case 'roi-desc': sorted.sort((a, b) => getRoi(b) - getRoi(a)); break
+      case 'size-desc': sorted.sort((a, b) => getSize(b) - getSize(a)); break
+      case 'score-desc': sorted.sort((a, b) => calcInvestmentScore(b) - calcInvestmentScore(a)); break
+    }
+    return sorted
+  }, [favoritePlotsUnsorted, sortBy])
 
   // Navigate to compare page with first 3 favorites
   const handleCompare = useCallback(() => {
@@ -85,6 +116,41 @@ export default function Favorites() {
     setTimeout(() => pw.print(), 300)
   }, [favoritePlots])
 
+  // CSV Export — download favorites as spreadsheet for investor analysis (like Madlan's data export)
+  const handleExportCsv = useCallback(() => {
+    const BOM = '\uFEFF' // UTF-8 BOM for Hebrew in Excel
+    const headers = ['גוש', 'חלקה', 'עיר', 'מחיר (₪)', 'שווי צפוי (₪)', 'תשואה (%)', 'שטח (מ"ר)', 'מחיר/מ"ר (₪)', 'ציון השקעה', 'סטטוס', 'ייעוד', 'מוכנות']
+    const rows = favoritePlots.map(p => {
+      const price = p.total_price ?? p.totalPrice ?? 0
+      const proj = p.projected_value ?? p.projectedValue ?? 0
+      const size = p.size_sqm ?? p.sizeSqM ?? 0
+      const roi = price > 0 ? Math.round(((proj - price) / price) * 100) : 0
+      const ppsqm = size > 0 ? Math.round(price / size) : 0
+      return [
+        p.block_number ?? p.blockNumber,
+        p.number,
+        p.city,
+        price,
+        proj,
+        roi,
+        size,
+        ppsqm,
+        calcInvestmentScore(p),
+        statusLabels[p.status] || p.status,
+        zoningLabels[p.zoning_stage ?? p.zoningStage] || '',
+        p.readiness_estimate ?? p.readinessEstimate ?? '',
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+    })
+    const csv = BOM + headers.join(',') + '\n' + rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `landmap-favorites-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [favoritePlots])
+
   return (
     <div className="min-h-screen bg-navy" dir="rtl">
       <PublicNav />
@@ -133,6 +199,26 @@ export default function Favorites() {
                 <Printer className="w-4 h-4" />
                 הדפס
               </button>
+              <button
+                onClick={handleExportCsv}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white/[0.05] border border-white/10 rounded-xl text-sm text-slate-300 hover:border-gold/30 hover:text-gold transition-all"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                CSV
+              </button>
+              {/* Sort selector */}
+              <div className="relative mr-2">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="appearance-none bg-white/[0.05] border border-white/10 rounded-xl text-sm text-slate-300 pl-8 pr-3 py-2.5 hover:border-gold/30 transition-all cursor-pointer focus:outline-none focus:border-gold/40"
+                >
+                  {sortOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <ArrowUpDown className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
+              </div>
               {/* Quick stats summary */}
               <div className="mr-auto flex items-center gap-3 text-[11px] text-slate-500">
                 <span>💰 סה״כ {formatPriceShort(favoritePlots.reduce((s, p) => s + (p.total_price ?? p.totalPrice ?? 0), 0))}</span>
