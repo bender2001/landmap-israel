@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { supabaseAdmin } from '../config/supabase.js'
 import { takeDailySnapshot, getPlotPriceHistory, getCityPriceHistory } from '../services/priceHistoryService.js'
+import { marketCache } from '../services/cacheService.js'
 
 const router = Router()
 

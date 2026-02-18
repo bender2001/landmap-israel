@@ -6,6 +6,7 @@ import { createPlotSchema, updatePlotSchema } from '../../schemas/plot.js'
 import { getAllPlots, getPlotByIdAdmin, createPlot, updatePlot, deletePlot } from '../../services/plotService.js'
 import { supabaseAdmin } from '../../config/supabase.js'
 import { logActivity } from '../../services/activityLogger.js'
+import { invalidatePlotCaches } from '../../services/cacheService.js'
 
 const router = Router()
 router.use(auth, adminOnly)
@@ -30,6 +31,7 @@ router.post('/bulk-delete', async (req, res, next) => {
 
     if (error) throw error
 
+    invalidatePlotCaches()
     logActivity({
       action: 'delete',
       entityType: 'plot',
@@ -60,6 +62,7 @@ router.post('/bulk-publish', async (req, res, next) => {
 
     if (error) throw error
 
+    invalidatePlotCaches()
     logActivity({
       action: is_published ? 'publish' : 'unpublish',
       entityType: 'plot',
@@ -125,6 +128,7 @@ router.get('/:id', async (req, res, next) => {
 router.post('/', validate(createPlotSchema), async (req, res, next) => {
   try {
     const plot = await createPlot(req.validated)
+    invalidatePlotCaches()
     logActivity({
       action: 'create',
       entityType: 'plot',
@@ -142,6 +146,7 @@ router.post('/', validate(createPlotSchema), async (req, res, next) => {
 router.patch('/:id', validate(updatePlotSchema), async (req, res, next) => {
   try {
     const plot = await updatePlot(req.params.id, req.validated)
+    invalidatePlotCaches()
     logActivity({
       action: 'update',
       entityType: 'plot',
@@ -159,6 +164,7 @@ router.patch('/:id', validate(updatePlotSchema), async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     await deletePlot(req.params.id)
+    invalidatePlotCaches()
     logActivity({
       action: 'delete',
       entityType: 'plot',
@@ -176,6 +182,7 @@ router.delete('/:id', async (req, res, next) => {
 router.patch('/:id/publish', async (req, res, next) => {
   try {
     const plot = await updatePlot(req.params.id, { is_published: req.body.is_published })
+    invalidatePlotCaches()
     logActivity({
       action: req.body.is_published ? 'publish' : 'unpublish',
       entityType: 'plot',

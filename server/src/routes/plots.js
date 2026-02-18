@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { getPublishedPlots, getPlotById, getPlotStats } from '../services/plotService.js'
 import { sanitizePlotQuery, sanitizePlotId } from '../middleware/sanitize.js'
 import { analytics } from '../services/analyticsService.js'
+import { plotCache, statsCache } from '../services/cacheService.js'
 
 const router = Router()
 
@@ -33,7 +34,8 @@ router.get('/', sanitizePlotQuery, async (req, res, next) => {
   try {
     // Cache list for 30s — data doesn't change often
     res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60')
-    const plots = await getPublishedPlots(req.query)
+    const cacheKey = `plots:${JSON.stringify(req.query)}`
+    const plots = await plotCache.wrap(cacheKey, () => getPublishedPlots(req.query), 30_000)
 
     // ETag support — avoid re-sending unchanged data
     const etag = generateETag(plots)
@@ -64,7 +66,7 @@ router.get('/', sanitizePlotQuery, async (req, res, next) => {
 router.get('/stats', async (req, res, next) => {
   try {
     res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300')
-    const stats = await getPlotStats()
+    const stats = await statsCache.wrap('plot-stats', () => getPlotStats(), 120_000)
     res.json(stats)
   } catch (err) {
     next(err)

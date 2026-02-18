@@ -111,6 +111,27 @@ app.use('/api/admin/activity', adminActivityRoutes)
 app.use('/api/admin/settings', adminSettingsRoutes)
 app.use('/api/admin/analytics', adminAnalyticsRoutes)
 
+// Cache stats endpoint for monitoring
+app.get('/api/cache-stats', (req, res) => {
+  try {
+    const { plotCache, statsCache, marketCache } = require('./services/cacheService.js')
+    res.json({
+      plots: plotCache.getStats(),
+      stats: statsCache.getStats(),
+      market: marketCache.getStats(),
+    })
+  } catch {
+    // Dynamic import for ESM
+    import('./services/cacheService.js').then(mod => {
+      res.json({
+        plots: mod.plotCache.getStats(),
+        stats: mod.statsCache.getStats(),
+        market: mod.marketCache.getStats(),
+      })
+    }).catch(() => res.json({ error: 'cache not available' }))
+  }
+})
+
 // Health check with DB connectivity, uptime, and memory stats
 app.get('/api/health', async (req, res) => {
   const mem = process.memoryUsage()

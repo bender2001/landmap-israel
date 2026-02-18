@@ -28,6 +28,7 @@ import { Phone } from 'lucide-react'
 import FirstVisitHints from '../../components/FirstVisitHints.jsx'
 import MarketTicker from '../../components/MarketTicker.jsx'
 import AlertSubscription from '../../components/AlertSubscription.jsx'
+import DealSpotlight from '../../components/DealSpotlight.jsx'
 
 function DataFreshnessIndicator({ updatedAt, onRefresh }) {
   const [, setTick] = useState(0)
@@ -444,6 +445,7 @@ export default function MapView() {
       <AlertSubscription filters={filters} statusFilter={statusFilter} />
       <MarketStatsWidget plots={filteredPlots} />
       <DealAlerts plots={filteredPlots} onSelectPlot={handleSelectPlot} />
+      <DealSpotlight plots={filteredPlots} onSelectPlot={handleSelectPlot} />
       <MapArea
         plots={filteredPlots}
         pois={pois}
