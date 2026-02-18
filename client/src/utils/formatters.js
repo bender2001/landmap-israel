@@ -932,3 +932,41 @@ export function haversineKm(lat1, lng1, lat2, lng2) {
     Math.sin(dLng / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
+
+/**
+ * Estimate driving time to major Israeli cities from a given coordinate.
+ * Uses haversine straight-line distance with a road-factor multiplier
+ * (Israeli roads add ~30-40% distance vs straight line due to terrain & route).
+ * Average speed: 60 km/h (accounts for urban/highway mix + traffic).
+ *
+ * Returns an array of { city, emoji, distanceKm, drivingMinutes, googleMapsUrl }
+ * sorted by distance ascending.
+ */
+const MAJOR_CITIES = [
+  { name: 'תל אביב', emoji: '🏙️', lat: 32.0853, lng: 34.7818 },
+  { name: 'ירושלים', emoji: '🕌', lat: 31.7683, lng: 35.2137 },
+  { name: 'חיפה', emoji: '⚓', lat: 32.7940, lng: 34.9896 },
+  { name: 'באר שבע', emoji: '🏜️', lat: 31.2530, lng: 34.7915 },
+  { name: 'נתב״ג', emoji: '✈️', lat: 32.0055, lng: 34.8854 },
+  { name: 'הרצליה', emoji: '🏢', lat: 32.1629, lng: 34.7913 },
+]
+
+export function calcCommuteTimes(lat, lng) {
+  if (!isFinite(lat) || !isFinite(lng)) return []
+  const ROAD_FACTOR = 1.35 // roads are ~35% longer than straight line in Israel
+  const AVG_SPEED_KMH = 60
+
+  return MAJOR_CITIES.map(city => {
+    const straightKm = haversineKm(lat, lng, city.lat, city.lng)
+    const roadKm = Math.round(straightKm * ROAD_FACTOR)
+    const minutes = Math.round((roadKm / AVG_SPEED_KMH) * 60)
+    const googleMapsUrl = `https://www.google.com/maps/dir/${lat},${lng}/${city.lat},${city.lng}`
+    return {
+      city: city.name,
+      emoji: city.emoji,
+      distanceKm: roadKm,
+      drivingMinutes: minutes,
+      googleMapsUrl,
+    }
+  }).sort((a, b) => a.distanceKm - b.distanceKm)
+}

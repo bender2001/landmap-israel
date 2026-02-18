@@ -7,7 +7,7 @@ import PriceTrendChart from './ui/PriceTrendChart'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import ProfitWaterfall from './ui/ProfitWaterfall'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
-import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict, calcRiskLevel, generatePlotSummary, calcDemandVelocity, calcBuildableValue, calcInvestmentTimeline, plotCenter, calcPlotPerimeter, calcAlternativeReturns } from '../utils/formatters'
+import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict, calcRiskLevel, generatePlotSummary, calcDemandVelocity, calcBuildableValue, calcInvestmentTimeline, plotCenter, calcPlotPerimeter, calcAlternativeReturns, calcCommuteTimes } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
 import NeighborhoodRadar from './ui/NeighborhoodRadar'
 import InvestmentBenchmark from './ui/InvestmentBenchmark'
@@ -354,6 +354,76 @@ function SimilarPlots({ currentPlot, allPlots, onSelectPlot }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * CommuteTimesSection — shows estimated driving times to major Israeli cities.
+ * Key feature on Madlan: investors assess a plot's connectivity value by
+ * commute time to employment hubs (Tel Aviv, Jerusalem, Haifa).
+ * Uses haversine-based estimates with road factor correction.
+ */
+function CommuteTimesSection({ coordinates }) {
+  const commutes = useMemo(() => {
+    const center = plotCenter(coordinates)
+    if (!center) return []
+    return calcCommuteTimes(center.lat, center.lng)
+  }, [coordinates])
+
+  if (commutes.length === 0) return null
+
+  const getTimeColor = (min) => {
+    if (min <= 30) return '#22C55E'  // green — very close
+    if (min <= 60) return '#EAB308'  // yellow — reasonable
+    if (min <= 90) return '#F97316'  // orange — far
+    return '#EF4444'                  // red — very far
+  }
+
+  const formatTime = (min) => {
+    if (min < 60) return `${min} דק׳`
+    const h = Math.floor(min / 60)
+    const m = min % 60
+    return m > 0 ? `${h} שע׳ ${m} דק׳` : `${h} שע׳`
+  }
+
+  return (
+    <div className="bg-navy-light/40 border border-white/5 rounded-xl p-3 mt-3 mb-3">
+      <div className="flex items-center gap-2 mb-3">
+        <Navigation className="w-3.5 h-3.5 text-gold" />
+        <span className="text-xs font-medium text-slate-200">זמני נסיעה משוערים</span>
+        <span className="text-[9px] text-slate-600 mr-auto">🚗 ממוצע</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {commutes.slice(0, 6).map((c) => (
+          <a
+            key={c.city}
+            href={c.googleMapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-2.5 py-2 bg-white/[0.02] border border-white/5 rounded-lg hover:border-gold/20 hover:bg-white/[0.04] transition-all group"
+            title={`~${c.distanceKm} ק״מ — לחץ לניווט ב-Google Maps`}
+          >
+            <span className="text-sm flex-shrink-0">{c.emoji}</span>
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-[10px] text-slate-400 truncate">{c.city}</span>
+              <div className="flex items-center gap-1">
+                <span
+                  className="text-xs font-bold"
+                  style={{ color: getTimeColor(c.drivingMinutes) }}
+                >
+                  {formatTime(c.drivingMinutes)}
+                </span>
+                <span className="text-[8px] text-slate-600">{c.distanceKm} ק״מ</span>
+              </div>
+            </div>
+            <ExternalLink className="w-2.5 h-2.5 text-slate-600 group-hover:text-gold transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100" />
+          </a>
+        ))}
+      </div>
+      <div className="mt-2 text-[8px] text-slate-600 text-center">
+        * הערכה בלבד — זמני נסיעה משתנים לפי תנועה ומסלול
+      </div>
     </div>
   )
 }
@@ -825,6 +895,20 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
         <div class="row"><span class="label">רווח נקי (אחרי כל המיסים)</span><span class="val" style="color:#22C55E">${formatCurrency(net)}</span></div>`
         })()}
       </div>
+      ${(() => {
+        const center = plotCenter(plot.coordinates)
+        if (!center) return ''
+        const commutes = calcCommuteTimes(center.lat, center.lng)
+        if (commutes.length === 0) return ''
+        const formatMin = (m) => m < 60 ? `${m} דק׳` : `${Math.floor(m / 60)} שע׳ ${m % 60 > 0 ? m % 60 + ' דק׳' : ''}`
+        return `<div class="section">
+          <h2>זמני נסיעה משוערים 🚗</h2>
+          <div class="grid3">
+            ${commutes.slice(0, 6).map(c => `<div class="card"><div class="label">${c.emoji} ${c.city}</div><div class="value">${formatMin(c.drivingMinutes)}</div><div style="font-size:10px;color:#999">${c.distanceKm} ק״מ</div></div>`).join('')}
+          </div>
+          <div style="font-size:10px;color:#aaa;text-align:center;margin-top:8px">* הערכה בלבד — זמני נסיעה משתנים לפי תנועה ומסלול</div>
+        </div>`
+      })()}
       <div class="footer">
         <div>LandMap Israel — מפת קרקעות להשקעה</div>
         <div>הופק ב-${new Date().toLocaleDateString('he-IL')} ${new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</div>
@@ -1290,6 +1374,42 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   <span className="text-[10px] font-medium" style={{ color: rankColor }}>
                     {rankLabel}
                   </span>
+                  {/* Area price trend — compare newer vs older listings to detect momentum */}
+                  {(() => {
+                    const withDates = cityPlots.filter(p => (p.created_at ?? p.createdAt) && (p.size_sqm ?? p.sizeSqM ?? 0) > 0)
+                    if (withDates.length < 4) return null
+                    const sorted = [...withDates].sort((a, b) => new Date(a.created_at ?? a.createdAt) - new Date(b.created_at ?? b.createdAt))
+                    const half = Math.floor(sorted.length / 2)
+                    const olderHalf = sorted.slice(0, half)
+                    const newerHalf = sorted.slice(half)
+                    const avgPsm = (arr) => {
+                      let sum = 0, cnt = 0
+                      for (const p of arr) {
+                        const pp = p.total_price ?? p.totalPrice ?? 0
+                        const ps = p.size_sqm ?? p.sizeSqM ?? 1
+                        if (pp > 0 && ps > 0) { sum += pp / ps; cnt++ }
+                      }
+                      return cnt > 0 ? sum / cnt : 0
+                    }
+                    const olderAvg = avgPsm(olderHalf)
+                    const newerAvg = avgPsm(newerHalf)
+                    if (olderAvg <= 0) return null
+                    const trendPct = Math.round(((newerAvg - olderAvg) / olderAvg) * 100)
+                    if (Math.abs(trendPct) < 2) return null
+                    const isUp = trendPct > 0
+                    return (
+                      <>
+                        <span className="text-[10px] text-slate-700">•</span>
+                        <span
+                          className="text-[10px] font-bold"
+                          style={{ color: isUp ? '#F59E0B' : '#22C55E' }}
+                          title={`מגמת מחירים: חלקות חדשות ${isUp ? 'יקרות' : 'זולות'} ב-${Math.abs(trendPct)}% מחלקות ישנות יותר`}
+                        >
+                          {isUp ? '↗' : '↘'} {isUp ? '+' : ''}{trendPct}%
+                        </span>
+                      </>
+                    )
+                  })()}
                   {/* Mini percentile bar */}
                   <div className="flex-1 max-w-[50px] mr-auto">
                     <div className="relative w-full h-1 rounded-full bg-white/5 overflow-hidden">
@@ -2441,6 +2561,11 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
             <div id="section-nearby-pois">
               <NearbyPoisSection plotId={plot.id} />
             </div>
+
+            {/* Commute Times — driving estimates to major cities (like Madlan's connectivity indicator) */}
+            {plot.coordinates && plot.coordinates.length >= 3 && (
+              <CommuteTimesSection coordinates={plot.coordinates} />
+            )}
 
             {/* Similar Plots */}
             <SimilarPlots currentPlot={plot} allPlots={allPlots} onSelectPlot={onSelectPlot} />
