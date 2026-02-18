@@ -733,7 +733,7 @@ export default function MapView() {
 
       {/* Floating contact CTA — desktop: full buttons, mobile: single expandable FAB */}
       {/* Desktop version */}
-      <div className="fixed bottom-[14rem] left-4 z-[30] hidden sm:flex flex-col gap-2 animate-bounce-in">
+      <div className="fixed bottom-[16rem] left-4 z-[30] hidden sm:flex flex-col gap-2 animate-bounce-in">
         <a
           href={selectedPlot
             ? whatsappLink(`שלום, אני מעוניין בפרטים על גוש ${selectedPlot.block_number ?? selectedPlot.blockNumber} חלקה ${selectedPlot.number} ב${selectedPlot.city}`)
@@ -771,7 +771,7 @@ export default function MapView() {
         </button>
       </div>
       {/* Mobile version — single WhatsApp FAB, compact */}
-      <div className="fixed bottom-[10rem] left-3 z-[30] sm:hidden">
+      <div className="fixed bottom-[12rem] left-3 z-[30] sm:hidden">
         <a
           href={selectedPlot
             ? whatsappLink(`שלום, אני מעוניין בפרטים על גוש ${selectedPlot.block_number ?? selectedPlot.blockNumber} חלקה ${selectedPlot.number} ב${selectedPlot.city}`)

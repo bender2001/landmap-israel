@@ -109,7 +109,7 @@ function MapLayerSwitcher({ activeLayer, onChangeLayer }) {
   }, [isOpen])
 
   return (
-    <div className="absolute top-4 right-4 z-[1000] pointer-events-none">
+    <div className="absolute top-3 sm:top-4 right-3 sm:right-4 z-[1000] pointer-events-none">
       <div className="pointer-events-auto relative" ref={ref}>
         <button
           onClick={() => setIsOpen(prev => !prev)}
@@ -243,7 +243,7 @@ function MapToolbar({ plots }) {
   const btnClass = "w-9 h-9 flex items-center justify-center hover:border-gold/20 transition-colors hover:bg-white/5"
 
   return (
-    <div className="absolute bottom-[11rem] sm:bottom-[13rem] left-3 z-[1000] pointer-events-none">
+    <div className="absolute bottom-[13rem] sm:bottom-[15rem] left-3 z-[1000] pointer-events-none">
       <div className="glass-panel pointer-events-auto flex flex-col divide-y divide-white/10 overflow-hidden">
         <button onClick={handleLocate} disabled={locating} className={`${btnClass} disabled:opacity-50`} title="המיקום שלי">
           <Navigation className={`w-4 h-4 text-gold ${locating ? 'animate-spin' : ''}`} />
@@ -317,7 +317,7 @@ function ColorModeToggle({ colorMode, onChangeColorMode }) {
   }, [isOpen])
 
   return (
-    <div className="absolute top-[60px] right-4 z-[1000] pointer-events-none">
+    <div className="absolute top-[52px] sm:top-[60px] right-3 sm:right-4 z-[1000] pointer-events-none">
       <div className="pointer-events-auto relative" ref={ref}>
         <button
           onClick={() => setIsOpen(prev => !prev)}
@@ -413,7 +413,7 @@ function GeoSearch() {
 
   if (!isOpen) {
     return (
-      <div className="absolute top-[116px] right-4 z-[1000] pointer-events-none">
+      <div className="absolute top-[100px] sm:top-[116px] right-3 sm:right-4 z-[1000] pointer-events-none">
         <button
           onClick={() => setIsOpen(true)}
           className="glass-panel w-9 h-9 flex items-center justify-center pointer-events-auto hover:border-gold/20 transition-colors"
@@ -428,7 +428,7 @@ function GeoSearch() {
   }
 
   return (
-    <div className="absolute top-[116px] right-4 z-[1000] pointer-events-none">
+    <div className="absolute top-[100px] sm:top-[116px] right-3 sm:right-4 z-[1000] pointer-events-none">
       <div className="pointer-events-auto glass-panel p-2 min-w-[220px]" dir="rtl">
         <div className="flex items-center gap-2 mb-1">
           <input
@@ -750,7 +750,7 @@ function MapViewportCounter({ plots, totalCount }) {
   const isPartial = visibleCount < totalCount
 
   return (
-    <div className="absolute bottom-24 sm:bottom-24 left-4 z-[1000] pointer-events-none flex">
+    <div className="absolute bottom-[11rem] sm:bottom-[12rem] left-4 z-[1000] pointer-events-none flex">
       <div className="glass-panel px-3 py-1.5 pointer-events-auto flex items-center gap-1.5">
         <Eye className="w-3.5 h-3.5 text-gold" />
         <span className="text-xs text-slate-300">
@@ -1008,8 +1008,8 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
           </div>
         </div>
       </div>
-      {/* Mobile brand badge — smaller, bottom-left above zoom */}
-      <div className="absolute top-14 left-3 z-[1000] pointer-events-none sm:hidden">
+      {/* Mobile brand badge — smaller, top-left below filter area */}
+      <div className="absolute top-[4.5rem] left-3 z-[1000] pointer-events-none sm:hidden">
         <div className="glass-panel px-2.5 py-1.5 pointer-events-auto">
           <div className="flex items-center gap-1.5">
             <span className="text-sm">🏗️</span>

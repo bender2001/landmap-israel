@@ -12,11 +12,12 @@ import PublicNav from '../../components/PublicNav.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import NeighborhoodRadar from '../../components/ui/NeighborhoodRadar.jsx'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../../utils/constants.js'
-import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcInvestmentVerdict } from '../../utils/formatters.js'
+import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcInvestmentVerdict, calcDaysOnMarket } from '../../utils/formatters.js'
 import PriceTrendChart from '../../components/ui/PriceTrendChart.jsx'
 import MiniMap from '../../components/ui/MiniMap.jsx'
 import { plotInquiryLink } from '../../utils/config.js'
 import InvestmentBenchmark from '../../components/ui/InvestmentBenchmark.jsx'
+import DueDiligenceChecklist from '../../components/ui/DueDiligenceChecklist.jsx'
 
 function JsonLdSchema({ plot }) {
   const blockNum = plot.block_number ?? plot.blockNumber
@@ -652,6 +653,20 @@ export default function PlotDetail() {
                     👁 {plot.views} צפיות
                   </span>
                 )}
+                {/* Days on Market — like Yad2's "ימים מאז פרסום" badge.
+                    Helps investors assess urgency: fresh listings = opportunity, stale = potential issues. */}
+                {(() => {
+                  const dom = calcDaysOnMarket(plot.created_at ?? plot.createdAt)
+                  if (!dom) return null
+                  return (
+                    <span
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border"
+                      style={{ color: dom.color, background: `${dom.color}10`, borderColor: `${dom.color}20` }}
+                    >
+                      📅 {dom.label}
+                    </span>
+                  )
+                })()}
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -995,6 +1010,11 @@ export default function PlotDetail() {
                   </div>
                 </div>
               )}
+
+              {/* Due Diligence Checklist — interactive pre-purchase verification steps.
+                  Like a flight pre-check but for land investment. No competitor has this.
+                  State persists per-plot in localStorage so users can track progress across sessions. */}
+              <DueDiligenceChecklist plotId={id} />
 
               {/* Proximity chips */}
               <div className="flex flex-wrap gap-3">

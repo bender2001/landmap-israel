@@ -2,6 +2,8 @@ import { Router } from 'express'
 import { supabaseAdmin } from '../config/supabase.js'
 import { takeDailySnapshot, getPlotPriceHistory, getCityPriceHistory } from '../services/priceHistoryService.js'
 import { marketCache } from '../services/cacheService.js'
+import { auth } from '../middleware/auth.js'
+import { adminOnly } from '../middleware/adminOnly.js'
 
 const router = Router()
 
@@ -265,8 +267,9 @@ router.get('/new-listings', async (req, res, next) => {
  * POST /api/market/snapshot
  * Trigger a daily price snapshot (idempotent — safe to call multiple times).
  * In production, call this from a daily cron job.
+ * Protected: requires admin auth — prevents unauthenticated users from triggering DB writes.
  */
-router.post('/snapshot', async (req, res, next) => {
+router.post('/snapshot', auth, adminOnly, async (req, res, next) => {
   try {
     const result = await takeDailySnapshot()
     res.json(result)

@@ -166,8 +166,14 @@ app.use('/api/admin/activity', adminActivityRoutes)
 app.use('/api/admin/settings', adminSettingsRoutes)
 app.use('/api/admin/analytics', adminAnalyticsRoutes)
 
-// Cache stats endpoint for monitoring
+// Cache stats endpoint for monitoring — restricted to prevent infrastructure info leaks.
+// Requires a simple secret token in query or header to prevent public enumeration.
 app.get('/api/cache-stats', (req, res) => {
+  const secret = process.env.CACHE_STATS_SECRET || process.env.ADMIN_SECRET
+  if (secret && req.query.token !== secret && req.headers['x-admin-token'] !== secret) {
+    return res.status(403).json({ error: 'גישה נדחתה', errorCode: 'FORBIDDEN' })
+  }
+
   try {
     const { plotCache, statsCache, marketCache } = require('./services/cacheService.js')
     res.json({
