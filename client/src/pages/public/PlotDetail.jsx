@@ -1138,6 +1138,59 @@ export default function PlotDetail() {
             )
           })()}
 
+          {/* Auto-generated Investment Narrative — natural-language summary for investors + SEO.
+              Google indexes natural language better than structured cards. Madlan does this with
+              "תיאור הנכס" sections — we generate ours from data for every plot automatically.
+              Provides instant context without the user having to parse numbers. */}
+          {(() => {
+            const score = calcInvestmentScore(plot)
+            const { grade } = getScoreLabel(score)
+            const cagrData = calcCAGR(roi, readiness)
+            const zoningName = zoningLabels[zoningStage] || zoningStage
+            const dunam = formatDunam(sizeSqM)
+
+            // Build narrative paragraphs
+            const introSentence = `חלקה ${plot.number} בגוש ${blockNumber} ממוקמת ב${plot.city} ומשתרעת על שטח של ${dunam} דונם (${sizeSqM.toLocaleString()} מ״ר).`
+
+            const priceSentence = `המחיר המבוקש עומד על ${formatCurrency(totalPrice)}, שהם ${formatCurrency(Math.round(totalPrice / sizeSqM * 1000))} לדונם.`
+
+            const roiSentence = roi > 0
+              ? `השווי הצפוי לאחר השבחה: ${formatCurrency(projectedValue)} — תשואה ברוטו של +${roi}%${cagrData ? ` (כ-${cagrData.cagr}% שנתי על פני ${cagrData.years} שנים)` : ''}.`
+              : null
+
+            const zoningSentence = `החלקה נמצאת בשלב תכנוני: ${zoningName}.${readiness ? ` מוכנות משוערת לבנייה: ${readiness}.` : ''}`
+
+            const scoreSentence = `ציון ההשקעה: ${score}/10 (${grade}).`
+
+            const areaCtx = plot.area_context ?? plot.areaContext
+            const nearbyDev = plot.nearby_development ?? plot.nearbyDevelopment
+
+            return (
+              <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 mb-6" id="section-narrative">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 rounded-lg bg-gold/15 flex items-center justify-center">
+                    <FileText className="w-3.5 h-3.5 text-gold" />
+                  </div>
+                  <h2 className="text-sm font-bold text-slate-200">סיכום השקעה</h2>
+                </div>
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  {introSentence} {priceSentence} {roiSentence} {zoningSentence} {scoreSentence}
+                </p>
+                {(areaCtx || nearbyDev) && (
+                  <p className="text-sm text-slate-400 leading-relaxed mt-2">
+                    {areaCtx && <span>📍 {areaCtx} </span>}
+                    {nearbyDev && <span>🏗️ {nearbyDev}</span>}
+                  </p>
+                )}
+                {plot.description && (
+                  <p className="text-sm text-slate-400 leading-relaxed mt-2 border-t border-white/5 pt-2">
+                    {plot.description}
+                  </p>
+                )}
+              </div>
+            )
+          })()}
+
           {/* Financial cards grid */}
           <div id="section-financial" className="grid grid-cols-3 gap-4 mb-8">
             <div className="rounded-2xl p-5 flex flex-col items-center gap-2 text-center bg-gradient-to-b from-blue-500/15 to-blue-500/8 border border-blue-500/20 relative overflow-hidden">

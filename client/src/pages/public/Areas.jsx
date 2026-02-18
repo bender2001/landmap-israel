@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { MapPin, TrendingUp, Ruler, DollarSign, ArrowLeft, BarChart3, Building2, Users, ChevronDown, ChevronUp, Activity, ArrowUpDown } from 'lucide-react'
+import { MapPin, TrendingUp, Ruler, DollarSign, ArrowLeft, BarChart3, Building2, Users, ChevronDown, ChevronUp, Activity, ArrowUpDown, Zap, Shield } from 'lucide-react'
 import { useMarketOverview } from '../../hooks/useMarketOverview.js'
 import { useMarketTrends } from '../../hooks/useMarketTrends.js'
 import { useMetaTags } from '../../hooks/useMetaTags.js'
@@ -139,6 +139,162 @@ function CityCard({ city, stats }) {
           </Link>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Market Health Score — composite score (0–100) per city evaluating investment attractiveness.
+ * Factors: availability ratio, average ROI, zoning diversity (advancement), price accessibility.
+ * This is a key differentiator vs Madlan/Yad2 — they don't offer aggregate investment scoring for areas.
+ */
+function calcMarketHealthScore(cityStats) {
+  if (!cityStats) return null
+  const { count, available, avgRoi, byZoning, priceRange, avgPricePerDunam, totalArea } = cityStats
+
+  // 1. Availability Score (0–25): Higher availability = better investor choice
+  const availRatio = count > 0 ? available / count : 0
+  const availScore = Math.min(25, Math.round(availRatio * 30)) // 83%+ = max
+
+  // 2. ROI Score (0–25): Higher ROI = better returns
+  const roiScore = Math.min(25, Math.round((Math.min(avgRoi, 250) / 250) * 25))
+
+  // 3. Zoning Diversity / Advancement Score (0–25): More advanced zoning stages = closer to realization
+  const zoningKeys = Object.keys(byZoning || {})
+  const advancedStages = ['DETAILED_PLAN_APPROVED', 'DEVELOPER_TENDER', 'BUILDING_PERMIT', 'MASTER_PLAN_APPROVED', 'DETAILED_PLAN_DEPOSIT']
+  const advancedCount = zoningKeys.reduce((s, k) => s + (advancedStages.includes(k) ? (byZoning[k] || 0) : 0), 0)
+  const advancedRatio = count > 0 ? advancedCount / count : 0
+  const diversityBonus = Math.min(5, zoningKeys.length) // up to 5 points for variety
+  const zoningScore = Math.min(25, Math.round(advancedRatio * 20) + diversityBonus)
+
+  // 4. Market Depth Score (0–25): More plots, wider price range = healthier market
+  const depthCount = Math.min(10, Math.round((count / 20) * 10)) // up to 10 for >20 plots
+  const priceSpread = priceRange && priceRange.max > 0 && priceRange.min > 0
+    ? Math.min(10, Math.round(((priceRange.max - priceRange.min) / priceRange.max) * 15))
+    : 0
+  const areaBonus = totalArea > 10000 ? 5 : totalArea > 5000 ? 3 : totalArea > 1000 ? 1 : 0
+  const depthScore = Math.min(25, depthCount + priceSpread + areaBonus)
+
+  const total = availScore + roiScore + zoningScore + depthScore
+
+  // Grade & color
+  let grade, color, emoji
+  if (total >= 80) { grade = 'A+'; color = '#22C55E'; emoji = '🔥' }
+  else if (total >= 65) { grade = 'A'; color = '#4ADE80'; emoji = '🟢' }
+  else if (total >= 50) { grade = 'B+'; color = '#FBBF24'; emoji = '🟡' }
+  else if (total >= 35) { grade = 'B'; color = '#F59E0B'; emoji = '🟠' }
+  else { grade = 'C'; color = '#EF4444'; emoji = '🔴' }
+
+  return {
+    total,
+    grade,
+    color,
+    emoji,
+    breakdown: {
+      availability: { score: availScore, max: 25, label: 'זמינות' },
+      roi: { score: roiScore, max: 25, label: 'תשואה' },
+      zoning: { score: zoningScore, max: 25, label: 'בשלות תכנונית' },
+      depth: { score: depthScore, max: 25, label: 'עומק שוק' },
+    },
+  }
+}
+
+function MarketHealthScores({ cities }) {
+  if (!cities || cities.length === 0) return null
+
+  const scored = useMemo(() => {
+    return cities
+      .map(city => ({ ...city, health: calcMarketHealthScore(city) }))
+      .filter(c => c.health)
+      .sort((a, b) => b.health.total - a.health.total)
+  }, [cities])
+
+  if (scored.length === 0) return null
+
+  return (
+    <div className="glass-panel p-5 mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+          <Shield className="w-4 h-4 text-gold" />
+          ציון בריאות שוק
+        </h3>
+        <span className="text-[9px] text-slate-500 bg-white/5 px-2 py-1 rounded-lg">
+          מבוסס על: זמינות, תשואה, תכנון, עומק שוק
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {scored.map(city => {
+          const h = city.health
+          return (
+            <Link
+              key={city.city}
+              to={`/?city=${encodeURIComponent(city.city)}`}
+              className="relative bg-white/[0.02] border border-white/5 rounded-xl p-4 hover:border-gold/20 hover:bg-white/[0.04] transition-all group"
+            >
+              {/* Score badge */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{h.emoji}</span>
+                  <div>
+                    <div className="text-base font-bold text-slate-100 group-hover:text-gold transition-colors">{city.city}</div>
+                    <div className="text-[10px] text-slate-500">{city.count} חלקות</div>
+                  </div>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div
+                    className="text-2xl font-black tabular-nums"
+                    style={{ color: h.color }}
+                  >
+                    {h.total}
+                  </div>
+                  <div
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: `${h.color}15`, color: h.color, border: `1px solid ${h.color}30` }}
+                  >
+                    {h.grade}
+                  </div>
+                </div>
+              </div>
+
+              {/* Breakdown bars */}
+              <div className="space-y-1.5">
+                {Object.entries(h.breakdown).map(([key, dim]) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <span className="text-[9px] text-slate-500 w-20 text-right">{dim.label}</span>
+                    <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${(dim.score / dim.max) * 100}%`,
+                          background: h.color,
+                          opacity: 0.7,
+                        }}
+                      />
+                    </div>
+                    <span className="text-[8px] text-slate-600 tabular-nums w-6 text-left">{dim.score}/{dim.max}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Total progress ring (simplified as bar) */}
+              <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-2">
+                <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-1000"
+                    style={{ width: `${h.total}%`, background: `linear-gradient(90deg, ${h.color}80, ${h.color})` }}
+                  />
+                </div>
+                <span className="text-[10px] font-bold tabular-nums" style={{ color: h.color }}>{h.total}/100</span>
+              </div>
+            </Link>
+          )
+        })}
+      </div>
+
+      <p className="text-[9px] text-slate-600 mt-3 text-center">
+        💡 הציון משקלל זמינות חלקות, תשואה ממוצעת, בשלות שלבי תכנון ועומק שוק. ציון גבוה = שוק אטרקטיבי יותר למשקיעים.
+      </p>
     </div>
   )
 }
@@ -494,6 +650,9 @@ export default function Areas() {
                 <StatCard icon={DollarSign} label="שווי כולל" value={formatCurrency(overview.totalValue)} subValue={`${overview.available} זמינות`} color="purple" />
               </div>
             )}
+
+            {/* Market Health Scores — composite investment score per city */}
+            {cities.length > 0 && <MarketHealthScores cities={cities} />}
 
             {/* Price trends chart */}
             {trends && <PriceTrendMiniChart trends={trends} />}

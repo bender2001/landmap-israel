@@ -1966,20 +1966,83 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 )
               })()}
 
-              {/* Tax authority comparison */}
-              {taxAuthorityValue && (
+              {/* Tax Authority Value Comparison — like Madlan's "מחיר נמוך ממדלן" but vs government valuation.
+                  Shows a visual gauge comparing asking price to the official tax authority assessment.
+                  Israeli investors check this to verify they're not overpaying — it's a trust signal. */}
+              {taxAuthorityValue > 0 && (
                 <div className="bg-navy-light/40 border border-white/5 rounded-xl p-3 mt-3 mb-3">
-                  <div className="text-xs text-slate-300">
-                    שווי רשות המיסים: {formatCurrency(taxAuthorityValue)}
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-purple-500/15 flex items-center justify-center">
+                      <Shield className="w-3.5 h-3.5 text-purple-400" />
+                    </div>
+                    <span className="text-xs font-medium text-slate-200">שווי רשות המיסים</span>
+                    {(() => {
+                      const diffPct = Math.round(((totalPrice - taxAuthorityValue) / taxAuthorityValue) * 100)
+                      const isBelow = diffPct < 0
+                      return (
+                        <span className={`text-[10px] font-bold mr-auto px-2 py-0.5 rounded-full ${
+                          isBelow ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                  : diffPct <= 10 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                  : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                        }`}>
+                          {isBelow ? `${Math.abs(diffPct)}% מתחת` : `+${diffPct}% מעל`}
+                        </span>
+                      )
+                    })()}
                   </div>
+                  {/* Visual comparison bars */}
+                  <div className="space-y-2">
+                    <div>
+                      <div className="flex items-center justify-between text-[10px] mb-1">
+                        <span className="text-slate-400">מחיר מבוקש</span>
+                        <span className="text-slate-300 font-medium">{formatCurrency(totalPrice)}</span>
+                      </div>
+                      <div className="relative h-2.5 rounded-full bg-white/5 overflow-hidden">
+                        <div
+                          className="absolute inset-y-0 right-0 rounded-full transition-all duration-700"
+                          style={{
+                            width: `${Math.min(100, Math.max(10, (totalPrice / Math.max(totalPrice, taxAuthorityValue) * 100)))}%`,
+                            background: totalPrice <= taxAuthorityValue
+                              ? 'linear-gradient(90deg, #22C55E, #4ADE80)'
+                              : 'linear-gradient(90deg, #F59E0B, #FB923C)',
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between text-[10px] mb-1">
+                        <span className="text-slate-400">🏛️ הערכת רשות המיסים</span>
+                        <span className="text-purple-400 font-medium">{formatCurrency(taxAuthorityValue)}</span>
+                      </div>
+                      <div className="relative h-2.5 rounded-full bg-white/5 overflow-hidden">
+                        <div
+                          className="absolute inset-y-0 right-0 rounded-full bg-purple-500/40 transition-all duration-700"
+                          style={{
+                            width: `${Math.min(100, Math.max(10, (taxAuthorityValue / Math.max(totalPrice, taxAuthorityValue) * 100)))}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  {/* Verdict */}
                   {totalPrice < taxAuthorityValue && (
-                    <div className="text-xs text-green-400 mt-1 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
-                      מחיר אטרקטיבי! מתחת לשווי רשות המיסים
+                    <div className="flex items-center gap-2 mt-2.5 p-2 rounded-lg bg-emerald-500/8 border border-emerald-500/15">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                      <span className="text-[11px] text-emerald-400 font-medium">
+                        מחיר אטרקטיבי! {formatCurrency(taxAuthorityValue - totalPrice)} מתחת לשומת רשות המיסים
+                      </span>
                     </div>
                   )}
-                  <div className="text-xs text-slate-400 mt-1">
-                    היטל השבחה משוער: {bettermentLevy}
+                  {totalPrice > taxAuthorityValue * 1.1 && (
+                    <div className="flex items-center gap-2 mt-2.5 p-2 rounded-lg bg-amber-500/8 border border-amber-500/15">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                      <span className="text-[11px] text-amber-400">
+                        המחיר מעל הערכת רשות המיסים — מומלץ לבדוק עם שמאי
+                      </span>
+                    </div>
+                  )}
+                  <div className="text-[9px] text-slate-600 mt-2">
+                    היטל השבחה משוער (50% מהשבחה): {bettermentLevy}
                   </div>
                 </div>
               )}
