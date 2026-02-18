@@ -3245,6 +3245,13 @@ body {
   top: 2.75rem;
   right: 4rem;
   z-index: 35;
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .alert-subscription-wrapper {
+    display: block;
+  }
 }
 
 @media (min-width: 640px) {

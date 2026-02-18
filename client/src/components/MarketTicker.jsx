@@ -130,7 +130,7 @@ export default function MarketTicker({ plots }) {
 
   return (
     <div
-      className={`fixed top-0 left-0 right-0 z-[50] transition-all duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-full'}`}
+      className={`fixed top-0 left-0 right-0 z-[50] transition-all duration-300 hidden sm:block ${isVisible ? 'translate-y-0' : '-translate-y-full'}`}
       dir="rtl"
     >
       <div className="bg-navy-light/80 backdrop-blur-md border-b border-white/5">
