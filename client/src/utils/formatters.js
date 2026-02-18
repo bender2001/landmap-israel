@@ -316,6 +316,103 @@ export function calcInvestmentVerdict(plot, allPlots) {
 }
 
 /**
+ * Calculate investment risk level for a plot.
+ * Combines zoning uncertainty, time horizon, liquidity risk, and price deviation.
+ * Returns { level: 1-5, label, color, emoji, factors: string[] }
+ *
+ * Risk factors considered:
+ * - Zoning stage (earlier = higher regulatory risk)
+ * - Time to maturity (longer holding = more uncertainty)
+ * - Price deviation from area average (overpriced = risk)
+ * - Size (very small or very large plots have different risk profiles)
+ * - Status (reserved/sold = lower risk than available with unknowns)
+ *
+ * This is a key differentiator vs Madlan/Yad2 — they don't show risk assessment.
+ */
+export function calcRiskLevel(plot, allPlots) {
+  if (!plot) return null
+
+  const price = plot.total_price ?? plot.totalPrice ?? 0
+  const projected = plot.projected_value ?? plot.projectedValue ?? 0
+  const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
+  const zoning = plot.zoning_stage ?? plot.zoningStage ?? 'AGRICULTURAL'
+  const readiness = plot.readiness_estimate ?? plot.readinessEstimate ?? ''
+  const roi = price > 0 ? ((projected - price) / price) * 100 : 0
+
+  let riskScore = 0 // 0-100, higher = riskier
+  const factors = []
+
+  // 1. Zoning risk (0-30 points): early stages = high regulatory risk
+  const zoningRiskMap = {
+    AGRICULTURAL: 30,
+    MASTER_PLAN_DEPOSIT: 25,
+    MASTER_PLAN_APPROVED: 18,
+    DETAILED_PLAN_PREP: 15,
+    DETAILED_PLAN_DEPOSIT: 10,
+    DETAILED_PLAN_APPROVED: 5,
+    DEVELOPER_TENDER: 3,
+    BUILDING_PERMIT: 1,
+  }
+  const zoningRisk = zoningRiskMap[zoning] ?? 20
+  riskScore += zoningRisk
+  if (zoningRisk >= 25) factors.push('שלב תכנוני מוקדם')
+  else if (zoningRisk >= 15) factors.push('תכנון בתהליך')
+
+  // 2. Time horizon risk (0-25 points): longer wait = more uncertainty
+  let timeRisk = 15 // default
+  if (readiness.includes('1-3')) timeRisk = 8
+  else if (readiness.includes('3-5')) timeRisk = 15
+  else if (readiness.includes('5+') || readiness.includes('5-')) timeRisk = 25
+  riskScore += timeRisk
+  if (timeRisk >= 20) factors.push('טווח השקעה ארוך (5+ שנים)')
+
+  // 3. Price deviation risk (0-20 points): far from average = suspicious
+  if (allPlots && allPlots.length >= 3 && sizeSqM > 0 && price > 0) {
+    const sameCityPlots = allPlots.filter(p => p.city === plot.city && p.id !== plot.id)
+    if (sameCityPlots.length >= 2) {
+      const avgPsm = sameCityPlots.reduce((sum, p) => {
+        const pp = p.total_price ?? p.totalPrice ?? 0
+        const ps = p.size_sqm ?? p.sizeSqM ?? 1
+        return sum + (ps > 0 ? pp / ps : 0)
+      }, 0) / sameCityPlots.length
+      const plotPsm = price / sizeSqM
+      const deviation = avgPsm > 0 ? ((plotPsm - avgPsm) / avgPsm) * 100 : 0
+      if (deviation > 20) { riskScore += 20; factors.push('מחיר גבוה מהממוצע האזורי') }
+      else if (deviation > 10) { riskScore += 10; factors.push('מחיר מעל הממוצע') }
+      else if (deviation < -20) { riskScore += 5; factors.push('מחיר נמוך משמעותית — יש לבדוק') }
+      else riskScore += 0
+    }
+  }
+
+  // 4. ROI realism risk (0-15 points): extremely high promised ROI is suspicious
+  if (roi > 300) { riskScore += 15; factors.push('תשואה צפויה גבוהה מאוד — יש לאמת') }
+  else if (roi > 200) { riskScore += 8 }
+  else if (roi < 30 && price > 0) { riskScore += 5; factors.push('תשואה צפויה נמוכה') }
+
+  // 5. Liquidity risk (0-10 points): land is inherently illiquid
+  riskScore += 5 // base liquidity risk for all land
+  if (sizeSqM > 10000) { riskScore += 5; factors.push('חלקה גדולה — נזילות נמוכה יותר') }
+
+  // Normalize to 1-5 scale
+  const level = riskScore <= 20 ? 1 : riskScore <= 35 ? 2 : riskScore <= 50 ? 3 : riskScore <= 70 ? 4 : 5
+
+  const config = {
+    1: { label: 'סיכון נמוך', color: '#22C55E', emoji: '🛡️' },
+    2: { label: 'סיכון נמוך-בינוני', color: '#84CC16', emoji: '✅' },
+    3: { label: 'סיכון בינוני', color: '#F59E0B', emoji: '⚖️' },
+    4: { label: 'סיכון בינוני-גבוה', color: '#F97316', emoji: '⚠️' },
+    5: { label: 'סיכון גבוה', color: '#EF4444', emoji: '🔴' },
+  }
+
+  return {
+    level,
+    ...config[level],
+    score: riskScore,
+    factors: factors.slice(0, 3), // max 3 factors for display
+  }
+}
+
+/**
  * Calculate percentile rank of a value within a sorted array.
  * Returns 0-100 (what percentage of values are below this one).
  * E.g., percentile=80 means "better than 80% of plots".

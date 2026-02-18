@@ -126,6 +126,27 @@ export function useStructuredData(plot, plots) {
       sameAs: [],
     }
 
+    // WebSite + SearchAction schema — enables Google Sitelinks Searchbox.
+    // When Google indexes this, users can search our site directly from Google results.
+    // Both Madlan and Yad2 use this pattern for massive organic traffic.
+    const websiteSchema = {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: 'LandMap Israel',
+      alternateName: ['לנדמאפ', 'LandMap', 'מפת קרקעות'],
+      url: window.location.origin,
+      description: 'מפת קרקעות להשקעה בישראל — חדרה, נתניה, קיסריה. מחירים, תשואות, ייעודי קרקע.',
+      inLanguage: ['he', 'en'],
+      potentialAction: {
+        '@type': 'SearchAction',
+        target: {
+          '@type': 'EntryPoint',
+          urlTemplate: `${window.location.origin}/?q={search_term_string}`,
+        },
+        'query-input': 'required name=search_term_string',
+      },
+    }
+
     // FAQ schema for search rich results (boosts SEO significantly)
     const faqSchema = !plot ? {
       '@context': 'https://schema.org',
@@ -166,7 +187,7 @@ export function useStructuredData(plot, plots) {
       ]
     } : null
 
-    const schemas = [jsonLd, orgSchema]
+    const schemas = [jsonLd, orgSchema, websiteSchema]
     if (faqSchema) schemas.push(faqSchema)
 
     const script = document.createElement('script')

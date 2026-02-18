@@ -14,6 +14,7 @@ import PlotPercentileBadges from './ui/PlotPercentileBadges'
 import { usePlot, useNearbyPlots, useSimilarPlots } from '../hooks/usePlots'
 import MiniMap from './ui/MiniMap'
 import DueDiligenceChecklist from './ui/DueDiligenceChecklist'
+import LocationScore from './ui/LocationScore'
 import { plotInquiryLink } from '../utils/config'
 
 function getDocIcon(mimeType) {
@@ -1796,14 +1797,18 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               )
             })()}
 
-            {/* Neighborhood Quality Score */}
+            {/* Neighborhood Quality Score + Location & Risk Assessment */}
             {(distanceToSea != null || distanceToPark != null || distanceToHospital != null) && (
               <CollapsibleSection
                 number={`0${++sectionNum}`}
                 icon={Shield}
-                title="ציון איכות סביבה"
+                title="מיקום, סביבה וסיכון"
                 sectionId="section-quality"
               >
+                {/* Location connectivity score + risk assessment — a key differentiator vs Madlan */}
+                <LocationScore plot={plot} allPlots={allPlots} />
+                <div className="h-px bg-white/5 my-4" />
+                {/* Radar chart — visual quality overview */}
                 <NeighborhoodRadar
                   distanceToSea={distanceToSea}
                   distanceToPark={distanceToPark}
@@ -1811,6 +1816,17 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   roi={roi}
                   investmentScore={calcInvestmentScore(plot)}
                 />
+              </CollapsibleSection>
+            )}
+            {/* Risk assessment fallback — show even without distance data */}
+            {distanceToSea == null && distanceToPark == null && distanceToHospital == null && allPlots.length >= 2 && (
+              <CollapsibleSection
+                number={`0${++sectionNum}`}
+                icon={Shield}
+                title="הערכת סיכון"
+                sectionId="section-quality"
+              >
+                <LocationScore plot={plot} allPlots={allPlots} />
               </CollapsibleSection>
             )}
 
