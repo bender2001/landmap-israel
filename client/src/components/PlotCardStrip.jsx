@@ -93,7 +93,19 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
     } catch { return new Set() }
   }, [selectedPlot?.id])
 
-  if (!plots || plots.length === 0) return null
+  if (!plots || plots.length === 0) return (
+    <div className="plot-strip-wrapper" dir="rtl">
+      <div className="flex items-center justify-center py-4 px-6">
+        <div className="flex items-center gap-3 bg-navy-light/40 border border-white/5 rounded-xl px-5 py-3">
+          <span className="text-lg">🔍</span>
+          <div>
+            <div className="text-xs font-medium text-slate-300">לא נמצאו חלקות</div>
+            <div className="text-[10px] text-slate-500">נסה לשנות את הסינון</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 
   // RTL scroll: positive = scroll left visually (show more to the left)
   const scroll = (dir) => {
