@@ -4,12 +4,8 @@ import { statusColors, statusLabels } from '../utils/constants'
 import SearchAutocomplete from './SearchAutocomplete'
 import SavedSearches from './SavedSearches'
 
-const baseCityOptions = [
-  { label: 'כל הערים', value: 'all' },
-  { label: 'חדרה', value: 'חדרה' },
-  { label: 'נתניה', value: 'נתניה' },
-  { label: 'קיסריה', value: 'קיסריה' },
-]
+// Known cities for stable ordering; any new cities found in data are appended dynamically
+const KNOWN_CITIES = ['חדרה', 'נתניה', 'קיסריה']
 
 const priceRangeOptions = [
   { label: 'כל המחירים', value: 'all', min: '', max: '' },
@@ -303,19 +299,36 @@ export default function FilterBar({
     }).catch(() => {})
   }
 
-  // Dynamic city options with plot counts (like Madlan shows listing counts per area)
+  // Dynamic city options with plot counts — auto-discovers new cities from data (like Madlan)
+  // Known cities keep stable ordering; any city in the data not in KNOWN_CITIES is appended
   const cityOptions = useMemo(() => {
-    if (!allPlots || allPlots.length === 0) return baseCityOptions
+    const fallback = [
+      { label: 'כל הערים', value: 'all' },
+      ...KNOWN_CITIES.map(c => ({ label: c, value: c })),
+    ]
+    if (!allPlots || allPlots.length === 0) return fallback
+
     const counts = {}
     allPlots.forEach(p => {
       const city = p.city || 'unknown'
       counts[city] = (counts[city] || 0) + 1
     })
-    return baseCityOptions.map(opt => {
-      if (opt.value === 'all') return { ...opt, label: `כל הערים (${allPlots.length})` }
-      const count = counts[opt.value] || 0
-      return { ...opt, label: `${opt.value} (${count})` }
-    })
+
+    // Start with "all" option
+    const options = [{ label: `כל הערים (${allPlots.length})`, value: 'all' }]
+    // Add known cities first (stable ordering)
+    for (const city of KNOWN_CITIES) {
+      const count = counts[city] || 0
+      options.push({ label: `${city} (${count})`, value: city })
+    }
+    // Append any new cities discovered in data, sorted by count descending
+    const newCities = Object.keys(counts)
+      .filter(c => !KNOWN_CITIES.includes(c) && c !== 'unknown')
+      .sort((a, b) => counts[b] - counts[a])
+    for (const city of newCities) {
+      options.push({ label: `${city} (${counts[city]})`, value: city })
+    }
+    return options
   }, [allPlots])
 
   // Derive price range value

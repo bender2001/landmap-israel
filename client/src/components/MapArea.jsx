@@ -434,6 +434,9 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
   const sizeSqM = plot.size_sqm ?? plot.sizeSqM
   const zoningStage = plot.zoning_stage ?? plot.zoningStage
   const readiness = plot.readiness_estimate ?? plot.readinessEstimate
+  // Freshness: "new listing" indicator (like Madlan/Yad2 "חדש!")
+  const createdAt = plot.created_at ?? plot.createdAt
+  const isNew = createdAt && (Date.now() - new Date(createdAt).getTime()) < 7 * 86400000
 
   const handleClick = useCallback(() => onSelectPlot(plot), [onSelectPlot, plot])
   const handleMouseOver = useCallback(() => { onHover(plot.id); prefetchPlot(plot.id) }, [onHover, prefetchPlot, plot.id])
@@ -456,8 +459,8 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
       }}
     >
       <Tooltip permanent direction="center" className="price-tooltip">
-        <span className="tooltip-main-price">{favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{plot.plot_images?.length > 0 ? '📷 ' : ''}{formatPriceShort(price)}</span>
-        <span className="tooltip-sub">{formatDunam(sizeSqM)} דונם · +{roi}% · ⭐{calcInvestmentScore(plot)}</span>
+        <span className="tooltip-main-price">{isNew ? '🆕 ' : ''}{favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{plot.plot_images?.length > 0 ? '📷 ' : ''}{formatPriceShort(price)}</span>
+        <span className="tooltip-sub">{formatDunam(sizeSqM)} דונם · {sizeSqM > 0 ? `₪${Math.round(price / sizeSqM).toLocaleString()}/מ״ר` : ''} · +{roi}%</span>
         {(() => {
           const avg = areaAvgPsm?.[plot.city]
           if (!avg || sizeSqM <= 0) return null

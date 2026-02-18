@@ -399,9 +399,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
 
   // ── Mobile bottom-sheet drag (vertical) + desktop swipe-to-close (horizontal) ──
   // Snap points as vh fractions
-  const SNAP_PEEK = 35
-  const SNAP_MID = 65
-  const SNAP_FULL = 92
+  const SNAP_PEEK = 40
+  const SNAP_MID = 75
+  const SNAP_FULL = 95
   const snapPoints = [SNAP_PEEK, SNAP_MID, SNAP_FULL]
 
   const [sheetHeight, setSheetHeight] = useState(SNAP_MID) // start at mid
@@ -733,7 +733,28 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 }
               </button>
             </div>
-            <div className="flex flex-wrap items-center gap-2 mt-2">
+            {/* Compact summary on mobile — full badges moved to scrollable area */}
+            <div className="flex items-center gap-2 mt-1.5 sm:hidden">
+              <span className="text-xs text-slate-400">
+                {formatDunam(sizeSqM)} דונם
+              </span>
+              <span className="text-[10px] text-slate-500">•</span>
+              <span
+                className="inline-flex items-center gap-1 text-xs font-medium"
+                style={{ color: statusColor }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor }} />
+                {statusLabels[plot.status]}
+              </span>
+              <span className="text-[10px] text-slate-500">•</span>
+              {(() => {
+                const score = calcInvestmentScore(plot)
+                const { color } = getScoreLabel(score)
+                return <span className="text-xs font-bold" style={{ color }}>⭐ {score}/10</span>
+              })()}
+            </div>
+            {/* Full badges — desktop only (hidden on mobile, shown in scroll area instead) */}
+            <div className="hidden sm:flex flex-wrap items-center gap-2 mt-2">
               <span className="text-xs text-slate-400 bg-white/5 px-2.5 py-1 rounded-lg">
                 {formatDunam(sizeSqM)} דונם ({sizeSqM.toLocaleString()} מ&quot;ר)
               </span>
@@ -745,7 +766,6 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   {densityUnitsPerDunam} יח&quot;ד/דונם
                 </span>
               )}
-              {/* Status badge */}
               <span
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium"
                 style={{
@@ -760,7 +780,6 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 />
                 {statusLabels[plot.status]}
               </span>
-              {/* Investment score badge */}
               {(() => {
                 const score = calcInvestmentScore(plot)
                 const { label, color } = getScoreLabel(score)
@@ -778,7 +797,6 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   </span>
                 )
               })()}
-              {/* View count badge — social proof like Madlan */}
               {plot.views > 0 && (
                 <span
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium"
@@ -793,7 +811,6 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   {plot.views} צפו
                 </span>
               )}
-              {/* Days on Market badge — like Madlan/Yad2 "ימים במודעה" */}
               {(() => {
                 const dom = calcDaysOnMarket(plot.created_at ?? plot.createdAt)
                 if (!dom) return null
@@ -866,6 +883,61 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
 
           {/* Quick section navigation */}
           <QuickNavBar scrollRef={scrollRef} />
+
+          {/* Mobile badges — full set shown in scrollable area */}
+          <div className="sm:hidden px-4 pt-2 pb-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] text-slate-400 bg-white/5 px-2 py-0.5 rounded-lg">
+                {formatDunam(sizeSqM)} דונם ({sizeSqM.toLocaleString()} מ&quot;ר)
+              </span>
+              <span className="text-[11px] text-slate-300 bg-white/5 px-2 py-0.5 rounded-lg">
+                {zoningLabels[zoningStage]}
+              </span>
+              {densityUnitsPerDunam && (
+                <span className="text-[11px] text-gold bg-gold/10 px-2 py-0.5 rounded-lg">
+                  {densityUnitsPerDunam} יח&quot;ד/דונם
+                </span>
+              )}
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                style={{
+                  background: statusColor + '14',
+                  border: `1px solid ${statusColor}35`,
+                  color: statusColor,
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: statusColor }} />
+                {statusLabels[plot.status]}
+              </span>
+              {(() => {
+                const score = calcInvestmentScore(plot)
+                const { label, color } = getScoreLabel(score)
+                return (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold"
+                    style={{ background: `${color}14`, border: `1px solid ${color}35`, color }}
+                    title={`ציון השקעה: ${score}/10 — ${label}`}
+                  >
+                    ⭐ {score}/10
+                  </span>
+                )
+              })()}
+              {plot.views > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)', color: '#A5B4FC' }}>
+                  <Eye className="w-2.5 h-2.5" /> {plot.views} צפו
+                </span>
+              )}
+              {(() => {
+                const dom = calcDaysOnMarket(plot.created_at ?? plot.createdAt)
+                if (!dom) return null
+                return (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ background: `${dom.color}14`, border: `1px solid ${dom.color}35`, color: dom.color }}>
+                    <Hourglass className="w-2.5 h-2.5" /> {dom.label}
+                  </span>
+                )
+              })()}
+            </div>
+          </div>
 
           <div className="px-6 pb-6">
             {/* Total Investment Summary — the #1 thing investors want to see upfront */}
