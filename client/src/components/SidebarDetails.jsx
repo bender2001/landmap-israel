@@ -914,7 +914,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
         >
           {/* Map preview area — real satellite map like Madlan */}
           {plot.coordinates && plot.coordinates.length >= 3 ? (
-            <div className="h-36 relative overflow-hidden">
+            <div className="h-36 relative overflow-hidden group">
               <MiniMap
                 coordinates={plot.coordinates}
                 status={plot.status}
@@ -923,6 +923,39 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 className="rounded-none border-0"
                 showStreetViewToggle
               />
+              {/* Navigation quick-links — Waze + Google Maps overlay on map preview.
+                  Critical for Israeli investors who want to physically visit the plot.
+                  Shows on hover (desktop) and always visible on mobile. */}
+              {(() => {
+                const center = plotCenter(plot.coordinates)
+                if (!center) return null
+                return (
+                  <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200">
+                    <a
+                      href={`https://www.waze.com/ul?ll=${center.lat},${center.lng}&navigate=yes&zoom=17`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-white bg-[#33CCFF]/90 backdrop-blur-sm rounded-lg hover:bg-[#33CCFF] transition-colors shadow-sm"
+                      title="נווט ב-Waze"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 6.63c.23.7.38 1.43.43 2.19.05.84-.01 1.63-.19 2.39-.18.76-.47 1.47-.85 2.11a7.88 7.88 0 01-1.47 1.8c.1.13.19.26.27.4.36.66.55 1.38.55 2.17 0 .83-.21 1.6-.63 2.3a4.54 4.54 0 01-1.7 1.7 4.54 4.54 0 01-2.3.63c-.75 0-1.44-.17-2.08-.51a4.32 4.32 0 01-1.28-.99 8.2 8.2 0 01-2.37.35c-1.39 0-2.69-.33-3.89-.99a7.8 7.8 0 01-2.92-2.77A7.47 7.47 0 011 13.39c0-1.39.33-2.69.99-3.89A7.8 7.8 0 014.76 6.58a7.47 7.47 0 013.83-1.08h.2c.37-1.07 1.02-1.93 1.95-2.58A5.34 5.34 0 0113.85 2c1.07 0 2.06.3 2.96.89.9.6 1.55 1.38 1.96 2.35a7.6 7.6 0 011.77 1.39zm-5.85-2.3a2.89 2.89 0 00-2.13.86 2.92 2.92 0 00-.86 2.14c0 .17.01.34.04.5a7.7 7.7 0 012.14-.61c.34-.06.68-.1 1.03-.11a3.02 3.02 0 00-.09-1.65 2.93 2.93 0 00-2.13-1.13zm-3.96 5.72c-.48 0-.89.17-1.23.51-.34.34-.51.75-.51 1.23s.17.89.51 1.23c.34.34.75.51 1.23.51s.89-.17 1.23-.51c.34-.34.51-.75.51-1.23s-.17-.89-.51-1.23a1.68 1.68 0 00-1.23-.51zm5.07 0c-.48 0-.89.17-1.23.51-.34.34-.51.75-.51 1.23s.17.89.51 1.23c.34.34.75.51 1.23.51s.89-.17 1.23-.51c.34-.34.51-.75.51-1.23s-.17-.89-.51-1.23a1.68 1.68 0 00-1.23-.51z"/></svg>
+                      Waze
+                    </a>
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${center.lat},${center.lng}&travelmode=driving`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-white bg-[#4285F4]/90 backdrop-blur-sm rounded-lg hover:bg-[#4285F4] transition-colors shadow-sm"
+                      title="נווט ב-Google Maps"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Navigation className="w-3 h-3" />
+                      Maps
+                    </a>
+                  </div>
+                )
+              })()}
             </div>
           ) : (
             <div className="h-36 bg-navy-mid relative overflow-hidden">

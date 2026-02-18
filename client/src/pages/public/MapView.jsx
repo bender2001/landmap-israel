@@ -88,6 +88,7 @@ function FilterSuggestions({ filteredCount, totalCount, filters, statusFilter, o
     (filters.ripeness !== 'all' ? 1 : 0) +
     (filters.minRoi && filters.minRoi !== 'all' ? 1 : 0) +
     (filters.zoning && filters.zoning !== 'all' ? 1 : 0) +
+    (filters.maxDays ? 1 : 0) +
     (filters.search ? 1 : 0) +
     statusFilter.length
 
@@ -101,6 +102,7 @@ function FilterSuggestions({ filteredCount, totalCount, filters, statusFilter, o
   if (filters.minRoi && filters.minRoi !== 'all') suggestions.push({ label: 'הסר סינון תשואה', action: () => onFilterChange('minRoi', 'all'), icon: '📈' })
   if (filters.zoning && filters.zoning !== 'all') suggestions.push({ label: 'הסר סינון תכנוני', action: () => onFilterChange('zoning', 'all'), icon: '🗺️' })
   if (filters.ripeness !== 'all') suggestions.push({ label: 'הסר סינון בשלות', action: () => onFilterChange('ripeness', 'all'), icon: '⏱️' })
+  if (filters.maxDays) suggestions.push({ label: 'הסר סינון חדשות', action: () => onFilterChange('maxDays', ''), icon: '🆕' })
   statusFilter.forEach(s => suggestions.push({ label: `הסר סטטוס "${s === 'AVAILABLE' ? 'זמין' : s === 'SOLD' ? 'נמכר' : s}"`, action: () => onToggleStatus(s), icon: '🏷️' }))
 
   if (suggestions.length === 0) return null
@@ -148,6 +150,7 @@ const initialFilters = {
   ripeness: 'all',
   minRoi: 'all',
   zoning: 'all',
+  maxDays: '',
   search: '',
 }
 
@@ -176,6 +179,7 @@ export default function MapView() {
       ripeness: p.ripeness || 'all',
       minRoi: p.minRoi || 'all',
       zoning: p.zoning || 'all',
+      maxDays: p.maxDays || '',
       search: p.q || '',
     }
   })
@@ -212,6 +216,7 @@ export default function MapView() {
     if (filters.ripeness !== 'all') params.set('ripeness', filters.ripeness)
     if (filters.minRoi && filters.minRoi !== 'all') params.set('minRoi', filters.minRoi)
     if (filters.zoning && filters.zoning !== 'all') params.set('zoning', filters.zoning)
+    if (filters.maxDays) params.set('maxDays', filters.maxDays)
     if (filters.search) params.set('q', filters.search)
     if (statusFilter.length > 0) params.set('status', statusFilter.join(','))
     if (sortBy !== 'default') params.set('sort', sortBy)
@@ -269,11 +274,25 @@ export default function MapView() {
     })
   }, [plots, filters.minRoi])
 
+  // Client-side freshness filter — "new listings" (last N days).
+  // Like Yad2/Madlan's "חדש באתר" — investors check daily for fresh opportunities.
+  const freshnessFilteredPlots = useMemo(() => {
+    if (!filters.maxDays) return roiFilteredPlots
+    const maxDays = parseInt(filters.maxDays, 10)
+    if (!maxDays || maxDays <= 0) return roiFilteredPlots
+    const cutoff = Date.now() - maxDays * 86400000
+    return roiFilteredPlots.filter((p) => {
+      const created = p.created_at ?? p.createdAt
+      if (!created) return false
+      return new Date(created).getTime() >= cutoff
+    })
+  }, [roiFilteredPlots, filters.maxDays])
+
   // Bounds filter — "Search this area" (like Madlan's "חפש באזור זה")
   // Filters plots to only those within the map viewport bounds the user selected
   const boundsFilteredPlots = useMemo(() => {
-    if (!boundsFilter) return roiFilteredPlots
-    return roiFilteredPlots.filter((p) => {
+    if (!boundsFilter) return freshnessFilteredPlots
+    return freshnessFilteredPlots.filter((p) => {
       if (!p.coordinates || !Array.isArray(p.coordinates) || p.coordinates.length < 3) return false
       // Check if any coordinate falls within bounds (inclusive check)
       return p.coordinates.some(c =>
@@ -282,7 +301,7 @@ export default function MapView() {
         c[1] >= boundsFilter.west && c[1] <= boundsFilter.east
       )
     })
-  }, [roiFilteredPlots, boundsFilter])
+  }, [freshnessFilteredPlots, boundsFilter])
 
   // Client-side search filter — acts as secondary filter for instant feedback
   // while server-side q param handles the primary DB-level search

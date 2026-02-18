@@ -1035,6 +1035,111 @@ function ViewportCulledPolygons({ plots, plotColors, hoveredId, onSelectPlot, on
   ))
 }
 
+/**
+ * MobileLegend — collapsible legend for mobile screens where the desktop legend is hidden.
+ * A floating button that expands into a compact legend matching the active color mode.
+ * Inspired by Madlan's mobile map UX — users need color context to understand the map.
+ */
+function MobileLegend({ colorMode, statusFilter, onToggleStatus, statusCounts }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setIsOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [isOpen])
+
+  return (
+    <div className="absolute bottom-8 right-3 z-[1000] pointer-events-none sm:hidden" ref={ref}>
+      <div className="pointer-events-auto">
+        {!isOpen ? (
+          <button
+            onClick={() => setIsOpen(true)}
+            className="glass-panel w-9 h-9 flex items-center justify-center hover:border-gold/20 transition-colors"
+            style={{ minWidth: 44, minHeight: 44 }}
+            title="מקרא מפה"
+            aria-label="מקרא מפה"
+          >
+            <span className="text-sm">🏷️</span>
+          </button>
+        ) : (
+          <div className="glass-panel p-2.5 min-w-[130px] animate-fade-in" dir="rtl">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-medium text-slate-400">מקרא</span>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="w-5 h-5 rounded flex items-center justify-center text-slate-500 hover:text-slate-300"
+              >
+                ✕
+              </button>
+            </div>
+            {colorMode === 'status' ? (
+              <div className="flex flex-col gap-0.5">
+                {Object.entries(statusColors).map(([status, color]) => {
+                  const isActive = statusFilter.length === 0 || statusFilter.includes(status)
+                  return (
+                    <button
+                      key={status}
+                      type="button"
+                      className={`flex items-center gap-1.5 px-1.5 py-1 rounded-lg text-[10px] transition-colors ${
+                        isActive ? 'text-slate-200' : 'text-slate-500 opacity-50'
+                      }`}
+                      onClick={() => onToggleStatus(status)}
+                      aria-pressed={isActive}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: color }} />
+                      <span>{statusLabels[status]}</span>
+                      {statusCounts[status] > 0 && (
+                        <span className="text-[8px] text-slate-600 mr-auto">{statusCounts[status]}</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : colorMode === 'price' ? (
+              <div className="flex flex-col gap-1">
+                <div className="text-[9px] text-slate-500">💰 מחיר/מ״ר</div>
+                <div className="h-1.5 rounded-full" style={{ background: 'linear-gradient(90deg, rgb(0,255,60), rgb(255,255,60), rgb(255,0,60))' }} />
+                <div className="flex justify-between text-[8px] text-slate-600">
+                  <span>זול</span>
+                  <span>יקר</span>
+                </div>
+              </div>
+            ) : colorMode === 'roi' ? (
+              <div className="flex flex-col gap-0.5">
+                <div className="text-[9px] text-slate-500 mb-0.5">📈 תשואה</div>
+                {[
+                  { label: '200%+', color: '#22C55E' },
+                  { label: '100%+', color: '#84CC16' },
+                  { label: '<50%', color: '#EF4444' },
+                ].map(item => (
+                  <div key={item.label} className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-sm" style={{ background: item.color }} />
+                    <span className="text-[9px] text-slate-400">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            ) : colorMode === 'heatmap' ? (
+              <div className="flex flex-col gap-1">
+                <div className="text-[9px] text-slate-500">🌡️ מפת חום</div>
+                <div className="h-1.5 rounded-full" style={{ background: 'linear-gradient(90deg, rgba(0,200,50,0.4), rgba(255,200,50,0.4), rgba(255,0,50,0.4))' }} />
+                <div className="flex justify-between text-[8px] text-slate-600">
+                  <span>זול</span>
+                  <span>יקר</span>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites, compareIds = [], onToggleCompare, onClearFilters, onFilterChange, onSearchArea, autoSearch = false, onToggleAutoSearch }) {
   const [hoveredId, setHoveredId] = useState(null)
   const [activeLayerId, setActiveLayerId] = useState('satellite')
@@ -1171,7 +1276,16 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
       </div>
       {/* Mobile brand badge — hidden on mobile to save space (redundant with filter bar) */}
 
-      {/* Bottom-right: Interactive Legend — adapts to color mode */}
+      {/* Mobile legend toggle — accessible on small screens where the full legend is hidden.
+          Like Madlan's collapsible map legend — essential for mobile users to understand polygon colors. */}
+      <MobileLegend
+        colorMode={colorMode}
+        statusFilter={statusFilter}
+        onToggleStatus={onToggleStatus}
+        statusCounts={statusCounts}
+      />
+
+      {/* Bottom-right: Interactive Legend — adapts to color mode (desktop only) */}
       <div className="absolute bottom-8 right-4 z-[1000] pointer-events-none hidden sm:block">
         <div className="glass-panel px-3 py-2.5 pointer-events-auto">
           {colorMode === 'status' ? (

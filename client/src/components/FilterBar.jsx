@@ -124,6 +124,15 @@ const quickPresetDefs = [
     isActive: (filters) => filters.sizeMin === '3' && !filters.sizeMax,
   },
   {
+    id: 'new-listings',
+    label: 'חדשות השבוע',
+    emoji: '🆕',
+    apply: (onFilterChange) => {
+      onFilterChange('maxDays', '7')
+    },
+    isActive: (filters) => filters.maxDays === '7',
+  },
+  {
     id: 'quick-flip',
     label: 'מהיר (1-3 שנים)',
     emoji: '⚡',
@@ -464,6 +473,7 @@ export default function FilterBar({
     (filters.ripeness !== 'all' ? 1 : 0) +
     (filters.minRoi && filters.minRoi !== 'all' ? 1 : 0) +
     (filters.zoning && filters.zoning !== 'all' ? 1 : 0) +
+    (filters.maxDays ? 1 : 0) +
     (filters.search ? 1 : 0) +
     statusFilter.length
 
@@ -744,6 +754,17 @@ export default function FilterBar({
               >
                 <Clock className="w-3 h-3" />
                 <span>{ripenessOptions.find(o => o.value === filters.ripeness)?.label}</span>
+                <X className="w-3 h-3 opacity-60 hover:opacity-100" />
+              </button>
+            )}
+            {filters.maxDays && (
+              <button
+                className="filter-active-chip"
+                onClick={() => onFilterChange('maxDays', '')}
+                aria-label={`הסר סינון חדשות: ${filters.maxDays} ימים`}
+              >
+                <Clock className="w-3 h-3" />
+                <span>🆕 {filters.maxDays} ימים אחרונים</span>
                 <X className="w-3 h-3 opacity-60 hover:opacity-100" />
               </button>
             )}
