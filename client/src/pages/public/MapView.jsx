@@ -82,6 +82,9 @@ export default function MapView() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false)
   const [boundsFilter, setBoundsFilter] = useState(null)
 
+  // Capture the initial ?plot= param before any effect can clear it
+  const initialPlotRef = useRef(searchParams.get('plot'))
+
   // Hydrate filters from URL params for shareable links
   const [filters, setFilters] = useState(() => {
     const p = Object.fromEntries(searchParams.entries())
@@ -139,6 +142,7 @@ export default function MapView() {
     if (statusFilter.length > 0) params.set('status', statusFilter.join(','))
     if (sortBy !== 'default') params.set('sort', sortBy)
     if (selectedPlot) params.set('plot', selectedPlot.id)
+    else if (initialPlotRef.current) params.set('plot', initialPlotRef.current)
     setSearchParams(params, { replace: true })
   }, [filters, statusFilter, sortBy, selectedPlot?.id])
 
@@ -272,10 +276,13 @@ export default function MapView() {
 
   // URL sync: open plot from ?plot=id on load
   useEffect(() => {
-    const plotId = searchParams.get('plot')
+    const plotId = searchParams.get('plot') || initialPlotRef.current
     if (plotId && filteredPlots.length > 0 && !selectedPlot) {
       const found = filteredPlots.find((p) => p.id === plotId)
-      if (found) setSelectedPlot(found)
+      if (found) {
+        setSelectedPlot(found)
+        initialPlotRef.current = null   // consumed – stop preserving in URL sync
+      }
     }
   }, [searchParams, filteredPlots])
 
