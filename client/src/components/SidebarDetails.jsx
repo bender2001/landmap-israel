@@ -11,7 +11,7 @@ import AnimatedNumber from './ui/AnimatedNumber'
 import NeighborhoodRadar from './ui/NeighborhoodRadar'
 import InvestmentBenchmark from './ui/InvestmentBenchmark'
 import PlotPercentileBadges from './ui/PlotPercentileBadges'
-import { usePlot, useNearbyPlots } from '../hooks/usePlots'
+import { usePlot, useNearbyPlots, useSimilarPlots } from '../hooks/usePlots'
 import MiniMap from './ui/MiniMap'
 import DueDiligenceChecklist from './ui/DueDiligenceChecklist'
 import { plotInquiryLink } from '../utils/config'
@@ -180,17 +180,24 @@ const committeeLevels = [
 ]
 
 function SimilarPlots({ currentPlot, allPlots, onSelectPlot }) {
-  // Use geo-proximity API for nearby plots (like Madlan's "נכסים באזור")
+  // Use investment-similarity API (zoning, price, size, ROI matching)
+  const { data: similarPlots } = useSimilarPlots(currentPlot?.id)
+  // Also fetch geo-proximity (nearby) for a separate section
   const { data: nearbyPlots } = useNearbyPlots(currentPlot?.id)
 
-  // Fallback to client-side similarity if API returns nothing
-  const similar = useMemo(() => {
-    if (nearbyPlots && nearbyPlots.length > 0) return nearbyPlots
+  // Deduplicate: remove plots that appear in both lists
+  const nearbyFiltered = useMemo(() => {
+    if (!nearbyPlots || nearbyPlots.length === 0) return []
+    const similarIds = new Set((similarPlots || []).map(p => p.id))
+    return nearbyPlots.filter(p => !similarIds.has(p.id)).slice(0, 3)
+  }, [nearbyPlots, similarPlots])
 
+  // Fallback: client-side similarity if both APIs return nothing
+  const fallbackSimilar = useMemo(() => {
+    if ((similarPlots && similarPlots.length > 0) || (nearbyPlots && nearbyPlots.length > 0)) return []
     if (!currentPlot || !allPlots || allPlots.length < 2) return []
     const price = currentPlot.total_price ?? currentPlot.totalPrice ?? 0
     const size = currentPlot.size_sqm ?? currentPlot.sizeSqM ?? 0
-
     return allPlots
       .filter(p => p.id !== currentPlot.id)
       .map(p => {
@@ -199,53 +206,81 @@ function SimilarPlots({ currentPlot, allPlots, onSelectPlot }) {
         const priceDiff = price > 0 ? Math.abs(pPrice - price) / price : 1
         const sizeDiff = size > 0 ? Math.abs(pSize - size) / size : 1
         const cityBonus = p.city === currentPlot.city ? 0 : 0.3
-        return { ...p, score: priceDiff + sizeDiff + cityBonus }
+        return { ...p, _similarityScore: 10 - (priceDiff + sizeDiff + cityBonus) * 3 }
       })
-      .sort((a, b) => a.score - b.score)
+      .sort((a, b) => b._similarityScore - a._similarityScore)
       .slice(0, 3)
-  }, [currentPlot?.id, allPlots, nearbyPlots])
+  }, [currentPlot?.id, allPlots, similarPlots, nearbyPlots])
 
-  if (similar.length === 0) return null
+  const hasSimilar = (similarPlots && similarPlots.length > 0) || fallbackSimilar.length > 0
+  const hasNearby = nearbyFiltered.length > 0
+  if (!hasSimilar && !hasNearby) return null
 
-  const hasDistance = similar[0]?.distance_km != null
+  const renderPlotRow = (p, showDistance = false, showReasons = false) => {
+    const bn = p.block_number ?? p.blockNumber
+    const price = p.total_price ?? p.totalPrice
+    const projValue = p.projected_value ?? p.projectedValue
+    const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
+    const color = statusColors[p.status]
+    return (
+      <button
+        key={p.id}
+        onClick={() => onSelectPlot(p)}
+        className="w-full flex items-center gap-3 bg-navy-light/40 border border-white/5 rounded-xl px-3 py-2.5 hover:border-gold/20 transition-all text-right group card-lift"
+      >
+        <div className="w-1 h-8 rounded-full flex-shrink-0" style={{ background: color }} />
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-medium text-slate-200 truncate">גוש {bn} | חלקה {p.number}</div>
+          <div className="text-[10px] text-slate-500 flex items-center gap-1">
+            {p.city}
+            {showDistance && p.distance_km != null && (
+              <span className="text-blue-400">· {p.distance_km < 1 ? `${Math.round(p.distance_km * 1000)}מ׳` : `${p.distance_km} ק״מ`}</span>
+            )}
+          </div>
+          {showReasons && p._matchReasons && p._matchReasons.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {p._matchReasons.slice(0, 2).map((reason, i) => (
+                <span key={i} className="text-[8px] text-gold/70 bg-gold/8 px-1.5 py-0.5 rounded">{reason}</span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="text-left flex-shrink-0">
+          <div className="text-xs font-bold text-gold">{formatCurrency(price)}</div>
+          <div className="text-[10px] text-emerald-400">+{roi}%</div>
+        </div>
+      </button>
+    )
+  }
 
   return (
-    <div className="mt-4 mb-2">
-      <h4 className="text-xs font-bold text-slate-400 mb-3 flex items-center gap-2">
-        <span className="w-5 h-5 rounded bg-gold/15 flex items-center justify-center text-[10px]">📍</span>
-        {hasDistance ? 'חלקות בסביבה' : 'חלקות דומות'}
-      </h4>
-      <div className="space-y-2">
-        {similar.map(p => {
-          const bn = p.block_number ?? p.blockNumber
-          const price = p.total_price ?? p.totalPrice
-          const projValue = p.projected_value ?? p.projectedValue
-          const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
-          const color = statusColors[p.status]
-          return (
-            <button
-              key={p.id}
-              onClick={() => onSelectPlot(p)}
-              className="w-full flex items-center gap-3 bg-navy-light/40 border border-white/5 rounded-xl px-3 py-2.5 hover:border-gold/20 transition-all text-right group card-lift"
-            >
-              <div className="w-1 h-8 rounded-full flex-shrink-0" style={{ background: color }} />
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-slate-200 truncate">גוש {bn} | חלקה {p.number}</div>
-                <div className="text-[10px] text-slate-500 flex items-center gap-1">
-                  {p.city}
-                  {p.distance_km != null && (
-                    <span className="text-blue-400">· {p.distance_km < 1 ? `${Math.round(p.distance_km * 1000)}מ׳` : `${p.distance_km} ק״מ`}</span>
-                  )}
-                </div>
-              </div>
-              <div className="text-left flex-shrink-0">
-                <div className="text-xs font-bold text-gold">{formatCurrency(price)}</div>
-                <div className="text-[10px] text-emerald-400">+{roi}%</div>
-              </div>
-            </button>
-          )
-        })}
-      </div>
+    <div className="mt-4 mb-2 space-y-4">
+      {/* Similar by investment characteristics */}
+      {hasSimilar && (
+        <div>
+          <h4 className="text-xs font-bold text-slate-400 mb-3 flex items-center gap-2">
+            <span className="w-5 h-5 rounded bg-purple-500/15 flex items-center justify-center text-[10px]">🎯</span>
+            חלקות דומות
+            <span className="text-[9px] text-slate-600 font-normal">מחיר, תכנון ותשואה</span>
+          </h4>
+          <div className="space-y-2">
+            {(similarPlots && similarPlots.length > 0 ? similarPlots : fallbackSimilar).map(p => renderPlotRow(p, false, true))}
+          </div>
+        </div>
+      )}
+
+      {/* Nearby by geography */}
+      {hasNearby && (
+        <div>
+          <h4 className="text-xs font-bold text-slate-400 mb-3 flex items-center gap-2">
+            <span className="w-5 h-5 rounded bg-blue-500/15 flex items-center justify-center text-[10px]">📍</span>
+            חלקות בסביבה
+          </h4>
+          <div className="space-y-2">
+            {nearbyFiltered.map(p => renderPlotRow(p, true, false))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

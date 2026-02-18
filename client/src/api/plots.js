@@ -18,6 +18,14 @@ export function getNearbyPlots(id, limit = 5) {
 }
 
 /**
+ * Fetch plots with similar investment characteristics (zoning, price, size, ROI).
+ * Unlike nearby (geography), this finds similar *opportunities*.
+ */
+export function getSimilarPlots(id, limit = 4) {
+  return api.get(`/plots/${id}/similar?limit=${limit}`)
+}
+
+/**
  * Track a plot view (fire-and-forget).
  * Server increments a views counter for popularity indicators.
  */

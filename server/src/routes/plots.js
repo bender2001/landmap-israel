@@ -246,6 +246,96 @@ router.get('/popular', async (req, res, next) => {
   }
 })
 
+// GET /api/plots/:id/similar - Find plots with similar investment characteristics
+// Unlike /nearby (geography), this matches by zoning stage, price range, size, and ROI.
+// Ideal for "חלקות דומות" — investors want similar *opportunities*, not just nearby land.
+router.get('/:id/similar', sanitizePlotId, async (req, res, next) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 4, 10)
+    const cacheKey = `similar:${req.params.id}:${limit}`
+    const cached = getCached(cacheKey)
+    if (cached) {
+      res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300')
+      res.set('X-Cache', 'HIT')
+      return res.json(cached)
+    }
+
+    res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300')
+    res.set('X-Cache', 'MISS')
+    const plot = await getPlotById(req.params.id)
+    if (!plot) return res.status(404).json({ error: 'Plot not found' })
+
+    const price = plot.total_price || 0
+    const sizeSqM = plot.size_sqm || 0
+    const zoning = plot.zoning_stage || 'AGRICULTURAL'
+    const projValue = plot.projected_value || 0
+    const plotRoi = price > 0 ? ((projValue - price) / price) * 100 : 0
+
+    // Zoning pipeline order for proximity matching
+    const ZONING_ORDER = [
+      'AGRICULTURAL', 'MASTER_PLAN_DEPOSIT', 'MASTER_PLAN_APPROVED',
+      'DETAILED_PLAN_PREP', 'DETAILED_PLAN_DEPOSIT', 'DETAILED_PLAN_APPROVED',
+      'DEVELOPER_TENDER', 'BUILDING_PERMIT',
+    ]
+    const plotZoningIdx = ZONING_ORDER.indexOf(zoning)
+
+    // Get all published plots (uses 30s cache)
+    const allPlots = await plotCache.wrap('plots:{}', () => getPublishedPlots({}), 30_000)
+
+    const scored = allPlots
+      .filter(p => p.id !== req.params.id && p.status !== 'SOLD')
+      .map(p => {
+        const pPrice = p.total_price || 0
+        const pSize = p.size_sqm || 0
+        const pZoning = p.zoning_stage || 'AGRICULTURAL'
+        const pProj = p.projected_value || 0
+        const pRoi = pPrice > 0 ? ((pProj - pPrice) / pPrice) * 100 : 0
+        const pZoningIdx = ZONING_ORDER.indexOf(pZoning)
+
+        // Price similarity (0-3 pts) — lower diff = higher score
+        const priceDiff = price > 0 ? Math.abs(pPrice - price) / price : 1
+        const priceScore = Math.max(0, 3 - priceDiff * 3)
+
+        // Size similarity (0-2 pts)
+        const sizeDiff = sizeSqM > 0 ? Math.abs(pSize - sizeSqM) / sizeSqM : 1
+        const sizeScore = Math.max(0, 2 - sizeDiff * 2)
+
+        // Zoning proximity (0-3 pts) — same or adjacent stage scores highest
+        const zoningDist = Math.abs(pZoningIdx - plotZoningIdx)
+        const zoningScore = zoningDist === 0 ? 3 : zoningDist === 1 ? 2 : zoningDist === 2 ? 1 : 0
+
+        // ROI similarity (0-2 pts)
+        const roiDiff = plotRoi > 0 ? Math.abs(pRoi - plotRoi) / Math.max(plotRoi, 1) : 1
+        const roiScore = Math.max(0, 2 - roiDiff * 2)
+
+        // Same city bonus (1 pt) — investors often focus on specific areas
+        const cityBonus = p.city === plot.city ? 1 : 0
+
+        const totalScore = priceScore + sizeScore + zoningScore + roiScore + cityBonus
+
+        return {
+          ...p,
+          _similarityScore: Math.round(totalScore * 100) / 100,
+          _matchReasons: [
+            zoningDist <= 1 && 'שלב תכנוני דומה',
+            priceDiff < 0.3 && 'טווח מחיר דומה',
+            sizeDiff < 0.4 && 'שטח דומה',
+            roiDiff < 0.3 && 'תשואה דומה',
+            p.city === plot.city && 'אותה עיר',
+          ].filter(Boolean),
+        }
+      })
+      .filter(p => p._similarityScore > 2) // minimum threshold
+      .sort((a, b) => b._similarityScore - a._similarityScore)
+      .slice(0, limit)
+
+    setCache(cacheKey, scored)
+    res.json(scored)
+  } catch (err) {
+    next(err)
+  }
+})
+
 // GET /api/plots/:id/nearby - Find plots near a given plot (geo-proximity)
 router.get('/:id/nearby', sanitizePlotId, async (req, res, next) => {
   try {

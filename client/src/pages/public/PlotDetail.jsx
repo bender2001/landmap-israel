@@ -1,7 +1,7 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart, ExternalLink } from 'lucide-react'
-import { usePlot, useNearbyPlots } from '../../hooks/usePlots.js'
+import { usePlot, useNearbyPlots, useSimilarPlots } from '../../hooks/usePlots.js'
 import { useMarketOverview } from '../../hooks/useMarketOverview.js'
 import { useFavorites } from '../../hooks/useFavorites.js'
 import { useViewTracker } from '../../hooks/useViewTracker.js'
@@ -78,66 +78,107 @@ function BreadcrumbSchema({ plot }) {
  * This eliminates an unnecessary full-dataset fetch on the detail page, cutting the initial
  * API payload by ~90% (one lightweight nearby query vs the entire plots table).
  */
+function PlotCard({ p }) {
+  const bn = p.block_number ?? p.blockNumber
+  const price = p.total_price ?? p.totalPrice
+  const projValue = p.projected_value ?? p.projectedValue
+  const sizeSqM = p.size_sqm ?? p.sizeSqM
+  const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
+  const color = statusColors[p.status]
+  const distLabel = p.distance_km != null
+    ? p.distance_km < 1 ? `${Math.round(p.distance_km * 1000)}מ׳` : `${p.distance_km} ק״מ`
+    : null
+  return (
+    <Link
+      to={`/plot/${p.id}`}
+      className="bg-navy-light/40 border border-white/5 rounded-2xl p-4 hover:border-gold/20 transition-all group"
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-1.5 h-8 rounded-full flex-shrink-0" style={{ background: color }} />
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-slate-200 truncate">גוש {bn} | חלקה {p.number}</div>
+          <div className="text-xs text-slate-500">
+            {p.city} · {formatDunam(sizeSqM)} דונם
+            {distLabel && <span className="text-blue-400"> · {distLabel}</span>}
+          </div>
+        </div>
+      </div>
+      {/* Match reason tags (from similar endpoint) */}
+      {p._matchReasons && p._matchReasons.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {p._matchReasons.slice(0, 2).map((reason, i) => (
+            <span key={i} className="text-[9px] text-gold/70 bg-gold/8 px-1.5 py-0.5 rounded">{reason}</span>
+          ))}
+        </div>
+      )}
+      <div className="flex justify-between items-end">
+        <div className="text-sm font-bold text-gold">{formatPriceShort(price)}</div>
+        <div className="text-xs font-bold text-emerald-400">+{roi}%</div>
+      </div>
+      <div className="mt-2 h-1 rounded-full bg-white/5 overflow-hidden">
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: `${Math.min(100, Math.max(8, (price / (projValue || 1)) * 100))}%`,
+            background: 'linear-gradient(90deg, #3B82F6, #60A5FA)',
+          }}
+        />
+      </div>
+    </Link>
+  )
+}
+
 function SimilarPlotsSection({ plotId, onNearbyLoaded }) {
-  const { data: similar = [], isLoading } = useNearbyPlots(plotId)
+  const { data: similar = [], isLoading: simLoading } = useSimilarPlots(plotId)
+  const { data: nearby = [], isLoading: nearLoading } = useNearbyPlots(plotId)
 
   // Lift nearby plots to parent for investment verdict area benchmark
   useEffect(() => {
-    if (similar.length > 0 && onNearbyLoaded) onNearbyLoaded(similar)
-  }, [similar, onNearbyLoaded])
+    const combined = [...(nearby || []), ...(similar || [])]
+    if (combined.length > 0 && onNearbyLoaded) onNearbyLoaded(combined)
+  }, [nearby, similar, onNearbyLoaded])
 
-  if (isLoading || similar.length === 0) return null
+  // Deduplicate: remove plots that appear in both lists
+  const nearbyFiltered = useMemo(() => {
+    if (!nearby || nearby.length === 0) return []
+    const simIds = new Set((similar || []).map(p => p.id))
+    return nearby.filter(p => !simIds.has(p.id)).slice(0, 4)
+  }, [nearby, similar])
+
+  const hasSimilar = similar && similar.length > 0
+  const hasNearby = nearbyFiltered.length > 0
+  const isLoading = simLoading && nearLoading
+
+  if (isLoading || (!hasSimilar && !hasNearby)) return null
 
   return (
-    <div className="mb-8">
-      <h2 className="text-base font-bold text-slate-100 mb-4 flex items-center gap-2">
-        <span className="w-7 h-7 rounded-lg bg-gold/15 flex items-center justify-center text-sm">📍</span>
-        חלקות בסביבה
-      </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {similar.map(p => {
-          const bn = p.block_number ?? p.blockNumber
-          const price = p.total_price ?? p.totalPrice
-          const projValue = p.projected_value ?? p.projectedValue
-          const sizeSqM = p.size_sqm ?? p.sizeSqM
-          const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
-          const color = statusColors[p.status]
-          const distLabel = p.distance_km != null
-            ? p.distance_km < 1 ? `${Math.round(p.distance_km * 1000)}מ׳` : `${p.distance_km} ק״מ`
-            : null
-          return (
-            <Link
-              key={p.id}
-              to={`/plot/${p.id}`}
-              className="bg-navy-light/40 border border-white/5 rounded-2xl p-4 hover:border-gold/20 transition-all group"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-1.5 h-8 rounded-full flex-shrink-0" style={{ background: color }} />
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-slate-200 truncate">גוש {bn} | חלקה {p.number}</div>
-                  <div className="text-xs text-slate-500">
-                    {p.city} · {formatDunam(sizeSqM)} דונם
-                    {distLabel && <span className="text-blue-400"> · {distLabel}</span>}
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-between items-end">
-                <div className="text-sm font-bold text-gold">{formatPriceShort(price)}</div>
-                <div className="text-xs font-bold text-emerald-400">+{roi}%</div>
-              </div>
-              <div className="mt-2 h-1 rounded-full bg-white/5 overflow-hidden">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${Math.min(100, Math.max(8, (price / (projValue || 1)) * 100))}%`,
-                    background: 'linear-gradient(90deg, #3B82F6, #60A5FA)',
-                  }}
-                />
-              </div>
-            </Link>
-          )
-        })}
-      </div>
+    <div className="space-y-8 mb-8">
+      {/* Similar by investment characteristics */}
+      {hasSimilar && (
+        <div>
+          <h2 className="text-base font-bold text-slate-100 mb-4 flex items-center gap-2">
+            <span className="w-7 h-7 rounded-lg bg-purple-500/15 flex items-center justify-center text-sm">🎯</span>
+            חלקות דומות
+            <span className="text-xs text-slate-500 font-normal">מחיר, שלב תכנוני ותשואה</span>
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {similar.map(p => <PlotCard key={p.id} p={p} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Nearby by geography */}
+      {hasNearby && (
+        <div>
+          <h2 className="text-base font-bold text-slate-100 mb-4 flex items-center gap-2">
+            <span className="w-7 h-7 rounded-lg bg-blue-500/15 flex items-center justify-center text-sm">📍</span>
+            חלקות בסביבה
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {nearbyFiltered.map(p => <PlotCard key={p.id} p={p} />)}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

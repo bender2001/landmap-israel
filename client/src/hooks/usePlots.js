@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useCallback } from 'react'
-import { getPlots, getPlot, getNearbyPlots, getPopularPlots, getFeaturedPlots, getPlotsBatch } from '../api/plots.js'
+import { getPlots, getPlot, getNearbyPlots, getSimilarPlots, getPopularPlots, getFeaturedPlots, getPlotsBatch } from '../api/plots.js'
 import { plots as mockPlots } from '../data/mockData.js'
 import { useIsSlowConnection } from './useNetworkStatus.js'
 
@@ -119,6 +119,24 @@ export function useNearbyPlots(plotId) {
     enabled: !!plotId,
     staleTime: 120_000,
     retry: 1,
+  })
+}
+
+/**
+ * Fetch plots with similar investment characteristics (zoning stage, price range, size, ROI).
+ * Unlike useNearbyPlots (geography), this finds similar *investment opportunities*.
+ * Server computes a weighted similarity score across multiple dimensions.
+ * Used in SidebarDetails to show "חלקות דומות" — like Madlan's recommendation engine.
+ */
+export function useSimilarPlots(plotId) {
+  return useQuery({
+    queryKey: ['similarPlots', plotId],
+    queryFn: () => getSimilarPlots(plotId, 4),
+    enabled: !!plotId,
+    staleTime: 120_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+    placeholderData: [],
   })
 }
 
