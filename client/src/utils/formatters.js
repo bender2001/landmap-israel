@@ -457,12 +457,19 @@ export function generatePlotSummary(plot) {
     BUILDING_PERMIT: 'היתר בנייה',
   }
 
+  // Physical dimensions
+  const perimeter = calcPlotPerimeter(plot.coordinates)
+  const perimeterStr = perimeter
+    ? perimeter >= 1000 ? `${(perimeter / 1000).toFixed(1)} ק״מ` : `${perimeter} מ׳`
+    : null
+
   const lines = [
     `🏗️ *גוש ${bn} | חלקה ${plot.number}*`,
     `📍 ${plot.city}`,
     ``,
     `💰 מחיר: ${formatCurrency(price)}`,
     `📐 שטח: ${formatDunam(sizeSqM)} דונם (${sizeSqM.toLocaleString()} מ״ר)`,
+    perimeterStr ? `📏 היקף: ${perimeterStr}` : null,
     sizeSqM > 0 ? `💵 מחיר/דונם: ${formatCurrency(Math.round(price / sizeSqM * 1000))}` : null,
     zoning && zoningNames[zoning] ? `🗺️ ייעוד: ${zoningNames[zoning]}` : null,
     ``,
@@ -763,4 +770,97 @@ export function plotCenter(coordinates) {
   const lng = valid.reduce((s, c) => s + c[1], 0) / valid.length
   if (!isFinite(lat) || !isFinite(lng)) return null
   return { lat, lng }
+}
+
+/**
+ * Calculate the perimeter of a plot polygon in meters using Haversine distance.
+ * Useful for investors assessing fencing costs, boundary surveys, and infrastructure.
+ * Both Madlan and Yad2 show land dimensions — this goes further with exact perimeter.
+ *
+ * @param {Array} coordinates - Array of [lat, lng] pairs forming the polygon
+ * @returns {number|null} Perimeter in meters, or null if invalid
+ */
+export function calcPlotPerimeter(coordinates) {
+  if (!coordinates || !Array.isArray(coordinates)) return null
+  const valid = coordinates.filter(c => Array.isArray(c) && c.length >= 2 && isFinite(c[0]) && isFinite(c[1]))
+  if (valid.length < 3) return null
+
+  const R = 6371000 // Earth radius in meters
+  const toRad = (deg) => deg * Math.PI / 180
+
+  let perimeter = 0
+  for (let i = 0; i < valid.length; i++) {
+    const [lat1, lng1] = valid[i]
+    const [lat2, lng2] = valid[(i + 1) % valid.length]
+    const dLat = toRad(lat2 - lat1)
+    const dLng = toRad(lng2 - lng1)
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
+    perimeter += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  }
+
+  return Math.round(perimeter)
+}
+
+/**
+ * Compare land investment returns against alternative investments (bank deposits, stock market).
+ * Israeli bank fixed deposits currently yield ~4-5% annually; TA-125 averages ~8-10% over 10yr.
+ * This gives investors context for the opportunity cost — a key factor professional investors weigh.
+ *
+ * @param {number} investmentAmount - Total cash invested (including taxes/fees)
+ * @param {number} expectedReturn - Expected total return amount
+ * @param {number} years - Investment horizon
+ * @returns {Object} Comparison data for bank, stock, and land
+ */
+export function calcAlternativeReturns(investmentAmount, expectedReturn, years) {
+  if (!investmentAmount || investmentAmount <= 0 || !years || years <= 0) return null
+
+  const bankRate = 0.045     // Israeli bank fixed deposit ~4.5%/yr (Bank of Israel Q4 2025)
+  const stockRate = 0.09     // TA-125 long-term avg ~9%/yr
+  const inflationRate = 0.03 // Israel avg CPI ~3%/yr
+
+  // Compound growth for alternatives
+  const bankFutureValue = Math.round(investmentAmount * Math.pow(1 + bankRate, years))
+  const stockFutureValue = Math.round(investmentAmount * Math.pow(1 + stockRate, years))
+  const landFutureValue = investmentAmount + expectedReturn
+
+  // Real returns (inflation-adjusted)
+  const realBankRate = ((1 + bankRate) / (1 + inflationRate)) - 1
+  const realStockRate = ((1 + stockRate) / (1 + inflationRate)) - 1
+  const landNominalCagr = years > 0 ? Math.pow(landFutureValue / investmentAmount, 1 / years) - 1 : 0
+  const realLandRate = ((1 + landNominalCagr) / (1 + inflationRate)) - 1
+
+  return {
+    bank: {
+      label: 'פיקדון בנקאי',
+      emoji: '🏦',
+      rate: bankRate,
+      futureValue: bankFutureValue,
+      profit: bankFutureValue - investmentAmount,
+      color: '#94A3B8',
+    },
+    stock: {
+      label: 'TA-125 (מניות)',
+      emoji: '📊',
+      rate: stockRate,
+      futureValue: stockFutureValue,
+      profit: stockFutureValue - investmentAmount,
+      color: '#3B82F6',
+    },
+    land: {
+      label: 'קרקע זו',
+      emoji: '🏗️',
+      rate: landNominalCagr,
+      futureValue: landFutureValue,
+      profit: expectedReturn,
+      color: '#C8942A',
+    },
+    years,
+    inflationRate,
+    realReturns: {
+      bank: Math.round(realBankRate * 1000) / 10,
+      stock: Math.round(realStockRate * 1000) / 10,
+      land: Math.round(realLandRate * 1000) / 10,
+    },
+  }
 }

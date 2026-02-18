@@ -1,15 +1,31 @@
 import { Router } from 'express'
+import { rateLimit } from 'express-rate-limit'
 import { getPublishedPlots } from '../services/plotService.js'
 import { sanitizePlotQuery } from '../middleware/sanitize.js'
 
 const router = Router()
+
+// Rate limit CSV exports — prevents scraping/mass-download abuse.
+// 20 exports per 15 minutes is generous for legitimate agent use
+// but blocks bots that try to dump the entire dataset repeatedly.
+const exportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'יותר מדי בקשות ייצוא — נסה שוב בעוד דקות',
+    errorCode: 'RATE_LIMIT_EXPORT',
+    retryAfter: 900,
+  },
+})
 
 /**
  * GET /api/export/csv — Export filtered plots as CSV download.
  * Supports same query params as /api/plots (city, priceMin, etc.)
  * Used by real estate agents for offline analysis (like Madlan's export feature).
  */
-router.get('/csv', sanitizePlotQuery, async (req, res, next) => {
+router.get('/csv', exportLimiter, sanitizePlotQuery, async (req, res, next) => {
   try {
     const plots = await getPublishedPlots(req.query)
 

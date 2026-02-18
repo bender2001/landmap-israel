@@ -7,7 +7,7 @@ import PriceTrendChart from './ui/PriceTrendChart'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import ProfitWaterfall from './ui/ProfitWaterfall'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
-import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict, calcRiskLevel, generatePlotSummary, calcDemandVelocity, calcBuildableValue, calcInvestmentTimeline, plotCenter } from '../utils/formatters'
+import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict, calcRiskLevel, generatePlotSummary, calcDemandVelocity, calcBuildableValue, calcInvestmentTimeline, plotCenter, calcPlotPerimeter, calcAlternativeReturns } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
 import NeighborhoodRadar from './ui/NeighborhoodRadar'
 import InvestmentBenchmark from './ui/InvestmentBenchmark'
@@ -1253,8 +1253,22 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               </div>
             )}
 
-            {/* Distance chips */}
+            {/* Distance & plot dimension chips */}
             <div className="flex flex-wrap gap-2.5 mt-3 animate-stagger-3">
+              {/* Plot perimeter — useful for fencing costs, boundary assessment.
+                  Neither Madlan nor Yad2 show this metric; professionals calculate it manually. */}
+              {(() => {
+                const perimeter = calcPlotPerimeter(plot.coordinates)
+                if (!perimeter) return null
+                return (
+                  <div className="flex items-center gap-2 bg-gradient-to-r from-navy-light/50 to-navy-light/60 border border-gold/15 rounded-xl px-4 py-2 text-xs text-slate-300 card-lift" title={`היקף החלקה: ${perimeter.toLocaleString()} מטר — שימושי להערכת עלויות גידור`}>
+                    <div className="w-6 h-6 rounded-lg bg-gold/15 flex items-center justify-center">
+                      <span className="text-gold text-[11px]">📐</span>
+                    </div>
+                    היקף: {perimeter >= 1000 ? `${(perimeter / 1000).toFixed(1)} ק״מ` : `${perimeter} מ׳`}
+                  </div>
+                )
+              })()}
               {distanceToSea != null && (
                 <div className="flex items-center gap-2 bg-gradient-to-r from-navy-light/50 to-navy-light/60 border border-blue-500/15 rounded-xl px-4 py-2 text-xs text-slate-300 card-lift">
                   <div className="w-6 h-6 rounded-lg bg-blue-500/15 flex items-center justify-center">
@@ -1658,6 +1672,80 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 readinessEstimate={readinessEstimate}
                 zoningStage={zoningStage}
               />
+
+              {/* Alternative Investment Comparison — "What if you put this money elsewhere?"
+                  No Israeli real estate platform shows this. Pro investors always weigh opportunity cost:
+                  bank deposit vs TA-125 vs land. This makes the value proposition crystal clear. */}
+              {(() => {
+                const purchaseTaxAlt = Math.round(totalPrice * 0.06)
+                const attorneyFeesAlt = Math.round(totalPrice * 0.0175)
+                const totalInvestmentAlt = totalPrice + purchaseTaxAlt + attorneyFeesAlt
+                const grossProfitAlt = projectedValue - totalPrice
+                const bettermentLevyAlt = Math.round(grossProfitAlt * 0.5)
+                const costsAlt = purchaseTaxAlt + attorneyFeesAlt
+                const taxableAlt = Math.max(0, grossProfitAlt - bettermentLevyAlt - costsAlt)
+                const capGainsAlt = Math.round(taxableAlt * 0.25)
+                const netProfitAlt = grossProfitAlt - costsAlt - bettermentLevyAlt - capGainsAlt
+                const cagrDataAlt = calcCAGR(roi, readinessEstimate)
+                const yearsAlt = cagrDataAlt?.years || 5
+
+                const comparison = calcAlternativeReturns(totalInvestmentAlt, netProfitAlt, yearsAlt)
+                if (!comparison) return null
+
+                const options = [comparison.land, comparison.stock, comparison.bank]
+                const maxProfit = Math.max(...options.map(o => o.profit))
+
+                return (
+                  <div className="bg-gradient-to-r from-navy-light/50 to-navy-light/40 border border-white/5 rounded-xl p-3 mb-3">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 rounded-lg bg-gold/15 flex items-center justify-center">
+                        <BarChart3 className="w-3.5 h-3.5 text-gold" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium text-slate-200">השוואת אלטרנטיבות השקעה</span>
+                        <span className="text-[9px] text-slate-500 block">מה אם היית משקיע {formatCurrency(totalInvestmentAlt)} אחרת? ({yearsAlt} שנים)</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {options.map((opt, i) => {
+                        const barWidth = maxProfit > 0 ? Math.max(5, (opt.profit / maxProfit) * 100) : 5
+                        const isWinner = opt.profit === maxProfit && options.filter(o => o.profit === maxProfit).length === 1
+                        return (
+                          <div key={i} className="flex items-center gap-2">
+                            <span className="text-[10px] w-[70px] flex-shrink-0 text-right" style={{ color: opt.color }}>
+                              {opt.emoji} {opt.label}
+                            </span>
+                            <div className="flex-1 relative h-4 rounded-lg bg-white/[0.03] overflow-hidden">
+                              <div
+                                className="absolute top-0 right-0 h-full rounded-lg transition-all duration-700"
+                                style={{
+                                  width: `${barWidth}%`,
+                                  background: `linear-gradient(90deg, ${opt.color}40, ${opt.color}20)`,
+                                  borderRight: `2px solid ${opt.color}`,
+                                }}
+                              />
+                              <span className="absolute inset-0 flex items-center justify-end pr-2 text-[9px] font-bold" style={{ color: opt.color }}>
+                                {opt.profit >= 0 ? '+' : ''}{formatCurrency(opt.profit)}
+                              </span>
+                            </div>
+                            {isWinner && <span className="text-[10px] flex-shrink-0" title="תשואה הגבוהה ביותר">🏆</span>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {comparison.realReturns && (
+                      <div className="flex items-center gap-3 mt-2 pt-2 border-t border-white/5 text-[9px] text-slate-500">
+                        <span>תשואה ריאלית (אחרי אינפלציה {(comparison.inflationRate * 100).toFixed(0)}%):</span>
+                        <span style={{ color: comparison.land.color }}>{comparison.realReturns.land}%/שנה</span>
+                        <span className="w-px h-3 bg-white/10" />
+                        <span style={{ color: comparison.stock.color }}>{comparison.realReturns.stock}%/שנה</span>
+                        <span className="w-px h-3 bg-white/10" />
+                        <span style={{ color: comparison.bank.color }}>{comparison.realReturns.bank}%/שנה</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
 
               <div className="bg-navy-light/40 border border-white/5 rounded-xl p-3 mb-3">
                 <div className="flex items-center gap-2 mb-2">
