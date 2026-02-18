@@ -369,6 +369,90 @@ export default function FilterBar({
           )}
         </div>
 
+        {/* Active filter chips — removable tags like Madlan/Yad2 */}
+        {activeCount > 0 && (
+          <div className="filter-active-chips-row">
+            {filters.city !== 'all' && (
+              <button
+                className="filter-active-chip"
+                onClick={() => onFilterChange('city', 'all')}
+                aria-label={`הסר סינון עיר: ${filters.city}`}
+              >
+                <MapPin className="w-3 h-3" />
+                <span>{filters.city}</span>
+                <X className="w-3 h-3 opacity-60 hover:opacity-100" />
+              </button>
+            )}
+            {priceRangeValue !== 'all' && (
+              <button
+                className="filter-active-chip"
+                onClick={() => { onFilterChange('priceMin', ''); onFilterChange('priceMax', '') }}
+                aria-label={`הסר סינון מחיר: ${priceDisplay}`}
+              >
+                <Banknote className="w-3 h-3" />
+                <span>{priceDisplay}</span>
+                <X className="w-3 h-3 opacity-60 hover:opacity-100" />
+              </button>
+            )}
+            {sizeRangeValue !== 'all' && (
+              <button
+                className="filter-active-chip"
+                onClick={() => { onFilterChange('sizeMin', ''); onFilterChange('sizeMax', '') }}
+                aria-label={`הסר סינון שטח: ${sizeDisplay}`}
+              >
+                <Ruler className="w-3 h-3" />
+                <span>{sizeDisplay}</span>
+                <X className="w-3 h-3 opacity-60 hover:opacity-100" />
+              </button>
+            )}
+            {filters.minRoi && filters.minRoi !== 'all' && (
+              <button
+                className="filter-active-chip"
+                onClick={() => onFilterChange('minRoi', 'all')}
+                aria-label={`הסר סינון תשואה: ${filters.minRoi}%+`}
+              >
+                <TrendingUp className="w-3 h-3" />
+                <span>{filters.minRoi}%+</span>
+                <X className="w-3 h-3 opacity-60 hover:opacity-100" />
+              </button>
+            )}
+            {filters.ripeness !== 'all' && (
+              <button
+                className="filter-active-chip"
+                onClick={() => onFilterChange('ripeness', 'all')}
+                aria-label={`הסר סינון בשלות: ${ripenessOptions.find(o => o.value === filters.ripeness)?.label}`}
+              >
+                <Clock className="w-3 h-3" />
+                <span>{ripenessOptions.find(o => o.value === filters.ripeness)?.label}</span>
+                <X className="w-3 h-3 opacity-60 hover:opacity-100" />
+              </button>
+            )}
+            {statusFilter.map(status => (
+              <button
+                key={status}
+                className="filter-active-chip"
+                onClick={() => onToggleStatus(status)}
+                aria-label={`הסר סינון סטטוס: ${statusLabels[status]}`}
+              >
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: statusColors[status] }} />
+                <span>{statusLabels[status]}</span>
+                <X className="w-3 h-3 opacity-60 hover:opacity-100" />
+              </button>
+            ))}
+            {filters.search && (
+              <button
+                className="filter-active-chip"
+                onClick={() => onFilterChange('search', '')}
+                aria-label={`הסר חיפוש: ${filters.search}`}
+              >
+                <Search className="w-3 h-3" />
+                <span>"{filters.search}"</span>
+                <X className="w-3 h-3 opacity-60 hover:opacity-100" />
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Bottom row: Clear + count */}
         {activeCount > 0 && (
           <div className="filter-actions-row">

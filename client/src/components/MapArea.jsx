@@ -481,16 +481,27 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
                     })()}
                   </div>
 
-                  <button
-                    className="plot-popup-cta"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onSelectPlot(plot)
-                    }}
-                  >
-                    <span>צפה בפרטים</span>
-                    <ArrowLeft className="w-4 h-4" />
-                  </button>
+                  <div className="plot-popup-actions">
+                    <button
+                      className="plot-popup-cta"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onSelectPlot(plot)
+                      }}
+                    >
+                      <span>צפה בפרטים</span>
+                      <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    {favorites && (
+                      <button
+                        className={`plot-popup-action-btn ${favorites.isFavorite(plot.id) ? 'is-active' : ''}`}
+                        onClick={(e) => { e.stopPropagation(); favorites.toggle(plot.id) }}
+                        title={favorites.isFavorite(plot.id) ? 'הסר ממועדפים' : 'הוסף למועדפים'}
+                      >
+                        {favorites.isFavorite(plot.id) ? '❤️' : '🤍'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </Popup>
             </Polygon>

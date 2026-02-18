@@ -426,12 +426,45 @@ body {
 }
 
 /* Popup CTA button */
+.plot-popup-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.plot-popup-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(200, 148, 42, 0.2);
+  background: rgba(200, 148, 42, 0.06);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.plot-popup-action-btn:hover {
+  background: rgba(200, 148, 42, 0.15);
+  transform: scale(1.08);
+}
+
+.plot-popup-action-btn.is-active {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
 .plot-popup-cta {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin-top: 14px;
+  margin-top: 0;
+  flex: 1;
   padding: 8px 16px;
   background: linear-gradient(135deg, #C8942A, #E5B94E);
   border: none;
@@ -1099,6 +1132,43 @@ body {
 /* ═══════════════════════════════════════════
    FILTER ACTIONS ROW (clear + count)
    ═══════════════════════════════════════════ */
+
+/* ── Active filter chips (removable tags like Madlan/Yad2) ── */
+.filter-active-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(200, 148, 42, 0.06);
+}
+
+.filter-active-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 6px;
+  font-size: 11px;
+  font-family: 'Heebo', sans-serif;
+  color: #C8942A;
+  background: rgba(200, 148, 42, 0.08);
+  border: 1px solid rgba(200, 148, 42, 0.15);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.filter-active-chip:hover {
+  background: rgba(200, 148, 42, 0.15);
+  border-color: rgba(200, 148, 42, 0.3);
+  transform: scale(1.03);
+}
+
+.filter-active-chip:active {
+  transform: scale(0.97);
+}
 
 .filter-actions-row {
   display: flex;
