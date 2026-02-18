@@ -204,6 +204,12 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
               <span style={{ fontSize: '20px', opacity: 0.5 }}>🏗️</span>
             </div>
             <div className="plot-card-mini-thumb-overlay" />
+            {/* Photo count badge — like Madlan/Yad2 multi-image indicator */}
+            {images.length > 1 && (
+              <span className="absolute bottom-2 left-2 z-10 flex items-center gap-0.5 px-1.5 py-0.5 text-[8px] font-bold text-white bg-black/60 backdrop-blur-sm rounded-md leading-none">
+                📷 {images.length}
+              </span>
+            )}
             <div className="plot-card-mini-accent" style={{ background: isCompared ? '#8B5CF6' : color, position: 'absolute', bottom: 0, left: 0, right: 0 }} />
           </div>
         )

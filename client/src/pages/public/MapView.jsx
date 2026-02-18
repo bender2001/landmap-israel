@@ -685,6 +685,17 @@ export default function MapView() {
           return `נבחרה חלקה: גוש ${bn} חלקה ${selectedPlot.number}, ${selectedPlot.city}. מחיר ${formatPriceShort(price)}, תשואה ${roi} אחוז.`
         })() : ''}
       </div>
+      {/* Screen reader announcement for filter result count — WCAG 4.1.3 Status Messages.
+          Uses aria-live="polite" so it doesn't interrupt active screen reader navigation.
+          Announces the result count whenever filters change (like Madlan's "X תוצאות"). */}
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {!isLoading && filteredPlots.length > 0
+          ? `נמצאו ${filteredPlots.length} חלקות`
+          : !isLoading && filteredPlots.length === 0
+            ? 'לא נמצאו חלקות מתאימות לסינון הנוכחי'
+            : ''
+        }
+      </div>
       <ConnectionStatus />
       {/* Data freshness indicator — shows when data was last synced (like Madlan's real-time feel) */}
       {dataUpdatedAt > 0 && (

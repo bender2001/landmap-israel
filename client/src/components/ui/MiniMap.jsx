@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Polygon, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { ExternalLink, Eye, Map as MapIcon } from 'lucide-react'
 import { statusColors } from '../../utils/constants'
+import { plotCenter as computeCenter } from '../../utils/formatters'
 
 // Gold pin icon
 const pinIcon = L.divIcon({
@@ -42,11 +43,9 @@ export default function MiniMap({ coordinates, status, city, className = '', int
   }, [coordinates])
 
   const center = useMemo(() => {
-    if (validCoords.length === 0) return [32.45, 34.87]
-    const lat = validCoords.reduce((s, c) => s + c[0], 0) / validCoords.length
-    const lng = validCoords.reduce((s, c) => s + c[1], 0) / validCoords.length
-    return [lat, lng]
-  }, [validCoords])
+    const c = computeCenter(coordinates)
+    return c ? [c.lat, c.lng] : [32.45, 34.87]
+  }, [coordinates])
 
   const bounds = useMemo(() => {
     if (validCoords.length < 2) return null

@@ -748,3 +748,19 @@ export function calcPlotPercentiles(plot, allPlots) {
     } : null,
   }
 }
+
+/**
+ * Compute the centroid (center point) of a plot's coordinates.
+ * Used across multiple components (MiniMap, SidebarDetails, MapArea) for
+ * navigation links, Street View, GovMap, and Waze URLs.
+ * Returns { lat, lng } or null if coordinates are invalid.
+ */
+export function plotCenter(coordinates) {
+  if (!coordinates || !Array.isArray(coordinates)) return null
+  const valid = coordinates.filter(c => Array.isArray(c) && c.length >= 2 && isFinite(c[0]) && isFinite(c[1]))
+  if (valid.length === 0) return null
+  const lat = valid.reduce((s, c) => s + c[0], 0) / valid.length
+  const lng = valid.reduce((s, c) => s + c[1], 0) / valid.length
+  if (!isFinite(lat) || !isFinite(lng)) return null
+  return { lat, lng }
+}

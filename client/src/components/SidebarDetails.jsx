@@ -7,7 +7,7 @@ import PriceTrendChart from './ui/PriceTrendChart'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import ProfitWaterfall from './ui/ProfitWaterfall'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
-import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict, calcRiskLevel, generatePlotSummary, calcDemandVelocity, calcBuildableValue, calcInvestmentTimeline } from '../utils/formatters'
+import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict, calcRiskLevel, generatePlotSummary, calcDemandVelocity, calcBuildableValue, calcInvestmentTimeline, plotCenter } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
 import NeighborhoodRadar from './ui/NeighborhoodRadar'
 import InvestmentBenchmark from './ui/InvestmentBenchmark'
@@ -1282,15 +1282,13 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
             </div>
 
             {/* External Map Links (Street View, Google Maps, Waze) */}
-            {plot.coordinates?.length >= 3 && (() => {
-              const validCoords = plot.coordinates.filter(c => Array.isArray(c) && c.length >= 2 && isFinite(c[0]) && isFinite(c[1]))
-              if (validCoords.length === 0) return null
-              const lat = validCoords.reduce((s, c) => s + c[0], 0) / validCoords.length
-              const lng = validCoords.reduce((s, c) => s + c[1], 0) / validCoords.length
+            {(() => {
+              const center = plotCenter(plot.coordinates)
+              if (!center) return null
               return (
                 <div className="flex flex-wrap gap-2 mt-3 animate-stagger-3">
                   <a
-                    href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`}
+                    href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${center.lat},${center.lng}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 bg-gradient-to-r from-navy-light/50 to-navy-light/60 border border-yellow-500/15 rounded-xl px-4 py-2 text-xs text-slate-300 hover:border-gold/30 transition-all card-lift"
@@ -1302,7 +1300,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                     <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
                   </a>
                   <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
+                    href={`https://www.google.com/maps/search/?api=1&query=${center.lat},${center.lng}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 bg-gradient-to-r from-navy-light/50 to-navy-light/60 border border-blue-500/15 rounded-xl px-4 py-2 text-xs text-slate-300 hover:border-gold/30 transition-all card-lift"
@@ -1314,7 +1312,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                     <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
                   </a>
                   <a
-                    href={`https://www.waze.com/ul?ll=${lat},${lng}&navigate=yes`}
+                    href={`https://www.waze.com/ul?ll=${center.lat},${center.lng}&navigate=yes`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 bg-gradient-to-r from-navy-light/50 to-navy-light/60 border border-cyan-500/15 rounded-xl px-4 py-2 text-xs text-slate-300 hover:border-gold/30 transition-all card-lift"
@@ -1356,7 +1354,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
               </a>
               <a
-                href={`https://www.govmap.gov.il/?lat=${(() => { const vc = plot.coordinates?.filter(c => Array.isArray(c) && c.length >= 2); return vc && vc.length > 0 ? (vc.reduce((s,c)=>s+c[0],0)/vc.length).toFixed(5) : '32.45' })()}&lon=${(() => { const vc = plot.coordinates?.filter(c => Array.isArray(c) && c.length >= 2); return vc && vc.length > 0 ? (vc.reduce((s,c)=>s+c[1],0)/vc.length).toFixed(5) : '34.87' })()}&z=15`}
+                href={`https://www.govmap.gov.il/?lat=${(plotCenter(plot.coordinates)?.lat ?? 32.45).toFixed(5)}&lon=${(plotCenter(plot.coordinates)?.lng ?? 34.87).toFixed(5)}&z=15`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 bg-gradient-to-r from-navy-light/50 to-navy-light/60 border border-amber-500/15 rounded-xl px-4 py-2 text-xs text-slate-300 hover:border-gold/30 transition-all card-lift"
