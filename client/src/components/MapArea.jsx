@@ -89,24 +89,45 @@ const MAP_LAYERS = [
 
 function MapLayerSwitcher({ activeLayer, onChangeLayer }) {
   const [isOpen, setIsOpen] = useState(false)
+  const ref = useRef(null)
+
+  // Close dropdown on outside click or Escape key
+  useEffect(() => {
+    if (!isOpen) return
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setIsOpen(false)
+    }
+    function handleKey(e) {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [isOpen])
 
   return (
     <div className="absolute top-4 right-4 z-[1000] pointer-events-none">
-      <div className="pointer-events-auto relative">
+      <div className="pointer-events-auto relative" ref={ref}>
         <button
           onClick={() => setIsOpen(prev => !prev)}
           className="glass-panel w-9 h-9 flex items-center justify-center hover:border-gold/20 transition-colors"
           style={{ minWidth: 44, minHeight: 44 }}
           title="שכבות מפה"
           aria-label="שכבות מפה"
+          aria-expanded={isOpen}
         >
           <Layers className="w-4 h-4 text-gold" />
         </button>
         {isOpen && (
-          <div className="absolute top-12 right-0 glass-panel p-2 min-w-[140px] flex flex-col gap-1" dir="rtl">
+          <div className="absolute top-12 right-0 glass-panel p-2 min-w-[140px] flex flex-col gap-1" dir="rtl" role="listbox" aria-label="שכבות מפה">
             {MAP_LAYERS.map(layer => (
               <button
                 key={layer.id}
+                role="option"
+                aria-selected={activeLayer === layer.id}
                 onClick={() => { onChangeLayer(layer.id); setIsOpen(false) }}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors ${
                   activeLayer === layer.id
@@ -276,23 +297,45 @@ function getRoiColor(roi) {
 
 function ColorModeToggle({ colorMode, onChangeColorMode }) {
   const [isOpen, setIsOpen] = useState(false)
+  const ref = useRef(null)
+
+  // Close dropdown on outside click or Escape key
+  useEffect(() => {
+    if (!isOpen) return
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setIsOpen(false)
+    }
+    function handleKey(e) {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [isOpen])
+
   return (
     <div className="absolute top-[60px] right-4 z-[1000] pointer-events-none">
-      <div className="pointer-events-auto relative">
+      <div className="pointer-events-auto relative" ref={ref}>
         <button
           onClick={() => setIsOpen(prev => !prev)}
           className="glass-panel w-9 h-9 flex items-center justify-center hover:border-gold/20 transition-colors"
           style={{ minWidth: 44, minHeight: 44 }}
           title="צביעת חלקות"
           aria-label="צביעת חלקות"
+          aria-expanded={isOpen}
         >
           <span className="text-sm">{COLOR_MODES.find(m => m.id === colorMode)?.emoji || '🏷️'}</span>
         </button>
         {isOpen && (
-          <div className="absolute top-12 right-0 glass-panel p-2 min-w-[130px] flex flex-col gap-1" dir="rtl">
+          <div className="absolute top-12 right-0 glass-panel p-2 min-w-[130px] flex flex-col gap-1" dir="rtl" role="listbox" aria-label="צביעת חלקות">
             {COLOR_MODES.map(mode => (
               <button
                 key={mode.id}
+                role="option"
+                aria-selected={colorMode === mode.id}
                 onClick={() => { onChangeColorMode(mode.id); setIsOpen(false) }}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors ${
                   colorMode === mode.id
@@ -979,14 +1022,17 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
       <div className="absolute bottom-8 right-4 z-[1000] pointer-events-none hidden sm:block">
         <div className="glass-panel px-3 py-2.5 pointer-events-auto">
           {colorMode === 'status' ? (
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-0.5" role="group" aria-label="סינון לפי סטטוס">
               {Object.entries(statusColors).map(([status, color]) => {
                 const isActive = statusFilter.length === 0 || statusFilter.includes(status)
                 return (
-                  <div
+                  <button
                     key={status}
+                    type="button"
                     className={`legend-item ${!isActive ? 'inactive' : ''}`}
                     onClick={() => onToggleStatus(status)}
+                    aria-pressed={isActive}
+                    aria-label={`${statusLabels[status]}${statusCounts[status] > 0 ? ` (${statusCounts[status]})` : ''}`}
                   >
                     <div
                       className="legend-item-check"
@@ -998,7 +1044,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
                     {statusCounts[status] > 0 && (
                       <span className="text-[9px] text-slate-500 mr-auto tabular-nums">{statusCounts[status]}</span>
                     )}
-                  </div>
+                  </button>
                 )
               })}
             </div>

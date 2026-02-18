@@ -1526,6 +1526,18 @@ body {
   cursor: pointer;
   transition: all 0.2s;
   user-select: none;
+  /* Button reset — element is now a <button> for keyboard accessibility */
+  background: none;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  width: 100%;
+  text-align: start;
+}
+
+.legend-item:focus-visible {
+  outline: 2px solid rgba(200, 148, 42, 0.6);
+  outline-offset: 1px;
 }
 
 .legend-item:hover {

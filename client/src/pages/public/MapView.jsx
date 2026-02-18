@@ -216,7 +216,7 @@ export default function MapView() {
       const desc = (p.description ?? '').toLowerCase()
       return bn.includes(q) || num.includes(q) || city.includes(q) || desc.includes(q)
     })
-  }, [roiFilteredPlots, filters.search, debouncedSearch])
+  }, [boundsFilteredPlots, filters.search, debouncedSearch])
 
   // Sort
   const sortedPlots = useMemo(() => {
