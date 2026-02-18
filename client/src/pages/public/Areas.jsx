@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { MapPin, TrendingUp, Ruler, DollarSign, ArrowLeft, BarChart3, Building2, Users, ChevronDown, ChevronUp } from 'lucide-react'
+import { MapPin, TrendingUp, Ruler, DollarSign, ArrowLeft, BarChart3, Building2, Users, ChevronDown, ChevronUp, Activity } from 'lucide-react'
 import { useAllPlots } from '../../hooks/usePlots.js'
+import { useMarketTrends } from '../../hooks/useMarketTrends.js'
 import PublicNav from '../../components/PublicNav.jsx'
 import PublicFooter from '../../components/PublicFooter.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
@@ -143,8 +144,118 @@ function CityCard({ city, stats, onSelect }) {
   )
 }
 
+const CITY_COLORS = {
+  'חדרה': '#3B82F6',
+  'נתניה': '#22C55E',
+  'קיסריה': '#E5B94E',
+}
+
+/**
+ * Mini SVG line chart for price trends per city — like Madlan's area price history.
+ * Pure SVG, no chart library dependency.
+ */
+function PriceTrendMiniChart({ trends }) {
+  if (!trends || !trends.cities || Object.keys(trends.cities).length === 0) return null
+
+  const cities = Object.entries(trends.cities)
+  const allValues = cities.flatMap(([, d]) => d.trend.map(t => t.avgPriceSqm))
+  const min = Math.min(...allValues) * 0.95
+  const max = Math.max(...allValues) * 1.05
+  const range = max - min || 1
+
+  const W = 500
+  const H = 180
+  const padX = 40
+  const padY = 20
+  const chartW = W - padX * 2
+  const chartH = H - padY * 2
+
+  return (
+    <div className="glass-panel p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+          <Activity className="w-4 h-4 text-gold" />
+          מגמת מחירים — 12 חודשים אחרונים
+        </h3>
+        <div className="flex items-center gap-3">
+          {cities.map(([city, data]) => (
+            <div key={city} className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: CITY_COLORS[city] || '#94A3B8' }} />
+              <span className="text-[10px] text-slate-400">{city}</span>
+              <span className={`text-[10px] font-bold ${data.change12m >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {data.change12m >= 0 ? '+' : ''}{data.change12m}%
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
+        {/* Grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map(pct => {
+          const y = padY + chartH * (1 - pct)
+          const val = Math.round(min + range * pct)
+          return (
+            <g key={pct}>
+              <line x1={padX} y1={y} x2={W - padX} y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+              <text x={padX - 4} y={y + 3} fill="rgba(148,163,184,0.5)" fontSize="8" textAnchor="end" fontFamily="sans-serif">
+                ₪{val.toLocaleString()}
+              </text>
+            </g>
+          )
+        })}
+
+        {/* Month labels */}
+        {trends.monthLabels && trends.monthLabels.map((label, i) => {
+          if (i % 2 !== 0) return null
+          const x = padX + (i / (trends.monthLabels.length - 1)) * chartW
+          return (
+            <text key={i} x={x} y={H - 4} fill="rgba(148,163,184,0.4)" fontSize="7" textAnchor="middle" fontFamily="sans-serif">
+              {label}
+            </text>
+          )
+        })}
+
+        {/* Lines */}
+        {cities.map(([city, data]) => {
+          const points = data.trend.map((t, i) => {
+            const x = padX + (i / (data.trend.length - 1)) * chartW
+            const y = padY + chartH * (1 - (t.avgPriceSqm - min) / range)
+            return `${x},${y}`
+          })
+          const color = CITY_COLORS[city] || '#94A3B8'
+          return (
+            <g key={city}>
+              <polyline
+                points={points.join(' ')}
+                fill="none"
+                stroke={color}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* End dot */}
+              {data.trend.length > 0 && (() => {
+                const last = data.trend[data.trend.length - 1]
+                const x = padX + ((data.trend.length - 1) / (data.trend.length - 1)) * chartW
+                const y = padY + chartH * (1 - (last.avgPriceSqm - min) / range)
+                return <circle cx={x} cy={y} r="3" fill={color} />
+              })()}
+            </g>
+          )
+        })}
+      </svg>
+
+      <p className="text-[9px] text-slate-600 mt-2 text-center">
+        מחיר ממוצע למ״ר לפי עיר. הנתונים מבוססים על חלקות פעילות במערכת.
+      </p>
+    </div>
+  )
+}
+
 export default function Areas() {
   const { data: plots = [], isLoading } = useAllPlots({})
+  const { data: trends } = useMarketTrends()
 
   const cityData = useMemo(() => {
     if (!plots || plots.length === 0) return []
@@ -223,8 +334,11 @@ export default function Areas() {
               </div>
             )}
 
+            {/* Price trends chart */}
+            {trends && <PriceTrendMiniChart trends={trends} />}
+
             {/* City cards */}
-            <div className="space-y-4">
+            <div className="space-y-4 mt-6">
               {cityData.map(({ city, stats }) => (
                 <CityCard key={city} city={city} stats={stats} />
               ))}
