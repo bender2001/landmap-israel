@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback, useMemo, memo } from 'react'
 import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows, Share2 } from 'lucide-react'
 import PriceSparkline from './ui/PriceSparkline'
 import { statusColors, statusLabels } from '../utils/constants'
-import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcMonthlyPayment, formatMonthlyPayment, calcDemandVelocity, calcBestInCategory } from '../utils/formatters'
+import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcMonthlyPayment, formatMonthlyPayment, calcDemandVelocity, calcBestInCategory, calcBuildableValue } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
 import { whatsappShareLink } from '../utils/config'
 
@@ -355,6 +355,20 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
               const payment = calcMonthlyPayment(price)
               if (!payment) return null
               return <span className="text-[9px] text-blue-400/70" title={`הון עצמי: ${formatPriceShort(payment.downPayment)} | הלוואה: ${formatPriceShort(payment.loanAmount)}`}>~{formatMonthlyPayment(payment.monthly)}</span>
+            })()}
+            {/* Buildable value — shows price per buildable sqm when density data available.
+                THE metric professional land investors use for quick deal evaluation. */}
+            {(() => {
+              const bv = calcBuildableValue(plot)
+              if (!bv) return null
+              return (
+                <span
+                  className="text-[8px] text-purple-400/70"
+                  title={`${bv.estimatedUnits} יח׳ דיור · ${formatPriceShort(bv.pricePerUnit)}/יח׳ · ${bv.totalBuildableArea.toLocaleString()} מ״ר בנוי`}
+                >
+                  🏢 {formatPriceShort(bv.pricePerBuildableSqm)}/מ״ר בנוי
+                </span>
+              )
             })()}
             <MarketPositionDot percentile={pricePercentile} />
           </div>

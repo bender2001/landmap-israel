@@ -572,6 +572,111 @@ export function calcBestInCategory(plots) {
 }
 
 /**
+ * Calculate buildable value analysis — the metric professional land investors use.
+ * Translates raw land cost into effective cost per buildable sqm using density data.
+ * This accounts for zoning potential: a plot at ₪1,500/sqm with 8 units/dunam
+ * is very different from one at ₪1,200/sqm with only 2 units/dunam.
+ *
+ * Key metric: "How much am I paying per apartment-equivalent?"
+ * Madlan/Yad2 don't show this — it's a differentiator for serious investors.
+ *
+ * @param {Object} plot - The plot object (needs density_units_per_dunam, size_sqm, total_price)
+ * @param {number} [avgUnitSizeSqm=100] - Average apartment size (100 sqm is Israeli standard)
+ * @returns {{ pricePerBuildableSqm, totalBuildableArea, estimatedUnits, pricePerUnit, efficiencyRatio } | null}
+ */
+export function calcBuildableValue(plot, avgUnitSizeSqm = 100) {
+  if (!plot) return null
+
+  const price = plot.total_price ?? plot.totalPrice ?? 0
+  const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
+  const density = plot.density_units_per_dunam ?? plot.densityUnitsPerDunam ?? 0
+
+  if (price <= 0 || sizeSqM <= 0 || density <= 0) return null
+
+  const dunam = sizeSqM / 1000
+  const estimatedUnits = Math.round(dunam * density)
+  if (estimatedUnits <= 0) return null
+
+  const totalBuildableArea = estimatedUnits * avgUnitSizeSqm
+  const pricePerBuildableSqm = Math.round(price / totalBuildableArea)
+  const pricePerUnit = Math.round(price / estimatedUnits)
+  // Efficiency ratio: buildable area / land area (higher = more efficient use of land)
+  const efficiencyRatio = Math.round((totalBuildableArea / sizeSqM) * 100) / 100
+
+  return {
+    pricePerBuildableSqm,
+    totalBuildableArea,
+    estimatedUnits,
+    pricePerUnit,
+    efficiencyRatio,
+    density,
+  }
+}
+
+/**
+ * Calculate investment timeline milestones with estimated dates.
+ * Maps the zoning pipeline into a visual timeline with past/current/future stages.
+ * Each stage has an estimated duration in months based on Israeli planning authority averages.
+ *
+ * @param {Object} plot - The plot (needs zoning_stage, readiness_estimate, created_at)
+ * @returns {{ stages: Array<{ key, label, icon, status, months }>, totalMonths, elapsedMonths, progressPct } | null}
+ */
+export function calcInvestmentTimeline(plot) {
+  if (!plot) return null
+
+  const zoning = plot.zoning_stage ?? plot.zoningStage ?? 'AGRICULTURAL'
+
+  // Average Israeli planning authority timelines per stage (months)
+  const stageData = [
+    { key: 'AGRICULTURAL', label: 'חקלאית', icon: '🌾', durationMonths: 0 },
+    { key: 'MASTER_PLAN_DEPOSIT', label: 'הפקדת מתאר', icon: '📋', durationMonths: 12 },
+    { key: 'MASTER_PLAN_APPROVED', label: 'אישור מתאר', icon: '✅', durationMonths: 8 },
+    { key: 'DETAILED_PLAN_PREP', label: 'הכנת מפורטת', icon: '📐', durationMonths: 10 },
+    { key: 'DETAILED_PLAN_DEPOSIT', label: 'הפקדת מפורטת', icon: '📋', durationMonths: 6 },
+    { key: 'DETAILED_PLAN_APPROVED', label: 'מפורטת מאושרת', icon: '✅', durationMonths: 6 },
+    { key: 'DEVELOPER_TENDER', label: 'מכרז יזמים', icon: '🏗️', durationMonths: 4 },
+    { key: 'BUILDING_PERMIT', label: 'היתר בנייה', icon: '🏠', durationMonths: 0 },
+  ]
+
+  const currentIdx = stageData.findIndex(s => s.key === zoning)
+  if (currentIdx < 0) return null
+
+  // Tag each stage as completed / current / future
+  const stages = stageData.map((stage, i) => ({
+    ...stage,
+    status: i < currentIdx ? 'completed' : i === currentIdx ? 'current' : 'future',
+  }))
+
+  // Calculate total remaining months from current stage to building permit
+  const remainingMonths = stageData
+    .slice(currentIdx + 1)
+    .reduce((sum, s) => sum + s.durationMonths, 0)
+
+  // Calculate elapsed months (from agricultural to current stage)
+  const elapsedMonths = stageData
+    .slice(1, currentIdx + 1)
+    .reduce((sum, s) => sum + s.durationMonths, 0)
+
+  const totalMonths = elapsedMonths + remainingMonths
+  const progressPct = totalMonths > 0 ? Math.round((elapsedMonths / totalMonths) * 100) : 100
+
+  // Estimated completion year
+  const estimatedCompletionDate = new Date()
+  estimatedCompletionDate.setMonth(estimatedCompletionDate.getMonth() + remainingMonths)
+  const estimatedYear = estimatedCompletionDate.getFullYear()
+
+  return {
+    stages,
+    totalMonths,
+    elapsedMonths,
+    remainingMonths,
+    progressPct,
+    currentStage: stageData[currentIdx],
+    estimatedYear,
+  }
+}
+
+/**
  * Calculate percentile rank of a value within a sorted array.
  * Returns 0-100 (what percentage of values are below this one).
  * E.g., percentile=80 means "better than 80% of plots".

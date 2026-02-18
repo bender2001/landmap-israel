@@ -6,7 +6,7 @@ import PriceTrendChart from './ui/PriceTrendChart'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import ProfitWaterfall from './ui/ProfitWaterfall'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
-import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict, calcRiskLevel, generatePlotSummary, calcDemandVelocity } from '../utils/formatters'
+import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict, calcRiskLevel, generatePlotSummary, calcDemandVelocity, calcBuildableValue, calcInvestmentTimeline } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
 import NeighborhoodRadar from './ui/NeighborhoodRadar'
 import InvestmentBenchmark from './ui/InvestmentBenchmark'
@@ -1515,6 +1515,48 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 )
               })()}
 
+              {/* Buildable Value Analysis — price per buildable sqm, THE metric for pro investors.
+                  Translates raw land cost into effective cost per buildable area using density data.
+                  This is a key differentiator: neither Madlan nor Yad2 show this metric. */}
+              {(() => {
+                const buildable = calcBuildableValue(plot)
+                if (!buildable) return null
+                return (
+                  <div className="bg-gradient-to-r from-purple-500/8 to-indigo-500/8 border border-purple-500/15 rounded-xl p-3 mb-3">
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <div className="w-6 h-6 rounded-lg bg-purple-500/15 flex items-center justify-center">
+                        <Building2 className="w-3.5 h-3.5 text-purple-400" />
+                      </div>
+                      <span className="text-xs font-medium text-slate-200">ניתוח שווי בנייה</span>
+                      <span className="text-[9px] text-purple-400/60 bg-purple-500/10 px-1.5 py-0.5 rounded mr-auto">PRO</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-white/[0.03] rounded-lg p-2 text-center">
+                        <div className="text-[9px] text-slate-500 mb-0.5">מחיר/מ״ר בנוי</div>
+                        <div className="text-sm font-bold text-purple-400">{formatCurrency(buildable.pricePerBuildableSqm)}</div>
+                      </div>
+                      <div className="bg-white/[0.03] rounded-lg p-2 text-center">
+                        <div className="text-[9px] text-slate-500 mb-0.5">מחיר ליח׳ דיור</div>
+                        <div className="text-sm font-bold text-indigo-400">{formatCurrency(buildable.pricePerUnit)}</div>
+                      </div>
+                      <div className="bg-white/[0.03] rounded-lg p-2 text-center">
+                        <div className="text-[9px] text-slate-500 mb-0.5">יח׳ דיור משוערות</div>
+                        <div className="text-sm font-bold text-slate-300">{buildable.estimatedUnits}</div>
+                      </div>
+                      <div className="bg-white/[0.03] rounded-lg p-2 text-center">
+                        <div className="text-[9px] text-slate-500 mb-0.5">שטח בנוי כולל</div>
+                        <div className="text-sm font-bold text-slate-300">{buildable.totalBuildableArea.toLocaleString()} מ״ר</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2 text-[9px] text-slate-500">
+                      <span>יחס ניצול: ×{buildable.efficiencyRatio}</span>
+                      <span className="text-slate-700">·</span>
+                      <span>על בסיס {buildable.density} יח״ד/דונם, 100 מ״ר ליח׳</span>
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* Tax authority comparison */}
               {taxAuthorityValue && (
                 <div className="bg-navy-light/40 border border-white/5 rounded-xl p-3 mt-3 mb-3">
@@ -1800,6 +1842,90 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   <span className="text-sm font-bold text-gold">{readinessEstimate}</span>
                 </div>
               )}
+
+              {/* Investment Timeline — compact visual progress bar showing path to building permit.
+                  Gives investors instant understanding of where this plot sits in the approval process,
+                  how far it's come, and how long until potential profit. Like a project Gantt chart condensed
+                  into a single glanceable widget. Madlan/Yad2 don't have this — pure differentiator. */}
+              {(() => {
+                const timeline = calcInvestmentTimeline(plot)
+                if (!timeline || timeline.stages.length === 0) return null
+                return (
+                  <div className="bg-navy-light/40 border border-white/5 rounded-xl p-3 mb-4">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-3.5 h-3.5 text-gold" />
+                        <span className="text-xs font-medium text-slate-200">ציר זמן השקעה</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {timeline.remainingMonths > 0 && (
+                          <span className="text-[9px] text-slate-500">~{timeline.remainingMonths} חודשים נותרו</span>
+                        )}
+                        <span className="text-[10px] font-bold text-gold">{timeline.progressPct}%</span>
+                      </div>
+                    </div>
+
+                    {/* Progress bar with stage markers */}
+                    <div className="relative">
+                      <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${Math.max(3, timeline.progressPct)}%`,
+                            background: timeline.progressPct >= 75
+                              ? 'linear-gradient(90deg, #22C55E, #4ADE80)'
+                              : timeline.progressPct >= 40
+                                ? 'linear-gradient(90deg, #C8942A, #E5B94E)'
+                                : 'linear-gradient(90deg, #3B82F6, #60A5FA)',
+                          }}
+                        />
+                      </div>
+
+                      {/* Stage dots */}
+                      <div className="flex justify-between mt-1.5">
+                        {timeline.stages.map((stage, i) => {
+                          const pct = timeline.stages.length > 1 ? (i / (timeline.stages.length - 1)) * 100 : 50
+                          return (
+                            <div
+                              key={stage.key}
+                              className="flex flex-col items-center"
+                              style={{ width: `${100 / timeline.stages.length}%` }}
+                              title={`${stage.label}${stage.status === 'completed' ? ' ✓' : stage.status === 'current' ? ' (נוכחי)' : ''}`}
+                            >
+                              <div
+                                className={`w-2 h-2 rounded-full transition-all ${
+                                  stage.status === 'completed'
+                                    ? 'bg-green-400 shadow-sm shadow-green-400/40'
+                                    : stage.status === 'current'
+                                      ? 'bg-gold shadow-sm shadow-gold/40 ring-2 ring-gold/20'
+                                      : 'bg-slate-700'
+                                }`}
+                              />
+                              {/* Show abbreviated label for first, current, and last stages */}
+                              {(i === 0 || stage.status === 'current' || i === timeline.stages.length - 1) && (
+                                <span className={`text-[7px] mt-1 text-center leading-tight ${
+                                  stage.status === 'current' ? 'text-gold font-bold' : 'text-slate-600'
+                                }`}>
+                                  {stage.icon}
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Estimated completion */}
+                    {timeline.estimatedYear && timeline.remainingMonths > 0 && (
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+                        <span className="text-[9px] text-slate-500">סיום משוער</span>
+                        <span className="text-[10px] font-medium text-gold">{timeline.estimatedYear}</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
               <div className="space-y-0 mb-2">
                 {zoningPipelineStages.map((stage, i) => {
                   const isCompleted = i < currentStageIndex
