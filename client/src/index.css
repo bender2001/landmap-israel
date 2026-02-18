@@ -2077,6 +2077,16 @@ body {
   transform: translateY(-4px);
 }
 
+/* Sold plot — dimmed card with reduced saturation (like Madlan's sold listings) */
+.plot-card-mini-sold {
+  opacity: 0.7;
+  filter: saturate(0.5);
+}
+.plot-card-mini-sold:hover {
+  opacity: 0.85;
+  filter: saturate(0.7);
+}
+
 .plot-card-mini-accent {
   height: 3px;
 }

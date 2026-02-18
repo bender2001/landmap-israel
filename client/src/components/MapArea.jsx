@@ -491,9 +491,9 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
       pathOptions={{
         color: isHovered ? '#FFFFFF' : color,
         fillColor: color,
-        fillOpacity: isHovered ? 0.6 : 0.45,
+        fillOpacity: plot.status === 'SOLD' ? (isHovered ? 0.35 : 0.2) : (isHovered ? 0.6 : 0.45),
         weight: isHovered ? 4 : 2.5,
-        dashArray: isHovered ? '' : '6 4',
+        dashArray: plot.status === 'SOLD' ? '4 6' : (isHovered ? '' : '6 4'),
       }}
       eventHandlers={{
         click: handleClick,
@@ -502,8 +502,8 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
       }}
     >
       <Tooltip permanent direction="center" className="price-tooltip">
-        <span className="tooltip-main-price">{isNew ? '🆕 ' : ''}{favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{plot.plot_images?.length > 0 ? '📷 ' : ''}{formatPriceShort(price)}</span>
-        <span className="tooltip-sub">{formatDunam(sizeSqM)} דונם · {sizeSqM > 0 ? `₪${Math.round(price / sizeSqM).toLocaleString()}/מ״ר` : ''} · +{roi}%</span>
+        <span className="tooltip-main-price">{plot.status === 'SOLD' ? '🔴 ' : ''}{isNew ? '🆕 ' : ''}{favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{plot.plot_images?.length > 0 ? '📷 ' : ''}{formatPriceShort(price)}</span>
+        <span className="tooltip-sub">{plot.status === 'SOLD' ? 'נמכר · ' : ''}{formatDunam(sizeSqM)} דונם · {sizeSqM > 0 ? `₪${Math.round(price / sizeSqM).toLocaleString()}/מ״ר` : ''} · +{roi}%</span>
         {/* Investment score + CAGR row — gives investors instant quality context on hover */}
         {(() => {
           const score = calcInvestmentScore(plot)
@@ -566,6 +566,11 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
             <span className="plot-popup-value">{zoningLabels[zoningStage]}</span>
           </div>
           <div className="plot-popup-badges">
+            {plot.status === 'SOLD' && (
+              <span className="plot-popup-badge" style={{ background: 'rgba(239,68,68,0.2)', color: '#F87171', border: '1px solid rgba(239,68,68,0.4)', fontWeight: 700 }}>
+                נמכר
+              </span>
+            )}
             <span className="plot-popup-badge plot-popup-badge-roi">+{roi}% ROI</span>
             {readiness && <span className="plot-popup-badge plot-popup-badge-time">{readiness}</span>}
             {(() => {
@@ -576,6 +581,16 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
                   {score}/10 {label}
                 </span>
               )
+            })()}
+            {/* Days on market — helps investors spot fresh vs stale listings */}
+            {(() => {
+              const created = createdAt
+              if (!created) return null
+              const days = Math.floor((Date.now() - new Date(created).getTime()) / 86400000)
+              if (days < 1) return <span className="plot-popup-badge" style={{ background: 'rgba(34,197,94,0.15)', color: '#4ADE80', border: '1px solid rgba(34,197,94,0.3)' }}>חדש היום!</span>
+              if (days <= 7) return <span className="plot-popup-badge" style={{ background: 'rgba(34,197,94,0.15)', color: '#4ADE80', border: '1px solid rgba(34,197,94,0.3)' }}>{days} ימים</span>
+              if (days <= 30) return <span className="plot-popup-badge" style={{ background: 'rgba(250,204,21,0.12)', color: '#FACC15', border: '1px solid rgba(250,204,21,0.3)' }}>{days} ימים</span>
+              return null
             })()}
             {(() => {
               const avg = areaAvgPsm?.[plot.city]

@@ -71,9 +71,9 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectPlot(plot) } }}
       onMouseEnter={() => prefetchPlot(plot.id)}
       onFocus={() => prefetchPlot(plot.id)}
-      className={`plot-card-mini ${isSelected ? 'plot-card-mini-selected' : ''} ${isCompared ? 'plot-card-mini-compared' : ''}`}
+      className={`plot-card-mini ${isSelected ? 'plot-card-mini-selected' : ''} ${isCompared ? 'plot-card-mini-compared' : ''} ${plot.status === 'SOLD' ? 'plot-card-mini-sold' : ''}`}
       style={{ '--card-color': color }}
-      aria-label={`גוש ${blockNum} חלקה ${plot.number}, ${plot.city}, ${formatPriceShort(price)}, תשואה +${roi}%`}
+      aria-label={`${plot.status === 'SOLD' ? 'נמכר — ' : ''}גוש ${blockNum} חלקה ${plot.number}, ${plot.city}, ${formatPriceShort(price)}, תשואה +${roi}%`}
     >
       {/* Freshness / popularity / trending badges */}
       {(isNew || isHot || isTrending || priceChange) && (
@@ -103,6 +103,15 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
               ↑ עלה {priceChange.pctChange}%
             </span>
           )}
+        </div>
+      )}
+      {/* Sold overlay — like Madlan's distinctive "נמכר" diagonal banner */}
+      {plot.status === 'SOLD' && (
+        <div className="absolute inset-0 z-[5] pointer-events-none flex items-center justify-center">
+          <div className="absolute inset-0 bg-navy/40" />
+          <span className="relative px-3 py-1 text-[10px] font-black tracking-wider text-red-300 bg-red-500/25 border border-red-500/30 rounded-lg backdrop-blur-sm -rotate-12 shadow-lg">
+            נמכר
+          </span>
         </div>
       )}
       {/* Thumbnail image with error fallback — prevents broken image icons */}
