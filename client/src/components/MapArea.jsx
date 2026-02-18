@@ -7,6 +7,7 @@ import { formatCurrency, formatPriceShort, formatDunam, calcInvestmentScore, get
 import { usePrefetchPlot } from '../hooks/usePlots'
 import MapClusterLayer from './MapClusterLayer'
 import MapRuler from './MapRuler'
+import MapHeatLayer from './MapHeatLayer'
 
 function FlyToSelected({ plot }) {
   const map = useMap()
@@ -237,6 +238,7 @@ const COLOR_MODES = [
   { id: 'status', label: 'סטטוס', emoji: '🏷️' },
   { id: 'price', label: 'מחיר/מ״ר', emoji: '💰' },
   { id: 'roi', label: 'תשואה', emoji: '📈' },
+  { id: 'heatmap', label: 'מפת חום', emoji: '🌡️' },
 ]
 
 function getHeatColor(value, min, max) {
@@ -364,6 +366,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         <FullscreenButton />
         <MapClusterLayer plots={plots} onSelectPlot={onSelectPlot} />
         <MapRuler />
+        <MapHeatLayer plots={plots} visible={colorMode === 'heatmap'} metric="priceSqm" />
 
         {plots.map((plot) => {
           // Validate coordinates before rendering polygon
@@ -597,6 +600,18 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
                   <span className="text-[10px] text-slate-300">{item.label}</span>
                 </div>
               ))}
+            </div>
+          ) : colorMode === 'heatmap' ? (
+            <div className="flex flex-col gap-1.5">
+              <div className="text-[10px] text-slate-400 font-medium mb-0.5">🌡️ מפת חום — צפיפות מחירים</div>
+              <div className="flex items-center gap-2">
+                <div className="h-2 flex-1 rounded-full" style={{ background: 'linear-gradient(90deg, rgba(0,200,50,0.4), rgba(255,200,50,0.4), rgba(255,0,50,0.4))' }} />
+              </div>
+              <div className="flex justify-between text-[9px] text-slate-500">
+                <span>זול</span>
+                <span>יקר</span>
+              </div>
+              <div className="text-[8px] text-slate-600 mt-0.5">עיגולים מציגים מחיר/מ״ר באזור</div>
             </div>
           ) : null}
         </div>
