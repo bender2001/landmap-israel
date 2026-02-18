@@ -116,7 +116,7 @@ export default function MapView() {
     return f
   }, [filters, statusFilter, sortBy])
 
-  const { data: plots = [], isLoading, error: plotsError, refetch: refetchPlots } = useAllPlots(apiFilters)
+  const { data: plots = [], isLoading, error: plotsError, refetch: refetchPlots, isPlaceholderData } = useAllPlots(apiFilters)
   const { data: pois = [] } = usePois()
 
   // Debounce search for performance
@@ -260,6 +260,13 @@ export default function MapView() {
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
         // Handled by SidebarDetails internally — we just need the shortcut documented
       }
+      // / key to open AI chat (like Cmd+K search pattern)
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
+        const tag = document.activeElement?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+        e.preventDefault()
+        setIsChatOpen(true)
+      }
       // Arrow keys to navigate between plots (only when no input is focused)
       if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && filteredPlots.length > 0) {
         const tag = document.activeElement?.tagName
@@ -376,7 +383,7 @@ export default function MapView() {
   return (
     <div className={`relative h-screen w-screen overflow-hidden bg-navy ${selectedPlot ? 'sidebar-open' : ''}`}>
       {/* Filter transition indicator */}
-      {isFilterStale && (
+      {(isFilterStale || isPlaceholderData) && (
         <div className="fixed top-0 left-0 right-0 z-[100] h-0.5">
           <div className="h-full bg-gradient-to-r from-gold via-gold-bright to-gold animate-pulse rounded-full" />
         </div>

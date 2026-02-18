@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { getPlots, getPlot, getNearbyPlots } from '../api/plots.js'
 import { plots as mockPlots } from '../data/mockData.js'
@@ -63,12 +63,18 @@ async function fetchPlotWithFallback(id) {
 }
 
 export function useAllPlots(filters) {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['plots', filters],
     queryFn: () => fetchPlotsWithFallback(filters),
     staleTime: 30_000,
-    retry: 1,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
+    placeholderData: keepPreviousData,
   })
+  return {
+    ...query,
+    isPlaceholderData: query.isPlaceholderData,
+  }
 }
 
 export function usePlot(id) {
