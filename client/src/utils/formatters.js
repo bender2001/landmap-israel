@@ -823,6 +823,31 @@ export function plotCenter(coordinates) {
 }
 
 /**
+ * Generate a Google Maps directions URL to a plot's center.
+ * Opens Google Maps with the destination pre-filled, using the user's current location
+ * as origin. Works on both desktop and mobile (triggers native Google Maps app on mobile).
+ * Like Madlan/Yad2's "הנחיות הגעה" button — critical for physical site visits.
+ *
+ * @param {Array} coordinates - Plot polygon [lat, lng] pairs
+ * @returns {string|null} Google Maps directions URL, or null if coordinates invalid
+ */
+export function plotNavigateUrl(coordinates) {
+  const center = plotCenter(coordinates)
+  if (!center) return null
+  return `https://www.google.com/maps/dir/?api=1&destination=${center.lat},${center.lng}&travelmode=driving`
+}
+
+/**
+ * Generate a Google Maps "view" URL centered on the plot (no directions).
+ * Useful for sharing the location or viewing surroundings.
+ */
+export function plotMapViewUrl(coordinates) {
+  const center = plotCenter(coordinates)
+  if (!center) return null
+  return `https://www.google.com/maps/@${center.lat},${center.lng},17z`
+}
+
+/**
  * Calculate the perimeter of a plot polygon in meters using Haversine distance.
  * Useful for investors assessing fencing costs, boundary surveys, and infrastructure.
  * Both Madlan and Yad2 show land dimensions — this goes further with exact perimeter.

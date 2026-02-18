@@ -1,9 +1,9 @@
 ﻿import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, Circle, ZoomControl, useMap, LayersControl } from 'react-leaflet'
 import L from 'leaflet'
 import { useState, useEffect, useCallback, useRef, useMemo, memo, forwardRef } from 'react'
-import { MapPin, Eye, Check, ArrowLeft, Navigation, Layers, Map as MapIcon } from 'lucide-react'
+import { MapPin, Eye, Check, ArrowLeft, Navigation, Layers, Map as MapIcon, Link2 } from 'lucide-react'
 import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
-import { formatCurrency, formatPriceShort, formatDunam, calcInvestmentScore, getScoreLabel, getInvestmentGrade, calcCAGR } from '../utils/formatters'
+import { formatCurrency, formatPriceShort, formatDunam, calcInvestmentScore, getScoreLabel, getInvestmentGrade, calcCAGR, plotNavigateUrl } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
 import { useAreaAverages } from '../hooks/useAreaAverages'
 import MapClusterLayer from './MapClusterLayer'
@@ -254,11 +254,12 @@ function UserLocationMarker() {
   )
 }
 
-/** Compact toolbar with locate + recenter + fullscreen grouped vertically above zoom */
+/** Compact toolbar with locate + recenter + share + fullscreen grouped vertically above zoom */
 function MapToolbar({ plots }) {
   const map = useMap()
   const [locating, setLocating] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement)
@@ -292,6 +293,44 @@ function MapToolbar({ plots }) {
     }
   }, [plots, map])
 
+  /**
+   * Share this map view — copies the current URL (with filters, sort, and map position hash)
+   * to clipboard. Like Google Maps' "Share" button — enables users to send a specific
+   * map view (zoomed into an area with filters applied) to other investors.
+   * The URL already syncs via MapUrlSync and search param hooks — we just need to copy it.
+   */
+  const handleShareView = useCallback(async () => {
+    try {
+      // Use Web Share API on mobile (opens native share sheet with WhatsApp, Telegram, etc.)
+      if (navigator.share && /Mobi|Android/i.test(navigator.userAgent)) {
+        const center = map.getCenter()
+        const zoom = map.getZoom()
+        await navigator.share({
+          title: 'LandMap Israel — מפת קרקעות להשקעה',
+          text: `צפה ב-${plots?.length || 0} חלקות להשקעה באזור זה`,
+          url: window.location.href,
+        })
+        return
+      }
+      // Desktop fallback: copy to clipboard
+      await navigator.clipboard.writeText(window.location.href)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch {
+      // Fallback for older browsers without clipboard API
+      try {
+        const input = document.createElement('input')
+        input.value = window.location.href
+        document.body.appendChild(input)
+        input.select()
+        document.execCommand('copy')
+        document.body.removeChild(input)
+        setLinkCopied(true)
+        setTimeout(() => setLinkCopied(false), 2000)
+      } catch {}
+    }
+  }, [map, plots?.length])
+
   const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) {
       document.exitFullscreen()
@@ -310,6 +349,27 @@ function MapToolbar({ plots }) {
         </button>
         <button onClick={handleRecenter} className={btnClass} title="הצג את כל החלקות">
           <MapIcon className="w-4 h-4 text-gold" />
+        </button>
+        {/* Share this view — copies the current URL (filters + map position) to clipboard.
+            Like Google Maps' share button — enables sending specific views to other investors. */}
+        <button
+          onClick={handleShareView}
+          className={`${btnClass} relative`}
+          title={linkCopied ? 'הקישור הועתק!' : 'שתף תצוגה נוכחית'}
+        >
+          {linkCopied ? (
+            <Check className="w-4 h-4 text-emerald-400" />
+          ) : (
+            <Link2 className="w-4 h-4 text-gold" />
+          )}
+          {/* Toast confirmation — appears briefly after copying */}
+          {linkCopied && (
+            <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap animate-fade-in">
+              <div className="bg-emerald-500/90 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg shadow-lg">
+                ✓ הקישור הועתק!
+              </div>
+            </div>
+          )}
         </button>
         <button onClick={toggleFullscreen} className={`${btnClass} hidden sm:flex`} title={isFullscreen ? 'צא ממסך מלא' : 'מסך מלא'}>
           {isFullscreen ? (
@@ -728,6 +788,24 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
             >
               ✈️
             </a>
+            {/* Navigate to plot — opens Google Maps directions (critical for physical site visits).
+                Like Madlan/Yad2's "הנחיות הגעה" — the #1 action investors take before visiting a plot. */}
+            {(() => {
+              const navUrl = plotNavigateUrl(plot.coordinates)
+              if (!navUrl) return null
+              return (
+                <a
+                  href={navUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="plot-popup-action-btn"
+                  onClick={(e) => e.stopPropagation()}
+                  title="נווט לחלקה (Google Maps)"
+                >
+                  🧭
+                </a>
+              )
+            })()}
           </div>
         </div>
       </Popup>
