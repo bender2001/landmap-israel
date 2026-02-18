@@ -229,6 +229,99 @@ if (process.env.NODE_ENV === 'production') {
     }
   })
 
+  // Areas page with OG meta for SEO
+  app.get('/areas', async (req, res, next) => {
+    try {
+      const indexPath = path.join(clientDist, 'index.html')
+      const { readFile } = await import('fs/promises')
+      let html = await readFile(indexPath, 'utf-8')
+
+      const baseUrl = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`
+      const title = 'סטטיסטיקות אזוריות — קרקעות להשקעה בישראל | LandMap Israel'
+      const description = 'השוואת אזורים לפי מחיר, תשואה, שטח ומספר חלקות — חדרה, נתניה, קיסריה. נתונים מעודכנים לצד מפה אינטראקטיבית.'
+
+      const ogTags = `
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:url" content="${baseUrl}/areas" />
+    <meta property="og:locale" content="he_IL" />
+    <meta property="og:site_name" content="LandMap Israel" />
+    <meta name="description" content="${description}" />
+    <link rel="canonical" href="${baseUrl}/areas" />
+    <title>${title}</title>`
+
+      html = html.replace(/<title>[^<]*<\/title>/, '')
+      html = html.replace('</head>', `${ogTags}\n  </head>`)
+
+      res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
+      res.send(html)
+    } catch {
+      next()
+    }
+  })
+
+  // About page with OG meta
+  app.get('/about', async (req, res, next) => {
+    try {
+      const indexPath = path.join(clientDist, 'index.html')
+      const { readFile } = await import('fs/promises')
+      let html = await readFile(indexPath, 'utf-8')
+
+      const baseUrl = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`
+      const title = 'אודות LandMap Israel — פלטפורמת השקעות קרקעות'
+      const description = 'LandMap Israel — פלטפורמה מתקדמת לחיפוש וניתוח קרקעות להשקעה בישראל. מפה אינטראקטיבית, AI יועץ, ונתוני תכנון בזמן אמת.'
+
+      const ogTags = `
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:url" content="${baseUrl}/about" />
+    <meta property="og:locale" content="he_IL" />
+    <meta property="og:site_name" content="LandMap Israel" />
+    <meta name="description" content="${description}" />
+    <link rel="canonical" href="${baseUrl}/about" />
+    <title>${title}</title>`
+
+      html = html.replace(/<title>[^<]*<\/title>/, '')
+      html = html.replace('</head>', `${ogTags}\n  </head>`)
+
+      res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=7200')
+      res.send(html)
+    } catch {
+      next()
+    }
+  })
+
+  // Calculator page with OG meta
+  app.get('/calculator', async (req, res, next) => {
+    try {
+      const indexPath = path.join(clientDist, 'index.html')
+      const { readFile } = await import('fs/promises')
+      let html = await readFile(indexPath, 'utf-8')
+
+      const baseUrl = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`
+      const title = 'מחשבון השקעות קרקע | LandMap Israel'
+      const description = 'חשב תשואה, עלויות נלוות, מימון ורווח נקי מהשקעה בקרקע בישראל. סימולטור מימון ואנליזת רגישות.'
+
+      const ogTags = `
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:url" content="${baseUrl}/calculator" />
+    <meta property="og:locale" content="he_IL" />
+    <meta property="og:site_name" content="LandMap Israel" />
+    <meta name="description" content="${description}" />
+    <link rel="canonical" href="${baseUrl}/calculator" />
+    <title>${title}</title>`
+
+      html = html.replace(/<title>[^<]*<\/title>/, '')
+      html = html.replace('</head>', `${ogTags}\n  </head>`)
+
+      res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=7200')
+      res.send(html)
+    } catch {
+      next()
+    }
+  })
+
   app.get('*', (req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'))
   })

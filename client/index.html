@@ -24,11 +24,23 @@
     <link rel="preconnect" href="https://a.basemaps.cartocdn.com" />
     <link rel="dns-prefetch" href="https://unpkg.com" />
     <link rel="dns-prefetch" href="https://server.arcgisonline.com" />
+    <link rel="canonical" href="https://landmap.co.il/" />
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" as="style" />
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   </head>
   <body class="m-0 p-0 overflow-hidden bg-navy font-heebo">
     <div id="root"></div>
+    <noscript>
+      <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#050D1A;color:#F1F5F9;font-family:sans-serif;text-align:center;padding:2rem;">
+        <div>
+          <h1 style="font-size:2rem;margin-bottom:1rem;color:#C8942A;">🏗️ LandMap Israel</h1>
+          <p style="font-size:1.1rem;margin-bottom:0.5rem;">מפת קרקעות להשקעה בישראל</p>
+          <p style="color:#94A3B8;">יש להפעיל JavaScript כדי להשתמש באפליקציה.</p>
+          <p style="color:#94A3B8;font-size:0.85rem;">Please enable JavaScript to use this application.</p>
+        </div>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
