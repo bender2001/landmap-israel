@@ -23,6 +23,7 @@ import adminImageRoutes from './routes/admin/images.js'
 import adminPoiRoutes from './routes/admin/pois.js'
 import adminActivityRoutes from './routes/admin/activity.js'
 import adminSettingsRoutes from './routes/admin/settings.js'
+import adminAnalyticsRoutes from './routes/admin/analytics.js'
 import sitemapRoutes from './routes/sitemap.js'
 import { errorHandler, requestId } from './middleware/errorHandler.js'
 import { supabaseAdmin } from './config/supabase.js'
@@ -99,6 +100,7 @@ app.use('/api/admin/images', adminImageRoutes)
 app.use('/api/admin/pois', adminPoiRoutes)
 app.use('/api/admin/activity', adminActivityRoutes)
 app.use('/api/admin/settings', adminSettingsRoutes)
+app.use('/api/admin/analytics', adminAnalyticsRoutes)
 
 // Health check with DB connectivity, uptime, and memory stats
 app.get('/api/health', async (req, res) => {

@@ -535,29 +535,59 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         </div>
       </div>
 
-      {/* Bottom-right: Interactive Legend — hidden on mobile, positioned above card strip */}
+      {/* Bottom-right: Interactive Legend — adapts to color mode */}
       <div className="absolute bottom-40 right-4 z-[1000] pointer-events-none hidden sm:block">
         <div className="glass-panel px-3 py-2.5 pointer-events-auto">
-          <div className="flex flex-col gap-0.5">
-            {Object.entries(statusColors).map(([status, color]) => {
-              const isActive = statusFilter.length === 0 || statusFilter.includes(status)
-              return (
-                <div
-                  key={status}
-                  className={`legend-item ${!isActive ? 'inactive' : ''}`}
-                  onClick={() => onToggleStatus(status)}
-                >
+          {colorMode === 'status' ? (
+            <div className="flex flex-col gap-0.5">
+              {Object.entries(statusColors).map(([status, color]) => {
+                const isActive = statusFilter.length === 0 || statusFilter.includes(status)
+                return (
                   <div
-                    className="legend-item-check"
-                    style={{ background: isActive ? color : 'rgba(100,116,139,0.3)' }}
+                    key={status}
+                    className={`legend-item ${!isActive ? 'inactive' : ''}`}
+                    onClick={() => onToggleStatus(status)}
                   >
-                    {isActive && <Check className="w-2.5 h-2.5" />}
+                    <div
+                      className="legend-item-check"
+                      style={{ background: isActive ? color : 'rgba(100,116,139,0.3)' }}
+                    >
+                      {isActive && <Check className="w-2.5 h-2.5" />}
+                    </div>
+                    <span className="text-slate-300">{statusLabels[status]}</span>
                   </div>
-                  <span className="text-slate-300">{statusLabels[status]}</span>
+                )
+              })}
+            </div>
+          ) : colorMode === 'price' ? (
+            <div className="flex flex-col gap-1.5">
+              <div className="text-[10px] text-slate-400 font-medium mb-0.5">💰 מחיר/מ״ר</div>
+              <div className="flex items-center gap-2">
+                <div className="h-2 flex-1 rounded-full" style={{ background: 'linear-gradient(90deg, rgb(0,255,60), rgb(255,255,60), rgb(255,0,60))' }} />
+              </div>
+              <div className="flex justify-between text-[9px] text-slate-500">
+                <span>זול</span>
+                <span>ממוצע</span>
+                <span>יקר</span>
+              </div>
+            </div>
+          ) : colorMode === 'roi' ? (
+            <div className="flex flex-col gap-1">
+              <div className="text-[10px] text-slate-400 font-medium mb-0.5">📈 תשואה</div>
+              {[
+                { label: '200%+', color: '#22C55E' },
+                { label: '150%+', color: '#4ADE80' },
+                { label: '100%+', color: '#84CC16' },
+                { label: '50%+', color: '#EAB308' },
+                { label: '<50%', color: '#EF4444' },
+              ].map(item => (
+                <div key={item.label} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: item.color }} />
+                  <span className="text-[10px] text-slate-300">{item.label}</span>
                 </div>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
 

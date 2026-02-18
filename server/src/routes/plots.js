@@ -2,6 +2,7 @@ import { Router } from 'express'
 import crypto from 'crypto'
 import { getPublishedPlots, getPlotById, getPlotStats } from '../services/plotService.js'
 import { sanitizePlotQuery, sanitizePlotId } from '../middleware/sanitize.js'
+import { analytics } from '../services/analyticsService.js'
 
 const router = Router()
 
@@ -40,6 +41,16 @@ router.get('/', sanitizePlotQuery, async (req, res, next) => {
     if (req.headers['if-none-match'] === etag) {
       return res.status(304).end()
     }
+
+    // Track search analytics (non-blocking)
+    if (req.query.q || req.query.city || req.query.priceMin || req.query.priceMax || req.query.status) {
+      analytics.trackSearch(req.query.q || '', plots.length, req.query)
+      if (req.query.city && req.query.city !== 'all') analytics.trackFilter(`city:${req.query.city}`)
+      if (req.query.priceMin || req.query.priceMax) analytics.trackFilter('price-range')
+      if (req.query.status) analytics.trackFilter('status')
+      if (req.query.sort) analytics.trackFilter(`sort:${req.query.sort}`)
+    }
+    analytics.trackSession()
 
     // Add total count header for pagination-ready responses
     res.set('X-Total-Count', String(plots.length))
@@ -122,6 +133,8 @@ router.get('/:id/nearby', sanitizePlotId, async (req, res, next) => {
 
 // POST /api/plots/:id/view - Track a plot view (fire-and-forget, no auth needed)
 router.post('/:id/view', sanitizePlotId, async (req, res) => {
+  // Track in analytics
+  analytics.trackPlotClick(req.params.id)
   // Always respond immediately — view tracking is non-critical
   res.json({ ok: true })
 
