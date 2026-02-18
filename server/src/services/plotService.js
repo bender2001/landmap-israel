@@ -3,7 +3,7 @@ import { supabaseAdmin } from '../config/supabase.js'
 export async function getPublishedPlots(filters = {}) {
   let query = supabaseAdmin
     .from('plots')
-    .select('*')
+    .select('*, plot_images(id, url, alt)')
     .eq('is_published', true)
     .order('created_at', { ascending: false })
 

@@ -175,8 +175,29 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
               className={`plot-card-mini ${isSelected ? 'plot-card-mini-selected' : ''} ${isCompared ? 'plot-card-mini-compared' : ''}`}
               style={{ '--card-color': color }}
             >
-              {/* Top color line */}
-              <div className="plot-card-mini-accent" style={{ background: isCompared ? '#8B5CF6' : color }} />
+              {/* Thumbnail image */}
+              {(() => {
+                const images = plot.plot_images
+                const thumbUrl = images && images.length > 0 ? images[0].url : null
+                if (!thumbUrl) return (
+                  <>
+                    <div className="plot-card-mini-accent" style={{ background: isCompared ? '#8B5CF6' : color }} />
+                  </>
+                )
+                return (
+                  <div className="plot-card-mini-thumb">
+                    <img
+                      src={thumbUrl}
+                      alt={images[0].alt || `גוש ${blockNum}`}
+                      className="plot-card-mini-thumb-img"
+                      loading="lazy"
+                    />
+                    <div className="plot-card-mini-thumb-overlay" />
+                    <div className="plot-card-mini-accent" style={{ background: isCompared ? '#8B5CF6' : color, position: 'absolute', bottom: 0, left: 0, right: 0 }} />
+                  </div>
+                )
+              })()}
+              {/* Top color line (no-image fallback handled above) */}
 
               {/* Compare toggle */}
               {onToggleCompare && (

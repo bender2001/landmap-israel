@@ -21,6 +21,7 @@ function normalizeMock(plot) {
     nearby_development: plot.nearbyDevelopment ?? plot.nearby_development,
     tax_authority_value: plot.taxAuthorityValue ?? plot.tax_authority_value,
     standard_22: plot.standard22 ?? plot.standard_22,
+    plot_images: plot.plot_images || [],
   }
 }
 

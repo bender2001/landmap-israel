@@ -228,7 +228,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
               }}
             >
               <Tooltip permanent direction="center" className="price-tooltip">
-                <span className="tooltip-main-price">{favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{formatPriceShort(price)}</span>
+                <span className="tooltip-main-price">{favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{plot.plot_images?.length > 0 ? '📷 ' : ''}{formatPriceShort(price)}</span>
                 <span className="tooltip-sub">{formatDunam(sizeSqM)} דונם · +{roi}% · ₪{sizeSqM > 0 ? Math.round(price / sizeSqM).toLocaleString() : '—'}/מ״ר</span>
               </Tooltip>
 
