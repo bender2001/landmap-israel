@@ -460,6 +460,8 @@ export default function MapView() {
         statusFilter={statusFilter}
         onToggleStatus={handleToggleStatus}
         favorites={favorites}
+        compareIds={compareIds}
+        onToggleCompare={toggleCompare}
       />
 
       <FilterBar

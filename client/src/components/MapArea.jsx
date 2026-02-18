@@ -386,7 +386,7 @@ function GeoSearch() {
   )
 }
 
-export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites }) {
+export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites, compareIds = [], onToggleCompare }) {
   const [hoveredId, setHoveredId] = useState(null)
   const [activeLayerId, setActiveLayerId] = useState('satellite')
   const [colorMode, setColorMode] = useState('status')
@@ -527,6 +527,19 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
 
               <Popup>
                 <div className="plot-popup">
+                  {/* Image thumbnail strip — like Madlan's inline property previews */}
+                  {plot.plot_images && plot.plot_images.length > 0 && (
+                    <div className="plot-popup-images">
+                      {plot.plot_images.slice(0, 3).map((img, i) => (
+                        <div key={img.id || i} className="plot-popup-image-thumb">
+                          <img src={img.url} alt={img.alt || `תמונה ${i + 1}`} loading="lazy" />
+                        </div>
+                      ))}
+                      {plot.plot_images.length > 3 && (
+                        <div className="plot-popup-image-more">+{plot.plot_images.length - 3}</div>
+                      )}
+                    </div>
+                  )}
                   <div className="plot-popup-header">
                     <span className="plot-popup-title">
                       גוש {blockNum} | חלקה {plot.number}
@@ -601,6 +614,15 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
                         title={favorites.isFavorite(plot.id) ? 'הסר ממועדפים' : 'הוסף למועדפים'}
                       >
                         {favorites.isFavorite(plot.id) ? '❤️' : '🤍'}
+                      </button>
+                    )}
+                    {onToggleCompare && (
+                      <button
+                        className={`plot-popup-action-btn ${compareIds.includes(plot.id) ? 'is-active' : ''}`}
+                        onClick={(e) => { e.stopPropagation(); onToggleCompare(plot.id) }}
+                        title={compareIds.includes(plot.id) ? 'הסר מהשוואה' : 'הוסף להשוואה'}
+                      >
+                        {compareIds.includes(plot.id) ? '⚖️' : '📊'}
                       </button>
                     )}
                   </div>
