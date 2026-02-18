@@ -1182,7 +1182,9 @@ function PolygonCenterLabels({ plots }) {
         const lat = coords.reduce((s, c) => s + c[0], 0) / coords.length
         const lng = coords.reduce((s, c) => s + c[1], 0) / coords.length
         const price = p.total_price ?? p.totalPrice ?? 0
-        const grade = getInvestmentGrade(p)
+        // Prefer server-computed score; fall back to client calculation
+        const score = p._investmentScore ?? calcInvestmentScore(p)
+        const { grade } = getInvestmentGrade(score)
         const shortPrice = price >= 1000000
           ? `${(price / 1000000).toFixed(1)}M`
           : price >= 1000

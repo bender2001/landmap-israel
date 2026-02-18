@@ -419,3 +419,32 @@ function gracefulShutdown(signal) {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
 process.on('SIGINT', () => gracefulShutdown('SIGINT'))
+
+// ─── Unhandled error safety nets ───
+// Without these, a single unhandled promise rejection silently kills the process
+// in Node 15+ (--unhandled-rejections=throw is now default). We log the error,
+// alert via SSE, and let the process manager (PM2/systemd) restart us cleanly.
+process.on('unhandledRejection', (reason, promise) => {
+  console.error(JSON.stringify({
+    level: 'fatal',
+    type: 'unhandledRejection',
+    message: reason?.message || String(reason),
+    stack: reason?.stack,
+    timestamp: new Date().toISOString(),
+  }))
+  // Don't exit — let the event loop drain and the process manager handle it.
+  // Most unhandled rejections are non-fatal (failed fetch, Supabase timeout).
+})
+
+process.on('uncaughtException', (err, origin) => {
+  console.error(JSON.stringify({
+    level: 'fatal',
+    type: 'uncaughtException',
+    origin,
+    message: err.message,
+    stack: err.stack,
+    timestamp: new Date().toISOString(),
+  }))
+  // Uncaught exceptions leave the process in an undefined state — shutdown cleanly.
+  gracefulShutdown('uncaughtException')
+})

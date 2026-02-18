@@ -22,6 +22,7 @@ import { Phone } from 'lucide-react'
 import { whatsappLink, CONTACT, plotOgImageUrl } from '../../utils/config.js'
 import { useRealtimeUpdates } from '../../hooks/useRealtimeUpdates.js'
 import IdleRender from '../../components/ui/IdleRender.jsx'
+import OfflineBanner from '../../components/ui/OfflineBanner.jsx'
 import { useRefreshOnReturn } from '../../hooks/usePageVisibility.js'
 import { useLocalStorage } from '../../hooks/useLocalStorage.js'
 import { usePriceChanges } from '../../hooks/usePriceChanges.js'
@@ -843,6 +844,9 @@ export default function MapView() {
         }
       </div>
       <ConnectionStatus sseConnected={sseConnected} />
+      {/* Offline/reconnection banner — shows when user loses internet (like Google Maps offline mode).
+          On reconnect, auto-refreshes plot data to ensure freshness. */}
+      <OfflineBanner onReconnect={refetchPlots} />
       {/* Data freshness indicator — shows when data was last synced (like Madlan's real-time feel) */}
       {dataUpdatedAt > 0 && (
         <DataFreshnessIndicator updatedAt={dataUpdatedAt} onRefresh={refetchPlots} />

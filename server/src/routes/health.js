@@ -48,13 +48,24 @@ router.get('/', async (req, res) => {
     overallStatus = 'error'
   }
 
-  // 2. Memory usage
+  // 2. Memory usage — includes heap utilization for leak detection.
+  // >85% heap utilization sustained = probable memory leak.
   const mem = process.memoryUsage()
+  const heapUsedMB = Math.round(mem.heapUsed / 1024 / 1024 * 10) / 10
+  const heapTotalMB = Math.round(mem.heapTotal / 1024 / 1024 * 10) / 10
+  const heapUtilPct = heapTotalMB > 0 ? Math.round((heapUsedMB / heapTotalMB) * 100) : 0
   checks.memory = {
-    heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024 * 10) / 10,
-    heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024 * 10) / 10,
+    heapUsedMB,
+    heapTotalMB,
+    heapUtilPct,
     rssMB: Math.round(mem.rss / 1024 / 1024 * 10) / 10,
     externalMB: Math.round(mem.external / 1024 / 1024 * 10) / 10,
+    arrayBuffersMB: Math.round((mem.arrayBuffers || 0) / 1024 / 1024 * 10) / 10,
+  }
+  // Flag memory pressure — helps catch leaks before OOM kill
+  if (heapUtilPct > 85) {
+    checks.memory.warning = 'High heap utilization — possible memory leak'
+    if (overallStatus === 'ok') overallStatus = 'degraded'
   }
 
   // 3. Cache stats
@@ -78,6 +89,8 @@ router.get('/', async (req, res) => {
     uptimeSeconds: uptimeSec,
     uptimeHuman: formatUptime(uptimeSec),
     nodeVersion: process.version,
+    pid: process.pid,
+    env: process.env.NODE_ENV || 'development',
     sseClients: getClientCount(),
     checks,
   })
