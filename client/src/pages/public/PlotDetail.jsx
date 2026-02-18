@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart, ExternalLink, Calculator as CalcIcon, FileText, Download, File, FileImage, FileSpreadsheet } from 'lucide-react'
 import { usePlot, useNearbyPlots, useSimilarPlots } from '../../hooks/usePlots.js'
 import { useMarketOverview } from '../../hooks/useMarketOverview.js'
+import { calcAnnualHoldingCosts, calcExitCosts, calcTransactionCosts } from '../../utils/plot.js'
 import { useFavorites } from '../../hooks/useFavorites.js'
 import { useViewTracker } from '../../hooks/useViewTracker.js'
 import { useLocalStorage } from '../../hooks/useLocalStorage.js'
@@ -1372,30 +1373,131 @@ export default function PlotDetail() {
                 </div>
               </div>
 
-              {/* Associated costs */}
-              <div id="section-costs" className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <DollarSign className="w-4 h-4 text-gold" />
-                  <h2 className="text-base font-bold text-slate-100">עלויות נלוות משוערות</h2>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm"><span className="text-slate-400">מס רכישה (6%)</span><span className="text-slate-300">{formatCurrency(Math.round(totalPrice * 0.06))}</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-slate-400">שכ"ט עו"ד (~1.5%+מע"מ)</span><span className="text-slate-300">{formatCurrency(Math.round(totalPrice * 0.0175))}</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-slate-400">היטל השבחה משוער</span><span className="text-slate-300">{formatCurrency(Math.round((projectedValue - totalPrice) * 0.5))}</span></div>
-                  {(() => {
-                    const gp = projectedValue - totalPrice
-                    const costs = Math.round(totalPrice * 0.0775)
-                    const betterment = Math.round(gp * 0.5)
-                    const taxable = Math.max(0, gp - betterment - costs)
-                    const capGains = Math.round(taxable * 0.25)
-                    return (
-                      <div className="flex justify-between text-sm"><span className="text-slate-400">מס שבח (25%)</span><span className="text-slate-300">{formatCurrency(capGains)}</span></div>
-                    )
-                  })()}
-                  <div className="h-px bg-white/5 my-1" />
-                  <div className="flex justify-between text-sm font-medium"><span className="text-slate-300">סה"כ עלות כוללת</span><span className="text-gold">{formatCurrency(Math.round(totalPrice * 1.0775))}</span></div>
-                </div>
-              </div>
+              {/* Associated costs — comprehensive P&L breakdown like Madlan's cost analysis */}
+              {(() => {
+                const txn = calcTransactionCosts(totalPrice)
+                const exit = calcExitCosts(totalPrice, projectedValue)
+                const holdYears = readiness?.includes('1-3') ? 2 : readiness?.includes('3-5') ? 4 : 7
+                const annual = calcAnnualHoldingCosts(totalPrice, sizeSqM, zoningStage)
+                const totalHolding = annual.totalAnnual * holdYears
+                const totalAllCosts = txn.total + totalHolding + exit.totalExit
+                const netAfterAll = (projectedValue - totalPrice) - totalAllCosts
+                const trueRoi = txn.totalWithPurchase > 0 ? Math.round((netAfterAll / txn.totalWithPurchase) * 100) : 0
+
+                return (
+                  <div id="section-costs" className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <DollarSign className="w-4 h-4 text-gold" />
+                      <h2 className="text-base font-bold text-slate-100">ניתוח עלויות מלא</h2>
+                    </div>
+
+                    {/* Entry costs */}
+                    <div className="mb-4">
+                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                        עלויות רכישה (חד-פעמי)
+                      </div>
+                      <div className="space-y-1.5 pr-3">
+                        <div className="flex justify-between text-sm"><span className="text-slate-400">מס רכישה (6%)</span><span className="text-slate-300">{formatCurrency(txn.purchaseTax)}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-slate-400">שכ״ט עו״ד (~1.75%)</span><span className="text-slate-300">{formatCurrency(txn.attorneyFees)}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-slate-400">שמאי מקרקעין</span><span className="text-slate-300">{formatCurrency(txn.appraiserFee)}</span></div>
+                        <div className="flex justify-between text-[13px] font-medium pt-1 border-t border-white/5">
+                          <span className="text-slate-300">סה״כ כניסה</span>
+                          <span className="text-blue-400">{formatCurrency(txn.total)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Annual holding costs */}
+                    <div className="mb-4">
+                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                        עלויות החזקה שנתיות
+                      </div>
+                      <div className="space-y-1.5 pr-3">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-400">ארנונה (~₪{annual.arnonaPerSqm}/מ״ר)</span>
+                          <span className="text-slate-300">{formatCurrency(annual.arnona)}<span className="text-[10px] text-slate-500">/שנה</span></span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-400">ניהול ותחזוקת קרקע</span>
+                          <span className="text-slate-300">{formatCurrency(annual.management)}<span className="text-[10px] text-slate-500">/שנה</span></span>
+                        </div>
+                        <div className="flex justify-between text-[13px] font-medium pt-1 border-t border-white/5">
+                          <span className="text-slate-300">סה״כ שנתי</span>
+                          <span className="text-amber-400">{formatCurrency(annual.totalAnnual)}<span className="text-[10px] text-slate-500">/שנה</span></span>
+                        </div>
+                        <div className="flex justify-between text-xs text-slate-500">
+                          <span>סה״כ ל-{holdYears} שנות החזקה</span>
+                          <span>{formatCurrency(totalHolding)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Exit costs */}
+                    <div className="mb-4">
+                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                        עלויות יציאה (מכירה)
+                      </div>
+                      <div className="space-y-1.5 pr-3">
+                        <div className="flex justify-between text-sm"><span className="text-slate-400">היטל השבחה (50%)</span><span className="text-slate-300">{formatCurrency(exit.bettermentLevy)}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-slate-400">מס שבח (25%)</span><span className="text-slate-300">{formatCurrency(exit.capitalGains)}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-slate-400">עמלת מתווך (1%)</span><span className="text-slate-300">{formatCurrency(exit.agentCommission)}</span></div>
+                        <div className="flex justify-between text-[13px] font-medium pt-1 border-t border-white/5">
+                          <span className="text-slate-300">סה״כ יציאה</span>
+                          <span className="text-red-400">{formatCurrency(exit.totalExit)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Net result summary — the bottom line investors care about */}
+                    <div className={`rounded-xl p-4 border ${netAfterAll >= 0 ? 'bg-emerald-500/8 border-emerald-500/15' : 'bg-red-500/8 border-red-500/15'}`}>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-bold text-slate-200">✨ רווח נקי (אחרי הכל)</span>
+                        <span className={`text-lg font-black ${netAfterAll >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {formatCurrency(netAfterAll)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">תשואה אמיתית (נטו)</span>
+                        <span className={`font-bold ${trueRoi >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{trueRoi > 0 ? '+' : ''}{trueRoi}%</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs mt-1">
+                        <span className="text-slate-500">סה״כ עלויות</span>
+                        <span className="text-slate-400">{formatCurrency(totalAllCosts)}</span>
+                      </div>
+                      {/* Visual cost breakdown bar */}
+                      <div className="mt-3 h-2 rounded-full bg-white/5 overflow-hidden flex">
+                        <div
+                          className="h-full bg-blue-500/60"
+                          style={{ width: `${totalAllCosts > 0 ? Math.round((txn.total / totalAllCosts) * 100) : 0}%` }}
+                          title={`רכישה: ${formatCurrency(txn.total)}`}
+                        />
+                        <div
+                          className="h-full bg-amber-500/60"
+                          style={{ width: `${totalAllCosts > 0 ? Math.round((totalHolding / totalAllCosts) * 100) : 0}%` }}
+                          title={`החזקה: ${formatCurrency(totalHolding)}`}
+                        />
+                        <div
+                          className="h-full bg-red-500/60"
+                          style={{ width: `${totalAllCosts > 0 ? Math.round((exit.totalExit / totalAllCosts) * 100) : 0}%` }}
+                          title={`יציאה: ${formatCurrency(exit.totalExit)}`}
+                        />
+                      </div>
+                      <div className="flex justify-between mt-1 text-[9px] text-slate-600">
+                        <span>🔵 רכישה</span>
+                        <span>🟡 החזקה</span>
+                        <span>🔴 יציאה</span>
+                      </div>
+                    </div>
+
+                    <p className="text-[9px] text-slate-600 mt-3 leading-relaxed">
+                      * אומדנים בלבד. המחירים והמיסים בפועל תלויים בנסיבות ספציפיות. יש להתייעץ עם רו״ח ועו״ד.
+                    </p>
+                  </div>
+                )
+              })()}
 
               {/* Neighborhood Radar */}
               <NeighborhoodRadar

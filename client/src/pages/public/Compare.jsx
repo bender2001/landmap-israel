@@ -4,6 +4,7 @@ import { BarChart3, X, Map, MapPin, Waves, TreePine, Hospital, TrendingUp, Award
 import { usePlotsBatch } from '../../hooks/usePlots'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
 import { formatCurrency, calcInvestmentScore, calcMonthlyPayment, formatMonthlyPayment, calcCAGR } from '../../utils/formatters'
+import { getPlotPrice, getPlotProjectedValue, getPlotSize, getPlotReadiness, calcTransactionCosts, calcExitCosts } from '../../utils/plot'
 import { useMetaTags } from '../../hooks/useMetaTags'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
@@ -12,33 +13,31 @@ import Spinner from '../../components/ui/Spinner'
 
 /**
  * Calculate full investment financials for a plot — used in the Net Profit Analysis section.
- * Mirrors the SidebarDetails/PlotDetail tax+cost calculations for consistency.
+ * Uses centralized cost calculators from utils/plot.js for consistency across the app.
  */
 function calcPlotFinancials(plot) {
-  const price = plot.total_price ?? plot.totalPrice ?? 0
-  const projected = plot.projected_value ?? plot.projectedValue ?? 0
-  const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
-  const readiness = plot.readiness_estimate ?? plot.readinessEstimate ?? ''
+  const price = getPlotPrice(plot)
+  const projected = getPlotProjectedValue(plot)
+  const sizeSqM = getPlotSize(plot)
+  const readiness = getPlotReadiness(plot)
   const roi = price > 0 ? Math.round(((projected - price) / price) * 100) : 0
 
-  const purchaseTax = Math.round(price * 0.06)       // מס רכישה 6%
-  const attorneyFees = Math.round(price * 0.0175)     // שכ״ט עו״ד ~1.75%
-  const totalInvestment = price + purchaseTax + attorneyFees
-
-  const grossProfit = projected - price
-  const bettermentLevy = Math.round(grossProfit * 0.5)  // היטל השבחה 50%
-  const costs = purchaseTax + attorneyFees
-  const taxable = Math.max(0, grossProfit - bettermentLevy - costs)
-  const capitalGains = Math.round(taxable * 0.25)        // מס שבח 25%
-  const netProfit = grossProfit - costs - bettermentLevy - capitalGains
-  const netRoi = totalInvestment > 0 ? Math.round((netProfit / totalInvestment) * 100) : 0
+  const txn = calcTransactionCosts(price)
+  const exit = calcExitCosts(price, projected)
+  const totalInvestment = txn.totalWithPurchase
 
   const cagrData = calcCAGR(roi, readiness)
 
   return {
     price, projected, sizeSqM, roi, readiness,
-    purchaseTax, attorneyFees, totalInvestment,
-    grossProfit, bettermentLevy, capitalGains, netProfit, netRoi,
+    purchaseTax: txn.purchaseTax,
+    attorneyFees: txn.attorneyFees,
+    totalInvestment,
+    grossProfit: projected - price,
+    bettermentLevy: exit.bettermentLevy,
+    capitalGains: exit.capitalGains,
+    netProfit: exit.netProfit,
+    netRoi: totalInvestment > 0 ? Math.round((exit.netProfit / totalInvestment) * 100) : 0,
     cagr: cagrData,
   }
 }
