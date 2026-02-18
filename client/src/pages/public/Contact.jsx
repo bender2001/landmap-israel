@@ -5,7 +5,8 @@ import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
 import { useMetaTags } from '../../hooks/useMetaTags'
 
-const phoneRegex = /^0[2-9]\d{7,8}$/
+// Accept Israeli numbers: 05X, +972-5X, 972-5X, with optional dashes/spaces
+const phoneRegex = /^(?:\+?972[-\s]?|0)(?:[2-9])[-\s]?\d{3}[-\s]?\d{4}$/
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function Contact() {
@@ -28,7 +29,7 @@ export default function Contact() {
   const validate = () => {
     const e = {}
     if (!formData.name || formData.name.trim().length < 2) e.name = 'נא להזין שם מלא'
-    if (!formData.phone || !phoneRegex.test(formData.phone.replace(/-/g, ''))) e.phone = 'נא להזין טלפון ישראלי תקין'
+    if (!formData.phone || !phoneRegex.test(formData.phone.trim())) e.phone = 'נא להזין טלפון ישראלי תקין (למשל 050-1234567 או +972-50-1234567)'
     if (!formData.email || !emailRegex.test(formData.email)) e.email = 'נא להזין אימייל תקין'
     return e
   }
@@ -40,9 +41,14 @@ export default function Contact() {
     if (Object.keys(newErrors).length > 0) return
 
     try {
+      // Normalize phone: strip spaces/dashes, convert +972/972 prefix to 0
+      const normalizedPhone = formData.phone
+        .trim()
+        .replace(/[-\s]/g, '')
+        .replace(/^\+?972/, '0')
       await createLead.mutateAsync({
         full_name: formData.name.trim(),
-        phone: formData.phone.replace(/-/g, ''),
+        phone: normalizedPhone,
         email: formData.email.trim(),
         message: formData.message.trim(),
       })

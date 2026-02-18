@@ -493,6 +493,8 @@ export default function MapView() {
           favorites={favorites}
           compareIds={compareIds}
           onToggleCompare={toggleCompare}
+          onClearFilters={handleClearFilters}
+          onFilterChange={handleFilterChange}
         />
       </MapErrorBoundary>
 

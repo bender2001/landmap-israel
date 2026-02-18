@@ -543,6 +543,81 @@ function hasValidCoordinates(plot) {
 }
 
 /**
+ * Viewport counter — shows "X of Y plots visible" and updates as user pans/zooms.
+ * Like Madlan's "X נכסים באזור זה" indicator. Uses plotBounds for efficient
+ * AABB intersection test without re-rendering polygons.
+ */
+function MapViewportCounter({ plots, totalCount }) {
+  const map = useMap()
+  const [visibleCount, setVisibleCount] = useState(plots.length)
+
+  // Precompute bounding boxes
+  const plotBounds = useMemo(() => {
+    const result = new Map()
+    for (const plot of plots) {
+      if (!hasValidCoordinates(plot)) continue
+      let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity
+      for (const c of plot.coordinates) {
+        if (c[0] < minLat) minLat = c[0]
+        if (c[0] > maxLat) maxLat = c[0]
+        if (c[1] < minLng) minLng = c[1]
+        if (c[1] > maxLng) maxLng = c[1]
+      }
+      result.set(plot.id, { minLat, maxLat, minLng, maxLng })
+    }
+    return result
+  }, [plots])
+
+  const updateCount = useCallback(() => {
+    const bounds = map.getBounds()
+    const north = bounds.getNorth()
+    const south = bounds.getSouth()
+    const east = bounds.getEast()
+    const west = bounds.getWest()
+
+    let count = 0
+    for (const [, bb] of plotBounds) {
+      if (bb.maxLat >= south && bb.minLat <= north && bb.maxLng >= west && bb.minLng <= east) {
+        count++
+      }
+    }
+    setVisibleCount(count)
+  }, [map, plotBounds])
+
+  useEffect(() => {
+    updateCount()
+    map.on('moveend', updateCount)
+    map.on('zoomend', updateCount)
+    return () => {
+      map.off('moveend', updateCount)
+      map.off('zoomend', updateCount)
+    }
+  }, [map, updateCount])
+
+  if (totalCount === 0) return null
+
+  const isPartial = visibleCount < totalCount
+
+  return (
+    <div className="absolute bottom-24 sm:bottom-24 left-4 z-[1000] pointer-events-none flex">
+      <div className="glass-panel px-3 py-1.5 pointer-events-auto flex items-center gap-1.5">
+        <Eye className="w-3.5 h-3.5 text-gold" />
+        <span className="text-xs text-slate-300">
+          {isPartial ? (
+            <>{visibleCount} <span className="text-slate-500">מתוך</span> {totalCount} חלקות</>
+          ) : (
+            <>{totalCount} חלקות</>
+          )}
+        </span>
+        {isPartial && (
+          <span className="w-1.5 h-1.5 rounded-full bg-gold/60 animate-pulse" title="הזז/הקטן מפה כדי לראות יותר" />
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
  * Viewport-culled polygon renderer — only renders polygons whose bounding box
  * intersects the current map viewport. This is a significant performance win
  * when there are many plots (50+), as Leaflet doesn't need to manage off-screen SVG paths.
@@ -632,7 +707,7 @@ function ViewportCulledPolygons({ plots, plotColors, hoveredId, onSelectPlot, on
   ))
 }
 
-export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites, compareIds = [], onToggleCompare }) {
+export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites, compareIds = [], onToggleCompare, onClearFilters, onFilterChange }) {
   const [hoveredId, setHoveredId] = useState(null)
   const [activeLayerId, setActiveLayerId] = useState('satellite')
   const [colorMode, setColorMode] = useState('status')
@@ -734,6 +809,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         <MapRuler />
         <MapHeatLayer plots={plots} visible={colorMode === 'heatmap'} metric="priceSqm" />
         <GeoSearch />
+        <MapViewportCounter plots={plots} totalCount={plots.length} />
 
         {/* Viewport-culled polygons: only renders plots visible in the current map viewport.
             Dramatically improves performance with many plots by avoiding off-screen SVG paths. */}
@@ -860,28 +936,49 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         </div>
       </div>
 
-      {/* Bottom-left (above zoom): Plot count badge — repositioned on mobile */}
-      <div className="absolute bottom-24 sm:bottom-24 left-4 z-[1000] pointer-events-none hidden sm:flex">
-        <div className="glass-panel px-3 py-1.5 pointer-events-auto flex items-center gap-1.5">
-          <Eye className="w-3.5 h-3.5 text-gold" />
-          <span className="text-xs text-slate-300">{plots.length} חלקות</span>
-        </div>
-      </div>
-
-      {/* Empty state */}
+      {/* Empty state — interactive suggestions like Madlan/Yad2 zero-results pages */}
       {plots.length === 0 && (
         <div className="absolute inset-0 z-[1000] flex items-center justify-center pointer-events-none">
-          <div className="glass-panel px-8 py-8 text-center pointer-events-auto max-w-xs">
+          <div className="glass-panel px-8 py-8 text-center pointer-events-auto max-w-sm">
             <div className="text-4xl mb-4">🏜️</div>
             <div className="text-base font-bold text-slate-200 mb-2">לא נמצאו חלקות</div>
             <div className="text-xs text-slate-400 mb-4 leading-relaxed">
-              נסה להרחיב את הסינון — הסר מסננים או בחר עיר אחרת
+              נסה להרחיב את הסינון — לחץ על אחת ההצעות למטה
             </div>
-            <div className="flex flex-wrap gap-2 justify-center">
-              <div className="text-[10px] text-slate-500 bg-white/5 px-3 py-1.5 rounded-lg">💡 הסר מסנן מחיר</div>
-              <div className="text-[10px] text-slate-500 bg-white/5 px-3 py-1.5 rounded-lg">💡 בחר "כל הערים"</div>
-              <div className="text-[10px] text-slate-500 bg-white/5 px-3 py-1.5 rounded-lg">💡 הסר סינון סטטוס</div>
+            <div className="flex flex-wrap gap-2 justify-center mb-4">
+              {onFilterChange && (
+                <button
+                  onClick={() => { onFilterChange('priceMin', ''); onFilterChange('priceMax', '') }}
+                  className="text-[10px] text-slate-400 bg-white/5 hover:bg-gold/10 hover:text-gold hover:border-gold/20 border border-white/10 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                >
+                  💡 הסר מסנן מחיר
+                </button>
+              )}
+              {onFilterChange && (
+                <button
+                  onClick={() => onFilterChange('city', 'all')}
+                  className="text-[10px] text-slate-400 bg-white/5 hover:bg-gold/10 hover:text-gold hover:border-gold/20 border border-white/10 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                >
+                  💡 בחר ״כל הערים״
+                </button>
+              )}
+              {statusFilter.length > 0 && onToggleStatus && (
+                <button
+                  onClick={() => statusFilter.forEach(s => onToggleStatus(s))}
+                  className="text-[10px] text-slate-400 bg-white/5 hover:bg-gold/10 hover:text-gold hover:border-gold/20 border border-white/10 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                >
+                  💡 הסר סינון סטטוס
+                </button>
+              )}
             </div>
+            {onClearFilters && (
+              <button
+                onClick={onClearFilters}
+                className="px-5 py-2 bg-gradient-to-r from-gold to-gold-bright text-navy font-bold text-xs rounded-xl hover:shadow-lg hover:shadow-gold/30 transition-all"
+              >
+                נקה את כל הסינונים
+              </button>
+            )}
           </div>
         </div>
       )}
