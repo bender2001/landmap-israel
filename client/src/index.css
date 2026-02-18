@@ -2328,7 +2328,7 @@ body {
   }
   /* Move AI chat fab above the strip on mobile */
   .ai-chat-fab {
-    bottom: calc(160px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(175px + env(safe-area-inset-bottom, 0px)) !important;
     right: 12px !important;
     width: 48px !important;
     height: 48px !important;

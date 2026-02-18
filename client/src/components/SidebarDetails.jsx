@@ -739,10 +739,10 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
           )}
 
           {/* Header */}
-          <div className="flex justify-between items-start p-5 pb-3">
-          <div>
+          <div className="flex justify-between items-start p-5 pb-3 gap-3">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h2 className="text-2xl font-black">
+              <h2 className="text-2xl font-black truncate">
                 <span className="bg-gradient-to-r from-gold to-gold-bright bg-clip-text text-transparent">גוש</span>
                 {' '}{blockNumber}{' | '}
                 <span className="bg-gradient-to-r from-gold to-gold-bright bg-clip-text text-transparent">חלקה</span>

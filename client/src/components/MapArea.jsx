@@ -243,7 +243,7 @@ function MapToolbar({ plots }) {
   const btnClass = "w-9 h-9 flex items-center justify-center hover:border-gold/20 transition-colors hover:bg-white/5"
 
   return (
-    <div className="absolute bottom-[13rem] sm:bottom-[15rem] left-3 z-[1000] pointer-events-none">
+    <div className="absolute bottom-[14rem] sm:bottom-[15rem] left-3 z-[1000] pointer-events-none">
       <div className="glass-panel pointer-events-auto flex flex-col divide-y divide-white/10 overflow-hidden">
         <button onClick={handleLocate} disabled={locating} className={`${btnClass} disabled:opacity-50`} title="המיקום שלי">
           <Navigation className={`w-4 h-4 text-gold ${locating ? 'animate-spin' : ''}`} />
@@ -520,7 +520,12 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
             <div className="plot-popup-images">
               {plot.plot_images.slice(0, 3).map((img, i) => (
                 <div key={img.id || i} className="plot-popup-image-thumb">
-                  <img src={img.url} alt={img.alt || `תמונה ${i + 1}`} loading="lazy" />
+                  <img
+                    src={img.url}
+                    alt={img.alt || `גוש ${blockNum} — תמונה ${i + 1}`}
+                    loading="lazy"
+                    onError={(e) => { e.target.style.display = 'none' }}
+                  />
                 </div>
               ))}
               {plot.plot_images.length > 3 && (
@@ -1008,15 +1013,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
           </div>
         </div>
       </div>
-      {/* Mobile brand badge — smaller, top-left below filter area */}
-      <div className="absolute top-[4.5rem] left-3 z-[1000] pointer-events-none sm:hidden">
-        <div className="glass-panel px-2.5 py-1.5 pointer-events-auto">
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm">🏗️</span>
-            <span className="text-[11px] font-bold brand-text">LandMap</span>
-          </div>
-        </div>
-      </div>
+      {/* Mobile brand badge — hidden on mobile to save space (redundant with filter bar) */}
 
       {/* Bottom-right: Interactive Legend — adapts to color mode */}
       <div className="absolute bottom-8 right-4 z-[1000] pointer-events-none hidden sm:block">

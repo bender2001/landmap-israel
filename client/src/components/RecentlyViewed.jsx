@@ -50,7 +50,7 @@ export default function RecentlyViewed({ plots, selectedPlot, onSelectPlot }) {
   if (recentPlots.length === 0) return null
 
   return (
-    <div className="absolute top-16 right-4 z-[25] pointer-events-none hidden sm:block" dir="rtl">
+    <div className="fixed top-[11rem] right-4 z-[25] pointer-events-none hidden sm:block" dir="rtl">
       <div className="pointer-events-auto" ref={panelRef}>
         {/* Toggle button */}
         <button

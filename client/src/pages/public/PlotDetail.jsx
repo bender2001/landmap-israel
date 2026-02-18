@@ -686,7 +686,8 @@ export default function PlotDetail() {
             </div>
           </div>
 
-          {/* Images gallery */}
+          {/* Images gallery — hero image uses fetchpriority=high for LCP, others lazy-loaded.
+              Error fallback prevents broken image icons when CDN/storage URLs expire. */}
           {images.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
               {images.map((img, i) => (
@@ -697,11 +698,30 @@ export default function PlotDetail() {
                 >
                   <img
                     src={img.url}
-                    alt={img.alt || `תמונה ${i + 1}`}
+                    alt={img.alt || `גוש ${blockNumber} חלקה ${plot.number} — תמונה ${i + 1}`}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     style={{ aspectRatio: i === 0 ? '16/9' : '1/1' }}
                     loading={i === 0 ? 'eager' : 'lazy'}
+                    fetchPriority={i === 0 ? 'high' : undefined}
+                    onError={(e) => {
+                      // Graceful fallback — styled placeholder instead of broken image icon
+                      e.target.style.display = 'none'
+                      const parent = e.target.parentElement
+                      if (parent && !parent.querySelector('.img-fallback-placeholder')) {
+                        const ph = document.createElement('div')
+                        ph.className = 'img-fallback-placeholder'
+                        ph.style.cssText = `position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:linear-gradient(135deg,rgba(200,148,42,0.08),rgba(200,148,42,0.02));`
+                        ph.innerHTML = `<span style="font-size:${i === 0 ? '32' : '20'}px;opacity:0.3">🏗️</span><span style="font-size:10px;color:rgba(148,163,184,0.4)">תמונה לא זמינה</span>`
+                        parent.appendChild(ph)
+                      }
+                    }}
                   />
+                  {/* Image count badge on last visible image */}
+                  {i === Math.min(images.length - 1, 5) && images.length > 6 && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">+{images.length - 6}</span>
+                    </div>
+                  )}
                 </button>
               ))}
             </div>

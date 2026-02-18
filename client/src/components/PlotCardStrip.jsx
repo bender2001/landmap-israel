@@ -105,7 +105,7 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
           )}
         </div>
       )}
-      {/* Thumbnail image */}
+      {/* Thumbnail image with error fallback — prevents broken image icons */}
       {(() => {
         const images = plot.plot_images
         const thumbUrl = images && images.length > 0 ? images[0].url : null
@@ -119,7 +119,16 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
               alt={images[0].alt || `גוש ${blockNum}`}
               className="plot-card-mini-thumb-img"
               loading="lazy"
+              onError={(e) => {
+                // Replace broken image with styled gradient placeholder
+                e.target.style.display = 'none'
+                const fallback = e.target.parentElement.querySelector('.plot-card-mini-thumb-fallback')
+                if (fallback) fallback.style.display = 'flex'
+              }}
             />
+            <div className="plot-card-mini-thumb-fallback" style={{ display: 'none', position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${color}25, ${color}08)`, alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: '20px', opacity: 0.5 }}>🏗️</span>
+            </div>
             <div className="plot-card-mini-thumb-overlay" />
             <div className="plot-card-mini-accent" style={{ background: isCompared ? '#8B5CF6' : color, position: 'absolute', bottom: 0, left: 0, right: 0 }} />
           </div>
@@ -434,12 +443,27 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
         </button>
       )}
 
-      {/* Cards */}
+      {/* Cards — supports ← → arrow key navigation between cards (WCAG listbox pattern) */}
       <div
         ref={scrollRef}
         className="plot-strip-scroll"
         role="listbox"
         aria-label="רשימת חלקות"
+        onKeyDown={(e) => {
+          // Arrow key navigation within the card strip
+          if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+          const focused = document.activeElement
+          if (!focused || !focused.hasAttribute('data-plot-id')) return
+          e.preventDefault()
+          // RTL: ArrowRight = previous, ArrowLeft = next
+          const sibling = e.key === 'ArrowLeft'
+            ? focused.nextElementSibling
+            : focused.previousElementSibling
+          if (sibling && sibling.hasAttribute('data-plot-id')) {
+            sibling.focus()
+            sibling.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+          }
+        }}
       >
         {plots.map((plot) => (
           <PlotCardItem

@@ -771,7 +771,7 @@ export default function MapView() {
         </button>
       </div>
       {/* Mobile version — single WhatsApp FAB, compact */}
-      <div className="fixed bottom-[12rem] left-3 z-[30] sm:hidden">
+      <div className="fixed bottom-[13rem] right-[4.5rem] z-[30] sm:hidden">
         <a
           href={selectedPlot
             ? whatsappLink(`שלום, אני מעוניין בפרטים על גוש ${selectedPlot.block_number ?? selectedPlot.blockNumber} חלקה ${selectedPlot.number} ב${selectedPlot.city}`)
