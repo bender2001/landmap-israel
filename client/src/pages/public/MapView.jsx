@@ -751,6 +751,25 @@ export default function MapView() {
           <div className="h-full bg-gradient-to-r from-gold via-gold-bright to-gold animate-pulse rounded-full" />
         </div>
       )}
+      {/* Mock/demo data warning — shows when API is down and we're using fallback data.
+          Critical UX: users must know they're seeing demo data, not real listings.
+          Like Google Maps' "offline mode" indicator — transparent about data freshness. */}
+      {isMockData && (
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[100] animate-bounce-in" dir="rtl">
+          <div className="flex items-center gap-2.5 px-4 py-2.5 bg-amber-500/15 backdrop-blur-md border border-amber-500/25 rounded-2xl shadow-lg">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
+            <span className="text-xs font-medium text-amber-300">
+              מוצגים נתוני הדגמה — השרת אינו זמין כרגע
+            </span>
+            <button
+              onClick={() => refetchPlots()}
+              className="text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-lg hover:bg-amber-400/20 transition-colors flex-shrink-0"
+            >
+              נסה שוב
+            </button>
+          </div>
+        </div>
+      )}
       {/* Bounds filter badge — shows when "Search this area" is active */}
       {boundsFilter && (
         <div className="fixed top-14 sm:top-16 left-1/2 -translate-x-1/2 z-[50]" dir="rtl">

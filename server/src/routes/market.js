@@ -104,6 +104,15 @@ router.get('/overview', async (req, res, next) => {
       }
     }, 300_000) // 5 min TTL — matches Cache-Control max-age
 
+    // ETag support — market overview is heavy (~2-5KB) and polled by the Areas page,
+    // MarketStatsWidget, and various widgets. With 304 responses, return visits skip
+    // the full payload — especially valuable on mobile with limited bandwidth.
+    const etag = generateETag(overview)
+    res.set('ETag', etag)
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end()
+    }
+
     res.json(overview)
   } catch (err) {
     next(err)
@@ -229,11 +238,21 @@ router.get('/trends', async (req, res, next) => {
       }
     }
 
-    res.json({
+    const trends = {
       months: months.map(m => m.key),
       monthLabels: months.map(m => m.label),
       cities,
-    })
+    }
+
+    // ETag support — trends data is ~3-8KB and used by sparklines, trend charts, and
+    // area comparison widgets. Rarely changes intraday, so 304 saves significant bandwidth.
+    const etag = generateETag(trends)
+    res.set('ETag', etag)
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end()
+    }
+
+    res.json(trends)
   } catch (err) {
     next(err)
   }

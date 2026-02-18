@@ -109,6 +109,16 @@ router.get('/stats', async (req, res, next) => {
   try {
     res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300')
     const stats = await statsCache.wrap('plot-stats', () => getPlotStats(), 120_000)
+
+    // ETag support — avoids re-sending unchanged stats (saves ~1-2KB per polling interval).
+    // Stats are polled frequently by widgets (MarketStatsWidget, FeaturedDeals) and rarely change,
+    // so conditional requests with 304 responses significantly reduce bandwidth.
+    const etag = generateETag(stats)
+    res.set('ETag', etag)
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end()
+    }
+
     res.json(stats)
   } catch (err) {
     next(err)
