@@ -278,6 +278,14 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
           if (!hasValidCoords) return null
 
           const isHovered = hoveredId === plot.id
+          const price = plot.total_price ?? plot.totalPrice
+          const projValue = plot.projected_value ?? plot.projectedValue
+          const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
+          const blockNum = plot.block_number ?? plot.blockNumber
+          const sizeSqM = plot.size_sqm ?? plot.sizeSqM
+          const zoningStage = plot.zoning_stage ?? plot.zoningStage
+          const readiness = plot.readiness_estimate ?? plot.readinessEstimate
+
           // Dynamic color based on color mode
           let color
           if (colorMode === 'price') {
@@ -288,13 +296,6 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
           } else {
             color = statusColors[plot.status]
           }
-          const price = plot.total_price ?? plot.totalPrice
-          const projValue = plot.projected_value ?? plot.projectedValue
-          const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
-          const blockNum = plot.block_number ?? plot.blockNumber
-          const sizeSqM = plot.size_sqm ?? plot.sizeSqM
-          const zoningStage = plot.zoning_stage ?? plot.zoningStage
-          const readiness = plot.readiness_estimate ?? plot.readinessEstimate
 
           return (
             <Polygon

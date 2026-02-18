@@ -116,7 +116,7 @@ export default function MapView() {
     return f
   }, [filters, statusFilter, sortBy])
 
-  const { data: plots = [], isLoading } = useAllPlots(apiFilters)
+  const { data: plots = [], isLoading, error: plotsError, refetch: refetchPlots } = useAllPlots(apiFilters)
   const { data: pois = [] } = usePois()
 
   // Debounce search for performance
@@ -335,6 +335,26 @@ export default function MapView() {
     )
   }
 
+  if (plotsError && plots.length === 0) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-navy" dir="rtl">
+        <div className="flex flex-col items-center gap-4 max-w-sm text-center px-6">
+          <div className="w-16 h-16 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center">
+            <span className="text-2xl">⚠️</span>
+          </div>
+          <h2 className="text-lg font-bold text-slate-200">שגיאה בטעינת הנתונים</h2>
+          <p className="text-sm text-slate-400">לא הצלחנו לטעון את נתוני החלקות. בדוק את החיבור לאינטרנט ונסה שוב.</p>
+          <button
+            onClick={() => refetchPlots()}
+            className="px-6 py-2.5 bg-gradient-to-r from-gold to-gold-bright text-navy font-bold text-sm rounded-xl hover:shadow-lg hover:shadow-gold/30 transition-all"
+          >
+            נסה שוב
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={`relative h-screen w-screen overflow-hidden bg-navy ${selectedPlot ? 'sidebar-open' : ''}`}>
       {/* Skip navigation for accessibility */}
@@ -414,6 +434,7 @@ export default function MapView() {
         compareIds={compareIds}
         onToggleCompare={toggleCompare}
         isLoading={isLoading}
+        onClearFilters={handleClearFilters}
       />
 
       <LeadModal

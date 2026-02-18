@@ -55,10 +55,16 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
   return (
     <div
       data-plot-id={plot.id}
+      role="option"
+      aria-selected={isSelected}
+      tabIndex={0}
       onClick={() => onSelectPlot(plot)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectPlot(plot) } }}
       onMouseEnter={() => prefetchPlot(plot.id)}
+      onFocus={() => prefetchPlot(plot.id)}
       className={`plot-card-mini ${isSelected ? 'plot-card-mini-selected' : ''} ${isCompared ? 'plot-card-mini-compared' : ''}`}
       style={{ '--card-color': color }}
+      aria-label={`גוש ${blockNum} חלקה ${plot.number}, ${plot.city}, ${formatPriceShort(price)}, תשואה +${roi}%`}
     >
       {/* Thumbnail image */}
       {(() => {
@@ -198,7 +204,7 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
   )
 })
 
-export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare, isLoading = false }) {
+export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare, isLoading = false, onClearFilters }) {
   const prefetchPlot = usePrefetchPlot()
   const areaAverages = useAreaAverages(plots)
   const scrollRef = useRef(null)
@@ -278,12 +284,20 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
   if (!plots || plots.length === 0) return (
     <div className="plot-strip-wrapper" dir="rtl">
       <div className="flex items-center justify-center py-4 px-6">
-        <div className="flex items-center gap-3 bg-navy-light/40 border border-white/5 rounded-xl px-5 py-3">
-          <span className="text-lg">🔍</span>
+        <div className="flex items-center gap-4 bg-navy-light/40 border border-white/5 rounded-xl px-5 py-3">
+          <span className="text-2xl">🔍</span>
           <div>
-            <div className="text-xs font-medium text-slate-300">לא נמצאו חלקות</div>
-            <div className="text-[10px] text-slate-500">נסה לשנות את הסינון</div>
+            <div className="text-xs font-medium text-slate-300">לא נמצאו חלקות מתאימות</div>
+            <div className="text-[10px] text-slate-500 mt-0.5">נסה להרחיב את טווח המחיר, לשנות עיר, או להסיר סינונים</div>
           </div>
+          {onClearFilters && (
+            <button
+              onClick={onClearFilters}
+              className="flex-shrink-0 px-3 py-1.5 text-[11px] font-medium text-gold bg-gold/10 border border-gold/20 rounded-lg hover:bg-gold/20 transition-colors"
+            >
+              נקה סינון
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -345,6 +359,8 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
       <div
         ref={scrollRef}
         className="plot-strip-scroll"
+        role="listbox"
+        aria-label="רשימת חלקות"
       >
         {plots.map((plot) => (
           <PlotCardItem
