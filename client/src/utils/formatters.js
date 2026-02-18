@@ -117,6 +117,32 @@ export function calcInvestmentScore(plot) {
 }
 
 /**
+ * Convert a numeric 1-10 investment score to a letter grade (S&P-style).
+ * Investors worldwide recognize letter grades — more intuitive than raw numbers.
+ * Used alongside calcInvestmentScore() for display in cards and badges.
+ *
+ * Grading scale:
+ *   9-10 → A+   (exceptional opportunity)
+ *   8    → A    (excellent)
+ *   7    → A-   (very good)
+ *   6    → B+   (good)
+ *   5    → B    (fair)
+ *   4    → B-   (below average)
+ *   3    → C+   (weak)
+ *   1-2  → C    (poor)
+ */
+export function getInvestmentGrade(score) {
+  if (score >= 9) return { grade: 'A+', color: '#22C55E', bg: '#22C55E', tier: 'exceptional' }
+  if (score >= 8) return { grade: 'A',  color: '#22C55E', bg: '#22C55E', tier: 'excellent' }
+  if (score >= 7) return { grade: 'A-', color: '#4ADE80', bg: '#4ADE80', tier: 'very-good' }
+  if (score >= 6) return { grade: 'B+', color: '#84CC16', bg: '#84CC16', tier: 'good' }
+  if (score >= 5) return { grade: 'B',  color: '#F59E0B', bg: '#F59E0B', tier: 'fair' }
+  if (score >= 4) return { grade: 'B-', color: '#F97316', bg: '#F97316', tier: 'below-avg' }
+  if (score >= 3) return { grade: 'C+', color: '#EF4444', bg: '#EF4444', tier: 'weak' }
+  return                  { grade: 'C',  color: '#DC2626', bg: '#DC2626', tier: 'poor' }
+}
+
+/**
  * Calculate annualized ROI (CAGR) based on total ROI and estimated holding period.
  * Returns percentage per year. E.g. 100% over 5 years → ~14.87% CAGR.
  */

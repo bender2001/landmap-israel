@@ -104,6 +104,16 @@ const quickPresetDefs = [
     isActive: (filters) => filters.priceMax === '400000' && !filters.priceMin,
   },
   {
+    id: 'premium',
+    label: '₪1M+',
+    emoji: '💎',
+    apply: (onFilterChange) => {
+      onFilterChange('priceMin', '1000000')
+      onFilterChange('priceMax', '')
+    },
+    isActive: (filters) => filters.priceMin === '1000000' && !filters.priceMax,
+  },
+  {
     id: 'large',
     label: '3+ דונם',
     emoji: '📐',
@@ -121,6 +131,15 @@ const quickPresetDefs = [
       onFilterChange('ripeness', '1-3')
     },
     isActive: (filters) => filters.ripeness === '1-3',
+  },
+  {
+    id: 'top-grade',
+    label: 'דירוג A+',
+    emoji: '🏆',
+    apply: (onFilterChange) => {
+      onFilterChange('minRoi', '200')
+    },
+    isActive: (filters) => filters.minRoi === '200',
   },
 ]
 

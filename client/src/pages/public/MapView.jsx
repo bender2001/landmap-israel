@@ -39,6 +39,12 @@ const FeaturedDeals = lazy(() => import('../../components/FeaturedDeals.jsx'))
 const MarketTicker = lazy(() => import('../../components/MarketTicker.jsx'))
 const PriceMovers = lazy(() => import('../../components/PriceMovers.jsx'))
 
+// Preload PlotDetail chunk — imported but not rendered here.
+// When a user selects a plot (opens sidebar), we trigger this import to preload
+// the PlotDetail route's JS chunk in the background. This way, clicking "View Full Page"
+// in the sidebar navigates instantly — no loading spinner for the full page.
+const plotDetailPreload = () => import('../../pages/public/PlotDetail.jsx')
+
 function DataFreshnessIndicator({ updatedAt, onRefresh }) {
   const [, setTick] = useState(0)
 
@@ -466,7 +472,12 @@ export default function MapView() {
 
   const handleSelectPlot = useCallback((plot) => {
     setSelectedPlot(plot)
-    if (plot?.id) trackView(plot.id)
+    if (plot?.id) {
+      trackView(plot.id)
+      // Preload PlotDetail route chunk in the background — so clicking "View Full Page"
+      // in the sidebar is instant. Only triggers the import once (browser caches the module).
+      plotDetailPreload()
+    }
   }, [trackView])
 
   const handleCloseSidebar = useCallback(() => {

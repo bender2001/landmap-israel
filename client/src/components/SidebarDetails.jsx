@@ -12,7 +12,7 @@ import AnimatedNumber from './ui/AnimatedNumber'
 import NeighborhoodRadar from './ui/NeighborhoodRadar'
 import InvestmentBenchmark from './ui/InvestmentBenchmark'
 import PlotPercentileBadges from './ui/PlotPercentileBadges'
-import { usePlot, useNearbyPlots, useSimilarPlots } from '../hooks/usePlots'
+import { usePlot, useNearbyPlots, useSimilarPlots, usePrefetchPlot } from '../hooks/usePlots'
 import MiniMap from './ui/MiniMap'
 import DueDiligenceChecklist from './ui/DueDiligenceChecklist'
 import InvestmentProjection from './ui/InvestmentProjection'
@@ -437,41 +437,63 @@ function MiniMortgageCalc({ totalPrice }) {
 }
 
 function PlotNavigation({ currentPlot, allPlots, onSelectPlot }) {
-  const { currentIndex, total } = useMemo(() => {
-    if (!currentPlot || !allPlots || allPlots.length < 2) return { currentIndex: -1, total: 0 }
+  const prefetchPlot = usePrefetchPlot()
+
+  const { currentIndex, total, prevPlot, nextPlot } = useMemo(() => {
+    if (!currentPlot || !allPlots || allPlots.length < 2) return { currentIndex: -1, total: 0, prevPlot: null, nextPlot: null }
     const idx = allPlots.findIndex(p => p.id === currentPlot.id)
-    return { currentIndex: idx, total: allPlots.length }
+    if (idx < 0) return { currentIndex: -1, total: 0, prevPlot: null, nextPlot: null }
+    const prevIdx = idx > 0 ? idx - 1 : allPlots.length - 1
+    const nextIdx = idx < allPlots.length - 1 ? idx + 1 : 0
+    return {
+      currentIndex: idx,
+      total: allPlots.length,
+      prevPlot: allPlots[prevIdx],
+      nextPlot: allPlots[nextIdx],
+    }
   }, [currentPlot?.id, allPlots])
+
+  // Prefetch adjacent plots' full data into React Query cache on mount.
+  // This eliminates the loading delay when clicking prev/next arrows —
+  // the enriched plot data (images, documents, committees) is already cached.
+  useEffect(() => {
+    if (prevPlot?.id) prefetchPlot(prevPlot.id)
+    if (nextPlot?.id) prefetchPlot(nextPlot.id)
+  }, [prevPlot?.id, nextPlot?.id, prefetchPlot])
 
   if (total < 2 || currentIndex < 0) return null
 
   const goPrev = () => {
-    const prevIdx = currentIndex > 0 ? currentIndex - 1 : total - 1
-    onSelectPlot(allPlots[prevIdx])
+    if (prevPlot) onSelectPlot(prevPlot)
   }
   const goNext = () => {
-    const nextIdx = currentIndex < total - 1 ? currentIndex + 1 : 0
-    onSelectPlot(allPlots[nextIdx])
+    if (nextPlot) onSelectPlot(nextPlot)
   }
+
+  // Compact preview of adjacent plot info for navigation context
+  const prevBn = prevPlot ? (prevPlot.block_number ?? prevPlot.blockNumber) : ''
+  const nextBn = nextPlot ? (nextPlot.block_number ?? nextPlot.blockNumber) : ''
 
   return (
     <div className="flex items-center gap-2 px-5 py-2 border-b border-white/5 bg-navy-light/20">
       <button
         onClick={goNext}
-        className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-gold/20 transition-all flex items-center justify-center"
-        title="חלקה הבאה"
+        onMouseEnter={() => nextPlot && prefetchPlot(nextPlot.id)}
+        className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-gold/20 transition-all flex items-center justify-center group"
+        title={nextPlot ? `הבא: גוש ${nextBn} חלקה ${nextPlot.number}` : 'חלקה הבאה'}
       >
-        <ChevronRight className="w-4 h-4 text-slate-400" />
+        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-gold transition-colors" />
       </button>
       <span className="text-[11px] text-slate-500 flex-1 text-center tabular-nums">
         {currentIndex + 1} / {total}
       </span>
       <button
         onClick={goPrev}
-        className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-gold/20 transition-all flex items-center justify-center"
-        title="חלקה קודמת"
+        onMouseEnter={() => prevPlot && prefetchPlot(prevPlot.id)}
+        className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-gold/20 transition-all flex items-center justify-center group"
+        title={prevPlot ? `הקודם: גוש ${prevBn} חלקה ${prevPlot.number}` : 'חלקה קודמת'}
       >
-        <ChevronLeft className="w-4 h-4 text-slate-400" />
+        <ChevronLeft className="w-4 h-4 text-slate-400 group-hover:text-gold transition-colors" />
       </button>
     </div>
   )
