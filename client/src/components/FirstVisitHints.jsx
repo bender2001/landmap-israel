@@ -37,7 +37,7 @@ export default function FirstVisitHints() {
 
   return (
     <div
-      className="fixed top-20 left-1/2 -translate-x-1/2 z-[40] animate-fade-in-up hidden sm:block"
+      className="fixed top-[5.5rem] left-1/2 -translate-x-1/2 z-[40] animate-fade-in-up hidden sm:block"
       dir="rtl"
     >
       <div className="bg-navy/95 backdrop-blur-xl border border-gold/20 rounded-2xl px-5 py-3.5 shadow-2xl shadow-gold/10 max-w-md">

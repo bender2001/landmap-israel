@@ -48,7 +48,7 @@ function DataFreshnessIndicator({ updatedAt, onRefresh }) {
   return (
     <button
       onClick={onRefresh}
-      className={`fixed top-3 left-16 sm:left-auto sm:top-auto sm:bottom-6 sm:right-6 z-[30] flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] backdrop-blur-md border transition-all hover:scale-105 ${
+      className={`fixed top-[2.75rem] left-4 sm:left-auto sm:top-auto sm:bottom-[5.5rem] sm:right-6 z-[30] flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] backdrop-blur-md border transition-all hover:scale-105 ${
         isStale
           ? 'bg-orange-500/10 border-orange-500/20 text-orange-400'
           : 'bg-white/5 border-white/10 text-slate-500 hover:text-slate-400'
@@ -564,7 +564,7 @@ export default function MapView() {
       <FirstVisitHints />
 
       {/* Floating contact CTA — always visible, like Madlan/Yad2 */}
-      <div className="fixed bottom-44 sm:bottom-6 left-4 z-[30] flex flex-col gap-2 animate-bounce-in">
+      <div className="fixed bottom-44 sm:bottom-[9.5rem] left-4 z-[30] flex flex-col gap-2 animate-bounce-in">
         {/* WhatsApp quick contact */}
         <a
           href={selectedPlot

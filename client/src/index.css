@@ -3242,15 +3242,15 @@ body {
    ═══════════════════════════════════════════ */
 .alert-subscription-wrapper {
   position: fixed;
-  top: 0.75rem;
-  right: 5rem;
+  top: 2.75rem;
+  right: 4rem;
   z-index: 35;
 }
 
 @media (min-width: 640px) {
   .alert-subscription-wrapper {
     top: auto;
-    bottom: 6.5rem;
+    bottom: 8.5rem;
     right: 1.5rem;
   }
 }

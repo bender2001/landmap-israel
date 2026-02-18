@@ -106,7 +106,7 @@ export default function DealAlerts({ plots, onSelectPlot }) {
 
   return (
     <div
-      className="fixed top-20 left-4 z-[45] animate-slide-in-left max-w-[280px]"
+      className="fixed top-[5.5rem] left-4 z-[45] animate-slide-in-left max-w-[280px]"
       dir="rtl"
     >
       <div className="relative bg-gradient-to-br from-navy-light/95 to-navy/95 backdrop-blur-xl border border-gold/20 rounded-2xl shadow-2xl shadow-gold/10 overflow-hidden">

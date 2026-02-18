@@ -5,6 +5,7 @@ import CookieConsent from './components/CookieConsent'
 import InstallPrompt from './components/InstallPrompt'
 import Spinner from './components/ui/Spinner'
 import ErrorBoundary from './components/ui/ErrorBoundary'
+import { useWebVitals } from './hooks/useWebVitals'
 
 const MapView = lazy(() => import('./pages/public/MapView'))
 const PlotDetail = lazy(() => import('./pages/public/PlotDetail'))
@@ -40,6 +41,10 @@ function PageLoader() {
 
 export default function App() {
   const [showIntro, setShowIntro] = useState(true)
+
+  // Monitor Core Web Vitals (LCP, FID, CLS, TTFB) — like Madlan/Yad2
+  // Reports to analytics endpoint for real performance monitoring
+  useWebVitals()
 
   return (
     <>

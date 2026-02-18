@@ -38,7 +38,7 @@ export default function ConnectionStatus() {
 
   return (
     <div
-      className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-2.5 rounded-2xl flex items-center gap-2.5 text-xs font-medium shadow-lg backdrop-blur-md border transition-all duration-500 ${
+      className={`fixed top-[2.75rem] left-1/2 -translate-x-1/2 z-[100] px-4 py-2.5 rounded-2xl flex items-center gap-2.5 text-xs font-medium shadow-lg backdrop-blur-md border transition-all duration-500 ${
         isOnline
           ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
           : 'bg-red-500/15 border-red-500/30 text-red-300'

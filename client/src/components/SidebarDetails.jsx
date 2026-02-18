@@ -3,6 +3,7 @@ import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2,
 import ShareMenu from './ui/ShareMenu'
 import ImageLightbox from './ui/ImageLightbox'
 import PriceTrendChart from './ui/PriceTrendChart'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 import ProfitWaterfall from './ui/ProfitWaterfall'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
 import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment } from '../utils/formatters'
@@ -472,6 +473,16 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
 
   const scrollRef = useRef(null)
   const panelRef = useRef(null)
+
+  // Focus trap: traps keyboard focus inside the sidebar panel (WCAG 2.4.3)
+  // Returns focus to the previously focused element (map polygon/card) when sidebar closes
+  const { returnFocus } = useFocusTrap(!!plot, panelRef)
+
+  // Wrap onClose to restore focus when sidebar closes
+  const handleClose = useCallback(() => {
+    returnFocus()
+    onClose()
+  }, [returnFocus, onClose])
   const [scrollShadow, setScrollShadow] = useState({ top: false, bottom: false })
   const [showScrollTop, setShowScrollTop] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
@@ -519,12 +530,12 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
     if (state.swiping && state.translateX > 80) {
       // Threshold reached — close the sidebar
       setSwipeOffset(0)
-      onClose()
+      handleClose()
     } else {
       setSwipeOffset(0)
     }
     swipeRef.current = { startX: 0, startY: 0, swiping: false, translateX: 0 }
-  }, [onClose])
+  }, [handleClose])
 
   const handlePrintReport = useCallback(() => {
     if (!plot) return
@@ -666,15 +677,19 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop — click to close (WCAG: backdrop should be dismissible) */}
       <div
         className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[50]"
-        onClick={onClose}
+        onClick={handleClose}
+        aria-hidden="true"
       />
 
       {/* Panel */}
       <div
         ref={panelRef}
+        role="dialog"
+        aria-label={`פרטי חלקה — גוש ${plot?.block_number ?? plot?.blockNumber} חלקה ${plot?.number}`}
+        aria-modal="true"
         className="sidebar-panel fixed top-0 right-0 h-full w-full sm:w-[420px] md:w-[480px] max-w-full z-[60] bg-navy border-l border-white/10 shadow-2xl flex flex-col overflow-hidden sm:animate-slide-in-right"
         dir="rtl"
         style={swipeOffset > 0 ? { transform: `translateX(${swipeOffset}px)`, transition: 'none' } : undefined}
@@ -847,8 +862,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               </button>
             )}
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:rotate-90 transition-all duration-300 flex items-center justify-center"
+              aria-label="סגור פרטי חלקה"
             >
               <X className="w-4 h-4 text-slate-400" />
             </button>

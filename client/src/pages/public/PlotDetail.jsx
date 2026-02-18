@@ -1,6 +1,6 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle } from 'lucide-react'
+import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows } from 'lucide-react'
 import { usePlot, useAllPlots } from '../../hooks/usePlots.js'
 import { useFavorites } from '../../hooks/useFavorites.js'
 import { useViewTracker } from '../../hooks/useViewTracker.js'
@@ -11,7 +11,7 @@ import PublicNav from '../../components/PublicNav.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import NeighborhoodRadar from '../../components/ui/NeighborhoodRadar.jsx'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../../utils/constants.js'
-import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, formatRelativeTime, getFreshnessColor } from '../../utils/formatters.js'
+import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR } from '../../utils/formatters.js'
 import PriceTrendChart from '../../components/ui/PriceTrendChart.jsx'
 import MiniMap from '../../components/ui/MiniMap.jsx'
 import { plotInquiryLink } from '../../utils/config.js'
@@ -218,6 +218,7 @@ export default function PlotDetail() {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [showScrollTop, setShowScrollTop] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const favorites = useFavorites()
   const { trackView } = useViewTracker()
 
@@ -248,6 +249,113 @@ export default function PlotDetail() {
   const scrollToTop = useCallback(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
+
+  const handleCopyLink = useCallback(() => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    }).catch(() => {})
+  }, [])
+
+  /**
+   * Print investment report — generates a clean, professional PDF-ready document.
+   * Like Madlan's "הפק דו״ח" — essential for agents and investors sharing with lawyers/accountants.
+   */
+  const handlePrintReport = useCallback(() => {
+    if (!plot || !computed) return
+    const { totalPrice, projectedValue, sizeSqM, blockNumber, roi, readiness, zoningStage } = computed
+    const areaCtx = plot.area_context ?? plot.areaContext ?? ''
+    const nearbyDev = plot.nearby_development ?? plot.nearbyDevelopment ?? ''
+    const cagrData = calcCAGR(roi, readiness)
+    const score = calcInvestmentScore(plot)
+    const { label: scoreLabel } = getScoreLabel(score)
+
+    const purchaseTax = Math.round(totalPrice * 0.06)
+    const attorneyFees = Math.round(totalPrice * 0.0175)
+    const grossProfit = projectedValue - totalPrice
+    const bettermentLevy = Math.round(grossProfit * 0.5)
+    const costs = purchaseTax + attorneyFees
+    const taxable = Math.max(0, grossProfit - bettermentLevy - costs)
+    const capGains = Math.round(taxable * 0.25)
+    const netProfit = grossProfit - costs - bettermentLevy - capGains
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    printWindow.document.write(`<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8">
+      <title>דו״ח השקעה - גוש ${blockNumber} חלקה ${plot.number}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a2e; padding: 40px; max-width: 800px; margin: 0 auto; line-height: 1.6; }
+        h1 { font-size: 24px; margin-bottom: 4px; color: #1a1a2e; }
+        .subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
+        .section { margin-bottom: 24px; }
+        .section h2 { font-size: 16px; color: #C8942A; border-bottom: 2px solid #C8942A; padding-bottom: 6px; margin-bottom: 12px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        .card { background: #f8f9fa; border-radius: 8px; padding: 12px; }
+        .card .label { font-size: 11px; color: #888; margin-bottom: 4px; }
+        .card .value { font-size: 18px; font-weight: 700; }
+        .card .value.gold { color: #C8942A; }
+        .card .value.green { color: #22C55E; }
+        .card .value.blue { color: #3B82F6; }
+        .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 13px; }
+        .row:last-child { border-bottom: none; }
+        .row .label { color: #666; }
+        .row .val { font-weight: 600; }
+        .score-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-weight: 700; font-size: 13px; }
+        .footer { margin-top: 40px; text-align: center; color: #aaa; font-size: 11px; border-top: 1px solid #eee; padding-top: 16px; }
+        .desc { font-size: 13px; color: #444; margin-bottom: 16px; }
+        .highlight { background: #FFFBEB; border: 1px solid #F59E0B; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+        @media print { body { padding: 20px; } }
+      </style></head><body>
+      <h1>🏗️ דו״ח השקעה — גוש ${blockNumber} | חלקה ${plot.number}</h1>
+      <div class="subtitle">${plot.city} • ${new Date().toLocaleDateString('he-IL')} • ציון השקעה: ${score}/10 (${scoreLabel})</div>
+      ${plot.description ? `<p class="desc">${plot.description}</p>` : ''}
+      ${areaCtx ? `<p class="desc">📍 ${areaCtx}</p>` : ''}
+      ${nearbyDev ? `<p class="desc">🏗️ ${nearbyDev}</p>` : ''}
+      <div class="section">
+        <h2>נתונים פיננסיים</h2>
+        <div class="grid3">
+          <div class="card"><div class="label">מחיר מבוקש</div><div class="value blue">${formatCurrency(totalPrice)}</div></div>
+          <div class="card"><div class="label">שווי צפוי</div><div class="value green">${formatCurrency(projectedValue)}</div></div>
+          <div class="card"><div class="label">תשואה צפויה</div><div class="value gold">+${roi}%</div></div>
+        </div>
+        ${cagrData ? `<div class="row" style="margin-top:8px"><span class="label">תשואה שנתית (CAGR)</span><span class="val" style="color:#C8942A">${cagrData.cagr}% לשנה (${cagrData.years} שנים)</span></div>` : ''}
+      </div>
+      <div class="section">
+        <h2>פרטי חלקה</h2>
+        <div class="row"><span class="label">שטח</span><span class="val">${(sizeSqM / 1000).toFixed(1)} דונם (${sizeSqM.toLocaleString()} מ״ר)</span></div>
+        <div class="row"><span class="label">מחיר למ״ר</span><span class="val">${formatCurrency(Math.round(totalPrice / sizeSqM))}</span></div>
+        <div class="row"><span class="label">מחיר לדונם</span><span class="val">${formatCurrency(Math.round(totalPrice / sizeSqM * 1000))}</span></div>
+        <div class="row"><span class="label">סטטוס</span><span class="val">${statusLabels[plot.status] || plot.status}</span></div>
+        <div class="row"><span class="label">ייעוד קרקע</span><span class="val">${zoningLabels[zoningStage] || zoningStage}</span></div>
+        ${readiness ? `<div class="row"><span class="label">מוכנות לבנייה</span><span class="val">${readiness}</span></div>` : ''}
+      </div>
+      <div class="section">
+        <h2>ניתוח עלויות ורווחיות</h2>
+        <div class="row"><span class="label">מס רכישה (6%)</span><span class="val">${formatCurrency(purchaseTax)}</span></div>
+        <div class="row"><span class="label">שכ״ט עו״ד (~1.75%)</span><span class="val">${formatCurrency(attorneyFees)}</span></div>
+        <div class="row"><span class="label">סה״כ עלות כוללת</span><span class="val" style="color:#3B82F6">${formatCurrency(Math.round(totalPrice * 1.0775))}</span></div>
+        <div class="row"><span class="label">רווח גולמי</span><span class="val" style="color:#22C55E">${formatCurrency(grossProfit)}</span></div>
+        <div class="row"><span class="label">היטל השבחה (50%)</span><span class="val" style="color:#EF4444">-${formatCurrency(bettermentLevy)}</span></div>
+        <div class="row"><span class="label">מס שבח (25%)</span><span class="val" style="color:#EF4444">-${formatCurrency(capGains)}</span></div>
+        <div class="highlight">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:600;font-size:15px">✨ רווח נקי (אחרי כל המיסים)</span>
+            <span style="font-weight:800;font-size:20px;color:${netProfit >= 0 ? '#22C55E' : '#EF4444'}">${formatCurrency(netProfit)}</span>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        <div>LandMap Israel — מפת קרקעות להשקעה</div>
+        <div>הופק ב-${new Date().toLocaleDateString('he-IL')} ${new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</div>
+        <div style="margin-top:4px">${window.location.href}</div>
+        <div style="margin-top:8px;font-size:10px">⚠️ מסמך זה הינו לצרכי מידע בלבד ואינו מהווה ייעוץ השקעות</div>
+      </div>
+    </body></html>`)
+    printWindow.document.close()
+    setTimeout(() => printWindow.print(), 300)
+  }, [plot, computed])
 
   // Dynamic page title + OG meta for SEO
   useEffect(() => {
@@ -661,9 +769,9 @@ export default function PlotDetail() {
           {/* Similar Plots */}
           <SimilarPlotsSection currentPlot={plot} allPlots={allPlots} />
 
-          {/* Sticky CTA */}
+          {/* Sticky CTA — enhanced with print, share, and map actions (like Madlan/Yad2 bottom bars) */}
           <div className="fixed bottom-0 left-0 right-0 z-40 bg-navy/90 backdrop-blur-xl border-t border-white/10 px-4 py-3">
-            <div className="max-w-4xl mx-auto flex gap-3">
+            <div className="max-w-4xl mx-auto flex gap-2">
               <button
                 onClick={() => setIsLeadModalOpen(true)}
                 className="flex-1 py-3.5 bg-gradient-to-r from-gold via-gold-bright to-gold rounded-2xl text-navy font-extrabold text-base shadow-lg shadow-gold/30 hover:shadow-xl transition-all"
@@ -674,13 +782,39 @@ export default function PlotDetail() {
                 href={plotInquiryLink(plot)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-14 flex items-center justify-center bg-[#25D366] rounded-2xl hover:bg-[#20BD5A] transition-all shadow-lg shadow-[#25D366]/20"
+                className="w-12 sm:w-14 flex items-center justify-center bg-[#25D366] rounded-2xl hover:bg-[#20BD5A] transition-all shadow-lg shadow-[#25D366]/20"
+                aria-label="צור קשר ב-WhatsApp"
               >
-                <MessageCircle className="w-6 h-6 text-white" />
+                <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </a>
               <button
+                onClick={handlePrintReport}
+                className="w-12 sm:w-14 flex items-center justify-center bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-gold/20 transition-all"
+                aria-label="הדפס דו״ח השקעה"
+                title="הדפס דו״ח השקעה (PDF)"
+              >
+                <Printer className="w-5 h-5 text-slate-400" />
+              </button>
+              <button
+                onClick={handleCopyLink}
+                className={`w-12 sm:w-14 flex items-center justify-center border rounded-2xl transition-all ${
+                  linkCopied
+                    ? 'bg-green-500/15 border-green-500/30'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-gold/20'
+                }`}
+                aria-label="העתק קישור"
+                title="העתק קישור לחלקה"
+              >
+                {linkCopied
+                  ? <Check className="w-5 h-5 text-green-400" />
+                  : <Copy className="w-5 h-5 text-slate-400" />
+                }
+              </button>
+              <button
                 onClick={() => navigate('/')}
-                className="w-14 flex items-center justify-center bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all"
+                className="w-12 sm:w-14 flex items-center justify-center bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-gold/20 transition-all"
+                aria-label="חזרה למפה"
+                title="חזרה למפה"
               >
                 <MapPin className="w-5 h-5 text-gold" />
               </button>

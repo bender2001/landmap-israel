@@ -77,7 +77,7 @@ export default function DealSpotlight({ plots, onSelectPlot }) {
   const { color: scoreColor } = getScoreLabel(score)
 
   return (
-    <div className="fixed bottom-[200px] sm:bottom-[140px] right-4 z-[25] animate-slide-in-right max-w-[280px]">
+    <div className="fixed bottom-[200px] sm:bottom-[14rem] right-4 z-[25] animate-slide-in-right max-w-[280px]">
       <div
         className="relative glass-panel overflow-hidden cursor-pointer group hover:border-gold/40 transition-all"
         onClick={handleClick}

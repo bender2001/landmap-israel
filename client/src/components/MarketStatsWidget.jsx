@@ -95,7 +95,7 @@ export default function MarketStatsWidget({ plots }) {
   if (!stats) return null
 
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none hidden md:block">
+    <div className="absolute top-[5.5rem] left-1/2 -translate-x-1/2 z-[1000] pointer-events-none hidden md:block">
       <div className="glass-panel pointer-events-auto max-w-lg">
         {/* Compact row — always visible */}
         <button
