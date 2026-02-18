@@ -61,6 +61,7 @@ app.use(cors({
     cb(new Error('Not allowed by CORS'))
   },
   credentials: true,
+  maxAge: 86400, // Cache preflight for 24h — reduces OPTIONS round-trips
 }))
 
 // Request tracing

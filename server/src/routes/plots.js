@@ -33,7 +33,7 @@ function generateETag(data) {
 router.get('/', sanitizePlotQuery, async (req, res, next) => {
   try {
     // Cache list for 30s — data doesn't change often
-    res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60')
+    res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60, stale-if-error=300')
     const cacheKey = `plots:${JSON.stringify(req.query)}`
     const plots = await plotCache.wrap(cacheKey, () => getPublishedPlots(req.query), 30_000)
 

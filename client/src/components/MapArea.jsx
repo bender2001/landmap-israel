@@ -91,7 +91,7 @@ function MapLayerSwitcher({ activeLayer, onChangeLayer }) {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
-    <div className="absolute top-14 sm:top-4 right-4 z-[1000] pointer-events-none">
+    <div className="absolute top-4 right-4 z-[1000] pointer-events-none">
       <div className="pointer-events-auto relative">
         <button
           onClick={() => setIsOpen(prev => !prev)}
@@ -126,36 +126,25 @@ function MapLayerSwitcher({ activeLayer, onChangeLayer }) {
   )
 }
 
-function LocateButton() {
+/** Compact toolbar with locate + recenter + fullscreen grouped vertically above zoom */
+function MapToolbar({ plots }) {
   const map = useMap()
   const [locating, setLocating] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', handler)
+    return () => document.removeEventListener('fullscreenchange', handler)
+  }, [])
 
   const handleLocate = () => {
     setLocating(true)
     map.locate({ setView: true, maxZoom: 14 })
     map.once('locationfound', () => setLocating(false))
     map.once('locationerror', () => setLocating(false))
-    // timeout fallback
     setTimeout(() => setLocating(false), 8000)
   }
-
-  return (
-    <div className="absolute bottom-40 sm:bottom-32 left-4 z-[1000] pointer-events-none">
-      <button
-        onClick={handleLocate}
-        disabled={locating}
-        className="glass-panel w-9 h-9 sm:w-9 sm:h-9 flex items-center justify-center pointer-events-auto hover:border-gold/20 transition-colors disabled:opacity-50"
-        style={{ minWidth: 44, minHeight: 44 }}
-        title="המיקום שלי"
-      >
-        <Navigation className={`w-4 h-4 text-gold ${locating ? 'animate-spin' : ''}`} />
-      </button>
-    </div>
-  )
-}
-
-function RecenterButton({ plots }) {
-  const map = useMap()
 
   const handleRecenter = useCallback(() => {
     if (!plots || plots.length === 0) return
@@ -175,31 +164,7 @@ function RecenterButton({ plots }) {
     }
   }, [plots, map])
 
-  return (
-    <div className="absolute bottom-52 sm:bottom-44 left-4 z-[1000] pointer-events-none">
-      <button
-        onClick={handleRecenter}
-        className="glass-panel w-9 h-9 flex items-center justify-center pointer-events-auto hover:border-gold/20 transition-colors"
-        style={{ minWidth: 44, minHeight: 44 }}
-        title="הצג את כל החלקות"
-        aria-label="מרכז מחדש את המפה"
-      >
-        <MapIcon className="w-4 h-4 text-gold" />
-      </button>
-    </div>
-  )
-}
-
-function FullscreenButton() {
-  const [isFullscreen, setIsFullscreen] = useState(false)
-
-  useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement)
-    document.addEventListener('fullscreenchange', handler)
-    return () => document.removeEventListener('fullscreenchange', handler)
-  }, [])
-
-  const toggle = useCallback(() => {
+  const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) {
       document.exitFullscreen()
     } else {
@@ -207,21 +172,25 @@ function FullscreenButton() {
     }
   }, [])
 
+  const btnClass = "w-9 h-9 flex items-center justify-center hover:border-gold/20 transition-colors hover:bg-white/5"
+
   return (
-    <div className="absolute bottom-64 sm:bottom-56 left-4 z-[1000] pointer-events-none hidden sm:block">
-      <button
-        onClick={toggle}
-        className="glass-panel w-9 h-9 flex items-center justify-center pointer-events-auto hover:border-gold/20 transition-colors"
-        style={{ minWidth: 44, minHeight: 44 }}
-        title={isFullscreen ? 'צא ממסך מלא' : 'מסך מלא'}
-        aria-label={isFullscreen ? 'צא ממסך מלא' : 'מסך מלא'}
-      >
-        {isFullscreen ? (
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gold"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-        ) : (
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gold"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-        )}
-      </button>
+    <div className="absolute bottom-28 left-3 z-[1000] pointer-events-none">
+      <div className="glass-panel pointer-events-auto flex flex-col divide-y divide-white/10 overflow-hidden">
+        <button onClick={handleLocate} disabled={locating} className={`${btnClass} disabled:opacity-50`} title="המיקום שלי">
+          <Navigation className={`w-4 h-4 text-gold ${locating ? 'animate-spin' : ''}`} />
+        </button>
+        <button onClick={handleRecenter} className={btnClass} title="הצג את כל החלקות">
+          <MapIcon className="w-4 h-4 text-gold" />
+        </button>
+        <button onClick={toggleFullscreen} className={`${btnClass} hidden sm:flex`} title={isFullscreen ? 'צא ממסך מלא' : 'מסך מלא'}>
+          {isFullscreen ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gold"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gold"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          )}
+        </button>
+      </div>
     </div>
   )
 }
@@ -261,7 +230,7 @@ function getRoiColor(roi) {
 function ColorModeToggle({ colorMode, onChangeColorMode }) {
   const [isOpen, setIsOpen] = useState(false)
   return (
-    <div className="absolute top-16 right-4 z-[1000] pointer-events-none">
+    <div className="absolute top-[60px] right-4 z-[1000] pointer-events-none">
       <div className="pointer-events-auto relative">
         <button
           onClick={() => setIsOpen(prev => !prev)}
@@ -354,7 +323,7 @@ function GeoSearch() {
 
   if (!isOpen) {
     return (
-      <div className="absolute top-28 right-4 z-[1000] pointer-events-none">
+      <div className="absolute top-[116px] right-4 z-[1000] pointer-events-none">
         <button
           onClick={() => setIsOpen(true)}
           className="glass-panel w-9 h-9 flex items-center justify-center pointer-events-auto hover:border-gold/20 transition-colors"
@@ -369,7 +338,7 @@ function GeoSearch() {
   }
 
   return (
-    <div className="absolute top-28 right-4 z-[1000] pointer-events-none">
+    <div className="absolute top-[116px] right-4 z-[1000] pointer-events-none">
       <div className="pointer-events-auto glass-panel p-2 min-w-[220px]" dir="rtl">
         <div className="flex items-center gap-2 mb-1">
           <input
@@ -534,6 +503,30 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
                 {compareIds.includes(plot.id) ? '⚖️' : '📊'}
               </button>
             )}
+            <button
+              className="plot-popup-action-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                const url = `${window.location.origin}/plot/${plot.id}`
+                navigator.clipboard.writeText(url).then(() => {
+                  e.currentTarget.textContent = '✅'
+                  setTimeout(() => { e.currentTarget.textContent = '🔗' }, 1500)
+                }).catch(() => {})
+              }}
+              title="העתק קישור לחלקה"
+            >
+              🔗
+            </button>
+            <a
+              href={`https://t.me/share/url?url=${encodeURIComponent(`${window.location.origin}/plot/${plot.id}`)}&text=${encodeURIComponent(`גוש ${blockNum} חלקה ${plot.number} | ${plot.city}\n${formatPriceShort(price)} · +${roi}% ROI`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="plot-popup-action-btn"
+              onClick={(e) => e.stopPropagation()}
+              title="שתף בטלגרם"
+            >
+              ✈️
+            </a>
           </div>
         </div>
       </Popup>
@@ -646,9 +639,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         <ZoomControl position="bottomleft" />
         <AutoFitBounds plots={plots} />
         <FlyToSelected plot={selectedPlot} />
-        <LocateButton />
-        <RecenterButton plots={plots} />
-        <FullscreenButton />
+        <MapToolbar plots={plots} />
         <MapClusterLayer plots={plots} onSelectPlot={onSelectPlot} />
         <MapRuler />
         <MapHeatLayer plots={plots} visible={colorMode === 'heatmap'} metric="priceSqm" />
@@ -713,7 +704,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
       </div>
 
       {/* Bottom-right: Interactive Legend — adapts to color mode */}
-      <div className="absolute bottom-40 right-4 z-[1000] pointer-events-none hidden sm:block">
+      <div className="absolute bottom-8 right-4 z-[1000] pointer-events-none hidden sm:block">
         <div className="glass-panel px-3 py-2.5 pointer-events-auto">
           {colorMode === 'status' ? (
             <div className="flex flex-col gap-0.5">
