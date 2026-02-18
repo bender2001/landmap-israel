@@ -3,7 +3,7 @@ import L from 'leaflet'
 import { useState, useEffect, useCallback, useRef, useMemo, memo, forwardRef } from 'react'
 import { MapPin, Eye, Check, ArrowLeft, Navigation, Layers, Map as MapIcon } from 'lucide-react'
 import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
-import { formatCurrency, formatPriceShort, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR } from '../utils/formatters'
+import { formatCurrency, formatPriceShort, formatDunam, calcInvestmentScore, getScoreLabel, getInvestmentGrade, calcCAGR } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
 import { useAreaAverages } from '../hooks/useAreaAverages'
 import MapClusterLayer from './MapClusterLayer'
@@ -562,16 +562,18 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
       }}
     >
       <Tooltip permanent direction="center" className="price-tooltip">
-        <span className="tooltip-main-price">{plot.status === 'SOLD' ? '🔴 ' : ''}{isNew ? '🆕 ' : ''}{favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{plot.plot_images?.length > 0 ? '📷 ' : ''}{formatPriceShort(price)}</span>
+        <span className="tooltip-main-price">{plot.status === 'SOLD' ? '🔴 ' : ''}{isNew ? '🆕 ' : ''}{favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{compareIds?.includes(plot.id) ? '⚖️ ' : ''}{plot.plot_images?.length > 0 ? '📷 ' : ''}{formatPriceShort(price)}</span>
         <span className="tooltip-sub">{plot.status === 'SOLD' ? 'נמכר · ' : ''}{formatDunam(sizeSqM)} דונם · {sizeSqM > 0 ? `₪${Math.round(price / sizeSqM).toLocaleString()}/מ״ר` : ''} · +{roi}%{(plot.views ?? 0) >= 5 ? ` · 👁${plot.views}` : ''}</span>
-        {/* Investment score + CAGR row — gives investors instant quality context on hover */}
+        {/* Investment grade + CAGR row — gives investors instant quality context on hover.
+            Uses letter grade (A+/B/C) which is faster to scan than numeric scores. */}
         {(() => {
           const score = calcInvestmentScore(plot)
-          const { color: scoreColor } = getScoreLabel(score)
+          const { grade, color: gradeColor } = getInvestmentGrade(score)
           const cagrData = calcCAGR(roi, readiness)
           return (
             <span className="tooltip-score-row">
-              <span style={{ color: scoreColor }}>⭐{score}/10</span>
+              <span className="tooltip-grade-badge" style={{ color: gradeColor, borderColor: `${gradeColor}40`, background: `${gradeColor}15` }}>{grade}</span>
+              <span style={{ color: gradeColor }}>⭐{score}/10</span>
               {cagrData && <span> · {cagrData.cagr}%/שנה</span>}
             </span>
           )

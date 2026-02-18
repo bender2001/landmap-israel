@@ -452,6 +452,8 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
   const scrollRef = useRef(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
+  const [scrollProgress, setScrollProgress] = useState(0) // 0-100%
+  const [visibleIndex, setVisibleIndex] = useState(0) // Which card is roughly centered
 
   const checkScroll = useCallback(() => {
     const el = scrollRef.current
@@ -461,7 +463,18 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
     // In RTL, scrollLeft starts at 0 and goes negative
     setCanScrollRight(Math.abs(scrollLeft) > 1)
     setCanScrollLeft(Math.abs(scrollLeft) + clientWidth < scrollWidth - 1)
-  }, [])
+
+    // Calculate scroll progress percentage for the progress bar
+    const maxScroll = scrollWidth - clientWidth
+    const progress = maxScroll > 0 ? Math.round((Math.abs(scrollLeft) / maxScroll) * 100) : 0
+    setScrollProgress(progress)
+
+    // Estimate which card index is visible (RTL: right-to-left)
+    // Average card width ~200px; compute approximate visible center card
+    const avgCardWidth = 200
+    const approxIdx = Math.round(Math.abs(scrollLeft) / avgCardWidth)
+    setVisibleIndex(Math.min(approxIdx, (plots?.length ?? 1) - 1))
+  }, [plots?.length])
 
   useEffect(() => {
     const el = scrollRef.current
@@ -599,6 +612,23 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Scroll position indicator — shows "X/Y" and progress bar (like Madlan's results counter) */}
+      {plots.length > 3 && (
+        <div className="absolute top-0.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 pointer-events-none">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-navy/80 backdrop-blur-sm border border-white/5 rounded-lg">
+            <span className="text-[9px] text-slate-400 font-medium tabular-nums">
+              {visibleIndex + 1}/{plots.length}
+            </span>
+            <div className="w-12 h-1 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gold/40 transition-all duration-200"
+                style={{ width: `${Math.max(8, scrollProgress)}%` }}
+              />
+            </div>
+          </div>
         </div>
       )}
 

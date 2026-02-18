@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { Map, Heart, Info, Phone, Menu, X, BarChart3, Calculator, GitCompareArrows } from 'lucide-react'
 import { useFavorites } from '../hooks/useFavorites'
 import { useLocalStorage } from '../hooks/useLocalStorage'
+import WhatsNew from './WhatsNew'
 
 const navLinks = [
   { to: '/areas', icon: BarChart3, label: 'אזורים' },
@@ -108,6 +109,9 @@ export default function PublicNav() {
                 </Link>
               )
             })}
+
+            {/* What's New notification bell */}
+            <WhatsNew />
 
             {/* Back to map */}
             <Link
