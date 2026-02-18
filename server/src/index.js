@@ -146,6 +146,7 @@ app.get('/api/health', async (req, res) => {
       heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
     },
     version: process.env.npm_package_version || '2.0.0',
+    sseClients: getClientCount(),
   }
   try {
     const start = Date.now()
@@ -270,7 +271,24 @@ if (process.env.NODE_ENV === 'production') {
 // Error handler
 app.use(errorHandler)
 
-app.listen(PORT, async () => {
+// ─── Server-Sent Events for real-time plot updates ───
+import { addClient, removeClient, closeAll as closeSSE, getClientCount } from './services/sseService.js'
+
+app.get('/api/events', (req, res) => {
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no', // Nginx compatibility
+  })
+  res.flushHeaders()
+  res.write('data: {"type":"connected"}\n\n')
+
+  addClient(res)
+  req.on('close', () => removeClient(res))
+})
+
+const server = app.listen(PORT, async () => {
   console.log(`[server] Running on http://localhost:${PORT}`)
 
   // Take daily price snapshot on startup (idempotent, non-blocking)
@@ -286,3 +304,25 @@ app.listen(PORT, async () => {
     console.warn(`[priceHistory] Snapshot failed (table may not exist yet): ${err.message}`)
   }
 })
+
+// ─── Graceful shutdown ───
+function gracefulShutdown(signal) {
+  console.log(`[server] ${signal} received — shutting down gracefully...`)
+
+  // Close SSE connections
+  closeSSE()
+
+  server.close(() => {
+    console.log('[server] HTTP server closed')
+    process.exit(0)
+  })
+
+  // Force exit after 10s if connections hang
+  setTimeout(() => {
+    console.warn('[server] Forcing exit after timeout')
+    process.exit(1)
+  }, 10_000).unref()
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))

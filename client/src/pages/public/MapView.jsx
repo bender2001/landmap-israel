@@ -30,6 +30,7 @@ import FirstVisitHints from '../../components/FirstVisitHints.jsx'
 import MarketTicker from '../../components/MarketTicker.jsx'
 import AlertSubscription from '../../components/AlertSubscription.jsx'
 import DealSpotlight from '../../components/DealSpotlight.jsx'
+import { useRealtimeUpdates } from '../../hooks/useRealtimeUpdates.js'
 
 function DataFreshnessIndicator({ updatedAt, onRefresh }) {
   const [, setTick] = useState(0)
@@ -363,6 +364,9 @@ export default function MapView() {
       prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
     )
   }, [])
+
+  // Real-time updates via SSE — auto-refresh when admin changes plots
+  useRealtimeUpdates()
 
   // JSON-LD structured data for SEO (like Madlan/Yad2)
   useStructuredData(selectedPlot, filteredPlots)

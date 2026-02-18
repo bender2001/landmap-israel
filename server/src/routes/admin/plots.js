@@ -7,6 +7,7 @@ import { getAllPlots, getPlotByIdAdmin, createPlot, updatePlot, deletePlot } fro
 import { supabaseAdmin } from '../../config/supabase.js'
 import { logActivity } from '../../services/activityLogger.js'
 import { invalidatePlotCaches } from '../../services/cacheService.js'
+import { broadcastEvent } from '../../services/sseService.js'
 
 const router = Router()
 router.use(auth, adminOnly)
@@ -129,6 +130,7 @@ router.post('/', validate(createPlotSchema), async (req, res, next) => {
   try {
     const plot = await createPlot(req.validated)
     invalidatePlotCaches()
+    broadcastEvent('plot_created', { plotId: plot.id })
     logActivity({
       action: 'create',
       entityType: 'plot',
@@ -147,6 +149,7 @@ router.patch('/:id', validate(updatePlotSchema), async (req, res, next) => {
   try {
     const plot = await updatePlot(req.params.id, req.validated)
     invalidatePlotCaches()
+    broadcastEvent('plot_updated', { plotId: plot.id })
     logActivity({
       action: 'update',
       entityType: 'plot',
@@ -165,6 +168,7 @@ router.delete('/:id', async (req, res, next) => {
   try {
     await deletePlot(req.params.id)
     invalidatePlotCaches()
+    broadcastEvent('plot_deleted', { plotId: req.params.id })
     logActivity({
       action: 'delete',
       entityType: 'plot',
