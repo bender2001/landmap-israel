@@ -1933,6 +1933,19 @@ body {
   scrollbar-width: none;
 }
 
+/* Mobile: mandatory snap for Madlan-like card-by-card scrolling experience */
+@media (max-width: 639px) {
+  .plot-strip-scroll {
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 16px;
+    gap: 10px;
+    padding: 6px 60px 14px 12px;
+  }
+  .plot-card-mini {
+    scroll-snap-align: start;
+  }
+}
+
 .plot-strip-scroll::-webkit-scrollbar {
   display: none;
 }

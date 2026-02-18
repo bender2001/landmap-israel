@@ -15,6 +15,7 @@ import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, get
 import PriceTrendChart from '../../components/ui/PriceTrendChart.jsx'
 import MiniMap from '../../components/ui/MiniMap.jsx'
 import { plotInquiryLink } from '../../utils/config.js'
+import InvestmentBenchmark from '../../components/ui/InvestmentBenchmark.jsx'
 
 function JsonLdSchema({ plot }) {
   const blockNum = plot.block_number ?? plot.blockNumber
@@ -757,6 +758,14 @@ export default function PlotDetail() {
 
               {/* Mortgage Calculator */}
               <MortgageCalcSection totalPrice={totalPrice} />
+
+              {/* Investment Benchmark — compare CAGR vs alternative investments */}
+              <InvestmentBenchmark
+                totalPrice={totalPrice}
+                projectedValue={projectedValue}
+                readinessEstimate={readiness}
+                className="mt-4"
+              />
             </div>
           </div>
 
