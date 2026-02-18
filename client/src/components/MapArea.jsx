@@ -10,6 +10,64 @@ import MapClusterLayer from './MapClusterLayer'
 import MapRuler from './MapRuler'
 import MapHeatLayer from './MapHeatLayer'
 
+/**
+ * MapUrlSync — persists the map viewport (lat/lng/zoom) in URL hash for shareable views.
+ * Format: #map=zoom/lat/lng (matches Madlan/Google Maps convention).
+ * Restores position on page load; debounced writes avoid excessive history pushes.
+ * Unlike search params, the hash doesn't trigger React Router re-renders.
+ */
+function MapUrlSync() {
+  const map = useMap()
+  const debounceRef = useRef(null)
+  const initializedRef = useRef(false)
+
+  // On mount: read position from URL hash and apply
+  useEffect(() => {
+    const hash = window.location.hash
+    const match = hash.match(/#map=(\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)/)
+    if (match) {
+      const zoom = parseFloat(match[1])
+      const lat = parseFloat(match[2])
+      const lng = parseFloat(match[3])
+      if (isFinite(zoom) && isFinite(lat) && isFinite(lng) &&
+          lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 &&
+          zoom >= 1 && zoom <= 22) {
+        map.setView([lat, lng], zoom, { animate: false })
+        initializedRef.current = true
+      }
+    }
+    // Small delay before starting to track — avoid overwriting hash from initial fitBounds
+    const timer = setTimeout(() => { initializedRef.current = true }, 3000)
+    return () => clearTimeout(timer)
+  }, [map])
+
+  // Track viewport changes and write to hash (debounced)
+  useEffect(() => {
+    const updateHash = () => {
+      if (!initializedRef.current) return
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      debounceRef.current = setTimeout(() => {
+        const center = map.getCenter()
+        const zoom = map.getZoom()
+        const newHash = `#map=${zoom}/${center.lat.toFixed(5)}/${center.lng.toFixed(5)}`
+        // Use replaceState to avoid polluting browser history with every pan/zoom
+        if (window.location.hash !== newHash) {
+          window.history.replaceState(null, '', newHash)
+        }
+      }, 600)
+    }
+    map.on('moveend', updateHash)
+    map.on('zoomend', updateHash)
+    return () => {
+      map.off('moveend', updateHash)
+      map.off('zoomend', updateHash)
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [map])
+
+  return null
+}
+
 function FlyToSelected({ plot }) {
   const map = useMap()
 
@@ -532,14 +590,19 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
           {plot.plot_images && plot.plot_images.length > 0 && (
             <div className="plot-popup-images">
               {plot.plot_images.slice(0, 3).map((img, i) => (
-                <div key={img.id || i} className="plot-popup-image-thumb">
+                <div key={img.id || i} className="plot-popup-image-thumb relative overflow-hidden">
                   <img
                     src={img.url}
                     alt={img.alt || `גוש ${blockNum} — תמונה ${i + 1}`}
                     loading="lazy"
                     decoding="async"
+                    className="transition-opacity duration-500"
+                    style={{ opacity: 0 }}
+                    onLoad={(e) => { e.target.style.opacity = 1 }}
                     onError={(e) => { e.target.style.display = 'none' }}
                   />
+                  {/* Gradient placeholder visible until image loads */}
+                  <div className="absolute inset-0 -z-10 bg-gradient-to-br from-navy-light/60 to-gold/5" />
                 </div>
               ))}
               {plot.plot_images.length > 3 && (
@@ -1050,6 +1113,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
           />
         )}
         <ZoomControl position="bottomleft" />
+        <MapUrlSync />
         <AutoFitBounds plots={plots} />
         <FlyToSelected plot={selectedPlot} />
         <MapToolbar plots={plots} />

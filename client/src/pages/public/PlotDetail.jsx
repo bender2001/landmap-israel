@@ -803,10 +803,21 @@ export default function PlotDetail() {
                   <img
                     src={img.url}
                     alt={img.alt || `גוש ${blockNumber} חלקה ${plot.number} — תמונה ${i + 1}`}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    style={{ aspectRatio: i === 0 ? '16/9' : '1/1' }}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500"
+                    style={{
+                      aspectRatio: i === 0 ? '16/9' : '1/1',
+                      opacity: 0,
+                      filter: 'blur(8px)',
+                      transition: 'opacity 0.5s ease, filter 0.5s ease, transform 0.3s ease',
+                    }}
                     loading={i === 0 ? 'eager' : 'lazy'}
                     fetchPriority={i === 0 ? 'high' : undefined}
+                    decoding="async"
+                    onLoad={(e) => {
+                      // Blur-up progressive reveal — image sharpens as it loads
+                      e.target.style.opacity = '1'
+                      e.target.style.filter = 'blur(0)'
+                    }}
                     onError={(e) => {
                       // Graceful fallback — styled placeholder instead of broken image icon
                       e.target.style.display = 'none'
@@ -820,6 +831,8 @@ export default function PlotDetail() {
                       }
                     }}
                   />
+                  {/* Gradient placeholder visible until image loads */}
+                  <div className="absolute inset-0 -z-10 bg-gradient-to-br from-navy-light/60 to-gold/5" />
                   {/* Image count badge on last visible image */}
                   {i === Math.min(images.length - 1, 5) && images.length > 6 && (
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
@@ -1385,16 +1398,37 @@ export default function PlotDetail() {
         </div>
       </div>
 
-      {/* Scroll-to-top button — appears when scrolled down */}
-      {showScrollTop && (
+      {/* Floating navigation: Back-to-Map + Scroll-to-top.
+          Back-to-Map preserves the map viewport position via URL hash (#map=zoom/lat/lng).
+          This is a UX pattern from Madlan/Yad2 — users can deep-dive into a plot and seamlessly
+          return to exactly where they were on the map, preserving all filters and position. */}
+      <div className="fixed bottom-20 right-4 z-50 flex flex-col gap-2 animate-fade-in">
+        {/* Back to Map — always visible. Uses navigate(-1) to preserve map hash + filters.
+            Falls back to /?plot=id if no history (e.g., direct link). */}
         <button
-          onClick={scrollToTop}
-          className="fixed bottom-20 right-4 z-50 w-10 h-10 rounded-xl bg-gold/20 border border-gold/30 flex items-center justify-center hover:bg-gold/30 transition-all shadow-lg backdrop-blur-sm animate-fade-in"
-          aria-label="חזרה למעלה"
+          onClick={() => window.history.length > 2 ? navigate(-1) : navigate(`/?plot=${id}`)}
+          className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center hover:bg-blue-500/30 transition-all shadow-lg backdrop-blur-sm group"
+          aria-label="חזרה למפה"
+          title="חזרה למפה"
         >
-          <ArrowUp className="w-4 h-4 text-gold" />
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 group-hover:text-blue-300">
+            <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+            <line x1="8" y1="2" x2="8" y2="18" />
+            <line x1="16" y1="6" x2="16" y2="22" />
+          </svg>
         </button>
-      )}
+
+        {/* Scroll-to-top — appears when scrolled down */}
+        {showScrollTop && (
+          <button
+            onClick={scrollToTop}
+            className="w-10 h-10 rounded-xl bg-gold/20 border border-gold/30 flex items-center justify-center hover:bg-gold/30 transition-all shadow-lg backdrop-blur-sm"
+            aria-label="חזרה למעלה"
+          >
+            <ArrowUp className="w-4 h-4 text-gold" />
+          </button>
+        )}
+      </div>
 
       <LeadModal
         isOpen={isLeadModalOpen}
