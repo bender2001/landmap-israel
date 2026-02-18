@@ -2,6 +2,7 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import { useCallback } from 'react'
 import { getPlots, getPlot, getNearbyPlots, getPopularPlots } from '../api/plots.js'
 import { plots as mockPlots } from '../data/mockData.js'
+import { useIsSlowConnection } from './useNetworkStatus.js'
 
 // Normalize mock data from camelCase to snake_case for consistency
 function normalizeMock(plot) {
@@ -71,19 +72,22 @@ async function fetchPlotWithFallback(id) {
 }
 
 export function useAllPlots(filters) {
+  // Adapt polling frequency to network quality — save bandwidth on slow connections
+  const isSlow = useIsSlowConnection()
+
   const query = useQuery({
     queryKey: ['plots', filters],
     queryFn: () => fetchPlotsWithFallback(filters),
-    staleTime: 30_000,
+    staleTime: isSlow ? 120_000 : 30_000,
     gcTime: 5 * 60_000,
-    retry: 2,
+    retry: isSlow ? 1 : 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
     placeholderData: keepPreviousData,
-    // Auto-refresh every 5 minutes to keep data fresh (like Madlan's real-time feel)
-    refetchInterval: 5 * 60_000,
+    // Auto-refresh: 5min on fast, 15min on slow connections — conserve bandwidth on 3G
+    refetchInterval: isSlow ? 15 * 60_000 : 5 * 60_000,
     refetchIntervalInBackground: false,
     // Refetch when window regains focus after being away
-    refetchOnWindowFocus: 'always',
+    refetchOnWindowFocus: isSlow ? false : 'always',
   })
   // Detect if data came from mock fallback (API was unreachable)
   const isMockData = query.data?._source === 'mock'

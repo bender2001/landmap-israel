@@ -1,5 +1,5 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart } from 'lucide-react'
 import { usePlot, useNearbyPlots } from '../../hooks/usePlots.js'
 import { useMarketOverview } from '../../hooks/useMarketOverview.js'
@@ -78,8 +78,13 @@ function BreadcrumbSchema({ plot }) {
  * This eliminates an unnecessary full-dataset fetch on the detail page, cutting the initial
  * API payload by ~90% (one lightweight nearby query vs the entire plots table).
  */
-function SimilarPlotsSection({ plotId }) {
+function SimilarPlotsSection({ plotId, onNearbyLoaded }) {
   const { data: similar = [], isLoading } = useNearbyPlots(plotId)
+
+  // Lift nearby plots to parent for investment verdict area benchmark
+  useEffect(() => {
+    if (similar.length > 0 && onNearbyLoaded) onNearbyLoaded(similar)
+  }, [similar, onNearbyLoaded])
 
   if (isLoading || similar.length === 0) return null
 
@@ -233,6 +238,10 @@ export default function PlotDetail() {
 
   // Market overview for below-market indicator (like Madlan's "מחיר נמוך ממדלן")
   const { data: marketData } = useMarketOverview()
+
+  // Nearby plots for investment verdict area benchmark — populated by SimilarPlotsSection
+  const [nearbyPlots, setNearbyPlots] = useState([])
+  const handleNearbyLoaded = useCallback((plots) => setNearbyPlots(plots), [])
 
   // Track view on mount (fire-and-forget, deduped by plotId)
   useEffect(() => {
@@ -587,9 +596,9 @@ export default function PlotDetail() {
             </div>
           )}
 
-          {/* Investment Verdict — instant assessment for the full page view */}
+          {/* Investment Verdict — instant assessment using nearby plots for area benchmark */}
           {(() => {
-            const verdict = calcInvestmentVerdict(plot, [])
+            const verdict = calcInvestmentVerdict(plot, nearbyPlots.length > 0 ? [plot, ...nearbyPlots] : [])
             if (!verdict) return null
             return (
               <div
@@ -856,7 +865,7 @@ export default function PlotDetail() {
           </div>
 
           {/* Similar Plots — lightweight: uses server-side geo-proximity API */}
-          <SimilarPlotsSection plotId={id} />
+          <SimilarPlotsSection plotId={id} onNearbyLoaded={handleNearbyLoaded} />
 
           {/* Sticky CTA — enhanced with print, share, compare, and map actions (like Madlan/Yad2 bottom bars) */}
           <div className="fixed bottom-0 left-0 right-0 z-40 bg-navy/90 backdrop-blur-xl border-t border-white/10 px-4 py-3">
