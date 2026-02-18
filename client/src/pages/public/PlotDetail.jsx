@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { useState, useEffect, useMemo } from 'react'
-import { ArrowRight, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle } from 'lucide-react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle } from 'lucide-react'
 import { usePlot } from '../../hooks/usePlots.js'
 import { useFavorites } from '../../hooks/useFavorites.js'
 import LeadModal from '../../components/LeadModal.jsx'
@@ -76,7 +76,31 @@ export default function PlotDetail() {
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
+  const [showScrollTop, setShowScrollTop] = useState(false)
   const favorites = useFavorites()
+
+  // Canonical link for SEO (like Madlan — each plot has a unique canonical URL)
+  useEffect(() => {
+    const canonical = document.querySelector('link[rel="canonical"]') || (() => {
+      const el = document.createElement('link')
+      el.setAttribute('rel', 'canonical')
+      document.head.appendChild(el)
+      return el
+    })()
+    canonical.href = `${window.location.origin}/plot/${id}`
+    return () => canonical.remove()
+  }, [id])
+
+  // Scroll-to-top visibility
+  useEffect(() => {
+    const handler = () => setShowScrollTop(window.scrollY > 400)
+    window.addEventListener('scroll', handler, { passive: true })
+    return () => window.removeEventListener('scroll', handler)
+  }, [])
+
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
 
   // Dynamic page title + OG meta for SEO
   useEffect(() => {
@@ -460,6 +484,17 @@ export default function PlotDetail() {
           </div>
         </div>
       </div>
+
+      {/* Scroll-to-top button — appears when scrolled down */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-20 right-4 z-50 w-10 h-10 rounded-xl bg-gold/20 border border-gold/30 flex items-center justify-center hover:bg-gold/30 transition-all shadow-lg backdrop-blur-sm animate-fade-in"
+          aria-label="חזרה למעלה"
+        >
+          <ArrowUp className="w-4 h-4 text-gold" />
+        </button>
+      )}
 
       <LeadModal
         isOpen={isLeadModalOpen}
