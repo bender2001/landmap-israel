@@ -562,7 +562,7 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
     >
       <Tooltip permanent direction="center" className="price-tooltip">
         <span className="tooltip-main-price">{plot.status === 'SOLD' ? '🔴 ' : ''}{isNew ? '🆕 ' : ''}{favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{plot.plot_images?.length > 0 ? '📷 ' : ''}{formatPriceShort(price)}</span>
-        <span className="tooltip-sub">{plot.status === 'SOLD' ? 'נמכר · ' : ''}{formatDunam(sizeSqM)} דונם · {sizeSqM > 0 ? `₪${Math.round(price / sizeSqM).toLocaleString()}/מ״ר` : ''} · +{roi}%</span>
+        <span className="tooltip-sub">{plot.status === 'SOLD' ? 'נמכר · ' : ''}{formatDunam(sizeSqM)} דונם · {sizeSqM > 0 ? `₪${Math.round(price / sizeSqM).toLocaleString()}/מ״ר` : ''} · +{roi}%{(plot.views ?? 0) >= 5 ? ` · 👁${plot.views}` : ''}</span>
         {/* Investment score + CAGR row — gives investors instant quality context on hover */}
         {(() => {
           const score = calcInvestmentScore(plot)

@@ -30,3 +30,36 @@ export const chatLimiter = rateLimit({
     retryAfter: 3600,
   },
 })
+
+/**
+ * Burst limiter for AI chat — prevents rapid-fire requests that burn Claude API credits.
+ * Allows max 3 messages per minute per IP, then forces a cooldown.
+ * Stacks with chatLimiter (20/hr) for layered protection.
+ */
+export const chatBurstLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'אנא המתן מספר שניות בין הודעות',
+    errorCode: 'RATE_LIMIT_CHAT_BURST',
+    retryAfter: 60,
+  },
+})
+
+/**
+ * Export rate limiter — prevents CSV/data export abuse.
+ * Max 5 exports per 15 minutes per IP.
+ */
+export const exportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'יותר מדי ייצואים — נסה שוב בעוד מספר דקות',
+    errorCode: 'RATE_LIMIT_EXPORT',
+    retryAfter: 900,
+  },
+})

@@ -158,6 +158,26 @@ export async function getPublishedPlots(filters = {}) {
   const { data, error } = await query
   if (error) throw error
 
+  // Optimize coordinate precision — 6 decimal places ≈ 11cm accuracy.
+  // Full Supabase precision (15+ decimals) adds ~30% unnecessary bytes to the JSON
+  // response for coordinate-heavy payloads. This reduces /api/plots response size
+  // without any visible impact on map rendering (Leaflet renders at pixel level).
+  if (data) {
+    for (const plot of data) {
+      if (plot.coordinates && Array.isArray(plot.coordinates)) {
+        plot.coordinates = plot.coordinates.map(coord => {
+          if (Array.isArray(coord) && coord.length >= 2) {
+            return [
+              Math.round(coord[0] * 1e6) / 1e6,
+              Math.round(coord[1] * 1e6) / 1e6,
+            ]
+          }
+          return coord
+        })
+      }
+    }
+  }
+
   // Enrich with server-computed investment metrics
   enrichPlotsWithScores(data)
 
