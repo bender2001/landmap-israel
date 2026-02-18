@@ -350,11 +350,16 @@ export default function MapView() {
           toggleCompare(selectedPlot.id)
         }
       }
-      // P key to print report for selected plot
+      // P key to print report for selected plot — triggers the print button inside the sidebar
       if ((e.key === 'p' || e.key === 'P') && !e.ctrlKey && !e.metaKey) {
         const tag = document.activeElement?.tagName
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-        // Handled by SidebarDetails internally — we just need the shortcut documented
+        if (selectedPlot) {
+          e.preventDefault()
+          // Find and click the print button inside the sidebar panel
+          const printBtn = document.querySelector('.sidebar-panel [data-action="print-report"]')
+          if (printBtn) printBtn.click()
+        }
       }
       // Enter key to open selected plot in full-page detail (like Madlan's property page)
       if (e.key === 'Enter' && selectedPlot && !e.ctrlKey && !e.metaKey) {

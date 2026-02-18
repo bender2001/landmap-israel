@@ -1950,8 +1950,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
           <div className="flex gap-2 mt-2.5">
             <button
               onClick={handlePrintReport}
+              data-action="print-report"
               className="flex-shrink-0 w-11 flex items-center justify-center bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 hover:border-gold/20 transition-all"
-              title="הדפס דו״ח השקעה"
+              title="הדפס דו״ח השקעה (P)"
             >
               <Printer className="w-4 h-4 text-slate-400 hover:text-gold" />
             </button>

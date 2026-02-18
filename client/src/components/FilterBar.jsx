@@ -344,6 +344,67 @@ export default function FilterBar({
     return options
   }, [allPlots])
 
+  // Dynamic price range options with counts — shows how many plots match each range (like Madlan)
+  const priceOptionsWithCounts = useMemo(() => {
+    if (!allPlots || allPlots.length === 0) return priceRangeOptions
+    return priceRangeOptions.map(opt => {
+      if (opt.value === 'all') return { ...opt, label: `כל המחירים (${allPlots.length})` }
+      const minVal = opt.min ? Number(opt.min) : 0
+      const maxVal = opt.max ? Number(opt.max) : Infinity
+      const count = allPlots.filter(p => {
+        const price = p.total_price ?? p.totalPrice ?? 0
+        return price >= minVal && price <= maxVal
+      }).length
+      return { ...opt, label: `${opt.label} (${count})` }
+    })
+  }, [allPlots])
+
+  // Dynamic size range options with counts
+  const sizeOptionsWithCounts = useMemo(() => {
+    if (!allPlots || allPlots.length === 0) return sizeRangeOptions
+    return sizeRangeOptions.map(opt => {
+      if (opt.value === 'all') return { ...opt, label: `כל הגדלים (${allPlots.length})` }
+      const minVal = opt.min ? Number(opt.min) * 1000 : 0 // convert dunam to sqm
+      const maxVal = opt.max ? Number(opt.max) * 1000 : Infinity
+      const count = allPlots.filter(p => {
+        const size = p.size_sqm ?? p.sizeSqM ?? 0
+        return size >= minVal && size <= maxVal
+      }).length
+      return { ...opt, label: `${opt.label} (${count})` }
+    })
+  }, [allPlots])
+
+  // Dynamic ROI options with counts
+  const roiOptionsWithCounts = useMemo(() => {
+    if (!allPlots || allPlots.length === 0) return roiOptions
+    return roiOptions.map(opt => {
+      if (opt.value === 'all') return { ...opt, label: `כל התשואות (${allPlots.length})` }
+      const minRoi = parseInt(opt.value, 10)
+      const count = allPlots.filter(p => {
+        const price = p.total_price ?? p.totalPrice ?? 0
+        const proj = p.projected_value ?? p.projectedValue ?? 0
+        if (price <= 0) return false
+        return ((proj - price) / price) * 100 >= minRoi
+      }).length
+      return { ...opt, label: `${opt.label} (${count})` }
+    })
+  }, [allPlots])
+
+  // Dynamic zoning options with counts
+  const zoningOptionsWithCounts = useMemo(() => {
+    if (!allPlots || allPlots.length === 0) return zoningOptions
+    const zoneCounts = {}
+    allPlots.forEach(p => {
+      const z = p.zoning_stage ?? p.zoningStage ?? 'UNKNOWN'
+      zoneCounts[z] = (zoneCounts[z] || 0) + 1
+    })
+    return zoningOptions.map(opt => {
+      if (opt.value === 'all') return { ...opt, label: `כל השלבים (${allPlots.length})` }
+      const count = zoneCounts[opt.value] || 0
+      return { ...opt, label: `${opt.label} (${count})` }
+    })
+  }, [allPlots])
+
   // Derive price range value
   const priceRangeValue =
     priceRangeOptions.find(
@@ -488,7 +549,7 @@ export default function FilterBar({
             label="מחיר"
             value={priceRangeValue}
             displayValue={priceDisplay}
-            options={priceRangeOptions}
+            options={priceOptionsWithCounts}
             onChange={handlePriceRange}
             isActive={priceRangeValue !== 'all'}
           />
@@ -498,7 +559,7 @@ export default function FilterBar({
             label="שטח"
             value={sizeRangeValue}
             displayValue={sizeDisplay}
-            options={sizeRangeOptions}
+            options={sizeOptionsWithCounts}
             onChange={handleSizeRange}
             isActive={sizeRangeValue !== 'all'}
           />
@@ -507,8 +568,8 @@ export default function FilterBar({
             icon={Layers}
             label="שלב תכנוני"
             value={filters.zoning || 'all'}
-            displayValue={filters.zoning && filters.zoning !== 'all' ? zoningOptions.find(o => o.value === filters.zoning)?.label?.replace(/^[^\s]+ /, '') : null}
-            options={zoningOptions}
+            displayValue={filters.zoning && filters.zoning !== 'all' ? zoningOptionsWithCounts.find(o => o.value === filters.zoning)?.label?.replace(/^[^\s]+ /, '').replace(/ \(\d+\)$/, '') : null}
+            options={zoningOptionsWithCounts}
             onChange={(val) => onFilterChange('zoning', val)}
             isActive={filters.zoning && filters.zoning !== 'all'}
           />
@@ -518,7 +579,7 @@ export default function FilterBar({
             label="תשואה"
             value={filters.minRoi || 'all'}
             displayValue={filters.minRoi && filters.minRoi !== 'all' ? `${filters.minRoi}%+` : null}
-            options={roiOptions}
+            options={roiOptionsWithCounts}
             onChange={(val) => onFilterChange('minRoi', val)}
             isActive={filters.minRoi && filters.minRoi !== 'all'}
           />

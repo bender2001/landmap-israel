@@ -23,6 +23,26 @@ export default function ShareMenu({ plotTitle, plotPrice, plotUrl, className = '
     })
   }
 
+  // Use native Web Share API on mobile when available — provides a native share sheet
+  // with all installed apps (WhatsApp, Telegram, Messages, etc.)
+  const handleNativeShare = async () => {
+    if (!navigator.share) return false
+    try {
+      await navigator.share({
+        title: plotTitle,
+        text: `${plotTitle}\n${plotPrice}`,
+        url: plotUrl,
+      })
+      setIsOpen(false)
+      return true
+    } catch {
+      // User cancelled or share failed — fall through to menu
+      return false
+    }
+  }
+
+  const canNativeShare = typeof navigator !== 'undefined' && !!navigator.share
+
   const shareOptions = [
     {
       label: 'WhatsApp',
@@ -50,7 +70,15 @@ export default function ShareMenu({ plotTitle, plotPrice, plotUrl, className = '
   return (
     <div className={`relative ${className}`} ref={menuRef}>
       <button
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={async () => {
+          // On mobile: try native share sheet first (covers WhatsApp, Telegram, all apps)
+          if (canNativeShare) {
+            const shared = await handleNativeShare()
+            if (shared) return
+          }
+          // Fall back to custom dropdown menu
+          setIsOpen((prev) => !prev)
+        }}
         className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:bg-white/10 transition"
       >
         <Share2 className="w-4 h-4" />
@@ -72,6 +100,17 @@ export default function ShareMenu({ plotTitle, plotPrice, plotUrl, className = '
               {opt.label}
             </a>
           ))}
+
+          {/* Native share — available on some desktop browsers too */}
+          {canNativeShare && (
+            <button
+              onClick={() => { handleNativeShare() }}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gold bg-gold/5 hover:bg-gold/15 transition-colors border-t border-white/5"
+            >
+              <Share2 className="w-4 h-4" />
+              שתף באפליקציה...
+            </button>
+          )}
 
           {/* Copy link */}
           <button

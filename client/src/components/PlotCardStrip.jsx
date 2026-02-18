@@ -363,20 +363,30 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
   if (!plots || plots.length === 0) return (
     <div className="plot-strip-wrapper" dir="rtl">
       <div className="flex items-center justify-center py-4 px-6">
-        <div className="flex items-center gap-4 bg-navy-light/40 border border-white/5 rounded-xl px-5 py-3">
-          <span className="text-2xl">🔍</span>
-          <div>
-            <div className="text-xs font-medium text-slate-300">לא נמצאו חלקות מתאימות</div>
-            <div className="text-[10px] text-slate-500 mt-0.5">נסה להרחיב את טווח המחיר, לשנות עיר, או להסיר סינונים</div>
+        <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 bg-navy-light/40 border border-white/5 rounded-xl px-5 py-4 max-w-lg">
+          <span className="text-3xl">🔍</span>
+          <div className="text-center sm:text-right">
+            <div className="text-sm font-semibold text-slate-200">לא נמצאו חלקות מתאימות</div>
+            <div className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+              נסה להרחיב את הסינון — שנה עיר, הרחב טווח מחיר או הסר חלק מהפילטרים
+            </div>
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2.5">
+              {onClearFilters && (
+                <button
+                  onClick={onClearFilters}
+                  className="px-3.5 py-1.5 text-[11px] font-semibold text-navy bg-gradient-to-r from-gold to-gold-bright rounded-lg hover:shadow-lg hover:shadow-gold/20 transition-all"
+                >
+                  נקה הכל וצפה בכל החלקות
+                </button>
+              )}
+              <a
+                href="/areas"
+                className="px-3 py-1.5 text-[11px] font-medium text-slate-400 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 hover:text-slate-200 transition-colors"
+              >
+                עיין באזורים
+              </a>
+            </div>
           </div>
-          {onClearFilters && (
-            <button
-              onClick={onClearFilters}
-              className="flex-shrink-0 px-3 py-1.5 text-[11px] font-medium text-gold bg-gold/10 border border-gold/20 rounded-lg hover:bg-gold/20 transition-colors"
-            >
-              נקה סינון
-            </button>
-          )}
         </div>
       </div>
     </div>
