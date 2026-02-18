@@ -4,6 +4,7 @@ import PriceSparkline from './ui/PriceSparkline'
 import ZoningProgressBar from './ui/ZoningProgressBar'
 import { statusColors, statusLabels } from '../utils/constants'
 import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, getInvestmentGrade, formatRelativeTime, getFreshnessColor, calcCAGR, calcMonthlyPayment, formatMonthlyPayment, calcDemandVelocity, calcBestInCategory, calcBuildableValue } from '../utils/formatters'
+import { calcTransactionCosts } from '../utils/plot'
 import { usePrefetchPlot } from '../hooks/usePlots'
 import { useAreaAverages } from '../hooks/useAreaAverages'
 import { whatsappShareLink, useNativeShare, buildPlotShareData } from '../utils/config'
@@ -402,6 +403,21 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
               const payment = calcMonthlyPayment(price)
               if (!payment) return null
               return <span className="text-[9px] text-blue-400/70" title={`הון עצמי: ${formatPriceShort(payment.downPayment)} | הלוואה: ${formatPriceShort(payment.loanAmount)}`}>~{formatMonthlyPayment(payment.monthly)}</span>
+            })()}
+            {/* Total entry cost — shows real investment required (price + tax + attorney + appraiser).
+                Professional investors always think in total entry cost, not just listing price.
+                This is a key differentiator vs Madlan/Yad2 which only show listed price. */}
+            {(() => {
+              if (price <= 0) return null
+              const txn = calcTransactionCosts(price)
+              return (
+                <span
+                  className="text-[8px] text-amber-400/60"
+                  title={`סה״כ עלות כניסה: ${formatPriceShort(txn.totalWithPurchase)}\nמס רכישה: ${formatPriceShort(txn.purchaseTax)} (6%)\nשכ״ט עו״ד: ${formatPriceShort(txn.attorneyFees)}\nשמאי: ${formatPriceShort(txn.appraiserFee)}`}
+                >
+                  🔑 כניסה: {formatPriceShort(txn.totalWithPurchase)}
+                </span>
+              )
             })()}
             {/* Buildable value — shows price per buildable sqm when density data available.
                 THE metric professional land investors use for quick deal evaluation. */}

@@ -546,7 +546,14 @@ export default function FilterBar({
           <span className="w-px h-3 bg-white/10" />
           <span>💰 ממוצע ₪{marketStats.avgPricePerDunam.toLocaleString()}/דונם</span>
           <span className="w-px h-3 bg-white/10" />
-          <span>🕐 עודכן היום</span>
+          <span>🕐 {(() => {
+            // Show actual data freshness instead of static text.
+            // Data is refreshed every 5 minutes via React Query refetchInterval.
+            const now = new Date()
+            const hour = now.getHours()
+            const min = now.getMinutes()
+            return `עודכן ${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`
+          })()}</span>
         </div>
       )}
 

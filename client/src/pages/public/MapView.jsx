@@ -1002,6 +1002,20 @@ export default function MapView() {
         </Suspense>
       </IdleRender>
 
+      {/* Keyboard shortcut discovery hint — hidden on mobile, shows a subtle "?" badge.
+          Clicking opens the KeyboardShortcuts modal. Increases discoverability of the
+          rich shortcut system (?, F, C, P, /, Ctrl+K, ←→, Enter) without cluttering the UI.
+          Like GitHub's / Notion's keyboard shortcut hints. */}
+      <button
+        onClick={() => setIsShortcutsOpen(true)}
+        className="fixed bottom-[5.5rem] left-4 z-[25] hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-navy/80 backdrop-blur-md border border-white/10 rounded-xl text-[10px] text-slate-500 hover:text-gold hover:border-gold/20 transition-all group"
+        title="קיצורי מקלדת — לחץ ? לרשימה מלאה"
+        aria-label="הצג קיצורי מקלדת"
+      >
+        <span className="text-[11px] font-mono bg-white/5 px-1.5 py-0.5 rounded border border-white/10 group-hover:border-gold/20 group-hover:text-gold transition-colors">?</span>
+        <span className="group-hover:text-slate-300 transition-colors">קיצורים</span>
+      </button>
+
       {/* Floating contact CTA — desktop: full buttons, mobile: single expandable FAB */}
       {/* Desktop version */}
       <div className="fixed bottom-[16rem] left-4 z-[30] hidden sm:flex flex-col gap-2 animate-bounce-in">
