@@ -10,6 +10,7 @@ import AnimatedNumber from './ui/AnimatedNumber'
 import PlotPercentileBadges from './ui/PlotPercentileBadges'
 import { usePlot, useNearbyPlots } from '../hooks/usePlots'
 import MiniMap from './ui/MiniMap'
+import DueDiligenceChecklist from './ui/DueDiligenceChecklist'
 import { plotInquiryLink } from '../utils/config'
 
 function getDocIcon(mimeType) {
@@ -72,6 +73,7 @@ function QuickNavBar({ scrollRef }) {
     { id: 'section-zoning', label: '🗺️', title: 'תכנון' },
     { id: 'section-images', label: '📷', title: 'תמונות' },
     { id: 'section-quality', label: '🛡️', title: 'איכות' },
+    { id: 'section-dd', label: '✅', title: 'בדיקות' },
   ]
 
   // Track which section is visible
@@ -1570,6 +1572,11 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
 
             {/* Similar Plots */}
             <SimilarPlots currentPlot={plot} allPlots={allPlots} onSelectPlot={onSelectPlot} />
+
+            {/* Due Diligence Checklist — like Madlan's buyer guides */}
+            <div id="section-dd">
+              <DueDiligenceChecklist plotId={plot.id} />
+            </div>
           </div>
         </div>
 

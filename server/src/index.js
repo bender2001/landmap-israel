@@ -243,6 +243,19 @@ if (process.env.NODE_ENV === 'production') {
 // Error handler
 app.use(errorHandler)
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`[server] Running on http://localhost:${PORT}`)
+
+  // Take daily price snapshot on startup (idempotent, non-blocking)
+  try {
+    const { takeDailySnapshot } = await import('./services/priceHistoryService.js')
+    const result = await takeDailySnapshot()
+    if (result.success) {
+      console.log(`[priceHistory] Snapshot taken: ${result.count} plots for ${result.date}`)
+    } else if (result.skipped) {
+      console.log(`[priceHistory] Snapshot skipped (${result.reason || 'already exists'})`)
+    }
+  } catch (err) {
+    console.warn(`[priceHistory] Snapshot failed (table may not exist yet): ${err.message}`)
+  }
 })

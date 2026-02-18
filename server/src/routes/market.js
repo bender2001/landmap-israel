@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { supabaseAdmin } from '../config/supabase.js'
+import { takeDailySnapshot, getPlotPriceHistory, getCityPriceHistory } from '../services/priceHistoryService.js'
 
 const router = Router()
 
@@ -248,6 +249,50 @@ router.get('/new-listings', async (req, res, next) => {
       plotIds: (data || []).map(p => p.id),
       since: sevenDaysAgo,
     })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
+ * POST /api/market/snapshot
+ * Trigger a daily price snapshot (idempotent — safe to call multiple times).
+ * In production, call this from a daily cron job.
+ */
+router.post('/snapshot', async (req, res, next) => {
+  try {
+    const result = await takeDailySnapshot()
+    res.json(result)
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
+ * GET /api/market/price-history/:plotId
+ * Get historical price data for a specific plot.
+ */
+router.get('/price-history/:plotId', async (req, res, next) => {
+  try {
+    const days = Math.min(parseInt(req.query.days) || 365, 730)
+    res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=7200')
+    const history = await getPlotPriceHistory(req.params.plotId, days)
+    res.json(history)
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
+ * GET /api/market/city-history/:city
+ * Get aggregated price history for a city.
+ */
+router.get('/city-history/:city', async (req, res, next) => {
+  try {
+    const days = Math.min(parseInt(req.query.days) || 365, 730)
+    res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=7200')
+    const history = await getCityPriceHistory(decodeURIComponent(req.params.city), days)
+    res.json(history)
   } catch (err) {
     next(err)
   }
