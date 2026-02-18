@@ -22,6 +22,7 @@ import adminImageRoutes from './routes/admin/images.js'
 import adminPoiRoutes from './routes/admin/pois.js'
 import adminActivityRoutes from './routes/admin/activity.js'
 import adminSettingsRoutes from './routes/admin/settings.js'
+import sitemapRoutes from './routes/sitemap.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import { supabaseAdmin } from './config/supabase.js'
 
@@ -64,6 +65,9 @@ const globalLimiter = rateLimit({
   legacyHeaders: false,
 })
 app.use('/api', globalLimiter)
+
+// ─── SEO routes (before API) ───
+app.use(sitemapRoutes)
 
 // ─── Public routes ───
 app.use('/api/plots', plotRoutes)

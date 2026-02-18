@@ -290,6 +290,59 @@ export default function PlotDetail() {
                 </div>
               )}
 
+              {/* Nearby Development — like Madlan's "פיתוח בסביבה" */}
+              {(() => {
+                const nearbyDev = plot.nearby_development ?? plot.nearbyDevelopment
+                if (!nearbyDev) return null
+                return (
+                  <div className="bg-gradient-to-r from-emerald-500/5 to-emerald-500/10 border border-emerald-500/15 rounded-2xl p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+                        <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                      </div>
+                      <h2 className="text-base font-bold text-slate-100">פיתוח בסביבה</h2>
+                    </div>
+                    <p className="text-sm text-slate-300 leading-relaxed">{nearbyDev}</p>
+                  </div>
+                )
+              })()}
+
+              {/* ROI Stages — investment growth visualization */}
+              {roi > 0 && (
+                <div className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+                  <h2 className="text-base font-bold text-slate-100 mb-3">שלבי צמיחת ההשקעה</h2>
+                  <div className="space-y-3">
+                    {roiStages.map((stage, i) => {
+                      const stageValue = Math.round(totalPrice * (1 + (roi / 100) * stage.pct))
+                      const profit = stageValue - totalPrice
+                      const isReached = stage.pct <= 1
+                      return (
+                        <div key={i} className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0 ${isReached ? 'bg-gold/15 border border-gold/30' : 'bg-white/5 border border-white/10'}`}>
+                            {stage.icon}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-baseline">
+                              <span className={`text-sm font-medium ${isReached ? 'text-slate-200' : 'text-slate-500'}`}>{stage.label}</span>
+                              <span className={`text-sm font-bold ${isReached ? 'text-gold' : 'text-slate-600'}`}>{formatCurrency(stageValue)}</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-white/5 mt-1 overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all"
+                                style={{
+                                  width: `${Math.min(100, stage.pct * 100)}%`,
+                                  background: isReached ? 'linear-gradient(90deg, #C8942A, #E5B94E)' : 'rgba(255,255,255,0.08)',
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Proximity chips */}
               <div className="flex flex-wrap gap-3">
                 {distanceToSea != null && (
