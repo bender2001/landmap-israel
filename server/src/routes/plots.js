@@ -161,6 +161,14 @@ router.get('/:id', sanitizePlotId, async (req, res, next) => {
     res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120')
     const plot = await getPlotById(req.params.id)
     if (!plot) return res.status(404).json({ error: 'Plot not found' })
+
+    // ETag for conditional requests — avoid resending unchanged data
+    const etag = generateETag(plot)
+    res.set('ETag', etag)
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end()
+    }
+
     res.json(plot)
   } catch (err) {
     next(err)

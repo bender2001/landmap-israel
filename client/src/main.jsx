@@ -6,6 +6,15 @@ import { AuthProvider } from './hooks/useAuth'
 import { ToastProvider } from './components/ui/ToastContainer'
 import App from './App'
 import './index.css'
+import { initWebVitals } from './utils/webVitals'
+
+// Track real user performance metrics (LCP, FID, CLS, TTFB)
+initWebVitals()
+
+// Reduce animations for users on slow connections or who prefer reduced motion
+if (navigator.connection?.saveData || navigator.connection?.effectiveType === '2g') {
+  document.documentElement.classList.add('reduce-motion')
+}
 
 // Register service worker for PWA + offline support
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

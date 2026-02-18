@@ -98,20 +98,34 @@ app.use('/api/admin/pois', adminPoiRoutes)
 app.use('/api/admin/activity', adminActivityRoutes)
 app.use('/api/admin/settings', adminSettingsRoutes)
 
-// Health check with DB connectivity
+// Health check with DB connectivity, uptime, and memory stats
 app.get('/api/health', async (req, res) => {
+  const mem = process.memoryUsage()
+  const base = {
+    timestamp: new Date().toISOString(),
+    uptime: Math.round(process.uptime()),
+    memory: {
+      rss: Math.round(mem.rss / 1024 / 1024),
+      heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
+      heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
+    },
+    version: process.env.npm_package_version || '2.0.0',
+  }
   try {
+    const start = Date.now()
     const { error } = await supabaseAdmin.from('plots').select('id').limit(1)
+    const dbLatency = Date.now() - start
     res.json({
-      status: 'ok',
+      ...base,
+      status: error ? 'degraded' : 'ok',
       db: error ? 'error' : 'connected',
-      timestamp: new Date().toISOString(),
+      dbLatencyMs: dbLatency,
     })
   } catch (e) {
     res.status(503).json({
+      ...base,
       status: 'degraded',
       db: 'unreachable',
-      timestamp: new Date().toISOString(),
     })
   }
 })
