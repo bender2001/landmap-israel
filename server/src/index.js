@@ -25,6 +25,8 @@ import adminActivityRoutes from './routes/admin/activity.js'
 import adminSettingsRoutes from './routes/admin/settings.js'
 import adminAnalyticsRoutes from './routes/admin/analytics.js'
 import alertRoutes from './routes/alerts.js'
+import dataSourceRoutes from './routes/data-sources.js'
+import subscriptionRoutes from './routes/subscription.js'
 import sitemapRoutes from './routes/sitemap.js'
 import ogRoutes from './routes/og.js'
 import { errorHandler, requestId } from './middleware/errorHandler.js'
@@ -156,6 +158,8 @@ app.use('/api/pois', poiRoutes)
 app.use('/api/market', marketRoutes)
 app.use('/api/export', exportRoutes)
 app.use('/api/alerts', alertRoutes)
+app.use('/api/data', dataSourceRoutes)
+app.use('/api/subscription', subscriptionRoutes)
 app.use('/api/og', ogRoutes)
 
 // ─── Admin routes ───

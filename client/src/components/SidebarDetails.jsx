@@ -1073,6 +1073,65 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
             </div>
           </div>
 
+          {/* Area Market Context Bar — compact area summary (like Madlan's neighborhood context).
+              Shows how many plots are in this city, average ROI, and this plot's price rank.
+              Computed from allPlots (already in props) — no extra API call needed. */}
+          {(() => {
+            if (!allPlots || allPlots.length < 3 || sizeSqM <= 0) return null
+            const cityPlots = allPlots.filter(p => (p.city === plot.city) && (p.total_price ?? p.totalPrice ?? 0) > 0)
+            if (cityPlots.length < 2) return null
+
+            // Compute area stats
+            const plotPsm = totalPrice / sizeSqM
+            let totalRoi = 0, totalPsm = 0
+            const psmValues = []
+            for (const p of cityPlots) {
+              const pp = p.total_price ?? p.totalPrice ?? 0
+              const ps = p.size_sqm ?? p.sizeSqM ?? 1
+              const pj = p.projected_value ?? p.projectedValue ?? 0
+              if (pp > 0 && ps > 0) {
+                totalPsm += pp / ps
+                psmValues.push(pp / ps)
+              }
+              if (pp > 0) totalRoi += ((pj - pp) / pp) * 100
+            }
+            const avgRoi = Math.round(totalRoi / cityPlots.length)
+            // Price rank: where does this plot's price/sqm sit among city plots?
+            const sorted = [...psmValues].sort((a, b) => a - b)
+            const rank = sorted.filter(v => v <= plotPsm).length
+            const percentile = Math.round((rank / sorted.length) * 100)
+            const rankLabel = percentile <= 25 ? 'הזולה ביותר' : percentile <= 50 ? 'מתחת לממוצע' : percentile <= 75 ? 'מעל הממוצע' : 'היקרה ביותר'
+            const rankColor = percentile <= 25 ? '#22C55E' : percentile <= 50 ? '#4ADE80' : percentile <= 75 ? '#FBBF24' : '#EF4444'
+
+            return (
+              <div className="mx-4 sm:mx-5 mt-2 mb-1">
+                <div className="flex items-center gap-2.5 bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2" dir="rtl">
+                  <span className="text-[10px]">🏘️</span>
+                  <span className="text-[10px] text-slate-500">
+                    {cityPlots.length} חלקות ב{plot.city}
+                  </span>
+                  <span className="text-[10px] text-slate-700">•</span>
+                  <span className="text-[10px] text-emerald-400/80">
+                    ∅ +{avgRoi}% ROI
+                  </span>
+                  <span className="text-[10px] text-slate-700">•</span>
+                  <span className="text-[10px] font-medium" style={{ color: rankColor }}>
+                    {rankLabel}
+                  </span>
+                  {/* Mini percentile bar */}
+                  <div className="flex-1 max-w-[50px] mr-auto">
+                    <div className="relative w-full h-1 rounded-full bg-white/5 overflow-hidden">
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
+                        style={{ width: `${percentile}%`, background: rankColor }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
           <div className="px-6 pb-6">
             {/* Total Investment Summary — the #1 thing investors want to see upfront */}
             {(() => {
@@ -1411,6 +1470,19 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 <PlotPercentileBadges plot={plot} allPlots={allPlots} />
               </div>
             )}
+
+            {/* View Full Details CTA — prominent banner linking to the full PlotDetail page.
+                The sidebar is a quick-view; the full page has mortgage calc, investment benchmark,
+                due diligence checklist, and richer content. Like Madlan's "לעמוד הנכס המלא". */}
+            <a
+              href={`/plot/${plot.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 mt-4 py-2.5 bg-gradient-to-r from-gold/10 to-gold/5 border border-gold/20 rounded-xl text-sm font-medium text-gold hover:from-gold/15 hover:to-gold/10 hover:border-gold/30 transition-all group"
+            >
+              <Maximize2 className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+              <span>צפה בדף המלא — מחשבון מימון, בדיקת נאותות ועוד</span>
+            </a>
 
             {/* Divider */}
             <div

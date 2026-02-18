@@ -374,6 +374,11 @@ export default function PlotDetail() {
   const [nearbyPlots, setNearbyPlots] = useState([])
   const handleNearbyLoaded = useCallback((plots) => setNearbyPlots(plots), [])
 
+  // Scroll to top on mount / route change — prevents stale scroll position from MapView
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [id])
+
   // Track view on mount (fire-and-forget, deduped by plotId)
   useEffect(() => {
     if (id) trackView(id)
