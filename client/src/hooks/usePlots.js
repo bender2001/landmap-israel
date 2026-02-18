@@ -67,13 +67,20 @@ export function useAllPlots(filters) {
     queryKey: ['plots', filters],
     queryFn: () => fetchPlotsWithFallback(filters),
     staleTime: 30_000,
+    gcTime: 5 * 60_000,
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
     placeholderData: keepPreviousData,
+    // Auto-refresh every 5 minutes to keep data fresh (like Madlan's real-time feel)
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: false,
+    // Refetch when window regains focus after being away
+    refetchOnWindowFocus: 'always',
   })
   return {
     ...query,
     isPlaceholderData: query.isPlaceholderData,
+    dataUpdatedAt: query.dataUpdatedAt,
   }
 }
 

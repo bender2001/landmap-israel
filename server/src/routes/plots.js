@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import crypto from 'crypto'
 import { getPublishedPlots, getPlotById, getPlotStats } from '../services/plotService.js'
+import { sanitizePlotQuery, sanitizePlotId } from '../middleware/sanitize.js'
 
 const router = Router()
 
@@ -9,7 +10,7 @@ function generateETag(data) {
 }
 
 // GET /api/plots - List published plots with optional filters
-router.get('/', async (req, res, next) => {
+router.get('/', sanitizePlotQuery, async (req, res, next) => {
   try {
     // Cache list for 30s — data doesn't change often
     res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60')
@@ -42,7 +43,7 @@ router.get('/stats', async (req, res, next) => {
 })
 
 // GET /api/plots/:id/nearby - Find plots near a given plot (geo-proximity)
-router.get('/:id/nearby', async (req, res, next) => {
+router.get('/:id/nearby', sanitizePlotId, async (req, res, next) => {
   try {
     res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300')
     const plot = await getPlotById(req.params.id)
@@ -92,7 +93,7 @@ router.get('/:id/nearby', async (req, res, next) => {
 })
 
 // POST /api/plots/:id/view - Track a plot view (fire-and-forget, no auth needed)
-router.post('/:id/view', async (req, res) => {
+router.post('/:id/view', sanitizePlotId, async (req, res) => {
   try {
     // Atomic increment to avoid read-then-write race condition
     const { supabaseAdmin } = await import('../config/supabase.js')
@@ -127,7 +128,7 @@ router.post('/:id/view', async (req, res) => {
 })
 
 // GET /api/plots/:id - Single plot with documents & images
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', sanitizePlotId, async (req, res, next) => {
   try {
     res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120')
     const plot = await getPlotById(req.params.id)

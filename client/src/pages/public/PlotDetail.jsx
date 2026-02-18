@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle } from 'lucide-react'
 import { usePlot, useAllPlots } from '../../hooks/usePlots.js'
 import { useFavorites } from '../../hooks/useFavorites.js'
+import { useViewTracker } from '../../hooks/useViewTracker.js'
 import LeadModal from '../../components/LeadModal.jsx'
 import ShareMenu from '../../components/ui/ShareMenu.jsx'
 import ImageLightbox from '../../components/ui/ImageLightbox.jsx'
@@ -218,6 +219,12 @@ export default function PlotDetail() {
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [showScrollTop, setShowScrollTop] = useState(false)
   const favorites = useFavorites()
+  const { trackView } = useViewTracker()
+
+  // Track view on mount (fire-and-forget, deduped by plotId)
+  useEffect(() => {
+    if (id) trackView(id)
+  }, [id, trackView])
 
   // Canonical link for SEO (like Madlan — each plot has a unique canonical URL)
   useEffect(() => {
