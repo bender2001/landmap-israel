@@ -1,6 +1,6 @@
 ﻿import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, ZoomControl, useMap, LayersControl } from 'react-leaflet'
 import L from 'leaflet'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapPin, Eye, Check, ArrowLeft, Navigation, Layers, Map as MapIcon } from 'lucide-react'
 import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
 import { formatCurrency, formatPriceShort, formatDunam } from '../utils/formatters'
@@ -160,11 +160,86 @@ const poiIcon = (poi) =>
     iconAnchor: [30, 20],
   })
 
+const COLOR_MODES = [
+  { id: 'status', label: 'סטטוס', emoji: '🏷️' },
+  { id: 'price', label: 'מחיר/מ״ר', emoji: '💰' },
+  { id: 'roi', label: 'תשואה', emoji: '📈' },
+]
+
+function getHeatColor(value, min, max) {
+  const t = max > min ? (value - min) / (max - min) : 0.5
+  // Green (good deal) → Yellow → Red (expensive)
+  const r = Math.round(t < 0.5 ? t * 2 * 255 : 255)
+  const g = Math.round(t < 0.5 ? 255 : (1 - (t - 0.5) * 2) * 255)
+  return `rgb(${r},${g},60)`
+}
+
+function getRoiColor(roi) {
+  // Higher ROI = more green
+  if (roi >= 200) return '#22C55E'
+  if (roi >= 150) return '#4ADE80'
+  if (roi >= 100) return '#84CC16'
+  if (roi >= 50) return '#EAB308'
+  return '#EF4444'
+}
+
+function ColorModeToggle({ colorMode, onChangeColorMode }) {
+  const [isOpen, setIsOpen] = useState(false)
+  return (
+    <div className="absolute top-16 right-4 z-[1000] pointer-events-none">
+      <div className="pointer-events-auto relative">
+        <button
+          onClick={() => setIsOpen(prev => !prev)}
+          className="glass-panel w-9 h-9 flex items-center justify-center hover:border-gold/20 transition-colors"
+          style={{ minWidth: 44, minHeight: 44 }}
+          title="צביעת חלקות"
+          aria-label="צביעת חלקות"
+        >
+          <span className="text-sm">{COLOR_MODES.find(m => m.id === colorMode)?.emoji || '🏷️'}</span>
+        </button>
+        {isOpen && (
+          <div className="absolute top-12 right-0 glass-panel p-2 min-w-[130px] flex flex-col gap-1" dir="rtl">
+            {COLOR_MODES.map(mode => (
+              <button
+                key={mode.id}
+                onClick={() => { onChangeColorMode(mode.id); setIsOpen(false) }}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors ${
+                  colorMode === mode.id
+                    ? 'bg-gold/15 text-gold font-medium'
+                    : 'text-slate-300 hover:bg-white/5'
+                }`}
+              >
+                <span>{mode.emoji}</span>
+                <span>{mode.label}</span>
+                {colorMode === mode.id && <Check className="w-3 h-3 mr-auto" />}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites }) {
   const [hoveredId, setHoveredId] = useState(null)
   const [activeLayerId, setActiveLayerId] = useState('satellite')
+  const [colorMode, setColorMode] = useState('status')
   const prefetchPlot = usePrefetchPlot()
   const activeLayer = MAP_LAYERS.find(l => l.id === activeLayerId) || MAP_LAYERS[0]
+
+  // Precompute price/sqm range for heatmap
+  const priceRange = useMemo(() => {
+    if (!plots || plots.length === 0) return { min: 0, max: 1 }
+    const values = plots
+      .map(p => {
+        const price = p.total_price ?? p.totalPrice ?? 0
+        const size = p.size_sqm ?? p.sizeSqM ?? 1
+        return size > 0 ? price / size : 0
+      })
+      .filter(v => v > 0)
+    return { min: Math.min(...values), max: Math.max(...values) }
+  }, [plots])
 
   return (
     <div className="h-full w-full relative z-0">
@@ -202,8 +277,17 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
           )
           if (!hasValidCoords) return null
 
-          const color = statusColors[plot.status]
           const isHovered = hoveredId === plot.id
+          // Dynamic color based on color mode
+          let color
+          if (colorMode === 'price') {
+            const ppsm = sizeSqM > 0 ? price / sizeSqM : 0
+            color = getHeatColor(ppsm, priceRange.min, priceRange.max)
+          } else if (colorMode === 'roi') {
+            color = getRoiColor(roi)
+          } else {
+            color = statusColors[plot.status]
+          }
           const price = plot.total_price ?? plot.totalPrice
           const projValue = plot.projected_value ?? plot.projectedValue
           const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
@@ -294,6 +378,9 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
 
       {/* Map layer switcher */}
       <MapLayerSwitcher activeLayer={activeLayerId} onChangeLayer={setActiveLayerId} />
+
+      {/* Color mode toggle — price heatmap / ROI / status */}
+      <ColorModeToggle colorMode={colorMode} onChangeColorMode={setColorMode} />
 
       {/* Map vignette overlay */}
       <div className="map-vignette" />
