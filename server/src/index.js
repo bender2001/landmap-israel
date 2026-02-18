@@ -37,9 +37,58 @@ import { supabaseAdmin } from './config/supabase.js'
 const app = express()
 const PORT = process.env.PORT || 3001
 
-// Security
+// Security — helmet with Content Security Policy enabled.
+// CSP prevents XSS by whitelisting only trusted resource origins.
+// Previously disabled (contentSecurityPolicy: false) which left the app
+// vulnerable to script injection. Now locked down to known origins.
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://unpkg.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: [
+        "'self'", "data:", "blob:",
+        "https://server.arcgisonline.com",
+        "https://*.tile.openstreetmap.org",
+        "https://*.basemaps.cartocdn.com",
+        "https://unpkg.com",
+        // Street View / satellite imagery providers
+        "https://*.google.com",
+        "https://*.googleapis.com",
+        "https://*.gstatic.com",
+      ],
+      connectSrc: [
+        "'self'",
+        // Tile servers (Leaflet fetches via JS for some layers)
+        "https://server.arcgisonline.com",
+        "https://*.tile.openstreetmap.org",
+        "https://*.basemaps.cartocdn.com",
+        // Geocoding
+        "https://nominatim.openstreetmap.org",
+        // Google Fonts CSS
+        "https://fonts.googleapis.com",
+        "https://fonts.gstatic.com",
+      ],
+      frameSrc: [
+        "'self'",
+        // Street View embed
+        "https://www.google.com",
+        "https://maps.google.com",
+      ],
+      workerSrc: ["'self'", "blob:"],
+      childSrc: ["'self'", "blob:"],
+      mediaSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'self'"],
+      // Report violations to server endpoint for monitoring
+      reportUri: '/api/csp-report',
+    },
+    reportOnly: false,
+  },
   crossOriginEmbedderPolicy: false,
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   permissionsPolicy: {
@@ -149,6 +198,24 @@ const globalLimiter = rateLimit({
   },
 })
 app.use('/api', globalLimiter)
+
+// ─── CSP violation reporting (before rate limiter to avoid counting bot reports) ───
+// Browsers send CSP violations as JSON POST. Log them for monitoring.
+// Helps catch any missing CSP whitelist entries without breaking the app.
+app.post('/api/csp-report', express.json({ type: ['application/json', 'application/csp-report'] }), (req, res) => {
+  const report = req.body?.['csp-report'] || req.body
+  if (report) {
+    console.warn(JSON.stringify({
+      level: 'warn',
+      type: 'csp-violation',
+      blockedUri: report['blocked-uri'] || report.blockedURL,
+      violatedDirective: report['violated-directive'] || report.effectiveDirective,
+      documentUri: report['document-uri'] || report.documentURL,
+      timestamp: new Date().toISOString(),
+    }))
+  }
+  res.status(204).end()
+})
 
 // ─── Health endpoint (before timeout — must respond fast for monitors) ───
 // Exempt from rate limiting above since monitors poll every 30-60s

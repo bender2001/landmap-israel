@@ -85,6 +85,27 @@ body {
 }
 
 /* ═══════════════════════════════════════════
+   BACKDROP-FILTER FALLBACK — graceful degradation
+   for browsers without backdrop-filter support
+   (older Firefox, Opera Mini, some Android WebViews).
+   Falls back to solid semi-opaque backgrounds
+   instead of the glassmorphism blur effect.
+   ═══════════════════════════════════════════ */
+@supports not (backdrop-filter: blur(1px)) {
+  .filter-bar-container,
+  [class*="backdrop-blur"] {
+    background-color: rgba(5, 13, 26, 0.95) !important;
+  }
+  .sidebar-panel,
+  .sidebar-details {
+    background-color: rgba(5, 13, 26, 0.98) !important;
+  }
+  nav {
+    background-color: rgba(5, 13, 26, 0.95) !important;
+  }
+}
+
+/* ═══════════════════════════════════════════
    INTRO OVERLAY ANIMATIONS
    ═══════════════════════════════════════════ */
 

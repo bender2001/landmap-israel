@@ -750,19 +750,64 @@ export default function PlotDetail() {
   }
 
   if (error || !plot) {
+    // Differentiate 404 (not found) vs network/server errors for better UX.
+    // 404 = plot was removed or link is wrong → show search + alternatives.
+    // Network error = transient issue → show retry button prominently.
+    const is404 = error?.status === 404 || (!error && !plot && !isLoading)
+    const isNetworkError = error && !error.status
+
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-navy" dir="rtl">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="text-6xl">🏗️</div>
-          <h1 className="text-xl font-bold text-slate-200">חלקה לא נמצאה</h1>
-          <p className="text-sm text-slate-400">ייתכן שהחלקה הוסרה או שהקישור שגוי</p>
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2 px-6 py-2.5 bg-gold/20 border border-gold/30 rounded-xl text-gold text-sm hover:bg-gold/30 transition-colors"
-          >
-            <ArrowRight className="w-4 h-4" />
-            חזרה למפה
-          </button>
+      <div className="min-h-screen w-full bg-navy" dir="rtl">
+        <PublicNav />
+        {/* noindex for error pages — prevent Google from indexing dead URLs */}
+        <meta name="robots" content="noindex, nofollow" />
+        <div className="flex items-center justify-center min-h-[80vh] px-4">
+          <div className="flex flex-col items-center gap-5 max-w-md text-center">
+            <div className="w-20 h-20 rounded-2xl bg-navy-light/60 border border-white/10 flex items-center justify-center">
+              <span className="text-4xl">{is404 ? '🔍' : '⚠️'}</span>
+            </div>
+            <h1 className="text-2xl font-bold text-slate-100">
+              {is404 ? 'חלקה לא נמצאה' : 'שגיאה בטעינת הנתונים'}
+            </h1>
+            <p className="text-sm text-slate-400 leading-relaxed max-w-xs">
+              {is404
+                ? 'ייתכן שהחלקה הוסרה מהמערכת או שהקישור שגוי. נסה לחפש את החלקה ישירות.'
+                : isNetworkError
+                  ? 'בעיית חיבור לשרת — בדוק את חיבור האינטרנט ונסה שנית.'
+                  : `השרת השיב עם שגיאה${error?.status ? ` (${error.status})` : ''}. נסה שוב בעוד רגע.`
+              }
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {/* Retry button — prominent for network errors, secondary for 404 */}
+              {!is404 && (
+                <button
+                  onClick={() => window.location.reload()}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-gold to-gold-bright text-navy font-bold text-sm rounded-xl hover:shadow-lg hover:shadow-gold/30 transition-all"
+                >
+                  🔄 נסה שוב
+                </button>
+              )}
+              <button
+                onClick={() => window.history.length > 2 ? navigate(-1) : navigate('/')}
+                className="flex items-center gap-2 px-5 py-2.5 bg-white/5 border border-white/10 rounded-xl text-slate-300 text-sm hover:bg-white/10 hover:text-white transition-colors"
+              >
+                <ArrowRight className="w-4 h-4" />
+                {window.history.length > 2 ? 'חזרה' : 'למפה'}
+              </button>
+              <Link
+                to="/"
+                className="flex items-center gap-2 px-5 py-2.5 bg-gold/10 border border-gold/20 rounded-xl text-gold text-sm hover:bg-gold/15 transition-colors"
+              >
+                🗺️ חפש במפה
+              </Link>
+            </div>
+            {/* Plot ID hint for debugging / customer support */}
+            {id && (
+              <p className="text-[10px] text-slate-600 mt-2">
+                מזהה חלקה: {id}
+              </p>
+            )}
+          </div>
         </div>
       </div>
     )

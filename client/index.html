@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
+    <!-- Prevent Safari from auto-detecting phone numbers in Hebrew text.
+         Plot numbers (גוש 10043), prices (₪450,000), and coordinates get incorrectly
+         styled as clickable phone links without this. -->
+    <meta name="format-detection" content="telephone=no" />
     <title>LandMap Israel — מפת קרקעות להשקעה</title>
     <meta name="description" content="פלטפורמת השקעות קרקעות בישראל — מפה אינטראקטיבית, נתוני תכנון, ועדות, שמאות ו-AI יועץ השקעות" />
     <meta name="keywords" content="קרקעות להשקעה, נדלן ישראל, מפת קרקעות, השקעות נדלן, land investment Israel" />
