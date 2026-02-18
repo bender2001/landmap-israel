@@ -56,12 +56,39 @@ function computeGrade(score) {
  */
 function enrichPlotsWithScores(plots) {
   if (!plots || plots.length === 0) return plots
+  const now = Date.now()
   for (const p of plots) {
     const price = p.total_price || 0
     const projected = p.projected_value || 0
     p._investmentScore = computeInvestmentScore(p)
     p._grade = computeGrade(p._investmentScore)
     p._roi = price > 0 ? Math.round(((projected - price) / price) * 100) : 0
+
+    // Computed days on market — saves client from recalculating every render cycle.
+    // Used for freshness badges, sort by "newest", and urgency signaling.
+    const created = p.created_at
+    p._daysOnMarket = created
+      ? Math.max(0, Math.floor((now - new Date(created).getTime()) / 86400000))
+      : null
+
+    // Price per sqm — pre-computed for sort, filter, and display.
+    // Eliminates redundant division in every plot card, tooltip, and comparison.
+    const size = p.size_sqm || 0
+    p._pricePerSqm = size > 0 ? Math.round(price / size) : null
+
+    // Monthly payment estimate (50% LTV, 6% rate, 15yr term) — pre-computed
+    // for affordability sort and display. Matches client's calcMonthlyPayment().
+    if (price > 0) {
+      const loanAmount = price * 0.5
+      const monthlyRate = 0.06 / 12
+      const numPayments = 15 * 12
+      p._monthlyPayment = Math.round(
+        loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) /
+        (Math.pow(1 + monthlyRate, numPayments) - 1)
+      )
+    } else {
+      p._monthlyPayment = null
+    }
   }
   return plots
 }
@@ -181,13 +208,32 @@ export async function getPublishedPlots(filters = {}) {
   // Enrich with server-computed investment metrics
   enrichPlotsWithScores(data)
 
-  // Post-fetch sorts for computed fields that can't be done in SQL
+  // Post-fetch sorts for computed fields that can't be done in SQL.
+  // These use the enriched _fields computed by enrichPlotsWithScores().
+  // Stable tie-breaker: sort by id when primary values are equal.
+  const tieBreak = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
   if (filters.sort === 'score-desc' && data) {
-    data.sort((a, b) => (b._investmentScore || 0) - (a._investmentScore || 0))
+    data.sort((a, b) => (b._investmentScore || 0) - (a._investmentScore || 0) || tieBreak(a, b))
   } else if (filters.sort === 'roi-desc' && data) {
-    data.sort((a, b) => (b._roi || 0) - (a._roi || 0))
+    data.sort((a, b) => (b._roi || 0) - (a._roi || 0) || tieBreak(a, b))
   } else if (filters.sort === 'roi-asc' && data) {
-    data.sort((a, b) => (a._roi || 0) - (b._roi || 0))
+    data.sort((a, b) => (a._roi || 0) - (b._roi || 0) || tieBreak(a, b))
+  } else if (filters.sort === 'ppsqm-asc' && data) {
+    // Price per sqm — ascending (cheapest per sqm first, best deals)
+    data.sort((a, b) => (a._pricePerSqm || Infinity) - (b._pricePerSqm || Infinity) || tieBreak(a, b))
+  } else if (filters.sort === 'ppsqm-desc' && data) {
+    // Price per sqm — descending (premium plots first)
+    data.sort((a, b) => (b._pricePerSqm || 0) - (a._pricePerSqm || 0) || tieBreak(a, b))
+  } else if (filters.sort === 'monthly-asc' && data) {
+    // Monthly payment — ascending (most affordable first)
+    data.sort((a, b) => (a._monthlyPayment || Infinity) - (b._monthlyPayment || Infinity) || tieBreak(a, b))
+  } else if (filters.sort === 'newest-first' && data) {
+    // Newest listings first — sort by created_at descending (explicit, not relying on default)
+    data.sort((a, b) => {
+      const aTs = a.created_at ? new Date(a.created_at).getTime() : 0
+      const bTs = b.created_at ? new Date(b.created_at).getTime() : 0
+      return bTs - aTs || tieBreak(a, b)
+    })
   } else if (filters.sort === 'cagr-desc' && data) {
     // CAGR sort: annualized return considering holding period.
     // More meaningful than raw ROI — a 200% ROI over 10 years (CAGR 11.6%)
@@ -204,7 +250,7 @@ export async function getPublishedPlots(filters = {}) {
         else if (readiness.includes('5+')) years = 7
         return (Math.pow(proj / price, 1 / years) - 1) * 100
       }
-      return getCagr(b) - getCagr(a)
+      return getCagr(b) - getCagr(a) || tieBreak(a, b)
     })
   }
 

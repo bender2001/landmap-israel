@@ -153,7 +153,8 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
   const color = statusColors[plot.status]
   const price = plot.total_price ?? plot.totalPrice
   const projValue = plot.projected_value ?? plot.projectedValue
-  const roi = price ? Math.round((projValue - price) / price * 100) : 0
+  // Prefer server-computed ROI when available (saves client Math on every card render)
+  const roi = plot._roi ?? (price ? Math.round((projValue - price) / price * 100) : 0)
   const blockNum = plot.block_number ?? plot.blockNumber
   const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
   const readiness = plot.readiness_estimate ?? plot.readinessEstimate
@@ -163,8 +164,9 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
   const demandVelocity = useMemo(() => calcDemandVelocity(plot), [plot])
 
   // Freshness & popularity badges (like Madlan/Yad2 "חדש!" and "פופולרי")
+  // Prefer server-computed _daysOnMarket when available to avoid redundant Date math
   const createdAt = plot.created_at ?? plot.createdAt
-  const daysSinceCreated = createdAt ? Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)) : Infinity
+  const daysSinceCreated = plot._daysOnMarket ?? (createdAt ? Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)) : Infinity)
   const isNew = daysSinceCreated <= 7
   const viewCount = plot.views ?? 0
   const isHot = viewCount >= 10

@@ -21,6 +21,7 @@ import InvestmentProjection from './ui/InvestmentProjection'
 import LocationScore from './ui/LocationScore'
 import QuickInquiryTemplates from './ui/QuickInquiryTemplates'
 import InvestmentScoreBreakdown from './ui/InvestmentScoreBreakdown'
+import AreaComparisonWidget from './ui/AreaComparisonWidget'
 import ZoningProgressBar from './ui/ZoningProgressBar'
 import { plotInquiryLink } from '../utils/config'
 
@@ -111,6 +112,7 @@ function QuickNavBar({ scrollRef }) {
 
   const sections = [
     { id: 'section-financial', label: '💰', title: 'פיננסי' },
+    { id: 'section-area-comparison', label: '📊', title: 'ביחס לאזור' },
     { id: 'section-roi-stages', label: '📈', title: 'השבחה' },
     { id: 'section-zoning', label: '🗺️', title: 'תכנון' },
     { id: 'section-images', label: '📷', title: 'תמונות' },
@@ -2351,6 +2353,18 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 projectedValue={projectedValue}
                 readinessEstimate={readinessEstimate}
               />
+            </CollapsibleSection>
+
+            {/* Area Comparison — how this plot ranks vs its city (like Madlan's "ביחס לאזור") */}
+            <CollapsibleSection
+              number={`0${++sectionNum}`}
+              icon={BarChart}
+              title="ביחס לאזור"
+              animClass="animate-stagger-7"
+              sectionId="section-area-comparison"
+              defaultOpen={false}
+            >
+              <AreaComparisonWidget plot={plot} allPlots={allPlots} />
             </CollapsibleSection>
 
             {/* ROI Stages - Appreciation Path */}
