@@ -1,8 +1,14 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Map, Search, Calculator, MapPin, ArrowLeft } from 'lucide-react'
+import { useMetaTags } from '../../hooks/useMetaTags'
 
 export default function NotFound() {
+  useMetaTags({
+    title: 'הדף לא נמצא — LandMap Israel',
+    description: 'הדף שחיפשת לא קיים. חזרו למפת הקרקעות או חפשו חלקה ספציפית.',
+  })
+
   const [query, setQuery] = useState('')
   const navigate = useNavigate()
 

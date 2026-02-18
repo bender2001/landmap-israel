@@ -4,6 +4,7 @@ import { roiStages, zoningLabels, ZoningStage } from '../../utils/constants'
 import { formatCurrency } from '../../utils/formatters'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
+import { useMetaTags } from '../../hooks/useMetaTags'
 
 const zoningOptions = Object.entries(zoningLabels)
 
@@ -16,6 +17,12 @@ function calcMonthlyPayment(principal, annualRate, years) {
 }
 
 export default function Calculator() {
+  useMetaTags({
+    title: 'מחשבון השקעה בקרקע — חישוב תשואה, מסים ועלויות | LandMap Israel',
+    description: 'חשבו תשואה צפויה, היטל השבחה, מס רכישה, CAGR ועלויות מימון להשקעה בקרקע בישראל. סימולציית מימון מלאה.',
+    url: `${window.location.origin}/calculator`,
+  })
+
   const [purchasePrice, setPurchasePrice] = useState('')
   const [plotSize, setPlotSize] = useState('')
   const [currentZoning, setCurrentZoning] = useState('AGRICULTURAL')

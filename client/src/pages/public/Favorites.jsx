@@ -5,11 +5,17 @@ import { useAllPlots } from '../../hooks/usePlots'
 import { useFavorites } from '../../hooks/useFavorites'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
 import { formatCurrency, formatPriceShort, calcInvestmentScore, getScoreLabel } from '../../utils/formatters'
+import { useMetaTags } from '../../hooks/useMetaTags'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
 import Spinner from '../../components/ui/Spinner'
 
 export default function Favorites() {
+  useMetaTags({
+    title: 'חלקות מועדפות — LandMap Israel',
+    description: 'רשימת החלקות שסימנת כמועדפות. השווה, שתף והדפס את ההשקעות שמעניינות אותך.',
+    url: `${window.location.origin}/favorites`,
+  })
   const { favorites, toggle } = useFavorites()
   const { data: allPlots = [], isLoading } = useAllPlots()
   const navigate = useNavigate()

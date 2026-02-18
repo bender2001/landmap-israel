@@ -2,8 +2,15 @@ import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
+import { useMetaTags } from '../../hooks/useMetaTags'
 
 export default function Terms() {
+  useMetaTags({
+    title: 'תנאי שימוש — LandMap Israel',
+    description: 'תנאי השימוש באתר LandMap Israel — פלטפורמה דיגיטלית להשקעות קרקע.',
+    url: `${window.location.origin}/terms`,
+  })
+
   return (
     <div className="min-h-screen bg-navy" dir="rtl">
       <PublicNav />

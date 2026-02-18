@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom'
 import IntroOverlay from './components/IntroOverlay'
 import CookieConsent from './components/CookieConsent'
 import InstallPrompt from './components/InstallPrompt'
+import ScrollToTop from './components/ui/ScrollToTop'
 import Spinner from './components/ui/Spinner'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import { useWebVitals } from './hooks/useWebVitals'
@@ -50,6 +51,7 @@ export default function App() {
     <>
       {showIntro && <IntroOverlay onComplete={() => setShowIntro(false)} />}
 
+      <ScrollToTop />
       <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
           <Routes>

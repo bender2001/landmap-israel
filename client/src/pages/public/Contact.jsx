@@ -3,11 +3,18 @@ import { User, Phone, Mail, MessageSquare, Lock, Send, CheckCircle2 } from 'luci
 import { useCreateLead } from '../../hooks/useLeads'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
+import { useMetaTags } from '../../hooks/useMetaTags'
 
 const phoneRegex = /^0[2-9]\d{7,8}$/
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function Contact() {
+  useMetaTags({
+    title: 'צור קשר — LandMap Israel | השאירו פרטים ונחזור אליכם',
+    description: 'מעוניינים בהשקעה בקרקע? צרו קשר עם צוות LandMap. נחזור אליכם בהקדם עם מידע מותאם אישית.',
+    url: `${window.location.origin}/contact`,
+  })
+
   const [formData, setFormData] = useState({ name: '', phone: '', email: '', message: '' })
   const [errors, setErrors] = useState({})
   const [isSuccess, setIsSuccess] = useState(false)

@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { MapPin, TrendingUp, Ruler, DollarSign, ArrowLeft, BarChart3, Building2, Users, ChevronDown, ChevronUp, Activity } from 'lucide-react'
-import { useAllPlots } from '../../hooks/usePlots.js'
+import { useMarketOverview } from '../../hooks/useMarketOverview.js'
 import { useMarketTrends } from '../../hooks/useMarketTrends.js'
+import { useMetaTags } from '../../hooks/useMetaTags.js'
 import PublicNav from '../../components/PublicNav.jsx'
 import PublicFooter from '../../components/PublicFooter.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
@@ -30,10 +31,8 @@ function StatCard({ icon: Icon, label, value, subValue, color = 'gold' }) {
   )
 }
 
-function CityCard({ city, stats, onSelect }) {
+function CityCard({ city, stats }) {
   const [expanded, setExpanded] = useState(false)
-  const avgPriceDunam = stats.totalArea > 0 ? Math.round((stats.totalPrice / stats.totalArea) * 1000) : 0
-  const roi = stats.totalPrice > 0 ? Math.round(((stats.totalProj - stats.totalPrice) / stats.totalPrice) * 100) : 0
 
   return (
     <div className="glass-panel overflow-hidden">
@@ -54,7 +53,7 @@ function CityCard({ city, stats, onSelect }) {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg">
-              +{roi}% ROI ממוצע
+              +{stats.avgRoi}% ROI ממוצע
             </span>
             {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
           </div>
@@ -64,7 +63,7 @@ function CityCard({ city, stats, onSelect }) {
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white/[0.03] rounded-lg p-3 text-center">
             <div className="text-[10px] text-slate-500 mb-1">מחיר ממוצע/דונם</div>
-            <div className="text-sm font-bold text-gold">{formatCurrency(avgPriceDunam)}</div>
+            <div className="text-sm font-bold text-gold">{formatCurrency(stats.avgPricePerDunam)}</div>
           </div>
           <div className="bg-white/[0.03] rounded-lg p-3 text-center">
             <div className="text-[10px] text-slate-500 mb-1">שטח כולל</div>
@@ -73,7 +72,7 @@ function CityCard({ city, stats, onSelect }) {
           <div className="bg-white/[0.03] rounded-lg p-3 text-center">
             <div className="text-[10px] text-slate-500 mb-1">זמינות</div>
             <div className="text-sm font-bold text-emerald-400">
-              {stats.byStatus.AVAILABLE || 0}/{stats.count}
+              {stats.available}/{stats.count}
             </div>
           </div>
         </div>
@@ -82,53 +81,52 @@ function CityCard({ city, stats, onSelect }) {
       {/* Expanded details */}
       {expanded && (
         <div className="border-t border-white/5 p-5 space-y-4">
-          {/* Status breakdown */}
-          <div>
-            <h4 className="text-xs font-semibold text-slate-400 mb-2">התפלגות סטטוסים</h4>
-            <div className="flex gap-2 flex-wrap">
-              {Object.entries(stats.byStatus).map(([status, count]) => (
-                <div
-                  key={status}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs"
-                  style={{ background: `${statusColors[status]}15`, color: statusColors[status], border: `1px solid ${statusColors[status]}30` }}
-                >
-                  <span className="w-2 h-2 rounded-full" style={{ background: statusColors[status] }} />
-                  {statusLabels[status]}: {count}
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Zoning breakdown */}
-          <div>
-            <h4 className="text-xs font-semibold text-slate-400 mb-2">שלבי תכנון</h4>
-            <div className="space-y-1.5">
-              {Object.entries(stats.byZoning)
-                .sort(([, a], [, b]) => b - a)
-                .map(([zoning, count]) => {
-                  const pct = Math.round((count / stats.count) * 100)
-                  return (
-                    <div key={zoning} className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-400 w-40 truncate">{zoningLabels[zoning] || zoning}</span>
-                      <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
-                        <div className="h-full rounded-full bg-gold/40" style={{ width: `${pct}%` }} />
+          {stats.byZoning && Object.keys(stats.byZoning).length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-slate-400 mb-2">שלבי תכנון</h4>
+              <div className="space-y-1.5">
+                {Object.entries(stats.byZoning)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([zoning, count]) => {
+                    const pct = Math.round((count / stats.count) * 100)
+                    return (
+                      <div key={zoning} className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-400 w-40 truncate">{zoningLabels[zoning] || zoning}</span>
+                        <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
+                          <div className="h-full rounded-full bg-gold/40" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-[10px] text-slate-500 w-8 text-left">{count}</span>
                       </div>
-                      <span className="text-[10px] text-slate-500 w-8 text-left">{count}</span>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Price range */}
-          <div>
-            <h4 className="text-xs font-semibold text-slate-400 mb-2">טווח מחירים</h4>
-            <div className="flex items-center gap-3 text-sm">
-              <span className="text-slate-400">{formatCurrency(stats.minPrice)}</span>
-              <div className="flex-1 h-1 rounded-full bg-gradient-to-r from-emerald-500/40 via-gold/40 to-red-500/40" />
-              <span className="text-slate-400">{formatCurrency(stats.maxPrice)}</span>
+          {stats.priceRange && (stats.priceRange.min > 0 || stats.priceRange.max > 0) && (
+            <div>
+              <h4 className="text-xs font-semibold text-slate-400 mb-2">טווח מחירים</h4>
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-slate-400">{formatCurrency(stats.priceRange.min)}</span>
+                <div className="flex-1 h-1 rounded-full bg-gradient-to-r from-emerald-500/40 via-gold/40 to-red-500/40" />
+                <span className="text-slate-400">{formatCurrency(stats.priceRange.max)}</span>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Price per sqm range */}
+          {stats.priceSqmRange && stats.priceSqmRange.max > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-slate-400 mb-2">מחיר למ״ר</h4>
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-slate-400">₪{stats.priceSqmRange.min.toLocaleString()}</span>
+                <div className="flex-1 h-1 rounded-full bg-gradient-to-r from-blue-500/40 via-purple-500/40 to-pink-500/40" />
+                <span className="text-slate-400">₪{stats.priceSqmRange.max.toLocaleString()}</span>
+              </div>
+            </div>
+          )}
 
           {/* CTA */}
           <Link
@@ -190,7 +188,7 @@ function PriceTrendMiniChart({ trends }) {
         </div>
       </div>
 
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet" role="img" aria-label="תרשים מגמות מחירים לפי עיר">
         {/* Grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map(pct => {
           const y = padY + chartH * (1 - pct)
@@ -254,53 +252,17 @@ function PriceTrendMiniChart({ trends }) {
 }
 
 export default function Areas() {
-  const { data: plots = [], isLoading } = useAllPlots({})
+  const { data: overview, isLoading } = useMarketOverview()
   const { data: trends } = useMarketTrends()
 
-  const cityData = useMemo(() => {
-    if (!plots || plots.length === 0) return []
+  // SEO meta tags
+  useMetaTags({
+    title: 'סקירת אזורים — השוואת ערים וקרקעות להשקעה | LandMap Israel',
+    description: 'השוואת מחירי קרקעות, תשואות ושלבי תכנון בין ערים בישראל — חדרה, נתניה, קיסריה. נתוני שוק מעודכנים למשקיעים.',
+    url: `${window.location.origin}/areas`,
+  })
 
-    const cities = {}
-    plots.forEach(p => {
-      const city = p.city || 'אחר'
-      if (!cities[city]) {
-        cities[city] = {
-          count: 0, totalPrice: 0, totalProj: 0, totalArea: 0,
-          byStatus: {}, byZoning: {}, prices: [], minPrice: Infinity, maxPrice: 0,
-        }
-      }
-      const c = cities[city]
-      const price = p.total_price ?? p.totalPrice ?? 0
-      const proj = p.projected_value ?? p.projectedValue ?? 0
-      const size = p.size_sqm ?? p.sizeSqM ?? 0
-      const zoning = p.zoning_stage ?? p.zoningStage ?? 'UNKNOWN'
-
-      c.count += 1
-      c.totalPrice += price
-      c.totalProj += proj
-      c.totalArea += size
-      c.byStatus[p.status] = (c.byStatus[p.status] || 0) + 1
-      c.byZoning[zoning] = (c.byZoning[zoning] || 0) + 1
-      c.prices.push(price)
-      if (price > 0 && price < c.minPrice) c.minPrice = price
-      if (price > c.maxPrice) c.maxPrice = price
-    })
-
-    return Object.entries(cities)
-      .map(([city, stats]) => ({ city, stats }))
-      .sort((a, b) => b.stats.count - a.stats.count)
-  }, [plots])
-
-  // Global stats
-  const globalStats = useMemo(() => {
-    if (!plots || plots.length === 0) return null
-    const totalArea = plots.reduce((s, p) => s + (p.size_sqm ?? p.sizeSqM ?? 0), 0)
-    const totalPrice = plots.reduce((s, p) => s + (p.total_price ?? p.totalPrice ?? 0), 0)
-    const totalProj = plots.reduce((s, p) => s + (p.projected_value ?? p.projectedValue ?? 0), 0)
-    const available = plots.filter(p => p.status === 'AVAILABLE').length
-    const avgRoi = totalPrice > 0 ? Math.round(((totalProj - totalPrice) / totalPrice) * 100) : 0
-    return { total: plots.length, totalArea, totalPrice, available, avgRoi, cities: cityData.length }
-  }, [plots, cityData])
+  const cities = overview?.cities || []
 
   return (
     <div className="min-h-screen bg-navy" dir="rtl">
@@ -325,12 +287,12 @@ export default function Areas() {
         ) : (
           <>
             {/* Global stats */}
-            {globalStats && (
+            {overview && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-                <StatCard icon={Building2} label="סה״כ חלקות" value={globalStats.total} color="gold" />
-                <StatCard icon={Ruler} label="שטח כולל" value={`${formatDunam(globalStats.totalArea)} דונם`} color="blue" />
-                <StatCard icon={TrendingUp} label="ROI ממוצע" value={`+${globalStats.avgRoi}%`} color="green" />
-                <StatCard icon={DollarSign} label="שווי כולל" value={formatCurrency(globalStats.totalPrice)} subValue={`${globalStats.available} זמינות`} color="purple" />
+                <StatCard icon={Building2} label="סה״כ חלקות" value={overview.total} color="gold" />
+                <StatCard icon={Ruler} label="שטח כולל" value={`${formatDunam(overview.totalArea)} דונם`} color="blue" />
+                <StatCard icon={TrendingUp} label="ROI ממוצע" value={`+${overview.avgRoi}%`} color="green" />
+                <StatCard icon={DollarSign} label="שווי כולל" value={formatCurrency(overview.totalValue)} subValue={`${overview.available} זמינות`} color="purple" />
               </div>
             )}
 
@@ -338,7 +300,7 @@ export default function Areas() {
             {trends && <PriceTrendMiniChart trends={trends} />}
 
             {/* City comparison table — like Madlan's area comparison */}
-            {cityData.length > 1 && (
+            {cities.length > 1 && (
               <div className="glass-panel p-5 mt-6">
                 <h3 className="text-sm font-bold text-slate-100 mb-4 flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-gold" />
@@ -357,24 +319,21 @@ export default function Areas() {
                       </tr>
                     </thead>
                     <tbody>
-                      {cityData.map(({ city, stats }) => {
-                        const avgPriceDunam = stats.totalArea > 0 ? Math.round((stats.totalPrice / stats.totalArea) * 1000) : 0
-                        const roi = stats.totalPrice > 0 ? Math.round(((stats.totalProj - stats.totalPrice) / stats.totalPrice) * 100) : 0
-                        const availPct = stats.count > 0 ? Math.round(((stats.byStatus.AVAILABLE || 0) / stats.count) * 100) : 0
-                        // Heatmap coloring: higher ROI = greener
-                        const roiColor = roi >= 150 ? 'text-emerald-400' : roi >= 100 ? 'text-emerald-500' : roi >= 50 ? 'text-yellow-400' : 'text-slate-400'
+                      {cities.map((city) => {
+                        const availPct = city.count > 0 ? Math.round((city.available / city.count) * 100) : 0
+                        const roiColor = city.avgRoi >= 150 ? 'text-emerald-400' : city.avgRoi >= 100 ? 'text-emerald-500' : city.avgRoi >= 50 ? 'text-yellow-400' : 'text-slate-400'
                         return (
-                          <tr key={city} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                          <tr key={city.city} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                             <td className="py-3 pr-2">
-                              <Link to={`/?city=${encodeURIComponent(city)}`} className="flex items-center gap-2 text-slate-200 hover:text-gold transition-colors font-medium">
-                                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: CITY_COLORS[city] || '#94A3B8' }} />
-                                {city}
+                              <Link to={`/?city=${encodeURIComponent(city.city)}`} className="flex items-center gap-2 text-slate-200 hover:text-gold transition-colors font-medium">
+                                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: CITY_COLORS[city.city] || '#94A3B8' }} />
+                                {city.city}
                               </Link>
                             </td>
-                            <td className="py-3 text-center text-slate-300">{stats.count}</td>
-                            <td className="py-3 text-center text-gold font-medium">{formatCurrency(avgPriceDunam)}</td>
-                            <td className={`py-3 text-center font-bold ${roiColor}`}>+{roi}%</td>
-                            <td className="py-3 text-center text-slate-400">{formatDunam(stats.totalArea)} דונם</td>
+                            <td className="py-3 text-center text-slate-300">{city.count}</td>
+                            <td className="py-3 text-center text-gold font-medium">{formatCurrency(city.avgPricePerDunam)}</td>
+                            <td className={`py-3 text-center font-bold ${roiColor}`}>+{city.avgRoi}%</td>
+                            <td className="py-3 text-center text-slate-400">{formatDunam(city.totalArea)} דונם</td>
                             <td className="py-3 text-center">
                               <div className="inline-flex items-center gap-1.5">
                                 <div className="w-12 h-1.5 rounded-full bg-white/5 overflow-hidden">
@@ -394,12 +353,12 @@ export default function Areas() {
 
             {/* City cards */}
             <div className="space-y-4 mt-6">
-              {cityData.map(({ city, stats }) => (
-                <CityCard key={city} city={city} stats={stats} />
+              {cities.map((city) => (
+                <CityCard key={city.city} city={city.city} stats={city} />
               ))}
             </div>
 
-            {cityData.length === 0 && (
+            {cities.length === 0 && !isLoading && (
               <div className="text-center py-20">
                 <div className="text-4xl mb-4">🏜️</div>
                 <div className="text-slate-400">אין נתונים להצגה</div>

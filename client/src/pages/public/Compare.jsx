@@ -4,6 +4,7 @@ import { BarChart3, X, Map, MapPin, Waves, TreePine, Hospital, TrendingUp, Award
 import { useAllPlots } from '../../hooks/usePlots'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
 import { formatCurrency, calcInvestmentScore, calcMonthlyPayment, formatMonthlyPayment } from '../../utils/formatters'
+import { useMetaTags } from '../../hooks/useMetaTags'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
 import Spinner from '../../components/ui/Spinner'
@@ -258,6 +259,12 @@ function CompareCell({ value, highlight = false, className = '' }) {
 }
 
 export default function Compare() {
+  useMetaTags({
+    title: 'השוואת חלקות — LandMap Israel',
+    description: 'השוואה מפורטת בין חלקות קרקע: מחירים, תשואות, מיקום, שלבי תכנון ואיכות השקעה.',
+    url: `${window.location.origin}/compare`,
+  })
+
   const [searchParams, setSearchParams] = useSearchParams()
   const plotIds = (searchParams.get('plots') || '').split(',').filter(Boolean)
   const { data: allPlots = [], isLoading } = useAllPlots()

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Map, Shield, Brain, Eye, ArrowLeft, Compass, TrendingUp, Lock } from 'lucide-react'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
+import { useMetaTags } from '../../hooks/useMetaTags'
 
 const steps = [
   {
@@ -40,6 +41,12 @@ const trustSignals = [
 ]
 
 export default function About() {
+  useMetaTags({
+    title: 'אודות LandMap — הפלטפורמה הדיגיטלית להשקעות קרקע בישראל',
+    description: 'LandMap מחברת בין משקיעים לקרקעות פוטנציאליות ברחבי ישראל. ניתוח AI, השוואות מחירים ונתוני תכנון — הכל במקום אחד.',
+    url: `${window.location.origin}/about`,
+  })
+
   return (
     <div className="min-h-screen bg-navy" dir="rtl">
       <PublicNav />
