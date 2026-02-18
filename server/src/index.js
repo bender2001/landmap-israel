@@ -52,6 +52,7 @@ app.use(helmet({
         "'self'", "data:", "blob:",
         "https://server.arcgisonline.com",
         "https://*.tile.openstreetmap.org",
+        "https://*.tile.opentopomap.org",
         "https://*.basemaps.cartocdn.com",
         "https://unpkg.com",
         // Street View / satellite imagery providers
@@ -64,6 +65,7 @@ app.use(helmet({
         // Tile servers (Leaflet fetches via JS for some layers)
         "https://server.arcgisonline.com",
         "https://*.tile.openstreetmap.org",
+        "https://*.tile.opentopomap.org",
         "https://*.basemaps.cartocdn.com",
         // Geocoding
         "https://nominatim.openstreetmap.org",
