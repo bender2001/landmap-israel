@@ -3,6 +3,9 @@ import { X, Keyboard } from 'lucide-react'
 const shortcuts = [
   { keys: ['←', '→'], label: 'ניווט בין חלקות' },
   { keys: ['Esc'], label: 'סגירת חלון / סרגל צד' },
+  { keys: ['F'], label: 'הוסף/הסר ממועדפים' },
+  { keys: ['C'], label: 'הוסף/הסר מהשוואה' },
+  { keys: ['P'], label: 'הדפס דו״ח השקעה' },
   { keys: ['?'], label: 'קיצורי מקלדת (עזרה זו)' },
 ]
 

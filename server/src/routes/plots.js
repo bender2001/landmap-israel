@@ -1,7 +1,12 @@
 import { Router } from 'express'
+import crypto from 'crypto'
 import { getPublishedPlots, getPlotById, getPlotStats } from '../services/plotService.js'
 
 const router = Router()
+
+function generateETag(data) {
+  return '"' + crypto.createHash('md5').update(JSON.stringify(data)).digest('hex').slice(0, 16) + '"'
+}
 
 // GET /api/plots - List published plots with optional filters
 router.get('/', async (req, res, next) => {
@@ -9,6 +14,14 @@ router.get('/', async (req, res, next) => {
     // Cache list for 30s — data doesn't change often
     res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60')
     const plots = await getPublishedPlots(req.query)
+
+    // ETag support — avoid re-sending unchanged data
+    const etag = generateETag(plots)
+    res.set('ETag', etag)
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end()
+    }
+
     res.json(plots)
   } catch (err) {
     next(err)

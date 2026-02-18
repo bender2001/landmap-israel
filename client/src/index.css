@@ -2047,7 +2047,7 @@ body {
   }
   .plot-strip-scroll {
     gap: 10px;
-    padding: 6px 16px 10px 16px;
+    padding: 4px 16px 12px 16px;
     scroll-padding-inline: 16px;
   }
   .plot-card-mini {
@@ -2063,7 +2063,19 @@ body {
     font-size: 13px;
   }
   .plot-card-mini-city {
-    margin-bottom: 5px;
+    margin-bottom: 3px;
+  }
+  .plot-card-mini-roi-bar {
+    display: none;
+  }
+  .plot-card-mini-deal {
+    display: none;
+  }
+  .plot-card-mini-footer {
+    margin-top: 2px;
+  }
+  .plot-card-mini-header {
+    margin-bottom: 2px;
   }
   .plot-strip-fade-right,
   .plot-strip-fade-left {
@@ -2071,7 +2083,7 @@ body {
   }
   /* Move AI chat fab above the strip on mobile */
   .ai-chat-fab {
-    bottom: calc(105px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(140px + env(safe-area-inset-bottom, 0px)) !important;
     right: 12px !important;
     width: 48px !important;
     height: 48px !important;

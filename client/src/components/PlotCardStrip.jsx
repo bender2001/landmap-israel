@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
-import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel } from '../utils/formatters'
+import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
 
 function useAreaAverages(plots) {
@@ -225,7 +225,7 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
                   </span>
                 </div>
 
-                {/* City + Score */}
+                {/* City + Score + Freshness */}
                 <div className="plot-card-mini-city">
                   <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
                   <span>{plot.city}</span>
@@ -239,6 +239,17 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
                         title={`ציון השקעה: ${score}/10`}
                       >
                         {score}/10
+                      </span>
+                    )
+                  })()}
+                  {(() => {
+                    const updatedAt = plot.updated_at ?? plot.updatedAt
+                    const freshness = formatRelativeTime(updatedAt)
+                    if (!freshness) return null
+                    const colorClass = getFreshnessColor(updatedAt)
+                    return (
+                      <span className={`text-[8px] ${colorClass} mr-auto opacity-70`} title={`עודכן ${freshness}`}>
+                        {freshness}
                       </span>
                     )
                   })()}

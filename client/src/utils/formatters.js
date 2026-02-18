@@ -32,6 +32,38 @@ export function formatDunam(sqm) {
 }
 
 /**
+ * Format a date as a relative time string (e.g., "היום", "לפני 3 ימים", "לפני שבוע").
+ * Used for freshness badges on plot cards (like Madlan's listing freshness).
+ */
+export function formatRelativeTime(dateStr) {
+  if (!dateStr) return null
+  const now = new Date()
+  const date = new Date(dateStr)
+  const diffMs = now - date
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return 'היום'
+  if (diffDays === 1) return 'אתמול'
+  if (diffDays <= 7) return `לפני ${diffDays} ימים`
+  if (diffDays <= 14) return 'לפני שבוע'
+  if (diffDays <= 30) return `לפני ${Math.floor(diffDays / 7)} שבועות`
+  if (diffDays <= 60) return 'לפני חודש'
+  return `לפני ${Math.floor(diffDays / 30)} חודשים`
+}
+
+/**
+ * Get a freshness color class based on how recently something was updated.
+ */
+export function getFreshnessColor(dateStr) {
+  if (!dateStr) return 'text-slate-500'
+  const diffDays = Math.floor((new Date() - new Date(dateStr)) / (1000 * 60 * 60 * 24))
+  if (diffDays <= 1) return 'text-green-400'
+  if (diffDays <= 7) return 'text-emerald-400'
+  if (diffDays <= 30) return 'text-slate-400'
+  return 'text-slate-500'
+}
+
+/**
  * Calculate an investment score (1-10) based on ROI, zoning progress, and readiness.
  * Higher = more attractive investment.
  */

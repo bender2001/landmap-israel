@@ -212,6 +212,30 @@ export default function MapView() {
         e.preventDefault()
         setIsShortcutsOpen(prev => !prev)
       }
+      // F key to toggle favorite on selected plot
+      if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey) {
+        const tag = document.activeElement?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+        if (selectedPlot && favorites) {
+          e.preventDefault()
+          favorites.toggle(selectedPlot.id)
+        }
+      }
+      // C key to toggle compare on selected plot
+      if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey) {
+        const tag = document.activeElement?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+        if (selectedPlot) {
+          e.preventDefault()
+          toggleCompare(selectedPlot.id)
+        }
+      }
+      // P key to print report for selected plot
+      if ((e.key === 'p' || e.key === 'P') && !e.ctrlKey && !e.metaKey) {
+        const tag = document.activeElement?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+        // Handled by SidebarDetails internally — we just need the shortcut documented
+      }
       // Arrow keys to navigate between plots (only when no input is focused)
       if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && filteredPlots.length > 0) {
         const tag = document.activeElement?.tagName
