@@ -201,6 +201,13 @@ export default function FilterBar({
 
   return (
     <div className="filter-bar-container" dir="rtl">
+      {/* Accessibility: announce filter results to screen readers */}
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {activeCount > 0
+          ? `מציג ${plotCount} חלקות עם ${activeCount} סינונים פעילים`
+          : `מציג ${plotCount} חלקות`
+        }
+      </div>
       {/* Market snapshot — like Madlan's data-driven header */}
       {marketStats && !isExpanded && (
         <div className="hidden md:flex items-center gap-4 mb-2 px-1 text-[10px] text-slate-500">

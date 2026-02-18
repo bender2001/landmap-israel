@@ -29,7 +29,21 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
       .slice(0, 6) // max 6 suggestions
   })()
 
-  const showDropdown = isFocused && value && suggestions.length > 0
+  const showDropdown = isFocused && value && value.length >= 1
+
+  // Recent searches (stored in localStorage)
+  const recentSearches = (() => {
+    if (showDropdown && suggestions.length > 0) return [] // don't show when we have results
+    try { return JSON.parse(localStorage.getItem('landmap_recent_searches') || '[]').slice(0, 3) } catch { return [] }
+  })()
+
+  const saveRecentSearch = useCallback((query) => {
+    try {
+      const recent = JSON.parse(localStorage.getItem('landmap_recent_searches') || '[]')
+      const updated = [query, ...recent.filter(q => q !== query)].slice(0, 5)
+      localStorage.setItem('landmap_recent_searches', JSON.stringify(updated))
+    } catch {}
+  }, [])
 
   // Close on outside click
   useEffect(() => {
@@ -68,6 +82,7 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
       e.preventDefault()
       const plot = suggestions[highlightIndex]
       if (plot) {
+        saveRecentSearch(value)
         onSelectPlot(plot)
         setIsFocused(false)
         inputRef.current?.blur()
@@ -79,9 +94,10 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
   }, [showDropdown, highlightIndex, suggestions, onSelectPlot])
 
   const handleSelect = useCallback((plot) => {
+    if (value) saveRecentSearch(value)
     onSelectPlot(plot)
     setIsFocused(false)
-  }, [onSelectPlot])
+  }, [onSelectPlot, value, saveRecentSearch])
 
   // Highlight matching text
   const highlightMatch = (text, query) => {
@@ -129,6 +145,14 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
       {/* Autocomplete dropdown */}
       {showDropdown && (
         <div className="search-autocomplete-dropdown" role="listbox" ref={listRef}>
+          {suggestions.length === 0 ? (
+            <div className="px-4 py-5 text-center">
+              <div className="text-lg mb-1">🔍</div>
+              <div className="text-xs text-slate-400 font-medium">לא נמצאו תוצאות עבור &quot;{value}&quot;</div>
+              <div className="text-[10px] text-slate-500 mt-1">נסה לחפש לפי מספר גוש, חלקה או שם עיר</div>
+            </div>
+          ) : (
+          <>
           <div className="search-autocomplete-header">
             <Search className="w-3 h-3 text-slate-500" />
             <span>{suggestions.length} תוצאות</span>
@@ -185,6 +209,8 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
           <div className="search-autocomplete-hint">
             <kbd>↑</kbd><kbd>↓</kbd> ניווט · <kbd>Enter</kbd> בחירה · <kbd>Esc</kbd> סגירה
           </div>
+          </>
+          )}
         </div>
       )}
     </div>
