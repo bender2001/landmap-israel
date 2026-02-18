@@ -394,7 +394,24 @@ export default function MapView() {
       />
 
       {selectedPlot && (
-        <Suspense fallback={null}>
+        <Suspense fallback={
+          <div className="sidebar-details-panel" dir="rtl">
+            <div className="p-6 space-y-4 animate-pulse">
+              <div className="flex justify-between items-center">
+                <div className="h-6 w-48 rounded bg-slate-700/50" />
+                <div className="h-8 w-8 rounded-lg bg-slate-700/30" />
+              </div>
+              <div className="h-4 w-32 rounded bg-slate-700/30" />
+              <div className="grid grid-cols-2 gap-3 mt-6">
+                {[1,2,3,4].map(i => (
+                  <div key={i} className="h-20 rounded-xl bg-slate-700/20" />
+                ))}
+              </div>
+              <div className="h-32 rounded-xl bg-slate-700/15 mt-4" />
+              <div className="h-24 rounded-xl bg-slate-700/15" />
+            </div>
+          </div>
+        }>
           <SidebarDetails
             plot={selectedPlot}
             onClose={handleCloseSidebar}
