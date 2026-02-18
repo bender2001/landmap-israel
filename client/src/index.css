@@ -4000,3 +4000,61 @@ body {
     text-align: center;
   }
 }
+
+/* ═══════════════════════════════════════════
+   REDUCED MOTION & DATA SAVER
+   Respects prefers-reduced-motion (WCAG 2.3.3) and Save-Data users.
+   ~10% of Israeli mobile users use Save-Data (metered plans).
+   Google, YouTube, Twitter all respect this — competitive parity.
+   ═══════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Keep essential transition for sidebar open/close (UX clarity) */
+  .sidebar-details,
+  .section-collapse {
+    transition-duration: 0.1s !important;
+  }
+
+  /* Disable backdrop-blur — expensive on low-end devices */
+  [class*="backdrop-blur"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Disable pulse/bounce animations */
+  .animate-pulse,
+  .animate-bounce,
+  .animate-bounce-in,
+  .animate-bell-ring,
+  .animate-ticker-in {
+    animation: none !important;
+  }
+
+  /* Simpler card hover — no scale transform */
+  .plot-card-mini:hover {
+    transform: none !important;
+  }
+}
+
+/* prefers-reduced-data (future CSS spec, Safari already supports) */
+@media (prefers-reduced-data: reduce) {
+  /* Skip decorative background images */
+  .map-noise,
+  .map-vignette {
+    display: none !important;
+  }
+
+  /* Disable backdrop-blur (GPU-heavy) */
+  [class*="backdrop-blur"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}

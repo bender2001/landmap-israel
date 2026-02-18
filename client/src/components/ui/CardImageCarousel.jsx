@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, memo } from 'react'
+import { useDataSaver } from '../../hooks/useDataSaver'
 
 /**
  * CardImageCarousel — Madlan/Airbnb-style multi-image carousel for plot cards.
@@ -18,6 +19,7 @@ const CardImageCarousel = memo(function CardImageCarousel({ images, blockNum, co
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loadErrors, setLoadErrors] = useState(new Set())
   const touchRef = useRef({ startX: 0, startY: 0 })
+  const dataSaver = useDataSaver()
 
   const count = images?.length || 0
 
@@ -130,9 +132,11 @@ const CardImageCarousel = memo(function CardImageCarousel({ images, blockNum, co
   // Multi-image carousel
   const currentImg = images[currentIndex]
 
-  // Preload next image for instant transitions — like Airbnb's carousel
+  // Preload next image for instant transitions — like Airbnb's carousel.
+  // Skipped when Save-Data is active or connection is slow to conserve bandwidth.
+  // ~10% of Israeli mobile users have Save-Data on (metered plans).
   useEffect(() => {
-    if (count <= 1) return
+    if (count <= 1 || dataSaver) return
     const nextIdx = (currentIndex + 1) % count
     const prevIdx = (currentIndex - 1 + count) % count
     ;[nextIdx, prevIdx].forEach(idx => {
@@ -146,7 +150,7 @@ const CardImageCarousel = memo(function CardImageCarousel({ images, blockNum, co
         setTimeout(() => { try { document.head.removeChild(link) } catch {} }, 10000)
       }
     })
-  }, [currentIndex, count, images, loadErrors])
+  }, [currentIndex, count, images, loadErrors, dataSaver])
 
   return (
     <div
