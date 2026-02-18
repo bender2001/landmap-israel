@@ -9,6 +9,7 @@ import { useAreaAverages } from '../hooks/useAreaAverages'
 import MapClusterLayer from './MapClusterLayer'
 import MapRuler from './MapRuler'
 import MapHeatLayer from './MapHeatLayer'
+import ZoningProgressBar from './ui/ZoningProgressBar'
 
 /**
  * MapUrlSync — persists the map viewport (lat/lng/zoom) in URL hash for shareable views.
@@ -583,6 +584,8 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
           if (diffPct >= -5) return null
           return <span className="tooltip-deal-badge">🔥 {Math.abs(diffPct)}% מתחת לממוצע</span>
         })()}
+        {/* Zoning pipeline progress — shows regulatory journey at a glance */}
+        {zoningStage && <ZoningProgressBar currentStage={zoningStage} variant="compact" className="mt-0.5" />}
       </Tooltip>
 
       <Popup>
@@ -630,6 +633,12 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
             <span className="plot-popup-label">ייעוד</span>
             <span className="plot-popup-value">{zoningLabels[zoningStage]}</span>
           </div>
+          {/* Zoning pipeline progress bar — visual regulatory journey tracker */}
+          {zoningStage && (
+            <div className="px-1 py-1">
+              <ZoningProgressBar currentStage={zoningStage} variant="compact" />
+            </div>
+          )}
           <div className="plot-popup-badges">
             {plot.status === 'SOLD' && (
               <span className="plot-popup-badge" style={{ background: 'rgba(239,68,68,0.2)', color: '#F87171', border: '1px solid rgba(239,68,68,0.4)', fontWeight: 700 }}>

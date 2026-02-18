@@ -23,6 +23,7 @@ import InvestmentProjection from '../../components/ui/InvestmentProjection.jsx'
 import DueDiligenceChecklist from '../../components/ui/DueDiligenceChecklist.jsx'
 import MobilePlotActionBar from '../../components/ui/MobilePlotActionBar.jsx'
 import QuickInquiryTemplates from '../../components/ui/QuickInquiryTemplates.jsx'
+import ZoningProgressBar from '../../components/ui/ZoningProgressBar.jsx'
 
 function JsonLdSchema({ plot }) {
   const blockNum = plot.block_number ?? plot.blockNumber
@@ -836,6 +837,12 @@ export default function PlotDetail() {
                 <span className="text-xs text-slate-300 bg-white/5 px-2.5 py-1 rounded-lg">
                   {zoningLabels[zoningStage]}
                 </span>
+                {/* Compact zoning pipeline progress — regulatory stage at a glance */}
+                {zoningStage && (
+                  <span className="inline-flex items-center bg-white/5 px-2.5 py-1 rounded-lg">
+                    <ZoningProgressBar currentStage={zoningStage} variant="compact" />
+                  </span>
+                )}
                 <span
                   className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium"
                   style={{ background: statusColor + '14', border: `1px solid ${statusColor}35`, color: statusColor }}

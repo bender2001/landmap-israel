@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback, useMemo, memo } from 'react'
 import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows, Share2 } from 'lucide-react'
 import PriceSparkline from './ui/PriceSparkline'
+import ZoningProgressBar from './ui/ZoningProgressBar'
 import { statusColors, statusLabels } from '../utils/constants'
 import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, getInvestmentGrade, formatRelativeTime, getFreshnessColor, calcCAGR, calcMonthlyPayment, formatMonthlyPayment, calcDemandVelocity, calcBestInCategory, calcBuildableValue } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
@@ -369,6 +370,13 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
             ))}
           </div>
         )}
+
+        {/* Zoning pipeline progress — compact regulatory stage tracker */}
+        {(() => {
+          const zoningStage = plot.zoning_stage ?? plot.zoningStage
+          if (!zoningStage) return null
+          return <ZoningProgressBar currentStage={zoningStage} variant="compact" className="mt-0.5" />
+        })()}
 
         {/* Demand velocity indicator — views/day urgency signal */}
         {demandVelocity && demandVelocity.tier !== 'low' && (

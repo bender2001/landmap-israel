@@ -39,6 +39,7 @@ const FeaturedDeals = lazy(() => import('../../components/FeaturedDeals.jsx'))
 const MarketTicker = lazy(() => import('../../components/MarketTicker.jsx'))
 const PriceMovers = lazy(() => import('../../components/PriceMovers.jsx'))
 const MobilePlotActionBar = lazy(() => import('../../components/ui/MobilePlotActionBar.jsx'))
+const MarketPulse = lazy(() => import('../../components/MarketPulse.jsx'))
 
 // Preload PlotDetail chunk — imported but not rendered here.
 // When a user selects a plot (opens sidebar), we trigger this import to preload
@@ -769,6 +770,15 @@ export default function MapView() {
         <Suspense fallback={null}>
           <WidgetErrorBoundary name="MarketTicker" silent>
             <MarketTicker plots={filteredPlots} />
+          </WidgetErrorBoundary>
+        </Suspense>
+      </IdleRender>
+      {/* Market Pulse — floating market activity widget (like Bloomberg's market indicators).
+          Shows market heat, availability, new listings, and hot deals. */}
+      <IdleRender>
+        <Suspense fallback={null}>
+          <WidgetErrorBoundary name="MarketPulse" silent>
+            <MarketPulse plots={filteredPlots} />
           </WidgetErrorBoundary>
         </Suspense>
       </IdleRender>

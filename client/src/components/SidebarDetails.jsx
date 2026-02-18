@@ -20,6 +20,7 @@ import DueDiligenceChecklist from './ui/DueDiligenceChecklist'
 import InvestmentProjection from './ui/InvestmentProjection'
 import LocationScore from './ui/LocationScore'
 import QuickInquiryTemplates from './ui/QuickInquiryTemplates'
+import ZoningProgressBar from './ui/ZoningProgressBar'
 import { plotInquiryLink } from '../utils/config'
 
 function getDocIcon(mimeType) {
@@ -2396,6 +2397,15 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   <Hourglass className="w-4 h-4 text-gold flex-shrink-0" />
                   <span className="text-sm text-slate-300">מוכנות לבנייה:</span>
                   <span className="text-sm font-bold text-gold">{readinessEstimate}</span>
+                </div>
+              )}
+
+              {/* Detailed Zoning Progress Bar — visual pipeline tracker.
+                  Shows where the plot sits in the regulatory journey from agricultural land
+                  to building permit. Investors can see at a glance how advanced the plot is. */}
+              {zoningStage && (
+                <div className="bg-navy-light/40 border border-white/5 rounded-xl p-4 mb-4">
+                  <ZoningProgressBar currentStage={zoningStage} variant="detailed" />
                 </div>
               )}
 

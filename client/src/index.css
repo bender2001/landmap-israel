@@ -3743,4 +3743,27 @@ body {
     background: #f1f5f9 !important;
     font-weight: 600 !important;
   }
+
+  /* ZoningProgressBar — ensure colors print correctly */
+  [class*="ZoningProgress"] {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* MarketPulse — hide on print (map overlay, not relevant on paper) */
+  [class*="MarketPulse"] {
+    display: none !important;
+  }
+
+  /* Branded print timestamp — auto-generated on printed pages */
+  .sidebar-panel::after {
+    content: "הופק ע״י LandMap Israel · " attr(data-print-date) " · landmap.co.il";
+    display: block;
+    font-size: 10px;
+    color: #94a3b8;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 12px;
+    margin-top: 24px;
+    text-align: center;
+  }
 }
