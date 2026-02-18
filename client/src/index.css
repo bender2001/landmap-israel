@@ -2431,6 +2431,9 @@ body {
    ═══════════════════════════════════════════ */
 
 @supports (padding: env(safe-area-inset-bottom)) {
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
   .sidebar-cta-footer {
     padding-bottom: calc(16px + env(safe-area-inset-bottom));
   }

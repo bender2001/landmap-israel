@@ -20,6 +20,7 @@ import { plotInquiryLink } from '../../utils/config.js'
 import InvestmentBenchmark from '../../components/ui/InvestmentBenchmark.jsx'
 import InvestmentProjection from '../../components/ui/InvestmentProjection.jsx'
 import DueDiligenceChecklist from '../../components/ui/DueDiligenceChecklist.jsx'
+import MobilePlotActionBar from '../../components/ui/MobilePlotActionBar.jsx'
 
 function JsonLdSchema({ plot }) {
   const blockNum = plot.block_number ?? plot.blockNumber
@@ -1532,6 +1533,15 @@ export default function PlotDetail() {
           </button>
         )}
       </div>
+
+      {/* Mobile sticky CTA bar — like Madlan/Yad2's bottom action bar on property pages.
+          Keeps WhatsApp/Call/Share buttons visible while scrolling through long detail pages.
+          Only visible on mobile (sm:hidden inside the component). Huge conversion driver. */}
+      <MobilePlotActionBar
+        plot={plot}
+        isFavorite={favorites?.favorites?.includes(id)}
+        onToggleFavorite={favorites?.toggle}
+      />
 
       <LeadModal
         isOpen={isLeadModalOpen}

@@ -38,6 +38,7 @@ const AlertSubscription = lazy(() => import('../../components/AlertSubscription.
 const FeaturedDeals = lazy(() => import('../../components/FeaturedDeals.jsx'))
 const MarketTicker = lazy(() => import('../../components/MarketTicker.jsx'))
 const PriceMovers = lazy(() => import('../../components/PriceMovers.jsx'))
+const MobilePlotActionBar = lazy(() => import('../../components/ui/MobilePlotActionBar.jsx'))
 
 // Preload PlotDetail chunk — imported but not rendered here.
 // When a user selects a plot (opens sidebar), we trigger this import to preload
@@ -855,6 +856,19 @@ export default function MapView() {
             allPlots={filteredPlots}
             onSelectPlot={handleSelectPlot}
             priceChange={getMergedPriceChange(selectedPlot.id)}
+          />
+        </Suspense>
+      )}
+
+      {/* Mobile sticky CTA bar — prominent WhatsApp/Call/Share buttons at the bottom.
+          Like Madlan/Yad2's mobile bottom action bar that dramatically improves conversion.
+          Only visible when a plot is selected and hidden on desktop (sm:hidden). */}
+      {selectedPlot && (
+        <Suspense fallback={null}>
+          <MobilePlotActionBar
+            plot={selectedPlot}
+            isFavorite={favorites?.isFavorite(selectedPlot.id)}
+            onToggleFavorite={favorites?.toggle}
           />
         </Suspense>
       )}

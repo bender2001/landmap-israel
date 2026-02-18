@@ -14,6 +14,7 @@ import InvestmentBenchmark from './ui/InvestmentBenchmark'
 import PlotPercentileBadges from './ui/PlotPercentileBadges'
 import { usePlot, useNearbyPlots, useSimilarPlots, usePrefetchPlot, useNearbyPois } from '../hooks/usePlots'
 import MiniMap from './ui/MiniMap'
+import StreetViewPanel from './ui/StreetViewPanel'
 import DueDiligenceChecklist from './ui/DueDiligenceChecklist'
 import InvestmentProjection from './ui/InvestmentProjection'
 import LocationScore from './ui/LocationScore'
@@ -111,6 +112,7 @@ function QuickNavBar({ scrollRef }) {
     { id: 'section-images', label: '📷', title: 'תמונות' },
     { id: 'section-quality', label: '🛡️', title: 'איכות' },
     { id: 'section-nearby-pois', label: '📍', title: 'סביבה' },
+    { id: 'section-streetview', label: '🛣️', title: 'Street View' },
     { id: 'section-dd', label: '✅', title: 'בדיקות' },
   ]
 
@@ -2566,6 +2568,25 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
             {plot.coordinates && plot.coordinates.length >= 3 && (
               <CommuteTimesSection coordinates={plot.coordinates} />
             )}
+
+            {/* Google Street View — lets investors see the actual terrain from street level.
+                This is Madlan's killer feature — visual context beyond satellite imagery.
+                Shows embedded 360° panorama at the plot's centroid coordinates. */}
+            {plot.coordinates && plot.coordinates.length >= 3 && (() => {
+              const center = plotCenter(plot.coordinates)
+              if (!center) return null
+              return (
+                <CollapsibleSection
+                  number="🛣️"
+                  icon={Eye}
+                  title="Street View — מבט מהקרקע"
+                  sectionId="section-streetview"
+                  defaultOpen={false}
+                >
+                  <StreetViewPanel lat={center.lat} lng={center.lng} />
+                </CollapsibleSection>
+              )
+            })()}
 
             {/* Similar Plots */}
             <SimilarPlots currentPlot={plot} allPlots={allPlots} onSelectPlot={onSelectPlot} />
