@@ -4,7 +4,7 @@ import { Heart, Map, MapPin, TrendingUp, Trash2, Clock, GitCompareArrows, Share2
 import { useAllPlots } from '../../hooks/usePlots'
 import { useFavorites } from '../../hooks/useFavorites'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
-import { formatCurrency, formatPriceShort, calcInvestmentScore, getScoreLabel } from '../../utils/formatters'
+import { formatCurrency, formatPriceShort, calcInvestmentScore, getScoreLabel, getInvestmentGrade, calcCAGR } from '../../utils/formatters'
 import { useMetaTags } from '../../hooks/useMetaTags'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
@@ -19,6 +19,207 @@ const sortOptions = [
   { value: 'score-desc', label: 'ציון ↓', icon: ArrowDown },
 ]
 import Spinner from '../../components/ui/Spinner'
+
+/**
+ * Portfolio Analytics — aggregated investment metrics for saved plots.
+ * Shows city diversification, grade distribution, weighted CAGR, and risk profile.
+ * Like Bloomberg's portfolio analytics but for land investments — no Israeli competitor has this.
+ */
+function PortfolioAnalytics({ plots }) {
+  const analytics = useMemo(() => {
+    if (!plots || plots.length < 2) return null
+
+    let totalValue = 0
+    let totalProjected = 0
+    const cityBreakdown = {}
+    const gradeBreakdown = { 'A+': 0, 'A': 0, 'B+': 0, 'B': 0, 'C+': 0, 'C': 0 }
+    const zoningBreakdown = {}
+    let cagrSum = 0
+    let cagrCount = 0
+
+    for (const p of plots) {
+      const price = p.total_price ?? p.totalPrice ?? 0
+      const proj = p.projected_value ?? p.projectedValue ?? 0
+      const readiness = p.readiness_estimate ?? p.readinessEstimate ?? ''
+      const zoning = p.zoning_stage ?? p.zoningStage ?? 'UNKNOWN'
+      const roi = price > 0 ? Math.round(((proj - price) / price) * 100) : 0
+
+      totalValue += price
+      totalProjected += proj
+
+      // City diversification
+      const city = p.city || 'לא ידוע'
+      cityBreakdown[city] = (cityBreakdown[city] || 0) + price
+
+      // Investment grade distribution
+      const score = calcInvestmentScore(p)
+      const { grade } = getInvestmentGrade(score)
+      if (gradeBreakdown[grade] !== undefined) gradeBreakdown[grade]++
+
+      // Zoning stage
+      const zoningLabel = zoningLabels[zoning] || zoning
+      zoningBreakdown[zoningLabel] = (zoningBreakdown[zoningLabel] || 0) + 1
+
+      // CAGR
+      const cagrData = calcCAGR(roi, readiness)
+      if (cagrData) {
+        cagrSum += cagrData.cagr
+        cagrCount++
+      }
+    }
+
+    const totalProfit = totalProjected - totalValue
+    const avgRoi = totalValue > 0 ? Math.round(((totalProjected - totalValue) / totalValue) * 100) : 0
+    const avgCagr = cagrCount > 0 ? Math.round((cagrSum / cagrCount) * 10) / 10 : null
+
+    // Top city concentration (risk indicator)
+    const cities = Object.entries(cityBreakdown).sort((a, b) => b[1] - a[1])
+    const topCityPct = totalValue > 0 ? Math.round((cities[0][1] / totalValue) * 100) : 0
+    const diversificationRisk = cities.length === 1 ? 'high' : topCityPct > 70 ? 'medium' : 'low'
+
+    return {
+      totalValue,
+      totalProjected,
+      totalProfit,
+      avgRoi,
+      avgCagr,
+      cityBreakdown: cities,
+      gradeBreakdown: Object.entries(gradeBreakdown).filter(([, v]) => v > 0),
+      zoningBreakdown: Object.entries(zoningBreakdown).sort((a, b) => b[1] - a[1]),
+      diversificationRisk,
+      topCityPct,
+      plotCount: plots.length,
+    }
+  }, [plots])
+
+  if (!analytics) return null
+
+  const gradeColors = {
+    'A+': '#22C55E', 'A': '#4ADE80', 'B+': '#C8942A', 'B': '#F59E0B', 'C+': '#F97316', 'C': '#EF4444',
+  }
+
+  const riskConfig = {
+    low: { label: 'מפוזר', color: '#22C55E', emoji: '🟢' },
+    medium: { label: 'ריכוזי', color: '#F59E0B', emoji: '🟡' },
+    high: { label: 'מרוכז', color: '#EF4444', emoji: '🔴' },
+  }
+
+  const risk = riskConfig[analytics.diversificationRisk]
+
+  return (
+    <div className="glass-panel p-0 overflow-hidden mb-6 border-gold/10">
+      <div className="h-1 bg-gradient-to-r from-gold via-gold-bright to-gold" />
+      <div className="p-5">
+        <div className="flex items-center gap-2 mb-5">
+          <div className="w-9 h-9 rounded-xl bg-gold/15 border border-gold/20 flex items-center justify-center">
+            <TrendingUp className="w-4 h-4 text-gold" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-slate-100">ניתוח תיק השקעות</h2>
+            <p className="text-[10px] text-slate-500">{analytics.plotCount} חלקות · סיכום אגרגטי</p>
+          </div>
+        </div>
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+          <div className="bg-blue-500/8 border border-blue-500/15 rounded-xl p-3 text-center">
+            <div className="text-[10px] text-slate-500 mb-0.5">שווי תיק</div>
+            <div className="text-sm font-black text-blue-400">{formatPriceShort(analytics.totalValue)}</div>
+          </div>
+          <div className="bg-emerald-500/8 border border-emerald-500/15 rounded-xl p-3 text-center">
+            <div className="text-[10px] text-slate-500 mb-0.5">רווח צפוי</div>
+            <div className="text-sm font-black text-emerald-400">+{formatPriceShort(analytics.totalProfit)}</div>
+          </div>
+          <div className="bg-gold/8 border border-gold/15 rounded-xl p-3 text-center">
+            <div className="text-[10px] text-slate-500 mb-0.5">ROI ממוצע</div>
+            <div className="text-sm font-black text-gold">+{analytics.avgRoi}%</div>
+          </div>
+          <div className="bg-purple-500/8 border border-purple-500/15 rounded-xl p-3 text-center">
+            <div className="text-[10px] text-slate-500 mb-0.5">CAGR ממוצע</div>
+            <div className="text-sm font-black text-purple-400">{analytics.avgCagr ? `${analytics.avgCagr}%` : '—'}<span className="text-[9px] font-normal text-slate-500">/שנה</span></div>
+          </div>
+        </div>
+
+        {/* City Diversification + Grade Distribution */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* City breakdown */}
+          <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <MapPin className="w-3 h-3 text-gold" /> פיזור גיאוגרפי
+              </span>
+              <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium`} style={{ color: risk.color, background: `${risk.color}15`, border: `1px solid ${risk.color}25` }}>
+                {risk.emoji} {risk.label}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {analytics.cityBreakdown.map(([city, value]) => {
+                const pct = Math.round((value / analytics.totalValue) * 100)
+                return (
+                  <div key={city}>
+                    <div className="flex justify-between text-[11px] mb-0.5">
+                      <span className="text-slate-400">{city}</span>
+                      <span className="text-slate-300 font-medium">{pct}% · {formatPriceShort(value)}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-gold to-gold-bright transition-all duration-500"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Grade distribution */}
+          <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3">
+            <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5 mb-3">
+              <Heart className="w-3 h-3 text-gold" /> דירוגי השקעה
+            </span>
+            {analytics.gradeBreakdown.length > 0 ? (
+              <div className="space-y-2">
+                {analytics.gradeBreakdown.map(([grade, count]) => {
+                  const pct = Math.round((count / analytics.plotCount) * 100)
+                  const color = gradeColors[grade] || '#94A3B8'
+                  return (
+                    <div key={grade}>
+                      <div className="flex justify-between text-[11px] mb-0.5">
+                        <span className="font-bold" style={{ color }}>{grade}</span>
+                        <span className="text-slate-400">{count} חלקות ({pct}%)</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${pct}%`, background: color }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-500 text-center py-4">אין נתונים</div>
+            )}
+          </div>
+        </div>
+
+        {/* Zoning stage distribution - compact pills */}
+        {analytics.zoningBreakdown.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            <span className="text-[10px] text-slate-500 flex items-center gap-1 mr-1">📋 שלבים:</span>
+            {analytics.zoningBreakdown.map(([label, count]) => (
+              <span key={label} className="text-[9px] text-slate-400 bg-white/5 border border-white/5 px-2 py-0.5 rounded-lg">
+                {label} <span className="font-bold text-slate-300">({count})</span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function Favorites() {
   useMetaTags({
@@ -233,6 +434,11 @@ export default function Favorites() {
             </div>
           )}
 
+          {/* Portfolio Analytics — aggregate investment metrics (only shown with 2+ favorites) */}
+          {!isLoading && favoritePlots.length >= 2 && (
+            <PortfolioAnalytics plots={favoritePlots} />
+          )}
+
           {isLoading ? (
             <div className="flex items-center justify-center py-20">
               <Spinner className="w-10 h-10 text-gold" />
@@ -334,12 +540,21 @@ export default function Favorites() {
                             </span>
                           )}
                         </span>
-                        <Link
-                          to={`/?plot=${plot.id}`}
-                          className="text-xs text-gold hover:underline font-medium"
-                        >
-                          פרטים מלאים
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            to={`/plot/${plot.id}`}
+                            className="text-xs text-gold hover:underline font-medium"
+                          >
+                            פרטים מלאים
+                          </Link>
+                          <span className="text-slate-700">|</span>
+                          <Link
+                            to={`/?plot=${plot.id}`}
+                            className="text-xs text-blue-400 hover:underline font-medium"
+                          >
+                            במפה
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -14,7 +14,7 @@ import PublicNav from '../../components/PublicNav.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import NeighborhoodRadar from '../../components/ui/NeighborhoodRadar.jsx'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../../utils/constants.js'
-import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcInvestmentVerdict, calcDaysOnMarket } from '../../utils/formatters.js'
+import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcInvestmentVerdict, calcDaysOnMarket, calcInvestmentTimeline } from '../../utils/formatters.js'
 import PriceTrendChart from '../../components/ui/PriceTrendChart.jsx'
 import MiniMap from '../../components/ui/MiniMap.jsx'
 import { plotInquiryLink } from '../../utils/config.js'
@@ -261,6 +261,7 @@ const SECTION_ANCHORS = [
   { id: 'section-financial', label: 'פיננסי', emoji: '💰' },
   { id: 'section-location', label: 'מיקום', emoji: '📍' },
   { id: 'section-projection', label: 'תחזית', emoji: '📈' },
+  { id: 'section-timeline', label: 'ציר זמן', emoji: '⏳' },
   { id: 'section-planning', label: 'תכנון', emoji: '📋' },
   { id: 'section-costs', label: 'עלויות', emoji: '🧾' },
   { id: 'section-documents', label: 'מסמכים', emoji: '📄' },
@@ -1247,6 +1248,141 @@ export default function PlotDetail() {
               zoningStage={zoningStage}
             />
           </div>
+
+          {/* Investment Timeline — visual roadmap from current zoning stage to building permit.
+              Uses calcInvestmentTimeline from formatters.js — shows elapsed, current, and remaining stages
+              with estimated months and completion year. Differentiator: no Israeli competitor shows a
+              clear visual timeline for land investment maturation. Like a Gantt chart for real estate. */}
+          {(() => {
+            const timeline = calcInvestmentTimeline(plot)
+            if (!timeline || timeline.stages.length === 0) return null
+            return (
+              <div id="section-timeline" className="mb-8 bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center">
+                      <Clock className="w-4 h-4 text-indigo-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-slate-100">ציר זמן השקעה</h2>
+                      <p className="text-[10px] text-slate-500">מסלול תכנוני מ-{timeline.stages[0].label} עד {timeline.stages[timeline.stages.length - 1].label}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {timeline.remainingMonths > 0 && (
+                      <div className="text-left">
+                        <div className="text-[10px] text-slate-500">נותרו</div>
+                        <div className="text-sm font-bold text-indigo-400">~{timeline.remainingMonths} חודשים</div>
+                      </div>
+                    )}
+                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/20 flex flex-col items-center justify-center">
+                      <span className="text-lg font-black text-indigo-400">{timeline.progressPct}%</span>
+                      <span className="text-[8px] text-slate-500">התקדמות</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Main progress bar */}
+                <div className="mb-6">
+                  <div className="h-2.5 rounded-full bg-white/5 overflow-hidden relative">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${Math.max(3, timeline.progressPct)}%`,
+                        background: timeline.progressPct >= 75
+                          ? 'linear-gradient(90deg, #22C55E, #4ADE80)'
+                          : timeline.progressPct >= 40
+                            ? 'linear-gradient(90deg, #C8942A, #E5B94E)'
+                            : 'linear-gradient(90deg, #6366F1, #818CF8)',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Stage milestones */}
+                <div className="relative">
+                  {/* Connecting line */}
+                  <div className="absolute right-[15px] top-4 bottom-4 w-px bg-gradient-to-b from-indigo-500/30 via-gold/20 to-emerald-500/30" />
+
+                  <div className="space-y-0">
+                    {timeline.stages.map((stage, i) => {
+                      const isCompleted = stage.status === 'completed'
+                      const isCurrent = stage.status === 'current'
+                      const isFuture = stage.status === 'future'
+                      return (
+                        <div
+                          key={stage.key}
+                          className={`relative flex items-center gap-3 py-2.5 pr-1 transition-all ${
+                            isCurrent ? 'bg-gold/5 -mx-2 px-2 rounded-xl' : ''
+                          } ${isFuture ? 'opacity-40' : ''}`}
+                        >
+                          {/* Stage dot */}
+                          <div
+                            className={`w-[30px] h-[30px] rounded-full flex items-center justify-center flex-shrink-0 z-10 border-2 transition-all ${
+                              isCompleted ? 'bg-emerald-500/20 border-emerald-500/40' :
+                              isCurrent ? 'bg-gold/20 border-gold/50 shadow-lg shadow-gold/20 scale-110' :
+                              'bg-white/5 border-white/10'
+                            }`}
+                          >
+                            {isCompleted ? (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            ) : (
+                              <span className="text-sm">{stage.icon}</span>
+                            )}
+                          </div>
+
+                          {/* Stage info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-medium ${
+                                isCompleted ? 'text-emerald-400/80' :
+                                isCurrent ? 'text-gold font-bold' :
+                                'text-slate-500'
+                              }`}>
+                                {stage.label}
+                              </span>
+                              {isCurrent && (
+                                <span className="text-[9px] text-gold bg-gold/10 px-2 py-0.5 rounded-full font-bold animate-pulse">
+                                  שלב נוכחי
+                                </span>
+                              )}
+                              {isCompleted && (
+                                <span className="text-[9px] text-emerald-400/60">✓ הושלם</span>
+                              )}
+                            </div>
+                            {stage.durationMonths > 0 && !isCompleted && (
+                              <span className="text-[10px] text-slate-600">
+                                ~{stage.durationMonths} חודשים {isCurrent ? '(בתהליך)' : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Estimated completion */}
+                {timeline.estimatedYear && timeline.remainingMonths > 0 && (
+                  <div className="mt-4 flex items-center gap-3 bg-indigo-500/8 border border-indigo-500/15 rounded-xl px-4 py-3">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm">🎯</span>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-400">השלמה משוערת</div>
+                      <div className="text-sm font-bold text-indigo-300">
+                        שנת {timeline.estimatedYear} ({timeline.elapsedMonths > 0 ? `${timeline.elapsedMonths} חודשים עברו, ` : ''}{timeline.remainingMonths} נותרו)
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-[9px] text-slate-600 mt-3">
+                  * הערכות זמנים מבוססות על ממוצעי רשויות תכנון בישראל. הזמנים בפועל עשויים להשתנות.
+                </p>
+              </div>
+            )
+          })()}
 
           {/* Two-column layout for details */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
