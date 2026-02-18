@@ -122,36 +122,29 @@ router.get('/:id/nearby', sanitizePlotId, async (req, res, next) => {
 
 // POST /api/plots/:id/view - Track a plot view (fire-and-forget, no auth needed)
 router.post('/:id/view', sanitizePlotId, async (req, res) => {
+  // Always respond immediately — view tracking is non-critical
+  res.json({ ok: true })
+
   try {
-    // Atomic increment to avoid read-then-write race condition
     const { supabaseAdmin } = await import('../config/supabase.js')
-    await supabaseAdmin.rpc('increment_views', { plot_id: req.params.id }).catch(async () => {
-      // Fallback if RPC doesn't exist: use raw update with coalesce
-      await supabaseAdmin
+    // Try RPC first (atomic increment, best approach)
+    const { error: rpcError } = await supabaseAdmin.rpc('increment_views', { plot_id: req.params.id })
+    if (rpcError) {
+      // Fallback: read-then-write (acceptable race condition for view counts)
+      const { data: plot } = await supabaseAdmin
         .from('plots')
-        .update({ views: supabaseAdmin.raw('coalesce(views, 0) + 1') })
+        .select('views')
         .eq('id', req.params.id)
-        .catch(() => {
-          // Last resort: read-then-write
-          return supabaseAdmin
-            .from('plots')
-            .select('views')
-            .eq('id', req.params.id)
-            .single()
-            .then(({ data: plot }) => {
-              if (plot) {
-                return supabaseAdmin
-                  .from('plots')
-                  .update({ views: (plot.views || 0) + 1 })
-                  .eq('id', req.params.id)
-              }
-            })
-        })
-    })
-    res.json({ ok: true })
+        .single()
+      if (plot) {
+        await supabaseAdmin
+          .from('plots')
+          .update({ views: (plot.views || 0) + 1 })
+          .eq('id', req.params.id)
+      }
+    }
   } catch {
-    // Non-critical — don't fail the request
-    res.json({ ok: true })
+    // Silently ignore — view tracking failure is not user-facing
   }
 })
 
