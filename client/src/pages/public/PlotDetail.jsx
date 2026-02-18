@@ -269,6 +269,16 @@ export default function PlotDetail() {
       setMeta('property', 'og:title', `גוש ${blockNum} חלקה ${plot.number} - ${plot.city}`)
       setMeta('property', 'og:description', desc)
       setMeta('property', 'og:url', window.location.href)
+      setMeta('property', 'og:type', 'product')
+      // OG image from first plot image — improves social sharing like Madlan
+      const images = plot.plot_images || []
+      if (images.length > 0 && images[0].url) {
+        setMeta('property', 'og:image', images[0].url)
+      }
+      // Twitter card
+      setMeta('name', 'twitter:card', 'summary_large_image')
+      setMeta('name', 'twitter:title', `גוש ${blockNum} חלקה ${plot.number} - ${plot.city}`)
+      setMeta('name', 'twitter:description', desc)
     }
     return () => { document.title = 'LandMap Israel - מפת קרקעות להשקעה' }
   }, [plot])

@@ -453,7 +453,7 @@ function PlotNavigation({ currentPlot, allPlots, onSelectPlot }) {
   )
 }
 
-export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal, favorites, compareIds = [], onToggleCompare, allPlots = [], onSelectPlot }) {
+export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal, favorites, compareIds = [], onToggleCompare, allPlots = [], onSelectPlot, priceChange }) {
   // Enrich plot data: fetch full plot when images/documents are missing (e.g. from list endpoint)
   const needsEnrich = rawPlot && !rawPlot.plot_images && !rawPlot.plot_documents
   const { data: enrichedPlot, isLoading: isEnriching } = usePlot(needsEnrich ? rawPlot.id : null)
@@ -910,6 +910,30 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 </div>
               )
             })()}
+
+            {/* Price Change Alert — like Yad2's "המחיר השתנה!" */}
+            {priceChange && (
+              <div className={`flex items-center gap-3 mt-3 p-3 rounded-xl border animate-stagger-3 ${
+                priceChange.direction === 'down'
+                  ? 'bg-green-500/10 border-green-500/20'
+                  : 'bg-red-500/10 border-red-500/20'
+              }`}>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  priceChange.direction === 'down' ? 'bg-green-500/20' : 'bg-red-500/20'
+                }`}>
+                  <span className="text-base">{priceChange.direction === 'down' ? '📉' : '📈'}</span>
+                </div>
+                <div className="min-w-0">
+                  <div className={`text-xs font-bold ${priceChange.direction === 'down' ? 'text-green-400' : 'text-red-400'}`}>
+                    {priceChange.direction === 'down' ? 'המחיר ירד!' : 'המחיר עלה'}
+                    {' '}{priceChange.pctChange}%
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    מחיר קודם: {formatCurrency(priceChange.previousPrice)}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Divider */}
             <div

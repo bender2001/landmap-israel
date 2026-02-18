@@ -22,6 +22,7 @@ import { useMetaTags } from '../../hooks/useMetaTags.js'
 import { useStructuredData } from '../../hooks/useStructuredData.js'
 import { formatCurrency, calcInvestmentScore, calcCAGR } from '../../utils/formatters.js'
 import { useViewTracker } from '../../hooks/useViewTracker.js'
+import { usePriceTracker } from '../../hooks/usePriceTracker.js'
 import { useSavedSearches } from '../../hooks/useSavedSearches.js'
 import { Phone } from 'lucide-react'
 
@@ -93,6 +94,7 @@ export default function MapView() {
   const [sortBy, setSortBy] = useState(() => searchParams.get('sort') || 'default')
   const favorites = useFavorites()
   const { trackView, isPopular } = useViewTracker()
+  const { recordPrices, getPriceChange } = usePriceTracker()
   const { searches: savedSearches, save: saveSearch, remove: removeSearch } = useSavedSearches()
 
   // Compare state (localStorage-backed, not URL to avoid conflict with filters)
@@ -148,6 +150,11 @@ export default function MapView() {
 
   const { data: plots = [], isLoading, error: plotsError, refetch: refetchPlots, isPlaceholderData, dataUpdatedAt } = useAllPlots(apiFilters)
   const { data: pois = [] } = usePois()
+
+  // Record prices for change detection (like Yad2's "המחיר ירד!" badge)
+  useEffect(() => {
+    if (plots.length > 0) recordPrices(plots)
+  }, [plots, recordPrices])
 
   // Debounce search for performance
   const debouncedSearch = useDebounce(filters.search, 250)
@@ -487,6 +494,7 @@ export default function MapView() {
             onToggleCompare={toggleCompare}
             allPlots={filteredPlots}
             onSelectPlot={handleSelectPlot}
+            priceChange={getPriceChange(selectedPlot.id)}
           />
         </Suspense>
       )}
@@ -518,6 +526,7 @@ export default function MapView() {
         onToggleCompare={toggleCompare}
         isLoading={isLoading}
         onClearFilters={handleClearFilters}
+        getPriceChange={getPriceChange}
       />
 
       <LeadModal

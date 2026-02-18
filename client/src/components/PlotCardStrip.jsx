@@ -43,7 +43,7 @@ function PlotCardSkeleton() {
   )
 }
 
-const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, prefetchPlot }) {
+const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, prefetchPlot, priceChange }) {
   const color = statusColors[plot.status]
   const price = plot.total_price ?? plot.totalPrice
   const projValue = plot.projected_value ?? plot.projectedValue
@@ -74,7 +74,7 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
       aria-label={`גוש ${blockNum} חלקה ${plot.number}, ${plot.city}, ${formatPriceShort(price)}, תשואה +${roi}%`}
     >
       {/* Freshness / popularity badges */}
-      {(isNew || isHot) && (
+      {(isNew || isHot || priceChange) && (
         <div className="absolute top-1.5 right-1.5 z-10 flex gap-1">
           {isNew && (
             <span className="px-1.5 py-0.5 text-[8px] font-black rounded-md bg-emerald-500 text-white shadow-sm shadow-emerald-500/40 leading-none">
@@ -84,6 +84,16 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
           {isHot && !isNew && (
             <span className="px-1.5 py-0.5 text-[8px] font-black rounded-md bg-orange-500 text-white shadow-sm shadow-orange-500/40 leading-none">
               🔥 פופולרי
+            </span>
+          )}
+          {priceChange && priceChange.direction === 'down' && (
+            <span className="px-1.5 py-0.5 text-[8px] font-black rounded-md bg-green-500 text-white shadow-sm shadow-green-500/40 leading-none">
+              ↓ ירד {priceChange.pctChange}%
+            </span>
+          )}
+          {priceChange && priceChange.direction === 'up' && (
+            <span className="px-1.5 py-0.5 text-[8px] font-black rounded-md bg-red-500/80 text-white shadow-sm shadow-red-500/40 leading-none">
+              ↑ עלה {priceChange.pctChange}%
             </span>
           )}
         </div>
@@ -238,7 +248,7 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
   )
 })
 
-export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare, isLoading = false, onClearFilters }) {
+export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare, isLoading = false, onClearFilters, getPriceChange }) {
   const prefetchPlot = usePrefetchPlot()
   const areaAverages = useAreaAverages(plots)
   const scrollRef = useRef(null)
@@ -407,6 +417,7 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
             onSelectPlot={onSelectPlot}
             onToggleCompare={onToggleCompare}
             prefetchPlot={prefetchPlot}
+            priceChange={getPriceChange ? getPriceChange(plot.id) : null}
           />
         ))}
       </div>
