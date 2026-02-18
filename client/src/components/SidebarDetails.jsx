@@ -2010,6 +2010,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                         alt={img.alt || `תמונה ${i + 1}`}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         loading="lazy"
+                        decoding="async"
                       />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                     </button>

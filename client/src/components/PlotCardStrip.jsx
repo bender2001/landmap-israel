@@ -193,6 +193,7 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
               alt={images[0].alt || `גוש ${blockNum}`}
               className="plot-card-mini-thumb-img"
               loading="lazy"
+              decoding="async"
               onError={(e) => {
                 // Replace broken image with styled gradient placeholder
                 e.target.style.display = 'none'

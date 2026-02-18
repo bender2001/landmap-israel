@@ -536,6 +536,7 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
                     src={img.url}
                     alt={img.alt || `גוש ${blockNum} — תמונה ${i + 1}`}
                     loading="lazy"
+                    decoding="async"
                     onError={(e) => { e.target.style.display = 'none' }}
                   />
                 </div>

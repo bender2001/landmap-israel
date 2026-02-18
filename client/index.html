@@ -19,12 +19,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Preconnect to map tile servers for faster map loads -->
-    <link rel="preconnect" href="https://server.arcgisonline.com" />
-    <link rel="preconnect" href="https://a.tile.openstreetmap.org" />
-    <link rel="preconnect" href="https://a.basemaps.cartocdn.com" />
-    <!-- Preconnect to Supabase for faster first API call -->
+    <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin />
+    <link rel="preconnect" href="https://a.tile.openstreetmap.org" crossorigin />
+    <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin />
+    <!-- DNS prefetch for tile subdomains, geocoding, and CDN -->
     <link rel="dns-prefetch" href="https://unpkg.com" />
     <link rel="dns-prefetch" href="https://server.arcgisonline.com" />
+    <link rel="dns-prefetch" href="https://b.tile.openstreetmap.org" />
+    <link rel="dns-prefetch" href="https://c.tile.openstreetmap.org" />
+    <link rel="dns-prefetch" href="https://b.basemaps.cartocdn.com" />
+    <link rel="dns-prefetch" href="https://c.basemaps.cartocdn.com" />
+    <link rel="dns-prefetch" href="https://nominatim.openstreetmap.org" />
     <link rel="canonical" href="https://landmap.co.il/" />
     <!-- Font: use fetchpriority=high since Heebo is the primary font and blocks render -->
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" as="style" fetchpriority="high" />

@@ -1,9 +1,14 @@
 import { Router } from 'express'
+import crypto from 'crypto'
 import { supabaseAdmin } from '../config/supabase.js'
 import { takeDailySnapshot, getPlotPriceHistory, getCityPriceHistory } from '../services/priceHistoryService.js'
 import { marketCache } from '../services/cacheService.js'
 import { auth } from '../middleware/auth.js'
 import { adminOnly } from '../middleware/adminOnly.js'
+
+function generateETag(data) {
+  return '"' + crypto.createHash('md5').update(JSON.stringify(data)).digest('hex').slice(0, 16) + '"'
+}
 
 const router = Router()
 
@@ -258,6 +263,101 @@ router.get('/new-listings', async (req, res, next) => {
       plotIds: (data || []).map(p => p.id),
       since: sevenDaysAgo,
     })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
+ * GET /api/market/price-changes
+ * Returns plots whose current price differs from their most recent snapshot.
+ * Enables persistent, cross-device "Price dropped!" / "Price rose!" badges.
+ * Unlike the localStorage-based usePriceTracker (per-device only), this works
+ * for any visitor and survives browser clears.
+ *
+ * Query params:
+ *   days=7    — compare to snapshot from N days ago (default 7, max 90)
+ *   minPct=3  — minimum % change to include (default 3, filters noise)
+ */
+router.get('/price-changes', async (req, res, next) => {
+  try {
+    const days = Math.min(Math.max(parseInt(req.query.days) || 7, 1), 90)
+    const minPct = Math.max(parseFloat(req.query.minPct) || 3, 0)
+    res.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=1200')
+
+    const cacheKey = `price-changes:${days}:${minPct}`
+    const changes = await marketCache.wrap(cacheKey, async () => {
+      // Get current prices for all published plots
+      const { data: plots, error: plotsErr } = await supabaseAdmin
+        .from('plots')
+        .select('id, block_number, number, city, total_price, size_sqm, status')
+        .eq('is_published', true)
+        .gt('total_price', 0)
+
+      if (plotsErr) throw plotsErr
+      if (!plots || plots.length === 0) return []
+
+      // Get the oldest snapshot within the window for each plot
+      const sinceDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      const { data: snapshots, error: snapErr } = await supabaseAdmin
+        .from('price_snapshots')
+        .select('plot_id, total_price, snapshot_date')
+        .gte('snapshot_date', sinceDate)
+        .order('snapshot_date', { ascending: true })
+
+      if (snapErr) {
+        // Table may not exist — return empty gracefully
+        if (snapErr.code === '42P01' || snapErr.message?.includes('does not exist')) return []
+        throw snapErr
+      }
+      if (!snapshots || snapshots.length === 0) return []
+
+      // Build map: plotId → earliest snapshot price in window
+      const oldestPriceMap = new Map()
+      for (const snap of snapshots) {
+        if (!oldestPriceMap.has(snap.plot_id)) {
+          oldestPriceMap.set(snap.plot_id, snap.total_price)
+        }
+      }
+
+      // Compare current vs snapshot prices
+      const result = []
+      for (const plot of plots) {
+        const oldPrice = oldestPriceMap.get(plot.id)
+        if (oldPrice == null || oldPrice <= 0) continue
+
+        const currentPrice = plot.total_price
+        const diff = currentPrice - oldPrice
+        const pctChange = Math.round(Math.abs((diff / oldPrice) * 100) * 10) / 10
+
+        if (pctChange < minPct) continue
+
+        result.push({
+          plotId: plot.id,
+          blockNumber: plot.block_number,
+          number: plot.number,
+          city: plot.city,
+          status: plot.status,
+          oldPrice,
+          currentPrice,
+          diff,
+          pctChange,
+          direction: diff < 0 ? 'down' : 'up',
+        })
+      }
+
+      // Sort by absolute % change descending (biggest changes first)
+      result.sort((a, b) => b.pctChange - a.pctChange)
+      return result
+    }, 600_000) // 10 min cache
+
+    const etag = generateETag(changes)
+    res.set('ETag', etag)
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end()
+    }
+
+    res.json(changes)
   } catch (err) {
     next(err)
   }
