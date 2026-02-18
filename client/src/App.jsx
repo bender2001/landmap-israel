@@ -15,6 +15,7 @@ const Privacy = lazy(() => import('./pages/public/Privacy'))
 const Favorites = lazy(() => import('./pages/public/Favorites'))
 const Compare = lazy(() => import('./pages/public/Compare'))
 const Calculator = lazy(() => import('./pages/public/Calculator'))
+const Areas = lazy(() => import('./pages/public/Areas'))
 const NotFound = lazy(() => import('./pages/public/NotFound'))
 
 const AdminLogin = lazy(() => import('./pages/admin/Login'))
@@ -57,6 +58,7 @@ export default function App() {
             <Route path="/favorites" element={<Favorites />} />
             <Route path="/compare" element={<Compare />} />
             <Route path="/calculator" element={<Calculator />} />
+            <Route path="/areas" element={<Areas />} />
 
             {/* Admin */}
             <Route path="/admin/login" element={<AdminLogin />} />

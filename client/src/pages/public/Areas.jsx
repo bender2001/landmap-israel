@@ -1,0 +1,246 @@
+import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
+import { MapPin, TrendingUp, Ruler, DollarSign, ArrowLeft, BarChart3, Building2, Users, ChevronDown, ChevronUp } from 'lucide-react'
+import { useAllPlots } from '../../hooks/usePlots.js'
+import PublicNav from '../../components/PublicNav.jsx'
+import PublicFooter from '../../components/PublicFooter.jsx'
+import Spinner from '../../components/ui/Spinner.jsx'
+import { formatCurrency, formatDunam } from '../../utils/formatters.js'
+import { statusColors, statusLabels, zoningLabels } from '../../utils/constants.js'
+
+function StatCard({ icon: Icon, label, value, subValue, color = 'gold' }) {
+  const colorMap = {
+    gold: 'bg-gold/15 text-gold border-gold/20',
+    green: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
+    blue: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
+    purple: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
+  }
+  return (
+    <div className="glass-panel p-4 flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${colorMap[color]}`}>
+          <Icon className="w-4 h-4" />
+        </div>
+        <span className="text-xs text-slate-400">{label}</span>
+      </div>
+      <div className="text-xl font-bold text-slate-100">{value}</div>
+      {subValue && <div className="text-[11px] text-slate-500">{subValue}</div>}
+    </div>
+  )
+}
+
+function CityCard({ city, stats, onSelect }) {
+  const [expanded, setExpanded] = useState(false)
+  const avgPriceDunam = stats.totalArea > 0 ? Math.round((stats.totalPrice / stats.totalArea) * 1000) : 0
+  const roi = stats.totalPrice > 0 ? Math.round(((stats.totalProj - stats.totalPrice) / stats.totalPrice) * 100) : 0
+
+  return (
+    <div className="glass-panel overflow-hidden">
+      {/* Header */}
+      <div
+        className="p-5 cursor-pointer hover:bg-white/[0.02] transition-colors"
+        onClick={() => setExpanded(prev => !prev)}
+      >
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gold/20 to-gold/5 border border-gold/20 flex items-center justify-center">
+              <MapPin className="w-5 h-5 text-gold" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-100">{city}</h3>
+              <span className="text-xs text-slate-400">{stats.count} חלקות</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg">
+              +{roi}% ROI ממוצע
+            </span>
+            {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+          </div>
+        </div>
+
+        {/* Quick stats row */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-white/[0.03] rounded-lg p-3 text-center">
+            <div className="text-[10px] text-slate-500 mb-1">מחיר ממוצע/דונם</div>
+            <div className="text-sm font-bold text-gold">{formatCurrency(avgPriceDunam)}</div>
+          </div>
+          <div className="bg-white/[0.03] rounded-lg p-3 text-center">
+            <div className="text-[10px] text-slate-500 mb-1">שטח כולל</div>
+            <div className="text-sm font-bold text-slate-200">{formatDunam(stats.totalArea)} דונם</div>
+          </div>
+          <div className="bg-white/[0.03] rounded-lg p-3 text-center">
+            <div className="text-[10px] text-slate-500 mb-1">זמינות</div>
+            <div className="text-sm font-bold text-emerald-400">
+              {stats.byStatus.AVAILABLE || 0}/{stats.count}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded details */}
+      {expanded && (
+        <div className="border-t border-white/5 p-5 space-y-4">
+          {/* Status breakdown */}
+          <div>
+            <h4 className="text-xs font-semibold text-slate-400 mb-2">התפלגות סטטוסים</h4>
+            <div className="flex gap-2 flex-wrap">
+              {Object.entries(stats.byStatus).map(([status, count]) => (
+                <div
+                  key={status}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs"
+                  style={{ background: `${statusColors[status]}15`, color: statusColors[status], border: `1px solid ${statusColors[status]}30` }}
+                >
+                  <span className="w-2 h-2 rounded-full" style={{ background: statusColors[status] }} />
+                  {statusLabels[status]}: {count}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Zoning breakdown */}
+          <div>
+            <h4 className="text-xs font-semibold text-slate-400 mb-2">שלבי תכנון</h4>
+            <div className="space-y-1.5">
+              {Object.entries(stats.byZoning)
+                .sort(([, a], [, b]) => b - a)
+                .map(([zoning, count]) => {
+                  const pct = Math.round((count / stats.count) * 100)
+                  return (
+                    <div key={zoning} className="flex items-center gap-2">
+                      <span className="text-[11px] text-slate-400 w-40 truncate">{zoningLabels[zoning] || zoning}</span>
+                      <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
+                        <div className="h-full rounded-full bg-gold/40" style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-[10px] text-slate-500 w-8 text-left">{count}</span>
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+
+          {/* Price range */}
+          <div>
+            <h4 className="text-xs font-semibold text-slate-400 mb-2">טווח מחירים</h4>
+            <div className="flex items-center gap-3 text-sm">
+              <span className="text-slate-400">{formatCurrency(stats.minPrice)}</span>
+              <div className="flex-1 h-1 rounded-full bg-gradient-to-r from-emerald-500/40 via-gold/40 to-red-500/40" />
+              <span className="text-slate-400">{formatCurrency(stats.maxPrice)}</span>
+            </div>
+          </div>
+
+          {/* CTA */}
+          <Link
+            to={`/?city=${encodeURIComponent(city)}`}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-gold to-gold-bright text-navy font-bold text-sm hover:shadow-lg hover:shadow-gold/20 transition-all"
+          >
+            <span>צפה בחלקות ב{city}</span>
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function Areas() {
+  const { data: plots = [], isLoading } = useAllPlots({})
+
+  const cityData = useMemo(() => {
+    if (!plots || plots.length === 0) return []
+
+    const cities = {}
+    plots.forEach(p => {
+      const city = p.city || 'אחר'
+      if (!cities[city]) {
+        cities[city] = {
+          count: 0, totalPrice: 0, totalProj: 0, totalArea: 0,
+          byStatus: {}, byZoning: {}, prices: [], minPrice: Infinity, maxPrice: 0,
+        }
+      }
+      const c = cities[city]
+      const price = p.total_price ?? p.totalPrice ?? 0
+      const proj = p.projected_value ?? p.projectedValue ?? 0
+      const size = p.size_sqm ?? p.sizeSqM ?? 0
+      const zoning = p.zoning_stage ?? p.zoningStage ?? 'UNKNOWN'
+
+      c.count += 1
+      c.totalPrice += price
+      c.totalProj += proj
+      c.totalArea += size
+      c.byStatus[p.status] = (c.byStatus[p.status] || 0) + 1
+      c.byZoning[zoning] = (c.byZoning[zoning] || 0) + 1
+      c.prices.push(price)
+      if (price > 0 && price < c.minPrice) c.minPrice = price
+      if (price > c.maxPrice) c.maxPrice = price
+    })
+
+    return Object.entries(cities)
+      .map(([city, stats]) => ({ city, stats }))
+      .sort((a, b) => b.stats.count - a.stats.count)
+  }, [plots])
+
+  // Global stats
+  const globalStats = useMemo(() => {
+    if (!plots || plots.length === 0) return null
+    const totalArea = plots.reduce((s, p) => s + (p.size_sqm ?? p.sizeSqM ?? 0), 0)
+    const totalPrice = plots.reduce((s, p) => s + (p.total_price ?? p.totalPrice ?? 0), 0)
+    const totalProj = plots.reduce((s, p) => s + (p.projected_value ?? p.projectedValue ?? 0), 0)
+    const available = plots.filter(p => p.status === 'AVAILABLE').length
+    const avgRoi = totalPrice > 0 ? Math.round(((totalProj - totalPrice) / totalPrice) * 100) : 0
+    return { total: plots.length, totalArea, totalPrice, available, avgRoi, cities: cityData.length }
+  }, [plots, cityData])
+
+  return (
+    <div className="min-h-screen bg-navy" dir="rtl">
+      <PublicNav />
+
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {/* Hero */}
+        <div className="text-center mb-10">
+          <h1 className="text-3xl sm:text-4xl font-black text-slate-100 mb-3">
+            <span className="brand-text">סקירת אזורים</span>
+          </h1>
+          <p className="text-slate-400 max-w-lg mx-auto text-sm leading-relaxed">
+            השוואת נתוני נדל"ן בין ערים — מחירים, תשואות, שלבי תכנון וזמינות.
+            כמו מדל"ן, רק עבור קרקעות להשקעה.
+          </p>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-20">
+            <Spinner className="w-10 h-10 text-gold" />
+          </div>
+        ) : (
+          <>
+            {/* Global stats */}
+            {globalStats && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+                <StatCard icon={Building2} label="סה״כ חלקות" value={globalStats.total} color="gold" />
+                <StatCard icon={Ruler} label="שטח כולל" value={`${formatDunam(globalStats.totalArea)} דונם`} color="blue" />
+                <StatCard icon={TrendingUp} label="ROI ממוצע" value={`+${globalStats.avgRoi}%`} color="green" />
+                <StatCard icon={DollarSign} label="שווי כולל" value={formatCurrency(globalStats.totalPrice)} subValue={`${globalStats.available} זמינות`} color="purple" />
+              </div>
+            )}
+
+            {/* City cards */}
+            <div className="space-y-4">
+              {cityData.map(({ city, stats }) => (
+                <CityCard key={city} city={city} stats={stats} />
+              ))}
+            </div>
+
+            {cityData.length === 0 && (
+              <div className="text-center py-20">
+                <div className="text-4xl mb-4">🏜️</div>
+                <div className="text-slate-400">אין נתונים להצגה</div>
+              </div>
+            )}
+          </>
+        )}
+      </main>
+
+      <PublicFooter />
+    </div>
+  )
+}

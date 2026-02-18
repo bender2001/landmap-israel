@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Map, Heart, Info, Phone, Menu, X } from 'lucide-react'
+import { Map, Heart, Info, Phone, Menu, X, BarChart3 } from 'lucide-react'
 import { useFavorites } from '../hooks/useFavorites'
 
 const navLinks = [
+  { to: '/areas', icon: BarChart3, label: 'אזורים' },
   { to: '/about', icon: Info, label: 'אודות' },
   { to: '/contact', icon: Phone, label: 'צור קשר' },
   { to: '/favorites', icon: Heart, label: 'מועדפים' },

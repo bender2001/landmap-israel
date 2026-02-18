@@ -14,6 +14,7 @@ import plotRoutes from './routes/plots.js'
 import leadRoutes from './routes/leads.js'
 import chatRoutes from './routes/chat.js'
 import poiRoutes from './routes/pois.js'
+import marketRoutes from './routes/market.js'
 import adminPlotRoutes from './routes/admin/plots.js'
 import adminLeadRoutes from './routes/admin/leads.js'
 import adminDashboardRoutes from './routes/admin/dashboard.js'
@@ -87,6 +88,7 @@ app.use('/api/plots', plotRoutes)
 app.use('/api/leads', leadRoutes)
 app.use('/api/chat', chatRoutes)
 app.use('/api/pois', poiRoutes)
+app.use('/api/market', marketRoutes)
 
 // ─── Admin routes ───
 app.use('/api/admin/plots', adminPlotRoutes)
