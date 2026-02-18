@@ -24,6 +24,7 @@ import { useRealtimeUpdates } from '../../hooks/useRealtimeUpdates.js'
 import IdleRender from '../../components/ui/IdleRender.jsx'
 import { useRefreshOnReturn } from '../../hooks/usePageVisibility.js'
 import { useLocalStorage } from '../../hooks/useLocalStorage.js'
+import { usePriceChanges } from '../../hooks/usePriceChanges.js'
 
 // Lazy-load non-critical widgets — they're not needed for first paint.
 // This reduces the MapView initial JS from ~126KB to ~95KB, cutting Time to Interactive.
@@ -36,6 +37,7 @@ const FirstVisitHints = lazy(() => import('../../components/FirstVisitHints.jsx'
 const AlertSubscription = lazy(() => import('../../components/AlertSubscription.jsx'))
 const FeaturedDeals = lazy(() => import('../../components/FeaturedDeals.jsx'))
 const MarketTicker = lazy(() => import('../../components/MarketTicker.jsx'))
+const PriceMovers = lazy(() => import('../../components/PriceMovers.jsx'))
 
 function DataFreshnessIndicator({ updatedAt, onRefresh }) {
   const [, setTick] = useState(0)
@@ -510,6 +512,19 @@ export default function MapView() {
     )
   }, [])
 
+  // Server-side price changes — persistent cross-device "Price dropped!" badges.
+  // Unlike the localStorage-based usePriceTracker which is per-browser only,
+  // this uses price_snapshots table for reliable, cross-device change detection.
+  // Falls back to client-side tracker when server data is unavailable.
+  const { data: serverPriceChanges } = usePriceChanges({ days: 14, minPct: 3 })
+  const getMergedPriceChange = useCallback((plotId) => {
+    // Prefer server-side change (persistent, cross-device)
+    const serverChange = serverPriceChanges.get(plotId)
+    if (serverChange) return serverChange
+    // Fallback to client-side localStorage tracker
+    return getPriceChange(plotId)
+  }, [serverPriceChanges, getPriceChange])
+
   // Real-time updates via SSE — auto-refresh when admin changes plots
   useRealtimeUpdates()
 
@@ -774,7 +789,7 @@ export default function MapView() {
             onToggleCompare={toggleCompare}
             allPlots={filteredPlots}
             onSelectPlot={handleSelectPlot}
-            priceChange={getPriceChange(selectedPlot.id)}
+            priceChange={getMergedPriceChange(selectedPlot.id)}
           />
         </Suspense>
       )}
@@ -827,7 +842,7 @@ export default function MapView() {
         onToggleCompare={toggleCompare}
         isLoading={isLoading}
         onClearFilters={handleClearFilters}
-        getPriceChange={getPriceChange}
+        getPriceChange={getMergedPriceChange}
       />
 
       <Suspense fallback={null}>
@@ -859,6 +874,18 @@ export default function MapView() {
         <Suspense fallback={null}>
           <WidgetErrorBoundary name="FeaturedDeals" silent>
             <FeaturedDeals onSelectPlot={handleSelectPlot} selectedPlot={selectedPlot} />
+          </WidgetErrorBoundary>
+        </Suspense>
+      </IdleRender>
+
+      {/* Price Movers widget — shows plots with recent price changes (drops & rises).
+          Like Yad2's "המחיר ירד!" but as a standalone discovery widget.
+          Uses server-side price_snapshots for cross-device persistence.
+          Deferred via IdleRender — supplementary feature, not critical for first paint. */}
+      <IdleRender>
+        <Suspense fallback={null}>
+          <WidgetErrorBoundary name="PriceMovers" silent>
+            <PriceMovers onSelectPlot={handleSelectPlot} plots={filteredPlots} />
           </WidgetErrorBoundary>
         </Suspense>
       </IdleRender>

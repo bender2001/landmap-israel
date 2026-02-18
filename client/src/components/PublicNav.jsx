@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Map, Heart, Info, Phone, Menu, X, BarChart3, Calculator } from 'lucide-react'
+import { Map, Heart, Info, Phone, Menu, X, BarChart3, Calculator, GitCompareArrows } from 'lucide-react'
 import { useFavorites } from '../hooks/useFavorites'
+import { useLocalStorage } from '../hooks/useLocalStorage'
 
 const navLinks = [
   { to: '/areas', icon: BarChart3, label: 'אזורים' },
+  { to: '/compare', icon: GitCompareArrows, label: 'השוואה', badge: 'compare' },
   { to: '/calculator', icon: Calculator, label: 'מחשבון' },
   { to: '/about', icon: Info, label: 'אודות' },
   { to: '/contact', icon: Phone, label: 'צור קשר' },
@@ -14,6 +16,7 @@ const navLinks = [
 export default function PublicNav() {
   const location = useLocation()
   const { favorites } = useFavorites()
+  const [compareIds] = useLocalStorage('landmap_compare', [])
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
   const hamburgerRef = useRef(null)
@@ -77,9 +80,11 @@ export default function PublicNav() {
 
           {/* Desktop nav links */}
           <div className="nav-desktop-links flex items-center gap-1">
-            {navLinks.map(({ to, icon: Icon, label }) => {
+            {navLinks.map(({ to, icon: Icon, label, badge }) => {
               const isActive = location.pathname === to
               const isFav = to === '/favorites'
+              const isCompare = badge === 'compare'
+              const badgeCount = isFav ? favorites.length : isCompare ? compareIds.length : 0
               return (
                 <Link
                   key={to}
@@ -93,9 +98,11 @@ export default function PublicNav() {
                 >
                   <Icon className="w-4 h-4" />
                   <span className="hidden sm:inline">{label}</span>
-                  {isFav && favorites.length > 0 && (
-                    <span className="absolute -top-1 -left-1 w-4.5 h-4.5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center min-w-[18px] h-[18px]">
-                      {favorites.length}
+                  {badgeCount > 0 && (
+                    <span className={`absolute -top-1 -left-1 text-white text-[9px] font-bold rounded-full flex items-center justify-center min-w-[18px] h-[18px] ${
+                      isFav ? 'bg-red-500' : 'bg-purple-500'
+                    }`}>
+                      {badgeCount}
                     </span>
                   )}
                 </Link>
