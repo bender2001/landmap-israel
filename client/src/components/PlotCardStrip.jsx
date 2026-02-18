@@ -8,6 +8,7 @@ import { calcTransactionCosts } from '../utils/plot'
 import { usePrefetchPlot } from '../hooks/usePlots'
 import { useAreaAverages } from '../hooks/useAreaAverages'
 import { whatsappShareLink, useNativeShare, buildPlotShareData } from '../utils/config'
+import { useDragScroll } from '../hooks/useDragScroll'
 
 /**
  * Compute price-per-sqm percentile for each plot relative to all plots.
@@ -482,6 +483,11 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
   // "Best in category" badges — highlight top deals in filtered results (like Madlan's deal indicators)
   const bestInCategory = useMemo(() => calcBestInCategory(plots), [plots])
   const scrollRef = useRef(null)
+
+  // Desktop drag-to-scroll — like Madlan/Airbnb card strips where you grab and drag.
+  // Includes momentum/inertia scrolling and prevents accidental card clicks during drag.
+  useDragScroll(scrollRef)
+
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
   const [scrollProgress, setScrollProgress] = useState(0) // 0-100%

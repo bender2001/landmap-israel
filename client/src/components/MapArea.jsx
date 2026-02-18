@@ -1151,6 +1151,119 @@ function MobileLegend({ colorMode, statusFilter, onToggleStatus, statusCounts })
   )
 }
 
+/**
+ * PolygonCenterLabels — at zoom ≥ 15, renders an investment grade label (A/B/C/D)
+ * and compact price at the centroid of each visible polygon.
+ * Like Madlan's on-map price badges that appear when you zoom in — gives immediate
+ * context without hovering. Uses L.divIcon for lightweight DOM markers.
+ * Only renders for plots visible in the viewport (leverages ViewportCulledPolygons' pattern).
+ */
+function PolygonCenterLabels({ plots }) {
+  const map = useMap()
+  const [zoom, setZoom] = useState(map.getZoom())
+  const markersRef = useRef([])
+
+  useEffect(() => {
+    const handler = () => setZoom(map.getZoom())
+    map.on('zoomend', handler)
+    return () => map.off('zoomend', handler)
+  }, [map])
+
+  // Only show labels at zoom ≥ 15 (when polygons are large enough to read)
+  const showLabels = zoom >= 15
+
+  // Precompute label data
+  const labelData = useMemo(() => {
+    if (!showLabels) return []
+    return plots
+      .filter(p => hasValidCoordinates(p))
+      .map(p => {
+        const coords = p.coordinates
+        const lat = coords.reduce((s, c) => s + c[0], 0) / coords.length
+        const lng = coords.reduce((s, c) => s + c[1], 0) / coords.length
+        const price = p.total_price ?? p.totalPrice ?? 0
+        const grade = getInvestmentGrade(p)
+        const shortPrice = price >= 1000000
+          ? `${(price / 1000000).toFixed(1)}M`
+          : price >= 1000
+            ? `${Math.round(price / 1000)}K`
+            : `${price}`
+        return { id: p.id, lat, lng, grade, shortPrice, status: p.status }
+      })
+  }, [plots, showLabels])
+
+  const gradeColors = useMemo(() => ({
+    'A+': '#22C55E', A: '#4ADE80', 'B+': '#84CC16', B: '#EAB308',
+    'C+': '#F59E0B', C: '#F97316', D: '#EF4444',
+  }), [])
+
+  // Render visible labels within padded viewport bounds
+  const renderLabels = useCallback(() => {
+    markersRef.current.forEach(m => m.remove())
+    markersRef.current = []
+
+    if (!showLabels || labelData.length === 0) return
+
+    const bounds = map.getBounds()
+    const padLat = (bounds.getNorth() - bounds.getSouth()) * 0.1
+    const padLng = (bounds.getEast() - bounds.getWest()) * 0.1
+    const north = bounds.getNorth() + padLat
+    const south = bounds.getSouth() - padLat
+    const east = bounds.getEast() + padLng
+    const west = bounds.getWest() - padLng
+
+    for (const d of labelData) {
+      if (d.lat < south || d.lat > north || d.lng < west || d.lng > east) continue
+
+      const color = gradeColors[d.grade] || '#94A3B8'
+      const isSold = d.status === 'SOLD'
+
+      const icon = L.divIcon({
+        className: 'polygon-center-label',
+        html: `<div style="
+          display:flex;flex-direction:column;align-items:center;gap:1px;
+          pointer-events:none;transform:translate(-50%,-50%);
+          ${isSold ? 'opacity:0.4;' : ''}
+        ">
+          <span style="
+            font-size:11px;font-weight:800;line-height:1;
+            color:${color};text-shadow:0 1px 3px rgba(0,0,0,0.8);
+            letter-spacing:0.5px;
+          ">${d.grade}</span>
+          <span style="
+            font-size:9px;font-weight:600;line-height:1;
+            color:rgba(255,255,255,0.7);text-shadow:0 1px 2px rgba(0,0,0,0.7);
+          ">₪${d.shortPrice}</span>
+        </div>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      })
+
+      const marker = L.marker([d.lat, d.lng], {
+        icon,
+        interactive: false,
+        keyboard: false,
+        zIndexOffset: -1000,
+      }).addTo(map)
+
+      markersRef.current.push(marker)
+    }
+  }, [map, labelData, showLabels, gradeColors])
+
+  // Render on data change + re-render on map pan/zoom for viewport culling
+  useEffect(() => {
+    renderLabels()
+    map.on('moveend', renderLabels)
+    return () => {
+      map.off('moveend', renderLabels)
+      markersRef.current.forEach(m => m.remove())
+      markersRef.current = []
+    }
+  }, [map, renderLabels])
+
+  return null
+}
+
 export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites, compareIds = [], onToggleCompare, onClearFilters, onFilterChange, onSearchArea, autoSearch = false, onToggleAutoSearch }) {
   const [hoveredId, setHoveredId] = useState(null)
   const [activeLayerId, setActiveLayerId] = useState('satellite')
@@ -1240,6 +1353,10 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         <GeoSearch />
         {onSearchArea && <SearchThisAreaButton onSearchArea={onSearchArea} autoSearch={autoSearch} onToggleAutoSearch={onToggleAutoSearch} />}
         <MapViewportCounter plots={plots} totalCount={plots.length} />
+
+        {/* Polygon center labels — investment grade + price shown at zoom ≥ 15.
+            Like Madlan's on-map price badges that appear when you zoom in. */}
+        <PolygonCenterLabels plots={plots} />
 
         {/* Viewport-culled polygons: only renders plots visible in the current map viewport.
             Dramatically improves performance with many plots by avoiding off-screen SVG paths. */}
