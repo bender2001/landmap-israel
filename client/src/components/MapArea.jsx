@@ -1366,6 +1366,149 @@ function PolygonCenterLabels({ plots }) {
   return null
 }
 
+/**
+ * CityAggregateLabels — at zoom < 13, renders floating city bubbles showing:
+ * - City name
+ * - Number of available plots
+ * - Average price per dunam
+ * - Average ROI %
+ *
+ * Like Madlan's area overlays that show "חדרה (15 נכסים)" before you zoom in.
+ * Gives investors a macro view of where the opportunities are concentrated.
+ * Hidden at zoom ≥ 13 where individual polygon labels take over.
+ */
+function CityAggregateLabels({ plots }) {
+  const map = useMap()
+  const [zoom, setZoom] = useState(map.getZoom())
+  const markersRef = useRef([])
+
+  useEffect(() => {
+    const handler = () => setZoom(map.getZoom())
+    map.on('zoomend', handler)
+    return () => map.off('zoomend', handler)
+  }, [map])
+
+  // Only show at low zoom (before individual labels kick in)
+  const showLabels = zoom < 13
+
+  // Aggregate stats per city with centroid
+  const cityData = useMemo(() => {
+    if (!showLabels || !plots || plots.length === 0) return []
+    const cities = {}
+    for (const p of plots) {
+      const city = p.city
+      if (!city) continue
+      if (!cities[city]) {
+        cities[city] = { city, count: 0, available: 0, totalPrice: 0, totalSize: 0, totalRoi: 0, roiCount: 0, lats: [], lngs: [] }
+      }
+      const c = cities[city]
+      c.count++
+      if (p.status === 'AVAILABLE') c.available++
+      const price = p.total_price ?? p.totalPrice ?? 0
+      const size = p.size_sqm ?? p.sizeSqM ?? 0
+      const proj = p.projected_value ?? p.projectedValue ?? 0
+      c.totalPrice += price
+      c.totalSize += size
+      if (price > 0) {
+        c.totalRoi += ((proj - price) / price) * 100
+        c.roiCount++
+      }
+      // Compute centroid from all plot coordinates in this city
+      if (p.coordinates && Array.isArray(p.coordinates)) {
+        for (const coord of p.coordinates) {
+          if (Array.isArray(coord) && coord.length >= 2 && isFinite(coord[0]) && isFinite(coord[1])) {
+            c.lats.push(coord[0])
+            c.lngs.push(coord[1])
+          }
+        }
+      }
+    }
+    return Object.values(cities)
+      .filter(c => c.lats.length > 0 && c.count >= 1)
+      .map(c => ({
+        city: c.city,
+        lat: c.lats.reduce((s, v) => s + v, 0) / c.lats.length,
+        lng: c.lngs.reduce((s, v) => s + v, 0) / c.lngs.length,
+        count: c.count,
+        available: c.available,
+        avgPricePerDunam: c.totalSize > 0 ? Math.round((c.totalPrice / c.totalSize) * 1000) : 0,
+        avgRoi: c.roiCount > 0 ? Math.round(c.totalRoi / c.roiCount) : 0,
+      }))
+  }, [plots, showLabels])
+
+  const renderLabels = useCallback(() => {
+    markersRef.current.forEach(m => m.remove())
+    markersRef.current = []
+
+    if (!showLabels || cityData.length === 0) return
+
+    for (const d of cityData) {
+      const priceK = d.avgPricePerDunam >= 1000000
+        ? `${(d.avgPricePerDunam / 1000000).toFixed(1)}M`
+        : d.avgPricePerDunam >= 1000
+          ? `${Math.round(d.avgPricePerDunam / 1000)}K`
+          : `${d.avgPricePerDunam}`
+      const roiColor = d.avgRoi >= 100 ? '#22C55E' : d.avgRoi >= 50 ? '#EAB308' : '#F97316'
+
+      const icon = L.divIcon({
+        className: 'city-aggregate-label',
+        html: `<div style="
+          display:flex;flex-direction:column;align-items:center;gap:2px;
+          pointer-events:auto;cursor:pointer;transform:translate(-50%,-50%);
+          background:rgba(5,13,26,0.85);backdrop-filter:blur(8px);
+          border:1px solid rgba(200,148,42,0.25);border-radius:12px;
+          padding:6px 10px;min-width:80px;
+          box-shadow:0 4px 12px rgba(0,0,0,0.4);
+          transition:transform 0.2s,border-color 0.2s;
+        " onmouseenter="this.style.transform='translate(-50%,-50%) scale(1.08)';this.style.borderColor='rgba(200,148,42,0.5)'"
+           onmouseleave="this.style.transform='translate(-50%,-50%) scale(1)';this.style.borderColor='rgba(200,148,42,0.25)'"
+        >
+          <span style="font-size:12px;font-weight:700;color:#E5B94E;line-height:1;">${d.city}</span>
+          <span style="font-size:10px;color:rgba(241,245,249,0.7);line-height:1;">
+            ${d.available} זמינות מתוך ${d.count}
+          </span>
+          <div style="display:flex;gap:8px;margin-top:2px;">
+            <span style="font-size:9px;color:rgba(241,245,249,0.5);line-height:1;" title="ממוצע מחיר/דונם">
+              💰 ₪${priceK}/דונם
+            </span>
+            <span style="font-size:9px;color:${roiColor};line-height:1;font-weight:600;" title="ממוצע תשואה">
+              📈 +${d.avgRoi}%
+            </span>
+          </div>
+        </div>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      })
+
+      const marker = L.marker([d.lat, d.lng], {
+        icon,
+        interactive: true,
+        keyboard: false,
+        zIndexOffset: 500,
+      }).addTo(map)
+
+      // Click to zoom into the city
+      marker.on('click', () => {
+        map.flyTo([d.lat, d.lng], 13, { duration: 1.2 })
+      })
+
+      markersRef.current.push(marker)
+    }
+  }, [map, cityData, showLabels])
+
+  useEffect(() => {
+    renderLabels()
+    map.on('moveend', renderLabels)
+    return () => {
+      map.off('moveend', renderLabels)
+      markersRef.current.forEach(m => m.remove())
+      markersRef.current = []
+    }
+  }, [map, renderLabels])
+
+  return null
+}
+
 export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites, compareIds = [], onToggleCompare, onClearFilters, onFilterChange, onSearchArea, autoSearch = false, onToggleAutoSearch }) {
   const [hoveredId, setHoveredId] = useState(null)
   const [activeLayerId, setActiveLayerId] = useState('satellite')
@@ -1455,6 +1598,11 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         <GeoSearch />
         {onSearchArea && <SearchThisAreaButton onSearchArea={onSearchArea} autoSearch={autoSearch} onToggleAutoSearch={onToggleAutoSearch} />}
         <MapViewportCounter plots={plots} totalCount={plots.length} />
+
+        {/* City aggregate labels — floating bubbles at low zoom (< 13) showing
+            city name, available count, avg price/dunam, and avg ROI.
+            Like Madlan's area overlays. Click to zoom into the city. */}
+        <CityAggregateLabels plots={plots} />
 
         {/* Polygon center labels — investment grade + price shown at zoom ≥ 15.
             Like Madlan's on-map price badges that appear when you zoom in. */}

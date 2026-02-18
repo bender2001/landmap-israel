@@ -921,6 +921,33 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
           <div style="font-size:10px;color:#aaa;text-align:center;margin-top:8px">* הערכה בלבד — זמני נסיעה משתנים לפי תנועה ומסלול</div>
         </div>`
       })()}
+      ${(() => {
+        // Alternative investments comparison — shows what the same money would earn
+        // in stocks, bonds, savings, and S&P500 vs this land plot.
+        // Professional investors always compare across asset classes.
+        const altReturns = calcAlternativeReturns(price, roi, readiness)
+        if (!altReturns || altReturns.length === 0) return ''
+        return `<div class="section">
+          <h2>השוואת חלופות השקעה 📊</h2>
+          <div style="font-size:11px;color:#666;margin-bottom:12px">
+            מה היית מרוויח אם היית משקיע ${formatCurrency(price)} באפיק אחר?
+          </div>
+          <div class="grid" style="grid-template-columns: repeat(2, 1fr);">
+            ${altReturns.map(alt => {
+              const isPlot = alt.name === 'קרקע זו' || alt.isPlot
+              const valColor = isPlot ? '#C8942A' : alt.finalValue > price ? '#22C55E' : '#94A3B8'
+              return `<div class="card" style="${isPlot ? 'border:2px solid #C8942A;background:#FFF8E7' : ''}">
+                <div class="label">${alt.emoji || '💼'} ${alt.name}</div>
+                <div class="value" style="font-size:15px;color:${valColor}">${formatCurrency(Math.round(alt.finalValue))}</div>
+                <div style="font-size:10px;color:${alt.totalReturn > 0 ? '#22C55E' : '#EF4444'};margin-top:2px;">
+                  ${alt.totalReturn > 0 ? '+' : ''}${Math.round(alt.totalReturn)}% (${alt.cagr || alt.annualReturn || '—'}%/שנה)
+                </div>
+              </div>`
+            }).join('')}
+          </div>
+          <div style="font-size:10px;color:#aaa;text-align:center;margin-top:8px">* תשואות היסטוריות — אינן מבטיחות תשואה עתידית</div>
+        </div>`
+      })()}
       <div class="footer">
         <div>LandMap Israel — מפת קרקעות להשקעה</div>
         <div>הופק ב-${new Date().toLocaleDateString('he-IL')} ${new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</div>
