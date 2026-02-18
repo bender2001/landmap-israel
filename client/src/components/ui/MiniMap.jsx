@@ -1,7 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { MapContainer, TileLayer, Polygon, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Eye, Map as MapIcon } from 'lucide-react'
 import { statusColors } from '../../utils/constants'
 
 // Gold pin icon
@@ -34,7 +34,8 @@ function FitBounds({ bounds }) {
  * - interactive: allow zoom/pan (default false)
  * - height: css height (default '200px')
  */
-export default function MiniMap({ coordinates, status, city, className = '', interactive = false, height = '200px' }) {
+export default function MiniMap({ coordinates, status, city, className = '', interactive = false, height = '200px', showStreetViewToggle = false }) {
+  const [viewMode, setViewMode] = useState('map') // 'map' | 'streetview'
   const validCoords = useMemo(() => {
     if (!coordinates || !Array.isArray(coordinates)) return []
     return coordinates.filter(c => Array.isArray(c) && c.length >= 2 && isFinite(c[0]) && isFinite(c[1]))
@@ -57,9 +58,51 @@ export default function MiniMap({ coordinates, status, city, className = '', int
   if (validCoords.length === 0) return null
 
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${center[0]},${center[1]}`
+  const streetViewEmbedUrl = `https://maps.google.com/maps?q=&layer=c&cbll=${center[0]},${center[1]}&cbp=11,0,0,0,0&ie=UTF8&source=embed&output=svembed`
 
   return (
     <div className={`relative rounded-2xl overflow-hidden border border-white/10 group ${className}`} style={{ height }}>
+      {/* Street View / Map toggle */}
+      {showStreetViewToggle && (
+        <div className="absolute top-3 left-3 z-20 flex bg-navy/80 backdrop-blur-sm rounded-lg border border-white/10 overflow-hidden">
+          <button
+            onClick={() => setViewMode('map')}
+            className={`flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-medium transition-all ${
+              viewMode === 'map'
+                ? 'bg-gold/20 text-gold'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="מפה"
+          >
+            <MapIcon className="w-3 h-3" />
+            מפה
+          </button>
+          <button
+            onClick={() => setViewMode('streetview')}
+            className={`flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-medium transition-all ${
+              viewMode === 'streetview'
+                ? 'bg-gold/20 text-gold'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="Street View"
+          >
+            <Eye className="w-3 h-3" />
+            רחוב
+          </button>
+        </div>
+      )}
+
+      {/* Street View iframe */}
+      {viewMode === 'streetview' && showStreetViewToggle ? (
+        <iframe
+          src={streetViewEmbedUrl}
+          className="w-full h-full border-0"
+          allowFullScreen
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          title="Google Street View"
+        />
+      ) : (
       <MapContainer
         center={center}
         zoom={15}
@@ -95,6 +138,8 @@ export default function MiniMap({ coordinates, status, city, className = '', int
         )}
         <Marker position={center} icon={pinIcon} />
       </MapContainer>
+
+      )}
 
       {/* Overlay gradient */}
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-navy/60 via-transparent to-transparent" />
