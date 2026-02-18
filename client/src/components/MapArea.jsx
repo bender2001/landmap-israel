@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, ZoomControl, useMap, LayersControl } from 'react-leaflet'
+﻿import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, ZoomControl, useMap, LayersControl } from 'react-leaflet'
 import L from 'leaflet'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { MapPin, Eye, Check, ArrowLeft, Navigation, Layers, Map as MapIcon } from 'lucide-react'
@@ -88,7 +88,7 @@ function MapLayerSwitcher({ activeLayer, onChangeLayer }) {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
-    <div className="absolute top-4 right-4 z-[30] pointer-events-none">
+    <div className="absolute top-4 right-4 z-[1000] pointer-events-none">
       <div className="pointer-events-auto relative">
         <button
           onClick={() => setIsOpen(prev => !prev)}
@@ -137,7 +137,7 @@ function LocateButton() {
   }
 
   return (
-    <div className="absolute bottom-48 sm:bottom-40 left-4 z-[20] pointer-events-none">
+    <div className="absolute bottom-48 sm:bottom-40 left-4 z-[1000] pointer-events-none">
       <button
         onClick={handleLocate}
         disabled={locating}
@@ -166,7 +166,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
   const activeLayer = MAP_LAYERS.find(l => l.id === activeLayerId) || MAP_LAYERS[0]
 
   return (
-    <div className="h-full w-full relative z-0">
+    <div className="h-full w-full relative">
       <MapContainer
         center={[32.45, 34.87]}
         zoom={10}
@@ -299,7 +299,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
       <div className="map-noise" />
 
       {/* Top-left: Brand badge — compact on mobile */}
-      <div className="absolute top-4 left-4 z-[30] pointer-events-none hidden sm:block">
+      <div className="absolute top-4 left-4 z-[1000] pointer-events-none hidden sm:block">
         <div className="glass-panel px-4 py-3 pointer-events-auto">
           <div className="flex items-center gap-2">
             <span className="text-lg">🏗️</span>
@@ -311,7 +311,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         </div>
       </div>
       {/* Mobile brand badge — smaller, bottom-left above zoom */}
-      <div className="absolute top-3 left-3 z-[25] pointer-events-none sm:hidden">
+      <div className="absolute top-3 left-3 z-[1000] pointer-events-none sm:hidden">
         <div className="glass-panel px-2.5 py-1.5 pointer-events-auto">
           <div className="flex items-center gap-1.5">
             <span className="text-sm">🏗️</span>
@@ -321,7 +321,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
       </div>
 
       {/* Bottom-right: Interactive Legend — hidden on mobile, positioned above card strip */}
-      <div className="absolute bottom-36 right-4 z-[20] pointer-events-none hidden sm:block">
+      <div className="absolute bottom-36 right-4 z-[1000] pointer-events-none hidden sm:block">
         <div className="glass-panel px-3 py-2.5 pointer-events-auto">
           <div className="flex flex-col gap-0.5">
             {Object.entries(statusColors).map(([status, color]) => {
@@ -347,7 +347,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
       </div>
 
       {/* Bottom-left (above zoom): Plot count badge — repositioned on mobile */}
-      <div className="absolute bottom-24 sm:bottom-24 left-4 z-[30] pointer-events-none hidden sm:flex">
+      <div className="absolute bottom-24 sm:bottom-24 left-4 z-[1000] pointer-events-none hidden sm:flex">
         <div className="glass-panel px-3 py-1.5 pointer-events-auto flex items-center gap-1.5">
           <Eye className="w-3.5 h-3.5 text-gold" />
           <span className="text-xs text-slate-300">{plots.length} חלקות</span>
@@ -356,7 +356,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
 
       {/* Empty state */}
       {plots.length === 0 && (
-        <div className="absolute inset-0 z-[20] flex items-center justify-center pointer-events-none">
+        <div className="absolute inset-0 z-[1000] flex items-center justify-center pointer-events-none">
           <div className="glass-panel px-8 py-8 text-center pointer-events-auto max-w-xs">
             <div className="text-4xl mb-4">🏜️</div>
             <div className="text-base font-bold text-slate-200 mb-2">לא נמצאו חלקות</div>
