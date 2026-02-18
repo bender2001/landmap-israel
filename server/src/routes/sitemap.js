@@ -26,6 +26,7 @@ router.get('/sitemap.xml', async (req, res) => {
     // Static pages
     const staticPages = [
       { path: '/', priority: '1.0', changefreq: 'daily' },
+      { path: '/areas', priority: '0.8', changefreq: 'weekly' },
       { path: '/about', priority: '0.5', changefreq: 'monthly' },
       { path: '/contact', priority: '0.5', changefreq: 'monthly' },
       { path: '/calculator', priority: '0.6', changefreq: 'monthly' },
@@ -45,12 +46,20 @@ router.get('/sitemap.xml', async (req, res) => {
     <priority>${p.priority}</priority>
   </url>`),
 
-      // City filter pages (like Madlan's /hadera, /netanya etc.)
+      // Dedicated city area pages (like Madlan's /hadera, /netanya etc.)
+      ...cities.map(city => `
+  <url>
+    <loc>${baseUrl}/areas/${encodeURIComponent(city)}</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>`),
+
+      // City filter map views
       ...cities.map(city => `
   <url>
     <loc>${baseUrl}/?city=${encodeURIComponent(city)}</loc>
     <changefreq>daily</changefreq>
-    <priority>0.8</priority>
+    <priority>0.7</priority>
   </url>`),
 
       // Individual plot pages

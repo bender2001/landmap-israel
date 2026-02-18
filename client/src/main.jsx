@@ -26,9 +26,20 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: 2,
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
       refetchOnWindowFocus: true,
       staleTime: 30_000,
+      gcTime: 10 * 60_000,
+      // 'offlineFirst' — serve stale cache instantly while revalidating in background.
+      // Critical for real estate apps where users switch between map/detail/compare
+      // and expect instant navigation. Like Madlan's seamless page transitions.
+      networkMode: 'offlineFirst',
+      // Refetch on reconnect — catches up after offline periods
+      refetchOnReconnect: 'always',
+    },
+    mutations: {
+      networkMode: 'offlineFirst',
     },
   },
 })

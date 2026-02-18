@@ -22,6 +22,7 @@ const Favorites = lazy(() => import('./pages/public/Favorites'))
 const Compare = lazy(() => import('./pages/public/Compare'))
 const Calculator = lazy(() => import('./pages/public/Calculator'))
 const Areas = lazy(() => import('./pages/public/Areas'))
+const AreaCity = lazy(() => import('./pages/public/AreaCity'))
 const Pricing = lazy(() => import('./pages/public/Pricing'))
 const NotFound = lazy(() => import('./pages/public/NotFound'))
 
@@ -95,6 +96,7 @@ export default function App() {
               <Route path="/compare" element={<Compare />} />
               <Route path="/calculator" element={<Calculator />} />
               <Route path="/areas" element={<Areas />} />
+              <Route path="/areas/:city" element={<AreaCity />} />
               <Route path="/pricing" element={<Pricing />} />
 
               {/* Admin */}

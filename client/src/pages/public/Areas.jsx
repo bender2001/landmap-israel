@@ -129,14 +129,22 @@ function CityCard({ city, stats }) {
             </div>
           )}
 
-          {/* CTA */}
-          <Link
-            to={`/?city=${encodeURIComponent(city)}`}
-            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-gold to-gold-bright text-navy font-bold text-sm hover:shadow-lg hover:shadow-gold/20 transition-all"
-          >
-            <span>צפה בחלקות ב{city}</span>
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
+          {/* CTAs */}
+          <div className="flex gap-2">
+            <Link
+              to={`/areas/${encodeURIComponent(city)}`}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-white/[0.05] border border-white/10 text-slate-200 font-bold text-sm hover:border-gold/30 hover:text-gold transition-all"
+            >
+              <span>פרופיל {city}</span>
+            </Link>
+            <Link
+              to={`/?city=${encodeURIComponent(city)}`}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-gold to-gold-bright text-navy font-bold text-sm hover:shadow-lg hover:shadow-gold/20 transition-all"
+            >
+              <span>צפה במפה</span>
+              <ArrowLeft className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
       )}
     </div>
@@ -229,7 +237,7 @@ function MarketHealthScores({ cities }) {
           return (
             <Link
               key={city.city}
-              to={`/?city=${encodeURIComponent(city.city)}`}
+              to={`/areas/${encodeURIComponent(city.city)}`}
               className="relative bg-white/[0.02] border border-white/5 rounded-xl p-4 hover:border-gold/20 hover:bg-white/[0.04] transition-all group"
             >
               {/* Score badge */}
@@ -426,7 +434,7 @@ function AreasJsonLd({ overview, cities }) {
       '@type': 'ListItem',
       position: i + 1,
       name: city.city,
-      url: `${window.location.origin}/?city=${encodeURIComponent(city.city)}`,
+      url: `${window.location.origin}/areas/${encodeURIComponent(city.city)}`,
       description: `${city.count} חלקות להשקעה ב${city.city}. מחיר ממוצע לדונם: ₪${city.avgPricePerDunam?.toLocaleString()}. תשואה ממוצעת: +${city.avgRoi}%.`,
     })),
   }
@@ -573,7 +581,7 @@ function SortableComparisonTable({ cities }) {
                   className={`border-b border-white/5 hover:bg-white/[0.02] transition-colors ${isTopRow ? 'bg-gold/[0.03]' : ''}`}
                 >
                   <td className="py-3 pr-2">
-                    <Link to={`/?city=${encodeURIComponent(city.city)}`} className="flex items-center gap-2 text-slate-200 hover:text-gold transition-colors font-medium">
+                    <Link to={`/areas/${encodeURIComponent(city.city)}`} className="flex items-center gap-2 text-slate-200 hover:text-gold transition-colors font-medium">
                       <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: CITY_COLORS[city.city] || '#94A3B8' }} />
                       {city.city}
                       {isTopRow && <span className="text-[8px] text-gold bg-gold/10 px-1.5 py-0.5 rounded-full">🏆</span>}
