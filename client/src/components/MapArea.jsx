@@ -827,6 +827,13 @@ function MapViewportCounter({ plots, totalCount }) {
           <span className="w-1.5 h-1.5 rounded-full bg-gold/60 animate-pulse" title="הזז/הקטן מפה כדי לראות יותר" />
         )}
       </div>
+      {/* Screen reader announcement — announces visible count changes for accessibility (WCAG 4.1.3) */}
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {isPartial
+          ? `מוצגות ${visibleCount} מתוך ${totalCount} חלקות בתצוגה הנוכחית`
+          : `מוצגות ${totalCount} חלקות`
+        }
+      </div>
     </div>
   )
 }

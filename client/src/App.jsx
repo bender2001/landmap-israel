@@ -60,6 +60,16 @@ export default function App() {
 
   return (
     <>
+      {/* Skip-to-content link — WCAG 2.4.1 bypass blocks.
+          Allows keyboard/screen-reader users to skip past navigation directly to main content.
+          Visually hidden until focused (Tab key), then appears as a prominent gold banner. */}
+      <a
+        href="#main-content"
+        className="skip-to-content"
+      >
+        דלג לתוכן הראשי
+      </a>
+
       {showIntro && !introSeen && (
         <Suspense fallback={null}>
           <IntroOverlay onComplete={() => setShowIntro(false)} />
@@ -69,40 +79,43 @@ export default function App() {
       <RouteProgressBar />
       <ScrollToTop />
       <ErrorBoundary>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            {/* Public */}
-            <Route path="/" element={<MapView />} />
-            <Route path="/plot/:id" element={<PlotDetail />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/favorites" element={<Favorites />} />
-            <Route path="/compare" element={<Compare />} />
-            <Route path="/calculator" element={<Calculator />} />
-            <Route path="/areas" element={<Areas />} />
+        {/* <main> landmark — lets screen readers jump to main content (WCAG 1.3.1 + 2.4.1) */}
+        <main id="main-content" tabIndex={-1} className="outline-none">
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* Public */}
+              <Route path="/" element={<MapView />} />
+              <Route path="/plot/:id" element={<PlotDetail />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/favorites" element={<Favorites />} />
+              <Route path="/compare" element={<Compare />} />
+              <Route path="/calculator" element={<Calculator />} />
+              <Route path="/areas" element={<Areas />} />
 
-            {/* Admin */}
-            <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="plots" element={<PlotList />} />
-              <Route path="plots/new" element={<PlotForm />} />
-              <Route path="plots/:id/edit" element={<PlotForm />} />
-              <Route path="leads" element={<LeadList />} />
-              <Route path="leads/:id" element={<LeadDetail />} />
-              <Route path="pois" element={<PoiList />} />
-              <Route path="pois/new" element={<PoiForm />} />
-              <Route path="pois/:id/edit" element={<PoiForm />} />
-              <Route path="activity" element={<ActivityLog />} />
-              <Route path="settings" element={<Settings />} />
-            </Route>
+              {/* Admin */}
+              <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="plots" element={<PlotList />} />
+                <Route path="plots/new" element={<PlotForm />} />
+                <Route path="plots/:id/edit" element={<PlotForm />} />
+                <Route path="leads" element={<LeadList />} />
+                <Route path="leads/:id" element={<LeadDetail />} />
+                <Route path="pois" element={<PoiList />} />
+                <Route path="pois/new" element={<PoiForm />} />
+                <Route path="pois/:id/edit" element={<PoiForm />} />
+                <Route path="activity" element={<ActivityLog />} />
+                <Route path="settings" element={<Settings />} />
+              </Route>
 
-            {/* 404 catch-all */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
+              {/* 404 catch-all */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </main>
       </ErrorBoundary>
 
       <Suspense fallback={null}>
