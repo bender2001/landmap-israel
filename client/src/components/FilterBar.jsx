@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, Link2, Download, Zap } from 'lucide-react'
-import { statusColors, statusLabels } from '../utils/constants'
+import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, Link2, Download, Zap, Layers } from 'lucide-react'
+import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
 import SearchAutocomplete from './SearchAutocomplete'
 import SavedSearches from './SavedSearches'
 
@@ -38,6 +38,18 @@ const roiOptions = [
   { label: '100%+', value: '100' },
   { label: '150%+', value: '150' },
   { label: '200%+', value: '200' },
+]
+
+const zoningOptions = [
+  { label: 'כל השלבים', value: 'all' },
+  { label: '🌾 חקלאית', value: 'AGRICULTURAL' },
+  { label: '📋 הפקדת מתאר', value: 'MASTER_PLAN_DEPOSIT' },
+  { label: '✅ מתאר מאושר', value: 'MASTER_PLAN_APPROVED' },
+  { label: '📐 הכנת מפורטת', value: 'DETAILED_PLAN_PREP' },
+  { label: '📋 הפקדת מפורטת', value: 'DETAILED_PLAN_DEPOSIT' },
+  { label: '✅ מפורטת מאושרת', value: 'DETAILED_PLAN_APPROVED' },
+  { label: '🏗️ מכרז יזמים', value: 'DEVELOPER_TENDER' },
+  { label: '🏠 היתר בנייה', value: 'BUILDING_PERMIT' },
 ]
 
 const sortOptions = [
@@ -366,6 +378,7 @@ export default function FilterBar({
     (sizeRangeValue !== 'all' ? 1 : 0) +
     (filters.ripeness !== 'all' ? 1 : 0) +
     (filters.minRoi && filters.minRoi !== 'all' ? 1 : 0) +
+    (filters.zoning && filters.zoning !== 'all' ? 1 : 0) +
     (filters.search ? 1 : 0) +
     statusFilter.length
 
@@ -488,6 +501,16 @@ export default function FilterBar({
             options={sizeRangeOptions}
             onChange={handleSizeRange}
             isActive={sizeRangeValue !== 'all'}
+          />
+
+          <SelectPill
+            icon={Layers}
+            label="שלב תכנוני"
+            value={filters.zoning || 'all'}
+            displayValue={filters.zoning && filters.zoning !== 'all' ? zoningOptions.find(o => o.value === filters.zoning)?.label?.replace(/^[^\s]+ /, '') : null}
+            options={zoningOptions}
+            onChange={(val) => onFilterChange('zoning', val)}
+            isActive={filters.zoning && filters.zoning !== 'all'}
           />
 
           <SelectPill
@@ -614,6 +637,17 @@ export default function FilterBar({
               >
                 <TrendingUp className="w-3 h-3" />
                 <span>{filters.minRoi}%+</span>
+                <X className="w-3 h-3 opacity-60 hover:opacity-100" />
+              </button>
+            )}
+            {filters.zoning && filters.zoning !== 'all' && (
+              <button
+                className="filter-active-chip"
+                onClick={() => onFilterChange('zoning', 'all')}
+                aria-label={`הסר סינון תכנוני: ${zoningOptions.find(o => o.value === filters.zoning)?.label}`}
+              >
+                <Layers className="w-3 h-3" />
+                <span>{zoningOptions.find(o => o.value === filters.zoning)?.label?.replace(/^[^\s]+ /, '')}</span>
                 <X className="w-3 h-3 opacity-60 hover:opacity-100" />
               </button>
             )}

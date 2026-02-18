@@ -593,6 +593,64 @@ function hasValidCoordinates(plot) {
 }
 
 /**
+ * "Search this area" button — appears when the user manually pans/zooms the map,
+ * like Madlan's "חפש באזור זה". Clicking it filters the plot list (PlotCardStrip,
+ * sidebar, etc.) to only plots visible in the current viewport.
+ * Hides after click, reappears on next manual move.
+ */
+function SearchThisAreaButton({ onSearchArea }) {
+  const map = useMap()
+  const [visible, setVisible] = useState(false)
+  const initialFitRef = useRef(true)
+  const timeoutRef = useRef(null)
+
+  useEffect(() => {
+    // Ignore the first few moves (auto fit-bounds on load)
+    const ignoreUntil = Date.now() + 2500
+    const handler = () => {
+      if (Date.now() < ignoreUntil) return
+      initialFitRef.current = false
+      // Debounce to avoid flicker
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      timeoutRef.current = setTimeout(() => setVisible(true), 300)
+    }
+    map.on('moveend', handler)
+    map.on('zoomend', handler)
+    return () => {
+      map.off('moveend', handler)
+      map.off('zoomend', handler)
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }
+  }, [map])
+
+  const handleClick = useCallback(() => {
+    const bounds = map.getBounds()
+    onSearchArea({
+      north: bounds.getNorth(),
+      south: bounds.getSouth(),
+      east: bounds.getEast(),
+      west: bounds.getWest(),
+    })
+    setVisible(false)
+  }, [map, onSearchArea])
+
+  if (!visible) return null
+
+  return (
+    <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[1001] pointer-events-none">
+      <button
+        onClick={handleClick}
+        className="pointer-events-auto glass-panel px-4 py-2 flex items-center gap-2 hover:border-gold/30 transition-all hover:shadow-lg hover:shadow-gold/10 animate-fade-in"
+        dir="rtl"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gold"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span className="text-xs font-medium text-slate-200">חפש באזור זה</span>
+      </button>
+    </div>
+  )
+}
+
+/**
  * Viewport counter — shows "X of Y plots visible" and updates as user pans/zooms.
  * Like Madlan's "X נכסים באזור זה" indicator. Uses plotBounds for efficient
  * AABB intersection test without re-rendering polygons.
@@ -757,7 +815,7 @@ function ViewportCulledPolygons({ plots, plotColors, hoveredId, onSelectPlot, on
   ))
 }
 
-export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites, compareIds = [], onToggleCompare, onClearFilters, onFilterChange }) {
+export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites, compareIds = [], onToggleCompare, onClearFilters, onFilterChange, onSearchArea }) {
   const [hoveredId, setHoveredId] = useState(null)
   const [activeLayerId, setActiveLayerId] = useState('satellite')
   const [colorMode, setColorMode] = useState('status')
@@ -860,6 +918,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         <MapRuler />
         <MapHeatLayer plots={plots} visible={colorMode === 'heatmap'} metric="priceSqm" />
         <GeoSearch />
+        {onSearchArea && <SearchThisAreaButton onSearchArea={onSearchArea} />}
         <MapViewportCounter plots={plots} totalCount={plots.length} />
 
         {/* Viewport-culled polygons: only renders plots visible in the current map viewport.

@@ -32,6 +32,16 @@ export async function getPublishedPlots(filters = {}) {
     query = query.in('status', statuses)
   }
 
+  // Zoning stage filter — supports comma-separated values for multi-select
+  if (filters.zoning && filters.zoning !== 'all') {
+    const stages = filters.zoning.split(',').filter(Boolean)
+    if (stages.length === 1) {
+      query = query.eq('zoning_stage', stages[0])
+    } else if (stages.length > 1) {
+      query = query.in('zoning_stage', stages)
+    }
+  }
+
   // Server-side text search — searches block_number, number, city, description
   if (filters.q && filters.q.trim()) {
     // Sanitize: escape special PostgREST/SQL chars to prevent injection

@@ -70,6 +70,7 @@ const initialFilters = {
   sizeMax: '',
   ripeness: 'all',
   minRoi: 'all',
+  zoning: 'all',
   search: '',
 }
 
@@ -79,6 +80,7 @@ export default function MapView() {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false)
+  const [boundsFilter, setBoundsFilter] = useState(null)
 
   // Hydrate filters from URL params for shareable links
   const [filters, setFilters] = useState(() => {
@@ -91,6 +93,7 @@ export default function MapView() {
       sizeMax: p.sizeMax || '',
       ripeness: p.ripeness || 'all',
       minRoi: p.minRoi || 'all',
+      zoning: p.zoning || 'all',
       search: p.q || '',
     }
   })
@@ -131,6 +134,7 @@ export default function MapView() {
     if (filters.sizeMax) params.set('sizeMax', filters.sizeMax)
     if (filters.ripeness !== 'all') params.set('ripeness', filters.ripeness)
     if (filters.minRoi && filters.minRoi !== 'all') params.set('minRoi', filters.minRoi)
+    if (filters.zoning && filters.zoning !== 'all') params.set('zoning', filters.zoning)
     if (filters.search) params.set('q', filters.search)
     if (statusFilter.length > 0) params.set('status', statusFilter.join(','))
     if (sortBy !== 'default') params.set('sort', sortBy)
@@ -150,6 +154,7 @@ export default function MapView() {
     if (filters.sizeMin) f.sizeMin = filters.sizeMin
     if (filters.sizeMax) f.sizeMax = filters.sizeMax
     if (filters.ripeness !== 'all') f.ripeness = filters.ripeness
+    if (filters.zoning && filters.zoning !== 'all') f.zoning = filters.zoning
     if (statusFilter.length > 0) f.status = statusFilter.join(',')
     // Pass search query to server for DB-level text search (faster than client-side)
     if (debouncedSearch) f.q = debouncedSearch
@@ -181,15 +186,30 @@ export default function MapView() {
     })
   }, [plots, filters.minRoi])
 
+  // Bounds filter — "Search this area" (like Madlan's "חפש באזור זה")
+  // Filters plots to only those within the map viewport bounds the user selected
+  const boundsFilteredPlots = useMemo(() => {
+    if (!boundsFilter) return roiFilteredPlots
+    return roiFilteredPlots.filter((p) => {
+      if (!p.coordinates || !Array.isArray(p.coordinates) || p.coordinates.length < 3) return false
+      // Check if any coordinate falls within bounds (inclusive check)
+      return p.coordinates.some(c =>
+        Array.isArray(c) && c.length >= 2 &&
+        c[0] >= boundsFilter.south && c[0] <= boundsFilter.north &&
+        c[1] >= boundsFilter.west && c[1] <= boundsFilter.east
+      )
+    })
+  }, [roiFilteredPlots, boundsFilter])
+
   // Client-side search filter — acts as secondary filter for instant feedback
   // while server-side q param handles the primary DB-level search
   const searchedPlots = useMemo(() => {
     // When search is passed to API (debouncedSearch), server already filtered — skip client filter
     // Only apply client-side filter for the brief moment between typing and debounce
     const activeSearch = filters.search && filters.search !== debouncedSearch ? filters.search : ''
-    if (!activeSearch) return roiFilteredPlots
+    if (!activeSearch) return boundsFilteredPlots
     const q = activeSearch.toLowerCase()
-    return roiFilteredPlots.filter((p) => {
+    return boundsFilteredPlots.filter((p) => {
       const bn = (p.block_number ?? p.blockNumber ?? '').toString()
       const num = (p.number ?? '').toString()
       const city = (p.city ?? '').toLowerCase()
@@ -378,6 +398,15 @@ export default function MapView() {
   const handleClearFilters = useCallback(() => {
     setFilters(initialFilters)
     setStatusFilter([])
+    setBoundsFilter(null)
+  }, [])
+
+  const handleSearchArea = useCallback((bounds) => {
+    setBoundsFilter(bounds)
+  }, [])
+
+  const handleClearBounds = useCallback(() => {
+    setBoundsFilter(null)
   }, [])
 
   const handleLoadSearch = useCallback((search) => {
@@ -512,6 +541,22 @@ export default function MapView() {
           <div className="h-full bg-gradient-to-r from-gold via-gold-bright to-gold animate-pulse rounded-full" />
         </div>
       )}
+      {/* Bounds filter badge — shows when "Search this area" is active */}
+      {boundsFilter && (
+        <div className="fixed top-14 sm:top-16 left-1/2 -translate-x-1/2 z-[50]" dir="rtl">
+          <div className="flex items-center gap-2 bg-gold/15 backdrop-blur-md border border-gold/25 rounded-full px-4 py-2 shadow-lg">
+            <span className="w-2 h-2 rounded-full bg-gold animate-pulse" />
+            <span className="text-xs font-medium text-gold">תוצאות מוגבלות לאזור הנבחר</span>
+            <button
+              onClick={handleClearBounds}
+              className="text-gold/80 hover:text-white text-sm font-bold transition-colors mr-1"
+              title="הסר סינון אזורי"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
       {/* Mock data warning — shown when API is unreachable and fallback demo data is used */}
       {isMockData && (
         <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-600/90 backdrop-blur-sm text-white text-center py-2 px-4 text-xs font-medium flex items-center justify-center gap-2" dir="rtl">
@@ -566,6 +611,7 @@ export default function MapView() {
           onToggleCompare={toggleCompare}
           onClearFilters={handleClearFilters}
           onFilterChange={handleFilterChange}
+          onSearchArea={handleSearchArea}
         />
       </MapErrorBoundary>
 

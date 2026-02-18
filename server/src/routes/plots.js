@@ -166,6 +166,13 @@ router.get('/featured', async (req, res, next) => {
       return scored
     }, 300_000)
 
+    // ETag support — consistent with main /plots endpoint
+    const etag = generateETag(featured)
+    res.set('ETag', etag)
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end()
+    }
+
     res.json(featured)
   } catch (err) {
     next(err)
@@ -239,6 +246,13 @@ router.get('/popular', async (req, res, next) => {
         return { ...p, _roi: roi }
       })
     }, 300_000)
+
+    // ETag support — consistent with main /plots endpoint
+    const etag = generateETag(popular)
+    res.set('ETag', etag)
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end()
+    }
 
     res.json(popular)
   } catch (err) {
