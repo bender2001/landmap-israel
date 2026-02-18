@@ -30,6 +30,15 @@ export async function getPublishedPlots(filters = {}) {
     query = query.in('status', statuses)
   }
 
+  // Server-side text search — searches block_number, number, city, description
+  if (filters.q && filters.q.trim()) {
+    const q = filters.q.trim()
+    // Use Supabase text search with ilike for flexible matching
+    query = query.or(
+      `block_number.ilike.%${q}%,number.ilike.%${q}%,city.ilike.%${q}%,description.ilike.%${q}%`
+    )
+  }
+
   // Server-side sorting
   if (filters.sort) {
     switch (filters.sort) {

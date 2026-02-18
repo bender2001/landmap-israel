@@ -16,9 +16,11 @@ import Spinner from '../../components/ui/Spinner.jsx'
 import KeyboardShortcuts from '../../components/KeyboardShortcuts.jsx'
 import RecentlyViewed from '../../components/RecentlyViewed.jsx'
 import ConnectionStatus from '../../components/ui/ConnectionStatus.jsx'
+import MarketStatsWidget from '../../components/MarketStatsWidget.jsx'
 import { useMetaTags } from '../../hooks/useMetaTags.js'
 import { useStructuredData } from '../../hooks/useStructuredData.js'
 import { formatCurrency, calcInvestmentScore } from '../../utils/formatters.js'
+import { useViewTracker } from '../../hooks/useViewTracker.js'
 import { useSavedSearches } from '../../hooks/useSavedSearches.js'
 import { Phone } from 'lucide-react'
 
@@ -60,6 +62,7 @@ export default function MapView() {
   })
   const [sortBy, setSortBy] = useState(() => searchParams.get('sort') || 'default')
   const favorites = useFavorites()
+  const { trackView, isPopular } = useViewTracker()
   const { searches: savedSearches, save: saveSearch, remove: removeSearch } = useSavedSearches()
 
   // Compare state (localStorage-backed, not URL to avoid conflict with filters)
@@ -266,7 +269,8 @@ export default function MapView() {
 
   const handleSelectPlot = useCallback((plot) => {
     setSelectedPlot(plot)
-  }, [])
+    if (plot?.id) trackView(plot.id)
+  }, [trackView])
 
   const handleCloseSidebar = useCallback(() => {
     setSelectedPlot(null)
@@ -341,6 +345,7 @@ export default function MapView() {
         דלג לתוכן המפה
       </a>
       <ConnectionStatus />
+      <MarketStatsWidget plots={filteredPlots} />
       <MapArea
         plots={filteredPlots}
         pois={pois}

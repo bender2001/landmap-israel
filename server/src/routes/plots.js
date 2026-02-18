@@ -22,6 +22,8 @@ router.get('/', async (req, res, next) => {
       return res.status(304).end()
     }
 
+    // Add total count header for pagination-ready responses
+    res.set('X-Total-Count', String(plots.length))
     res.json(plots)
   } catch (err) {
     next(err)
