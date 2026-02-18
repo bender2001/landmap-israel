@@ -10,6 +10,7 @@ import PublicNav from '../../components/PublicNav.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../../utils/constants.js'
 import { formatCurrency, formatDunam } from '../../utils/formatters.js'
+import PriceTrendChart from '../../components/ui/PriceTrendChart.jsx'
 
 function JsonLdSchema({ plot }) {
   const blockNum = plot.block_number ?? plot.blockNumber
@@ -264,6 +265,11 @@ export default function PlotDetail() {
               <div className="text-xl sm:text-2xl font-bold text-gold">{roi}%</div>
               {readiness && <div className="text-xs text-slate-500">{readiness}</div>}
             </div>
+          </div>
+
+          {/* Price trend chart — like Madlan area trends */}
+          <div className="mb-8">
+            <PriceTrendChart totalPrice={totalPrice} sizeSqM={sizeSqM} city={plot.city} />
           </div>
 
           {/* Two-column layout for details */}

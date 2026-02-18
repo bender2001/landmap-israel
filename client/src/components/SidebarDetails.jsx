@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon, Download, File, FileImage, FileSpreadsheet, Printer, ExternalLink, Eye, Navigation } from 'lucide-react'
 import ShareMenu from './ui/ShareMenu'
 import ImageLightbox from './ui/ImageLightbox'
+import PriceTrendChart from './ui/PriceTrendChart'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
 import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
@@ -1001,6 +1002,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               })()}
 
               {/* Associated Costs */}
+              {/* Price Trend Chart — like Madlan's area price trends */}
+              <PriceTrendChart totalPrice={totalPrice} sizeSqM={sizeSqM} city={plot.city} />
+
               <div className="bg-navy-light/40 border border-white/5 rounded-xl p-3 mb-3">
                 <div className="flex items-center gap-2 mb-2">
                   <DollarSign className="w-3.5 h-3.5 text-gold" />

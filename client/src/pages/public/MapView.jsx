@@ -366,7 +366,7 @@ export default function MapView() {
       {selectedPlot && (
         <button
           onClick={() => setIsLeadModalOpen(true)}
-          className="fixed bottom-20 sm:bottom-6 left-4 z-[45] flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-gold via-gold-bright to-gold text-navy font-extrabold text-sm rounded-2xl shadow-lg shadow-gold/30 hover:shadow-xl hover:scale-105 transition-all animate-bounce-in"
+          className="fixed bottom-36 sm:bottom-6 left-4 z-[30] flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-gold via-gold-bright to-gold text-navy font-extrabold text-sm rounded-2xl shadow-lg shadow-gold/30 hover:shadow-xl hover:scale-105 transition-all animate-bounce-in"
           aria-label="צור קשר לגבי חלקה זו"
         >
           <Phone className="w-4 h-4" />
