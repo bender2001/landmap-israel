@@ -7,6 +7,7 @@ import ProfitWaterfall from './ui/ProfitWaterfall'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
 import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
+import PlotPercentileBadges from './ui/PlotPercentileBadges'
 import { usePlot, useNearbyPlots } from '../hooks/usePlots'
 import MiniMap from './ui/MiniMap'
 import { plotInquiryLink } from '../utils/config'
@@ -934,6 +935,13 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                     מחיר קודם: {formatCurrency(priceChange.previousPrice)}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Percentile ranking badges — shows where this plot stands vs all others */}
+            {allPlots.length >= 2 && (
+              <div className="mt-4 animate-stagger-3">
+                <PlotPercentileBadges plot={plot} allPlots={allPlots} />
               </div>
             )}
 

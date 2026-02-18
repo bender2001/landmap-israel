@@ -127,3 +127,76 @@ export function getScoreLabel(score) {
   if (score >= 4) return { label: 'בינוני', color: '#F59E0B' }
   return { label: 'נמוך', color: '#EF4444' }
 }
+
+/**
+ * Calculate percentile rank of a value within a sorted array.
+ * Returns 0-100 (what percentage of values are below this one).
+ * E.g., percentile=80 means "better than 80% of plots".
+ */
+export function calcPercentile(value, allValues) {
+  if (!allValues || allValues.length === 0) return null
+  const sorted = [...allValues].sort((a, b) => a - b)
+  const below = sorted.filter(v => v < value).length
+  return Math.round((below / sorted.length) * 100)
+}
+
+/**
+ * Calculate percentiles for a plot across multiple dimensions.
+ * Used to show "זול מ-X% מהחלקות" badges (like Madlan/Yad2).
+ * @param {Object} plot - The plot to analyze
+ * @param {Array} allPlots - All plots for comparison
+ * @returns {Object} Percentile data per dimension
+ */
+export function calcPlotPercentiles(plot, allPlots) {
+  if (!plot || !allPlots || allPlots.length < 2) return null
+
+  const getPrice = (p) => p.total_price ?? p.totalPrice ?? 0
+  const getSize = (p) => p.size_sqm ?? p.sizeSqM ?? 0
+  const getRoi = (p) => {
+    const price = getPrice(p)
+    const proj = p.projected_value ?? p.projectedValue ?? 0
+    return price > 0 ? ((proj - price) / price) * 100 : 0
+  }
+  const getPriceSqm = (p) => {
+    const size = getSize(p)
+    return size > 0 ? getPrice(p) / size : 0
+  }
+
+  const allPrices = allPlots.map(getPrice).filter(v => v > 0)
+  const allSizes = allPlots.map(getSize).filter(v => v > 0)
+  const allRois = allPlots.map(getRoi).filter(v => v > 0)
+  const allPriceSqm = allPlots.map(getPriceSqm).filter(v => v > 0)
+
+  const plotPrice = getPrice(plot)
+  const plotSize = getSize(plot)
+  const plotRoi = getRoi(plot)
+  const plotPriceSqm = getPriceSqm(plot)
+
+  return {
+    // Price percentile (lower = cheaper = good for buyer)
+    price: plotPrice > 0 ? {
+      value: calcPercentile(plotPrice, allPrices),
+      label: 'מחיר',
+      // "Cheaper than X%" — invert: 100 - percentile
+      cheaperThan: 100 - calcPercentile(plotPrice, allPrices),
+    } : null,
+    // Size percentile (higher = bigger)
+    size: plotSize > 0 ? {
+      value: calcPercentile(plotSize, allSizes),
+      label: 'שטח',
+      biggerThan: calcPercentile(plotSize, allSizes),
+    } : null,
+    // ROI percentile (higher = better return)
+    roi: plotRoi > 0 ? {
+      value: calcPercentile(plotRoi, allRois),
+      label: 'תשואה',
+      betterThan: calcPercentile(plotRoi, allRois),
+    } : null,
+    // Price per sqm percentile (lower = better value)
+    priceSqm: plotPriceSqm > 0 ? {
+      value: calcPercentile(plotPriceSqm, allPriceSqm),
+      label: 'מחיר/מ״ר',
+      cheaperThan: 100 - calcPercentile(plotPriceSqm, allPriceSqm),
+    } : null,
+  }
+}
