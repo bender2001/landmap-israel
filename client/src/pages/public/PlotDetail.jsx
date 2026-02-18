@@ -247,6 +247,106 @@ function getDocIcon(mimeType) {
 }
 
 /**
+ * SectionNav — horizontal scroll-spy navigation for quick-jumping between PlotDetail sections.
+ * Like Madlan's property page section anchors and Google's "jump to" links.
+ * Uses IntersectionObserver to highlight the active section as the user scrolls.
+ * Sticky below the reading progress bar for always-visible navigation.
+ */
+const SECTION_ANCHORS = [
+  { id: 'section-financial', label: 'פיננסי', emoji: '💰' },
+  { id: 'section-location', label: 'מיקום', emoji: '📍' },
+  { id: 'section-projection', label: 'תחזית', emoji: '📈' },
+  { id: 'section-planning', label: 'תכנון', emoji: '📋' },
+  { id: 'section-costs', label: 'עלויות', emoji: '🧾' },
+  { id: 'section-documents', label: 'מסמכים', emoji: '📄' },
+  { id: 'section-similar', label: 'דומות', emoji: '🎯' },
+]
+
+function SectionNav() {
+  const [activeId, setActiveId] = useState('')
+  const [visible, setVisible] = useState(false)
+
+  // Show only after scrolling past hero section
+  useEffect(() => {
+    const handler = () => setVisible(window.scrollY > 300)
+    window.addEventListener('scroll', handler, { passive: true })
+    handler()
+    return () => window.removeEventListener('scroll', handler)
+  }, [])
+
+  // Intersection Observer — track which section is in view
+  useEffect(() => {
+    const elements = SECTION_ANCHORS
+      .map(a => document.getElementById(a.id))
+      .filter(Boolean)
+    if (elements.length === 0) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Pick the first intersecting entry with highest intersection ratio
+        const visible = entries
+          .filter(e => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
+        if (visible.length > 0) {
+          setActiveId(visible[0].target.id)
+        }
+      },
+      { rootMargin: '-80px 0px -40% 0px', threshold: [0, 0.25, 0.5] }
+    )
+
+    elements.forEach(el => observer.observe(el))
+    return () => observer.disconnect()
+  }, [])
+
+  const handleClick = useCallback((id) => {
+    const el = document.getElementById(id)
+    if (!el) return
+    const y = el.getBoundingClientRect().top + window.scrollY - 100 // offset for sticky nav
+    window.scrollTo({ top: y, behavior: 'smooth' })
+  }, [])
+
+  if (!visible) return null
+
+  // Only show pills for sections that actually exist on the page
+  const existingAnchors = SECTION_ANCHORS.filter(a => document.getElementById(a.id))
+  if (existingAnchors.length < 2) return null
+
+  return (
+    <div
+      className="fixed top-[4.25rem] left-0 right-0 z-[54] transition-all duration-300"
+      style={{ opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(-8px)' }}
+    >
+      <div className="bg-navy/85 backdrop-blur-xl border-b border-white/5">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6">
+          <div
+            className="flex items-center gap-1 py-1.5 overflow-x-auto scrollbar-none"
+            dir="rtl"
+            role="navigation"
+            aria-label="קפיצה לסעיף"
+          >
+            {existingAnchors.map(anchor => (
+              <button
+                key={anchor.id}
+                onClick={() => handleClick(anchor.id)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                  activeId === anchor.id
+                    ? 'bg-gold/15 text-gold border-gold/25 shadow-sm shadow-gold/10'
+                    : 'bg-white/[0.02] text-slate-500 border-transparent hover:bg-white/[0.05] hover:text-slate-300'
+                }`}
+                aria-current={activeId === anchor.id ? 'true' : undefined}
+              >
+                <span className="text-[10px]">{anchor.emoji}</span>
+                <span>{anchor.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
  * Reading progress bar — thin gold bar at the top of the viewport that fills as the user scrolls.
  * Standard UX pattern on content-heavy pages (Medium, Madlan property pages, news sites).
  * Helps users gauge how far they are in the long plot detail page.
@@ -674,6 +774,7 @@ export default function PlotDetail() {
     <div className="min-h-screen w-full bg-navy" dir="rtl">
       <PublicNav />
       <ReadingProgressBar />
+      <SectionNav />
       <JsonLdSchema plot={plot} />
       <BreadcrumbSchema plot={plot} />
       <PlotFaqSchema plot={plot} />
@@ -846,7 +947,7 @@ export default function PlotDetail() {
 
           {/* Location mini-map — like Madlan always shows location context */}
           {plot.coordinates && plot.coordinates.length >= 3 && (
-            <div className="mb-8">
+            <div id="section-location" className="mb-8">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-gold" />
@@ -1036,7 +1137,7 @@ export default function PlotDetail() {
           })()}
 
           {/* Financial cards grid */}
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          <div id="section-financial" className="grid grid-cols-3 gap-4 mb-8">
             <div className="rounded-2xl p-5 flex flex-col items-center gap-2 text-center bg-gradient-to-b from-blue-500/15 to-blue-500/8 border border-blue-500/20 relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-400 to-blue-600" />
               <div className="text-xs text-slate-400">מחיר מבוקש</div>
@@ -1074,7 +1175,7 @@ export default function PlotDetail() {
 
           {/* Forward-looking investment projection — year-by-year S-curve growth.
               Differentiator: Madlan/Yad2 show history, we show the investor's future. */}
-          <div className="mb-8 bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+          <div id="section-projection" className="mb-8 bg-navy-light/40 border border-white/5 rounded-2xl p-5">
             <InvestmentProjection
               totalPrice={totalPrice}
               projectedValue={projectedValue}
@@ -1166,7 +1267,7 @@ export default function PlotDetail() {
                 const docs = plot.plot_documents?.length ? plot.plot_documents : plot.documents?.length ? plot.documents : null
                 if (!docs) return null
                 return (
-                  <div className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+                  <div id="section-documents" className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
                     <div className="flex items-center gap-2 mb-3">
                       <div className="w-7 h-7 rounded-lg bg-gold/15 flex items-center justify-center">
                         <FileText className="w-3.5 h-3.5 text-gold" />
@@ -1244,7 +1345,7 @@ export default function PlotDetail() {
             {/* Right: Zoning pipeline + costs */}
             <div className="space-y-4">
               {/* Zoning pipeline */}
-              <div className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+              <div id="section-planning" className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
                 <h2 className="text-base font-bold text-slate-100 mb-3">צינור תכנוני</h2>
                 {readiness && (
                   <div className="flex items-center gap-2 mb-4 bg-gold/5 border border-gold/20 rounded-xl px-4 py-2.5">
@@ -1271,7 +1372,7 @@ export default function PlotDetail() {
               </div>
 
               {/* Associated costs */}
-              <div className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+              <div id="section-costs" className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <DollarSign className="w-4 h-4 text-gold" />
                   <h2 className="text-base font-bold text-slate-100">עלויות נלוות משוערות</h2>
@@ -1318,7 +1419,9 @@ export default function PlotDetail() {
           </div>
 
           {/* Similar Plots — lightweight: uses server-side geo-proximity API */}
-          <SimilarPlotsSection plotId={id} onNearbyLoaded={handleNearbyLoaded} />
+          <div id="section-similar">
+            <SimilarPlotsSection plotId={id} onNearbyLoaded={handleNearbyLoaded} />
+          </div>
 
           {/* Sticky CTA — enhanced with print, share, compare, and map actions (like Madlan/Yad2 bottom bars) */}
           <div className="fixed bottom-0 left-0 right-0 z-40 bg-navy/90 backdrop-blur-xl border-t border-white/10 px-4 py-3">

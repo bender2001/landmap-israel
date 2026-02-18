@@ -5,6 +5,7 @@ import { sanitizePlotQuery, sanitizePlotId } from '../middleware/sanitize.js'
 import { analytics } from '../services/analyticsService.js'
 import { plotCache, statsCache } from '../services/cacheService.js'
 import { supabaseAdmin } from '../config/supabase.js'
+import { haversineKm, calcCentroid, formatDistance } from '../utils/geo.js'
 
 const router = Router()
 
@@ -291,16 +292,8 @@ router.get('/:id/nearby-pois', sanitizePlotId, async (req, res, next) => {
     const plot = await getPlotById(req.params.id)
     if (!plot) return res.status(404).json({ error: 'Plot not found' })
 
-    const coords = plot.coordinates
-    if (!coords || !Array.isArray(coords) || coords.length === 0) {
-      return res.json({ pois: [], categories: {} })
-    }
-
-    // Calculate plot centroid
-    const valid = coords.filter(c => Array.isArray(c) && c.length >= 2 && isFinite(c[0]) && isFinite(c[1]))
-    if (valid.length === 0) return res.json({ pois: [], categories: {} })
-    const centLat = valid.reduce((s, c) => s + c[0], 0) / valid.length
-    const centLng = valid.reduce((s, c) => s + c[1], 0) / valid.length
+    const center = calcCentroid(plot.coordinates)
+    if (!center) return res.json({ pois: [], categories: {} })
 
     // Fetch all POIs (lightweight table, small dataset)
     const { data: pois, error } = await supabaseAdmin
@@ -312,25 +305,15 @@ router.get('/:id/nearby-pois', sanitizePlotId, async (req, res, next) => {
       return res.json({ pois: [], categories: {} })
     }
 
-    // Haversine distance calculation + filter by radius
-    const R = 6371 // Earth radius in km
+    // Distance calculation + filter by radius (uses shared haversine utility)
     const nearbyPois = pois
       .map(poi => {
         const lat = poi.lat ?? poi.latitude
         const lng = poi.lng ?? poi.longitude
         if (!lat || !lng || !isFinite(lat) || !isFinite(lng)) return null
-        const dLat = (lat - centLat) * Math.PI / 180
-        const dLng = (lng - centLng) * Math.PI / 180
-        const a = Math.sin(dLat / 2) ** 2 +
-          Math.cos(centLat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) *
-          Math.sin(dLng / 2) ** 2
-        const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-        if (distKm > maxKm) return null
-        return {
-          ...poi,
-          distance_km: Math.round(distKm * 100) / 100,
-          distance_m: Math.round(distKm * 1000),
-        }
+        const dist = formatDistance(haversineKm(center.lat, center.lng, lat, lng))
+        if (dist.km > maxKm) return null
+        return { ...poi, distance_km: dist.km, distance_m: dist.m }
       })
       .filter(Boolean)
       .sort((a, b) => a.distance_km - b.distance_km)
@@ -347,7 +330,7 @@ router.get('/:id/nearby-pois', sanitizePlotId, async (req, res, next) => {
     const result = {
       pois: nearbyPois,
       categories,
-      plotCenter: { lat: centLat, lng: centLng },
+      plotCenter: center,
       count: nearbyPois.length,
     }
 
@@ -466,16 +449,8 @@ router.get('/:id/nearby', sanitizePlotId, async (req, res, next) => {
     const plot = await getPlotById(req.params.id)
     if (!plot) return res.status(404).json({ error: 'Plot not found' })
 
-    const coords = plot.coordinates
-    if (!coords || !Array.isArray(coords) || coords.length === 0) {
-      return res.json([])
-    }
-
-    // Calculate centroid
-    const valid = coords.filter(c => Array.isArray(c) && c.length >= 2 && isFinite(c[0]) && isFinite(c[1]))
-    if (valid.length === 0) return res.json([])
-    const centLat = valid.reduce((s, c) => s + c[0], 0) / valid.length
-    const centLng = valid.reduce((s, c) => s + c[1], 0) / valid.length
+    const center = calcCentroid(plot.coordinates)
+    if (!center) return res.json([])
 
     // Get all plots (cached) and compute distance — avoids redundant Supabase queries.
     // Previously called getPublishedPlots({}) directly, bypassing the 30s plot cache.
@@ -484,19 +459,10 @@ router.get('/:id/nearby', sanitizePlotId, async (req, res, next) => {
     const nearby = allPlots
       .filter(p => p.id !== req.params.id && p.coordinates && p.coordinates.length > 0)
       .map(p => {
-        const pc = p.coordinates.filter(c => Array.isArray(c) && c.length >= 2)
-        if (pc.length === 0) return null
-        const lat = pc.reduce((s, c) => s + c[0], 0) / pc.length
-        const lng = pc.reduce((s, c) => s + c[1], 0) / pc.length
-        // Haversine distance in km
-        const R = 6371
-        const dLat = (lat - centLat) * Math.PI / 180
-        const dLng = (lng - centLng) * Math.PI / 180
-        const a = Math.sin(dLat / 2) ** 2 +
-          Math.cos(centLat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) *
-          Math.sin(dLng / 2) ** 2
-        const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-        return { ...p, distance_km: Math.round(dist * 100) / 100 }
+        const pCenter = calcCentroid(p.coordinates)
+        if (!pCenter) return null
+        const dist = formatDistance(haversineKm(center.lat, center.lng, pCenter.lat, pCenter.lng))
+        return { ...p, distance_km: dist.km }
       })
       .filter(p => p && p.distance_km <= maxKm)
       .sort((a, b) => a.distance_km - b.distance_km)
