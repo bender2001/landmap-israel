@@ -471,6 +471,10 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
   const [scrollProgress, setScrollProgress] = useState(0) // 0-100%
   const [visibleIndex, setVisibleIndex] = useState(0) // Which card is roughly centered
 
+  // Throttled scroll handler using requestAnimationFrame — prevents 60+ state updates
+  // per second during fast scrolling (especially on mobile/trackpad).
+  // Without this, every scroll pixel triggers 4 setState calls which cascade re-renders.
+  const rafRef = useRef(null)
   const checkScroll = useCallback(() => {
     const el = scrollRef.current
     if (!el) return
@@ -492,17 +496,26 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
     setVisibleIndex(Math.min(approxIdx, (plots?.length ?? 1) - 1))
   }, [plots?.length])
 
+  const throttledCheckScroll = useCallback(() => {
+    if (rafRef.current) return // already scheduled
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null
+      checkScroll()
+    })
+  }, [checkScroll])
+
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    checkScroll()
-    el.addEventListener('scroll', checkScroll, { passive: true })
-    window.addEventListener('resize', checkScroll)
+    checkScroll() // initial measurement (synchronous, no throttle needed)
+    el.addEventListener('scroll', throttledCheckScroll, { passive: true })
+    window.addEventListener('resize', throttledCheckScroll)
     return () => {
-      el.removeEventListener('scroll', checkScroll)
-      window.removeEventListener('resize', checkScroll)
+      el.removeEventListener('scroll', throttledCheckScroll)
+      window.removeEventListener('resize', throttledCheckScroll)
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [plots, checkScroll])
+  }, [plots, checkScroll, throttledCheckScroll])
 
   // Scroll to selected card
   useEffect(() => {

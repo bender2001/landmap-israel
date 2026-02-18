@@ -31,7 +31,6 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
       .slice(0, 6) // max 6 suggestions
   }, [value, plots])
 
-  const showDropdown = isFocused && (value?.length >= 1 || true) // show on focus even without query
   const hasQuery = value && value.length >= 1
 
   // Recent searches (stored in localStorage)
@@ -99,7 +98,7 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
   }, [highlightIndex])
 
   const handleKeyDown = useCallback((e) => {
-    if (!showDropdown) return
+    if (!isFocused) return
 
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -120,7 +119,7 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
       setIsFocused(false)
       inputRef.current?.blur()
     }
-  }, [showDropdown, highlightIndex, suggestions, onSelectPlot])
+  }, [isFocused, highlightIndex, suggestions, onSelectPlot])
 
   const handleSelect = useCallback((plot) => {
     if (value) saveRecentSearch(value)
@@ -144,7 +143,7 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
 
   return (
     <div className="search-autocomplete-wrap" ref={wrapRef}>
-      <div className={`filter-search-input-wrap ${showDropdown ? 'search-has-dropdown' : ''}`}>
+      <div className={`filter-search-input-wrap ${(isFocused && hasQuery) || showFocusMenu ? 'search-has-dropdown' : ''}`}>
         <Search className="filter-search-icon" />
         <input
           ref={inputRef}
@@ -157,9 +156,11 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
           className="filter-search-input"
           autoComplete="off"
           role="combobox"
-          aria-expanded={showDropdown || showFocusMenu}
+          aria-expanded={(isFocused && hasQuery) || showFocusMenu}
           aria-haspopup="listbox"
           aria-autocomplete="list"
+          aria-controls={isFocused ? 'search-autocomplete-listbox' : undefined}
+          aria-activedescendant={highlightIndex >= 0 && hasQuery && suggestions[highlightIndex] ? `search-option-${suggestions[highlightIndex].id}` : undefined}
         />
         {value && (
           <button
@@ -281,7 +282,7 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
 
       {/* Autocomplete dropdown */}
       {hasQuery && isFocused && (
-        <div className="search-autocomplete-dropdown" role="listbox" ref={listRef}>
+        <div className="search-autocomplete-dropdown" role="listbox" id="search-autocomplete-listbox" aria-label="תוצאות חיפוש" ref={listRef}>
           {suggestions.length === 0 ? (
             <div className="px-4 py-5 text-center">
               <div className="text-lg mb-1">🔍</div>
@@ -307,6 +308,7 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
             return (
               <button
                 key={plot.id}
+                id={`search-option-${plot.id}`}
                 className={`search-autocomplete-item ${isHighlighted ? 'is-highlighted' : ''}`}
                 onClick={() => handleSelect(plot)}
                 onMouseEnter={() => setHighlightIndex(i)}

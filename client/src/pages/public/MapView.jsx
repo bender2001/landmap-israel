@@ -361,7 +361,9 @@ export default function MapView() {
     )
   }, [sortBy, userLocation])
 
-  // Sort
+  // Sort — all comparators include a deterministic tie-breaker (plot.id) to prevent
+  // visual jitter when two items share the same primary value. Without this, Array.sort's
+  // instability causes cards to swap positions on every React re-render cycle.
   const sortedPlots = useMemo(() => {
     if (sortBy === 'default') return searchedPlots
     const sorted = [...searchedPlots]
@@ -372,40 +374,40 @@ export default function MapView() {
       const proj = p.projected_value ?? p.projectedValue ?? 0
       return price > 0 ? (proj - price) / price : 0
     }
+    // Stable tie-breaker: when primary values are equal, sort by id for deterministic order.
+    const tieBreak = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
     switch (sortBy) {
       case 'distance-asc': {
-        // Sort by distance from user's current location — like Madlan's proximity sort.
-        // Uses the plotCenter helper (centroid of polygon) for each plot.
-        if (!userLocation) break // Still waiting for geolocation
+        if (!userLocation) break
         sorted.sort((a, b) => {
           const ca = plotCenter(a.coordinates)
           const cb = plotCenter(b.coordinates)
-          if (!ca && !cb) return 0
+          if (!ca && !cb) return tieBreak(a, b)
           if (!ca) return 1
           if (!cb) return -1
           const distA = haversineKm(userLocation.lat, userLocation.lng, ca.lat, ca.lng)
           const distB = haversineKm(userLocation.lat, userLocation.lng, cb.lat, cb.lng)
-          return distA - distB
+          return distA - distB || tieBreak(a, b)
         })
         break
       }
-      case 'price-asc': sorted.sort((a, b) => getPrice(a) - getPrice(b)); break
-      case 'price-desc': sorted.sort((a, b) => getPrice(b) - getPrice(a)); break
-      case 'size-asc': sorted.sort((a, b) => getSize(a) - getSize(b)); break
-      case 'size-desc': sorted.sort((a, b) => getSize(b) - getSize(a)); break
-      case 'roi-desc': sorted.sort((a, b) => getRoi(b) - getRoi(a)); break
-      case 'roi-asc': sorted.sort((a, b) => getRoi(a) - getRoi(b)); break
+      case 'price-asc': sorted.sort((a, b) => getPrice(a) - getPrice(b) || tieBreak(a, b)); break
+      case 'price-desc': sorted.sort((a, b) => getPrice(b) - getPrice(a) || tieBreak(a, b)); break
+      case 'size-asc': sorted.sort((a, b) => getSize(a) - getSize(b) || tieBreak(a, b)); break
+      case 'size-desc': sorted.sort((a, b) => getSize(b) - getSize(a) || tieBreak(a, b)); break
+      case 'roi-desc': sorted.sort((a, b) => getRoi(b) - getRoi(a) || tieBreak(a, b)); break
+      case 'roi-asc': sorted.sort((a, b) => getRoi(a) - getRoi(b) || tieBreak(a, b)); break
       case 'ppsqm-asc': sorted.sort((a, b) => {
         const aPpsqm = getSize(a) > 0 ? getPrice(a) / getSize(a) : Infinity
         const bPpsqm = getSize(b) > 0 ? getPrice(b) / getSize(b) : Infinity
-        return aPpsqm - bPpsqm
+        return aPpsqm - bPpsqm || tieBreak(a, b)
       }); break
       case 'ppsqm-desc': sorted.sort((a, b) => {
         const aPpsqm = getSize(a) > 0 ? getPrice(a) / getSize(a) : 0
         const bPpsqm = getSize(b) > 0 ? getPrice(b) / getSize(b) : 0
-        return bPpsqm - aPpsqm
+        return bPpsqm - aPpsqm || tieBreak(a, b)
       }); break
-      case 'score-desc': sorted.sort((a, b) => calcInvestmentScore(b) - calcInvestmentScore(a)); break
+      case 'score-desc': sorted.sort((a, b) => calcInvestmentScore(b) - calcInvestmentScore(a) || tieBreak(a, b)); break
       case 'cagr-desc': sorted.sort((a, b) => {
         const getCagr = (p) => {
           const price = p.total_price ?? p.totalPrice ?? 0
@@ -415,27 +417,25 @@ export default function MapView() {
           const data = calcCAGR(roiPct, readiness)
           return data ? data.cagr : 0
         }
-        return getCagr(b) - getCagr(a)
+        return getCagr(b) - getCagr(a) || tieBreak(a, b)
       }); break
       case 'updated-desc': sorted.sort((a, b) => {
         const getTs = (p) => new Date(p.updated_at ?? p.updatedAt ?? p.created_at ?? p.createdAt ?? 0).getTime()
-        return getTs(b) - getTs(a)
+        return getTs(b) - getTs(a) || tieBreak(a, b)
       }); break
       case 'newest-first': sorted.sort((a, b) => {
-        // Sort by creation date descending — newest listings first (like Yad2's default sort)
         const aTs = new Date(a.created_at ?? a.createdAt ?? 0).getTime()
         const bTs = new Date(b.created_at ?? b.createdAt ?? 0).getTime()
-        return bTs - aTs
+        return bTs - aTs || tieBreak(a, b)
       }); break
       case 'monthly-asc': sorted.sort((a, b) => {
-        // Sort by estimated monthly payment ascending — cheapest to service first
         const getMonthly = (p) => {
           const price = p.total_price ?? p.totalPrice ?? 0
           if (price <= 0) return Infinity
           const payment = calcMonthlyPayment(price)
           return payment ? payment.monthly : Infinity
         }
-        return getMonthly(a) - getMonthly(b)
+        return getMonthly(a) - getMonthly(b) || tieBreak(a, b)
       }); break
     }
     return sorted
