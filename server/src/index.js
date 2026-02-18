@@ -210,38 +210,8 @@ app.get('/api/cache-stats', (req, res) => {
   }
 })
 
-// Health check with DB connectivity, uptime, and memory stats
-app.get('/api/health', async (req, res) => {
-  const mem = process.memoryUsage()
-  const base = {
-    timestamp: new Date().toISOString(),
-    uptime: Math.round(process.uptime()),
-    memory: {
-      rss: Math.round(mem.rss / 1024 / 1024),
-      heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
-      heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
-    },
-    version: process.env.npm_package_version || '2.0.0',
-    sseClients: getClientCount(),
-  }
-  try {
-    const start = Date.now()
-    const { error } = await supabaseAdmin.from('plots').select('id').limit(1)
-    const dbLatency = Date.now() - start
-    res.json({
-      ...base,
-      status: error ? 'degraded' : 'ok',
-      db: error ? 'error' : 'connected',
-      dbLatencyMs: dbLatency,
-    })
-  } catch (e) {
-    res.status(503).json({
-      ...base,
-      status: 'degraded',
-      db: 'unreachable',
-    })
-  }
-})
+// Note: Health endpoint is handled by healthRoutes above (routes/health.js).
+// SSE client count is exposed via the /api/health route's checks object.
 
 // ─── Serve frontend static files in production ───
 if (process.env.NODE_ENV === 'production') {

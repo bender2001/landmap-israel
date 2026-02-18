@@ -14,7 +14,7 @@ import WidgetErrorBoundary from '../../components/ui/WidgetErrorBoundary.jsx'
 import ConnectionStatus from '../../components/ui/ConnectionStatus.jsx'
 import { useMetaTags } from '../../hooks/useMetaTags.js'
 import { useStructuredData } from '../../hooks/useStructuredData.js'
-import { formatCurrency, formatPriceShort, calcInvestmentScore, calcCAGR, haversineKm, plotCenter } from '../../utils/formatters.js'
+import { formatCurrency, formatPriceShort, calcInvestmentScore, calcCAGR, calcMonthlyPayment, haversineKm, plotCenter } from '../../utils/formatters.js'
 import { useViewTracker } from '../../hooks/useViewTracker.js'
 import { usePriceTracker } from '../../hooks/usePriceTracker.js'
 import { useSavedSearches } from '../../hooks/useSavedSearches.js'
@@ -90,6 +90,7 @@ function FilterSuggestions({ filteredCount, totalCount, filters, statusFilter, o
     (filters.minRoi && filters.minRoi !== 'all' ? 1 : 0) +
     (filters.zoning && filters.zoning !== 'all' ? 1 : 0) +
     (filters.maxDays ? 1 : 0) +
+    (filters.maxMonthly ? 1 : 0) +
     (filters.search ? 1 : 0) +
     statusFilter.length
 
@@ -104,6 +105,7 @@ function FilterSuggestions({ filteredCount, totalCount, filters, statusFilter, o
   if (filters.zoning && filters.zoning !== 'all') suggestions.push({ label: 'הסר סינון תכנוני', action: () => onFilterChange('zoning', 'all'), icon: '🗺️' })
   if (filters.ripeness !== 'all') suggestions.push({ label: 'הסר סינון בשלות', action: () => onFilterChange('ripeness', 'all'), icon: '⏱️' })
   if (filters.maxDays) suggestions.push({ label: 'הסר סינון חדשות', action: () => onFilterChange('maxDays', ''), icon: '🆕' })
+  if (filters.maxMonthly) suggestions.push({ label: 'הסר סינון תשלום חודשי', action: () => onFilterChange('maxMonthly', ''), icon: '🏦' })
   statusFilter.forEach(s => suggestions.push({ label: `הסר סטטוס "${s === 'AVAILABLE' ? 'זמין' : s === 'SOLD' ? 'נמכר' : s}"`, action: () => onToggleStatus(s), icon: '🏷️' }))
 
   if (suggestions.length === 0) return null
@@ -152,6 +154,7 @@ const initialFilters = {
   minRoi: 'all',
   zoning: 'all',
   maxDays: '',
+  maxMonthly: '',
   search: '',
 }
 
@@ -181,6 +184,7 @@ export default function MapView() {
       minRoi: p.minRoi || 'all',
       zoning: p.zoning || 'all',
       maxDays: p.maxDays || '',
+      maxMonthly: p.maxMonthly || '',
       search: p.q || '',
     }
   })
@@ -222,6 +226,7 @@ export default function MapView() {
     if (filters.minRoi && filters.minRoi !== 'all') params.set('minRoi', filters.minRoi)
     if (filters.zoning && filters.zoning !== 'all') params.set('zoning', filters.zoning)
     if (filters.maxDays) params.set('maxDays', filters.maxDays)
+    if (filters.maxMonthly) params.set('maxMonthly', filters.maxMonthly)
     if (filters.search) params.set('q', filters.search)
     if (statusFilter.length > 0) params.set('status', statusFilter.join(','))
     if (sortBy !== 'default') params.set('sort', sortBy)
@@ -247,7 +252,7 @@ export default function MapView() {
     // Pass search query to server for DB-level text search (faster than client-side)
     if (debouncedSearch) f.q = debouncedSearch
     // Pass sorts to server for better performance — includes server-computed score, ROI, and CAGR sorts
-    if (['price-asc', 'price-desc', 'size-asc', 'size-desc', 'updated-desc', 'score-desc', 'roi-desc', 'roi-asc', 'cagr-desc'].includes(sortBy)) {
+    if (['price-asc', 'price-desc', 'size-asc', 'size-desc', 'updated-desc', 'score-desc', 'roi-desc', 'roi-asc', 'cagr-desc', 'newest-first'].includes(sortBy)) {
       f.sort = sortBy
     }
     return f
@@ -293,11 +298,26 @@ export default function MapView() {
     })
   }, [roiFilteredPlots, filters.maxDays])
 
+  // Monthly payment affordability filter — "how much can I pay per month?" (like Madlan's affordability filter).
+  // Uses calcMonthlyPayment with default terms (50% LTV, 6%, 15yr) to filter by max monthly payment.
+  // Investors think in monthly cash flow, not just total price — this bridges the gap.
+  const affordabilityFilteredPlots = useMemo(() => {
+    if (!filters.maxMonthly) return freshnessFilteredPlots
+    const maxMonthly = parseInt(filters.maxMonthly, 10)
+    if (!maxMonthly || maxMonthly <= 0) return freshnessFilteredPlots
+    return freshnessFilteredPlots.filter((p) => {
+      const price = p.total_price ?? p.totalPrice ?? 0
+      if (price <= 0) return false
+      const payment = calcMonthlyPayment(price)
+      return payment && payment.monthly <= maxMonthly
+    })
+  }, [freshnessFilteredPlots, filters.maxMonthly])
+
   // Bounds filter — "Search this area" (like Madlan's "חפש באזור זה")
   // Filters plots to only those within the map viewport bounds the user selected
   const boundsFilteredPlots = useMemo(() => {
-    if (!boundsFilter) return freshnessFilteredPlots
-    return freshnessFilteredPlots.filter((p) => {
+    if (!boundsFilter) return affordabilityFilteredPlots
+    return affordabilityFilteredPlots.filter((p) => {
       if (!p.coordinates || !Array.isArray(p.coordinates) || p.coordinates.length < 3) return false
       // Check if any coordinate falls within bounds (inclusive check)
       return p.coordinates.some(c =>
@@ -306,7 +326,7 @@ export default function MapView() {
         c[1] >= boundsFilter.west && c[1] <= boundsFilter.east
       )
     })
-  }, [freshnessFilteredPlots, boundsFilter])
+  }, [affordabilityFilteredPlots, boundsFilter])
 
   // Client-side search filter — acts as secondary filter for instant feedback
   // while server-side q param handles the primary DB-level search
@@ -399,6 +419,22 @@ export default function MapView() {
       case 'updated-desc': sorted.sort((a, b) => {
         const getTs = (p) => new Date(p.updated_at ?? p.updatedAt ?? p.created_at ?? p.createdAt ?? 0).getTime()
         return getTs(b) - getTs(a)
+      }); break
+      case 'newest-first': sorted.sort((a, b) => {
+        // Sort by creation date descending — newest listings first (like Yad2's default sort)
+        const aTs = new Date(a.created_at ?? a.createdAt ?? 0).getTime()
+        const bTs = new Date(b.created_at ?? b.createdAt ?? 0).getTime()
+        return bTs - aTs
+      }); break
+      case 'monthly-asc': sorted.sort((a, b) => {
+        // Sort by estimated monthly payment ascending — cheapest to service first
+        const getMonthly = (p) => {
+          const price = p.total_price ?? p.totalPrice ?? 0
+          if (price <= 0) return Infinity
+          const payment = calcMonthlyPayment(price)
+          return payment ? payment.monthly : Infinity
+        }
+        return getMonthly(a) - getMonthly(b)
       }); break
     }
     return sorted

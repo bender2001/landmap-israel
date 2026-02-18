@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { supabaseAdmin } from '../config/supabase.js'
 import { plotCache, statsCache, marketCache } from '../services/cacheService.js'
+import { getClientCount } from '../services/sseService.js'
 
 const router = Router()
 
@@ -77,6 +78,7 @@ router.get('/', async (req, res) => {
     uptimeSeconds: uptimeSec,
     uptimeHuman: formatUptime(uptimeSec),
     nodeVersion: process.version,
+    sseClients: getClientCount(),
     checks,
   })
 })

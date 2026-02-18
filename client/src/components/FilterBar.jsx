@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, Link2, Download, Zap, Layers, Navigation } from 'lucide-react'
+import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, Link2, Download, Zap, Layers, Navigation, Wallet } from 'lucide-react'
 import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
 import SearchAutocomplete from './SearchAutocomplete'
 import SavedSearches from './SavedSearches'
@@ -41,6 +41,21 @@ const roiOptions = [
   { label: '200%+', value: '200' },
 ]
 
+/**
+ * Monthly payment (affordability) filter — like Madlan's "תשלום חודשי" filter.
+ * Based on default mortgage terms: 50% LTV, 6% rate, 15-year term.
+ * Shows max monthly payment the investor needs to plan for.
+ */
+const monthlyPaymentOptions = [
+  { label: 'כל התשלומים', value: '' },
+  { label: 'עד ₪1,500/חודש', value: '1500' },
+  { label: 'עד ₪2,500/חודש', value: '2500' },
+  { label: 'עד ₪4,000/חודש', value: '4000' },
+  { label: 'עד ₪6,000/חודש', value: '6000' },
+  { label: 'עד ₪8,000/חודש', value: '8000' },
+  { label: 'עד ₪12,000/חודש', value: '12000' },
+]
+
 const zoningOptions = [
   { label: 'כל השלבים', value: 'all' },
   { label: '🌾 חקלאית', value: 'AGRICULTURAL' },
@@ -67,6 +82,8 @@ const sortOptions = [
   { label: 'ציון השקעה: גבוה לנמוך', value: 'score-desc', icon: ArrowDown },
   { label: 'CAGR: גבוה לנמוך', value: 'cagr-desc', icon: ArrowDown },
   { label: 'עודכן לאחרונה', value: 'updated-desc', icon: ArrowDown },
+  { label: 'חדש בשוק (ימים)', value: 'newest-first', icon: ArrowDown },
+  { label: 'תשלום חודשי: נמוך לגבוה', value: 'monthly-asc', icon: ArrowUp },
 ]
 
 const statusEntries = Object.entries(statusColors)
@@ -150,6 +167,15 @@ const quickPresetDefs = [
       onFilterChange('minRoi', '200')
     },
     isActive: (filters) => filters.minRoi === '200',
+  },
+  {
+    id: 'affordable',
+    label: 'עד ₪4K/חודש',
+    emoji: '🏦',
+    apply: (onFilterChange) => {
+      onFilterChange('maxMonthly', '4000')
+    },
+    isActive: (filters) => filters.maxMonthly === '4000',
   },
 ]
 
@@ -475,6 +501,7 @@ export default function FilterBar({
     (filters.minRoi && filters.minRoi !== 'all' ? 1 : 0) +
     (filters.zoning && filters.zoning !== 'all' ? 1 : 0) +
     (filters.maxDays ? 1 : 0) +
+    (filters.maxMonthly ? 1 : 0) +
     (filters.search ? 1 : 0) +
     statusFilter.length
 
@@ -617,6 +644,16 @@ export default function FilterBar({
             options={roiOptionsWithCounts}
             onChange={(val) => onFilterChange('minRoi', val)}
             isActive={filters.minRoi && filters.minRoi !== 'all'}
+          />
+
+          <SelectPill
+            icon={Wallet}
+            label="תשלום חודשי"
+            value={filters.maxMonthly || ''}
+            displayValue={filters.maxMonthly ? `עד ₪${Number(filters.maxMonthly).toLocaleString()}/חודש` : null}
+            options={monthlyPaymentOptions}
+            onChange={(val) => onFilterChange('maxMonthly', val)}
+            isActive={!!filters.maxMonthly}
           />
 
           {/* Thin separator */}
@@ -766,6 +803,17 @@ export default function FilterBar({
               >
                 <Clock className="w-3 h-3" />
                 <span>🆕 {filters.maxDays} ימים אחרונים</span>
+                <X className="w-3 h-3 opacity-60 hover:opacity-100" />
+              </button>
+            )}
+            {filters.maxMonthly && (
+              <button
+                className="filter-active-chip"
+                onClick={() => onFilterChange('maxMonthly', '')}
+                aria-label={`הסר סינון תשלום חודשי: עד ₪${Number(filters.maxMonthly).toLocaleString()}`}
+              >
+                <Wallet className="w-3 h-3" />
+                <span>עד ₪{Number(filters.maxMonthly).toLocaleString()}/חודש</span>
                 <X className="w-3 h-3 opacity-60 hover:opacity-100" />
               </button>
             )}
