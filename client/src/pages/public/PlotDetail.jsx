@@ -1,6 +1,6 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart, ExternalLink, Calculator as CalcIcon } from 'lucide-react'
+import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart, ExternalLink, Calculator as CalcIcon, FileText, Download, File, FileImage, FileSpreadsheet } from 'lucide-react'
 import { usePlot, useNearbyPlots, useSimilarPlots } from '../../hooks/usePlots.js'
 import { useMarketOverview } from '../../hooks/useMarketOverview.js'
 import { useFavorites } from '../../hooks/useFavorites.js'
@@ -233,6 +233,45 @@ function SimilarPlotsSection({ plotId, onNearbyLoaded }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function getDocIcon(mimeType) {
+  if (!mimeType) return File
+  if (mimeType.startsWith('image/')) return FileImage
+  if (mimeType.includes('spreadsheet') || mimeType.includes('excel') || mimeType.includes('csv')) return FileSpreadsheet
+  return FileText
+}
+
+/**
+ * Reading progress bar — thin gold bar at the top of the viewport that fills as the user scrolls.
+ * Standard UX pattern on content-heavy pages (Medium, Madlan property pages, news sites).
+ * Helps users gauge how far they are in the long plot detail page.
+ */
+function ReadingProgressBar() {
+  const [progress, setProgress] = useState(0)
+
+  useEffect(() => {
+    const handler = () => {
+      const scrollTop = window.scrollY
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight
+      if (docHeight <= 0) return
+      setProgress(Math.min(100, Math.round((scrollTop / docHeight) * 100)))
+    }
+    window.addEventListener('scroll', handler, { passive: true })
+    handler() // initial
+    return () => window.removeEventListener('scroll', handler)
+  }, [])
+
+  if (progress <= 0) return null
+
+  return (
+    <div className="fixed top-16 left-0 right-0 z-[55] h-[2px] bg-white/5" aria-hidden="true">
+      <div
+        className="h-full bg-gradient-to-r from-gold via-gold-bright to-gold transition-[width] duration-150 ease-out"
+        style={{ width: `${progress}%` }}
+      />
     </div>
   )
 }
@@ -632,6 +671,7 @@ export default function PlotDetail() {
   return (
     <div className="min-h-screen w-full bg-navy" dir="rtl">
       <PublicNav />
+      <ReadingProgressBar />
       <JsonLdSchema plot={plot} />
       <BreadcrumbSchema plot={plot} />
       <PlotFaqSchema plot={plot} />
@@ -1084,6 +1124,63 @@ export default function PlotDetail() {
                   </div>
                 </div>
               )}
+
+              {/* Documents — PDFs, surveys, plans that investors need for due diligence.
+                  Matches the sidebar's document access on the full-page view.
+                  Like Madlan/Yad2's property document sections — essential for serious investors. */}
+              {(() => {
+                const docs = plot.plot_documents?.length ? plot.plot_documents : plot.documents?.length ? plot.documents : null
+                if (!docs) return null
+                return (
+                  <div className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-lg bg-gold/15 flex items-center justify-center">
+                        <FileText className="w-3.5 h-3.5 text-gold" />
+                      </div>
+                      <h2 className="text-base font-bold text-slate-100">מסמכים ותוכניות</h2>
+                      <span className="text-[10px] text-slate-500 bg-white/5 px-2 py-0.5 rounded-full">{docs.length}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {docs.map((doc, i) => {
+                        if (typeof doc === 'object' && doc.url) {
+                          const DocIcon = getDocIcon(doc.mime_type)
+                          return (
+                            <a
+                              key={doc.id || i}
+                              href={doc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-3 bg-white/[0.02] border border-white/5 rounded-xl px-4 py-3 hover:border-gold/20 hover:bg-gold/5 transition-all group"
+                            >
+                              <DocIcon className="w-5 h-5 text-gold/60 group-hover:text-gold transition-colors flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm text-slate-300 group-hover:text-slate-200 transition-colors truncate">
+                                  {doc.name || 'מסמך'}
+                                </div>
+                                {doc.mime_type && (
+                                  <div className="text-[10px] text-slate-600 mt-0.5">
+                                    {doc.mime_type.includes('pdf') ? 'PDF' : doc.mime_type.includes('image') ? 'תמונה' : doc.mime_type.includes('spread') || doc.mime_type.includes('excel') ? 'גיליון' : 'מסמך'}
+                                  </div>
+                                )}
+                              </div>
+                              <Download className="w-4 h-4 text-slate-500 group-hover:text-gold transition-colors flex-shrink-0" />
+                            </a>
+                          )
+                        }
+                        return (
+                          <div
+                            key={i}
+                            className="flex items-center gap-3 bg-white/[0.02] border border-white/5 rounded-xl px-4 py-3"
+                          >
+                            <FileText className="w-5 h-5 text-gold/60 flex-shrink-0" />
+                            <span className="text-sm text-slate-300">{doc}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* Due Diligence Checklist — interactive pre-purchase verification steps.
                   Like a flight pre-check but for land investment. No competitor has this.

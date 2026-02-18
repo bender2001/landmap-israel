@@ -9,6 +9,62 @@ import { useMetaTags } from '../../hooks/useMetaTags'
 const phoneRegex = /^(?:\+?972[-\s]?|0)(?:[2-9])[-\s]?\d{3}[-\s]?\d{4}$/
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+/**
+ * Organization + LocalBusiness JSON-LD — helps Google show contact info in search results
+ * and improves local SEO for "LandMap Israel contact" queries.
+ * Like Madlan's organization markup — standard practice for real estate platforms.
+ */
+function ContactJsonLd() {
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'RealEstateAgent',
+    name: 'LandMap Israel',
+    description: 'פלטפורמת השקעות בקרקעות בישראל — מפות, ניתוח תשואות ומידע תכנוני למשקיעים',
+    url: window.location.origin,
+    logo: `${window.location.origin}/logo.png`,
+    email: 'info@landmap.co.il',
+    telephone: '+972-50-000-0000',
+    address: {
+      '@type': 'PostalAddress',
+      addressCountry: 'IL',
+      addressRegion: 'ישראל',
+    },
+    areaServed: {
+      '@type': 'Country',
+      name: 'Israel',
+    },
+    openingHoursSpecification: [
+      {
+        '@type': 'OpeningHoursSpecification',
+        dayOfWeek: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
+        opens: '09:00',
+        closes: '18:00',
+      },
+      {
+        '@type': 'OpeningHoursSpecification',
+        dayOfWeek: 'Friday',
+        opens: '09:00',
+        closes: '13:00',
+      },
+    ],
+    sameAs: [],
+    contactPoint: {
+      '@type': 'ContactPoint',
+      contactType: 'customer support',
+      telephone: '+972-50-000-0000',
+      email: 'info@landmap.co.il',
+      availableLanguage: ['Hebrew', 'English', 'Russian'],
+    },
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
 export default function Contact() {
   useMetaTags({
     title: 'צור קשר — LandMap Israel | השאירו פרטים ונחזור אליכם',
@@ -66,6 +122,7 @@ export default function Contact() {
   return (
     <div className="min-h-screen bg-navy" dir="rtl">
       <PublicNav />
+      <ContactJsonLd />
 
       <div className="pt-28 pb-16 px-4">
         <div className="max-w-5xl mx-auto">
