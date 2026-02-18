@@ -23,7 +23,7 @@ import adminPoiRoutes from './routes/admin/pois.js'
 import adminActivityRoutes from './routes/admin/activity.js'
 import adminSettingsRoutes from './routes/admin/settings.js'
 import sitemapRoutes from './routes/sitemap.js'
-import { errorHandler } from './middleware/errorHandler.js'
+import { errorHandler, requestId } from './middleware/errorHandler.js'
 import { supabaseAdmin } from './config/supabase.js'
 
 const app = express()
@@ -47,6 +47,9 @@ app.use(cors({
   },
   credentials: true,
 }))
+
+// Request tracing
+app.use(requestId)
 
 // Compression
 app.use(compression())

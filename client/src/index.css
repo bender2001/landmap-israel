@@ -2903,3 +2903,149 @@ body {
   content-visibility: auto;
   contain-intrinsic-size: auto 200px;
 }
+
+/* ═══════════════════════════════════════════
+   PRINT STYLESHEET — Plot Report
+   Professional print layout like Madlan/Yad2
+   ═══════════════════════════════════════════ */
+@media print {
+  /* Hide non-essential UI */
+  .filter-bar-container,
+  .plot-card-strip,
+  .leaflet-container,
+  .map-vignette,
+  .map-noise,
+  .glass-panel,
+  .compare-bar,
+  .ai-chat-widget,
+  .ai-chat-fab,
+  [class*="ConnectionStatus"],
+  [class*="MarketStats"],
+  [class*="RecentlyViewed"],
+  [class*="KeyboardShortcuts"],
+  [class*="LeadModal"],
+  [class*="IntroOverlay"],
+  .legend-item,
+  button[aria-label="צור קשר לגבי חלקה זו"],
+  .sidebar-close-btn,
+  .section-chevron,
+  nav,
+  footer {
+    display: none !important;
+  }
+
+  /* Reset dark theme for print */
+  body, html, #root {
+    background: white !important;
+    color: #1a1a1a !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  * {
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Sidebar becomes full-width document */
+  .sidebar-details,
+  [class*="sidebar"] {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: white !important;
+    border: none !important;
+    box-shadow: none !important;
+    transform: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Make sections visible */
+  .section-collapse {
+    max-height: none !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+    content-visibility: visible !important;
+  }
+
+  /* Print header */
+  .sidebar-details::before {
+    content: "LandMap Israel — דוח חלקה";
+    display: block;
+    font-size: 24px;
+    font-weight: 800;
+    color: #1a1a1a;
+    border-bottom: 3px solid #C8942A;
+    padding-bottom: 12px;
+    margin-bottom: 20px;
+  }
+
+  /* Text colors for print */
+  .text-slate-100, .text-slate-200, .text-slate-300 {
+    color: #1a1a1a !important;
+  }
+  .text-slate-400, .text-slate-500 {
+    color: #555 !important;
+  }
+  .text-gold, .brand-text {
+    color: #C8942A !important;
+    -webkit-text-fill-color: #C8942A !important;
+  }
+
+  /* Background adjustments */
+  [class*="bg-navy"], [class*="bg-slate"] {
+    background: white !important;
+  }
+  [class*="border-white/"], [class*="border-gold/"] {
+    border-color: #ddd !important;
+  }
+
+  /* Cards in print */
+  .card-lift, [class*="glass"] {
+    background: #f9f9f9 !important;
+    border: 1px solid #ddd !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Page break control */
+  .section-header {
+    break-after: avoid;
+  }
+  [class*="CollapsibleSection"] {
+    break-inside: avoid;
+  }
+
+  /* Footer with timestamp */
+  @page {
+    margin: 15mm;
+    @bottom-center {
+      content: "LandMap Israel · " counter(page) " / " counter(pages);
+      font-size: 9px;
+      color: #999;
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════
+   MAP RULER TOOL
+   ═══════════════════════════════════════════ */
+.ruler-tooltip {
+  background: rgba(5, 13, 26, 0.9) !important;
+  border: 1px solid rgba(200, 148, 42, 0.4) !important;
+  border-radius: 8px !important;
+  color: #F1F5F9 !important;
+  font-family: 'Heebo', sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+  white-space: nowrap !important;
+}
+.ruler-tooltip::before {
+  display: none !important;
+}

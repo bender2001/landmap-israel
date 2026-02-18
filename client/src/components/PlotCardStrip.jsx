@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback, useMemo, memo } from 'react'
 import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows, Share2 } from 'lucide-react'
+import PriceSparkline from './ui/PriceSparkline'
 import { statusColors, statusLabels } from '../utils/constants'
 import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
@@ -186,7 +187,10 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
 
         <div className="plot-card-mini-footer">
           <div className="flex flex-col">
-            <span className="plot-card-mini-price">{formatPriceShort(price)}</span>
+            <div className="flex items-center gap-1">
+              <span className="plot-card-mini-price">{formatPriceShort(price)}</span>
+              <PriceSparkline currentPrice={price} projectedValue={projValue} />
+            </div>
             {pricePerDunam && <span className="text-[9px] text-slate-500">{pricePerDunam}/דונם</span>}
           </div>
           <div className="plot-card-mini-tags">

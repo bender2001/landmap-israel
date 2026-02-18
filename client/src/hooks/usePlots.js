@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
-import { getPlots, getPlot } from '../api/plots.js'
+import { getPlots, getPlot, getNearbyPlots } from '../api/plots.js'
 import { plots as mockPlots } from '../data/mockData.js'
 
 // Normalize mock data from camelCase to snake_case for consistency
@@ -76,6 +76,19 @@ export function usePlot(id) {
     queryKey: ['plot', id],
     queryFn: () => fetchPlotWithFallback(id),
     enabled: !!id,
+    retry: 1,
+  })
+}
+
+/**
+ * Fetch nearby plots based on geo-proximity (server-computed Haversine distance).
+ */
+export function useNearbyPlots(plotId) {
+  return useQuery({
+    queryKey: ['nearbyPlots', plotId],
+    queryFn: () => getNearbyPlots(plotId, 4),
+    enabled: !!plotId,
+    staleTime: 120_000,
     retry: 1,
   })
 }

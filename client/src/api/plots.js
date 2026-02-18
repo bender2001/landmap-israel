@@ -12,3 +12,7 @@ export function getPlots(filters = {}) {
 export function getPlot(id) {
   return api.get(`/plots/${id}`)
 }
+
+export function getNearbyPlots(id, limit = 5) {
+  return api.get(`/plots/${id}/nearby?limit=${limit}`)
+}

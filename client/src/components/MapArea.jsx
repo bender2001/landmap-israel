@@ -6,6 +6,7 @@ import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
 import { formatCurrency, formatPriceShort, formatDunam } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
 import MapClusterLayer from './MapClusterLayer'
+import MapRuler from './MapRuler'
 
 function FlyToSelected({ plot }) {
   const map = useMap()
@@ -268,6 +269,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         <FlyToSelected plot={selectedPlot} />
         <LocateButton />
         <MapClusterLayer plots={plots} onSelectPlot={onSelectPlot} />
+        <MapRuler />
 
         {plots.map((plot) => {
           // Validate coordinates before rendering polygon

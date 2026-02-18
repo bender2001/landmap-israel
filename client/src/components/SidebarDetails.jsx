@@ -6,7 +6,7 @@ import PriceTrendChart from './ui/PriceTrendChart'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
 import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
-import { usePlot } from '../hooks/usePlots'
+import { usePlot, useNearbyPlots } from '../hooks/usePlots'
 import MiniMap from './ui/MiniMap'
 import { plotInquiryLink } from '../utils/config'
 
@@ -105,7 +105,13 @@ const committeeLevels = [
 ]
 
 function SimilarPlots({ currentPlot, allPlots, onSelectPlot }) {
+  // Use geo-proximity API for nearby plots (like Madlan's "נכסים באזור")
+  const { data: nearbyPlots } = useNearbyPlots(currentPlot?.id)
+
+  // Fallback to client-side similarity if API returns nothing
   const similar = useMemo(() => {
+    if (nearbyPlots && nearbyPlots.length > 0) return nearbyPlots
+
     if (!currentPlot || !allPlots || allPlots.length < 2) return []
     const price = currentPlot.total_price ?? currentPlot.totalPrice ?? 0
     const size = currentPlot.size_sqm ?? currentPlot.sizeSqM ?? 0
@@ -115,7 +121,6 @@ function SimilarPlots({ currentPlot, allPlots, onSelectPlot }) {
       .map(p => {
         const pPrice = p.total_price ?? p.totalPrice ?? 0
         const pSize = p.size_sqm ?? p.sizeSqM ?? 0
-        // Score: closer price + size + same city bonus
         const priceDiff = price > 0 ? Math.abs(pPrice - price) / price : 1
         const sizeDiff = size > 0 ? Math.abs(pSize - size) / size : 1
         const cityBonus = p.city === currentPlot.city ? 0 : 0.3
@@ -123,15 +128,17 @@ function SimilarPlots({ currentPlot, allPlots, onSelectPlot }) {
       })
       .sort((a, b) => a.score - b.score)
       .slice(0, 3)
-  }, [currentPlot?.id, allPlots])
+  }, [currentPlot?.id, allPlots, nearbyPlots])
 
   if (similar.length === 0) return null
+
+  const hasDistance = similar[0]?.distance_km != null
 
   return (
     <div className="mt-4 mb-2">
       <h4 className="text-xs font-bold text-slate-400 mb-3 flex items-center gap-2">
-        <span className="w-5 h-5 rounded bg-gold/15 flex items-center justify-center text-[10px]">🔗</span>
-        חלקות דומות
+        <span className="w-5 h-5 rounded bg-gold/15 flex items-center justify-center text-[10px]">📍</span>
+        {hasDistance ? 'חלקות בסביבה' : 'חלקות דומות'}
       </h4>
       <div className="space-y-2">
         {similar.map(p => {
@@ -149,7 +156,12 @@ function SimilarPlots({ currentPlot, allPlots, onSelectPlot }) {
               <div className="w-1 h-8 rounded-full flex-shrink-0" style={{ background: color }} />
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-medium text-slate-200 truncate">גוש {bn} | חלקה {p.number}</div>
-                <div className="text-[10px] text-slate-500">{p.city}</div>
+                <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                  {p.city}
+                  {p.distance_km != null && (
+                    <span className="text-blue-400">· {p.distance_km < 1 ? `${Math.round(p.distance_km * 1000)}מ׳` : `${p.distance_km} ק״מ`}</span>
+                  )}
+                </div>
               </div>
               <div className="text-left flex-shrink-0">
                 <div className="text-xs font-bold text-gold">{formatCurrency(price)}</div>

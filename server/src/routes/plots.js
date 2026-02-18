@@ -41,6 +41,56 @@ router.get('/stats', async (req, res, next) => {
   }
 })
 
+// GET /api/plots/:id/nearby - Find plots near a given plot (geo-proximity)
+router.get('/:id/nearby', async (req, res, next) => {
+  try {
+    res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300')
+    const plot = await getPlotById(req.params.id)
+    if (!plot) return res.status(404).json({ error: 'Plot not found' })
+
+    const coords = plot.coordinates
+    if (!coords || !Array.isArray(coords) || coords.length === 0) {
+      return res.json([])
+    }
+
+    // Calculate centroid
+    const valid = coords.filter(c => Array.isArray(c) && c.length >= 2 && isFinite(c[0]) && isFinite(c[1]))
+    if (valid.length === 0) return res.json([])
+    const centLat = valid.reduce((s, c) => s + c[0], 0) / valid.length
+    const centLng = valid.reduce((s, c) => s + c[1], 0) / valid.length
+
+    // Get all plots and compute distance
+    const allPlots = await getPublishedPlots({})
+    const limit = Math.min(parseInt(req.query.limit) || 5, 10)
+    const maxKm = parseFloat(req.query.maxKm) || 10
+
+    const nearby = allPlots
+      .filter(p => p.id !== req.params.id && p.coordinates && p.coordinates.length > 0)
+      .map(p => {
+        const pc = p.coordinates.filter(c => Array.isArray(c) && c.length >= 2)
+        if (pc.length === 0) return null
+        const lat = pc.reduce((s, c) => s + c[0], 0) / pc.length
+        const lng = pc.reduce((s, c) => s + c[1], 0) / pc.length
+        // Haversine distance in km
+        const R = 6371
+        const dLat = (lat - centLat) * Math.PI / 180
+        const dLng = (lng - centLng) * Math.PI / 180
+        const a = Math.sin(dLat / 2) ** 2 +
+          Math.cos(centLat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) *
+          Math.sin(dLng / 2) ** 2
+        const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        return { ...p, distance_km: Math.round(dist * 100) / 100 }
+      })
+      .filter(p => p && p.distance_km <= maxKm)
+      .sort((a, b) => a.distance_km - b.distance_km)
+      .slice(0, limit)
+
+    res.json(nearby)
+  } catch (err) {
+    next(err)
+  }
+})
+
 // GET /api/plots/:id - Single plot with documents & images
 router.get('/:id', async (req, res, next) => {
   try {
