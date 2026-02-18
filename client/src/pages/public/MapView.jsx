@@ -35,7 +35,7 @@ function DataFreshnessIndicator({ updatedAt, onRefresh }) {
   }, [])
 
   const ago = Math.round((Date.now() - updatedAt) / 1000)
-  const label = ago < 60 ? 'עכשיו' : ago < 300 ? `לפני ${Math.floor(ago / 60)} דק׳` : `לפני ${Math.floor(ago / 60)} דק׳`
+  const label = ago < 60 ? 'עכשיו' : ago < 3600 ? `לפני ${Math.floor(ago / 60)} דק׳` : `לפני ${Math.floor(ago / 3600)} שע׳`
   const isStale = ago > 300 // >5 min
 
   return (

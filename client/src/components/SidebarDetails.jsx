@@ -25,7 +25,7 @@ function SectionIcon({ icon: Icon, className = '' }) {
   )
 }
 
-function CollapsibleSection({ number, icon, title, children, animClass = '' }) {
+function CollapsibleSection({ number, icon, title, children, animClass = '', sectionId }) {
   const [isOpen, setIsOpen] = useState(true)
   const contentRef = useRef(null)
   const [maxHeight, setMaxHeight] = useState('2000px')
@@ -37,7 +37,7 @@ function CollapsibleSection({ number, icon, title, children, animClass = '' }) {
   }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className={animClass}>
+    <div className={animClass} id={sectionId}>
       <div
         className="section-header"
         onClick={() => setIsOpen((prev) => !prev)}
@@ -56,6 +56,63 @@ function CollapsibleSection({ number, icon, title, children, animClass = '' }) {
       >
         <div className="pb-2">{children}</div>
       </div>
+    </div>
+  )
+}
+
+/** Quick-nav pill bar — lets users jump between sidebar sections (like Madlan's section anchors) */
+function QuickNavBar({ scrollRef }) {
+  const [activeSection, setActiveSection] = useState(null)
+
+  const sections = [
+    { id: 'section-financial', label: '💰', title: 'פיננסי' },
+    { id: 'section-roi-stages', label: '📈', title: 'השבחה' },
+    { id: 'section-zoning', label: '🗺️', title: 'תכנון' },
+    { id: 'section-images', label: '📷', title: 'תמונות' },
+    { id: 'section-quality', label: '🛡️', title: 'איכות' },
+  ]
+
+  // Track which section is visible
+  useEffect(() => {
+    const container = scrollRef?.current
+    if (!container) return
+    const handleScroll = () => {
+      const containerTop = container.scrollTop + 80
+      let found = null
+      for (const s of sections) {
+        const el = container.querySelector(`#${s.id}`)
+        if (el && el.offsetTop <= containerTop) found = s.id
+      }
+      setActiveSection(found)
+    }
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [scrollRef])
+
+  const scrollTo = (id) => {
+    const container = scrollRef?.current
+    if (!container) return
+    const el = container.querySelector(`#${id}`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  return (
+    <div className="sticky top-0 z-20 bg-navy/80 backdrop-blur-md border-b border-white/5 px-4 py-1.5 flex items-center gap-1 overflow-x-auto scrollbar-none" dir="rtl">
+      {sections.map(s => (
+        <button
+          key={s.id}
+          onClick={() => scrollTo(s.id)}
+          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium whitespace-nowrap transition-all ${
+            activeSection === s.id
+              ? 'bg-gold/15 text-gold border border-gold/20'
+              : 'text-slate-500 hover:text-slate-300 hover:bg-white/5 border border-transparent'
+          }`}
+          title={s.title}
+        >
+          <span>{s.label}</span>
+          <span className="hidden sm:inline">{s.title}</span>
+        </button>
+      ))}
     </div>
   )
 }
@@ -747,6 +804,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
           <div className={`scroll-shadow-top ${scrollShadow.top ? 'visible' : ''}`} />
           <div className={`scroll-shadow-bottom ${scrollShadow.bottom ? 'visible' : ''}`} />
 
+          {/* Quick section navigation */}
+          <QuickNavBar scrollRef={scrollRef} />
+
           <div className="px-6 pb-6">
             {/* Description */}
             {plot.description && (
@@ -864,6 +924,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 icon={Award}
                 title="סטטוס ועדות"
                 animClass="animate-stagger-4"
+                sectionId="section-committees"
               >
                 <div className="space-y-0 mb-2">
                   {committeeLevels.map((level, i) => {
@@ -937,6 +998,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               icon={TrendingUp}
               title="נתונים פיננסיים"
               animClass="animate-stagger-6"
+              sectionId="section-financial"
             >
               <div className="grid grid-cols-3 gap-3 mb-3">
                 {/* Asked price */}
@@ -1127,6 +1189,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               icon={BarChart3}
               title="צפי השבחה לפי שלבי תכנון"
               animClass="animate-stagger-7"
+              sectionId="section-roi-stages"
             >
               <div className="bg-navy-light/40 border border-white/5 rounded-xl p-3 mb-2">
                 <div className="space-y-1">
@@ -1178,6 +1241,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               icon={MapPin}
               title="צינור תכנוני"
               animClass="animate-stagger-8"
+              sectionId="section-zoning"
             >
               {readinessEstimate && (
                 <div className="flex items-center gap-2 mb-4 bg-gradient-to-r from-gold/5 to-gold/10 border border-gold/20 rounded-xl px-4 py-2.5">
@@ -1227,6 +1291,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 number={`0${++sectionNum}`}
                 icon={ImageIcon}
                 title="תמונות"
+                sectionId="section-images"
               >
                 <div className="grid grid-cols-3 gap-2 mb-2">
                   {plot.plot_images.map((img, i) => (
@@ -1307,6 +1372,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 number={`0${++sectionNum}`}
                 icon={Shield}
                 title="ציון איכות סביבה"
+                sectionId="section-quality"
               >
                 <NeighborhoodRadar
                   distanceToSea={distanceToSea}
