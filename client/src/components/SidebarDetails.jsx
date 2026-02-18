@@ -3,6 +3,7 @@ import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2,
 import ShareMenu from './ui/ShareMenu'
 import ImageLightbox from './ui/ImageLightbox'
 import PriceTrendChart from './ui/PriceTrendChart'
+import ProfitWaterfall from './ui/ProfitWaterfall'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
 import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
@@ -587,6 +588,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
         <div class="row"><span class="label">שכ״ט עו״ד (~1.75%)</span><span class="val">${formatCurrency(Math.round(price * 0.0175))}</span></div>
         <div class="row"><span class="label">היטל השבחה משוער</span><span class="val">${formatCurrency(Math.round((proj - price) * 0.5))}</span></div>
         <div class="row"><span class="label">סה״כ עלות כוללת</span><span class="val" style="color:#C8942A">${formatCurrency(Math.round(price * 1.0775))}</span></div>
+        <div class="row"><span class="label">רווח נקי (אחרי עלויות)</span><span class="val" style="color:#22C55E">${formatCurrency(Math.round(proj - price * 1.0775 - (proj - price) * 0.5))}</span></div>
       </div>
       <div class="footer">
         <div>LandMap Israel — מפת קרקעות להשקעה</div>
@@ -1182,8 +1184,8 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                     <span className="text-emerald-400 font-medium">{formatCurrency(projectedValue - totalPrice)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-slate-400">רווח צפוי (נטו, אחרי היטל)</span>
-                    <span className="text-emerald-400 font-medium">{formatCurrency(Math.round((projectedValue - totalPrice) * 0.5))}</span>
+                    <span className="text-slate-400">רווח צפוי (נטו, אחרי עלויות)</span>
+                    <span className="text-emerald-400 font-medium">{formatCurrency(Math.round(projectedValue - totalPrice * 1.0775 - (projectedValue - totalPrice) * 0.5))}</span>
                   </div>
                   {readinessEstimate && (
                     <div className="flex justify-between text-xs">
@@ -1203,6 +1205,8 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   </div>
                 </div>
               </div>
+              {/* Profitability Waterfall — visual breakdown of costs vs profit */}
+              <ProfitWaterfall totalPrice={totalPrice} projectedValue={projectedValue} sizeSqM={sizeSqM} />
               {/* Mini Mortgage Calculator */}
               <MiniMortgageCalc totalPrice={totalPrice} />
             </CollapsibleSection>
