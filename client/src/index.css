@@ -740,32 +740,10 @@ body {
   animation: brand-shimmer 6s linear infinite;
 }
 
-/* ═══════════════════════════════════════════
-   CTA BUTTON SHIMMER
-   ═══════════════════════════════════════════ */
-
-@keyframes cta-shimmer {
-  0% { left: -150%; }
-  100% { left: 250%; }
-}
-
-.cta-shimmer::after {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -150%;
-  width: 80%;
-  height: 200%;
-  background: linear-gradient(
-    105deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.08) 45%,
-    rgba(255, 255, 255, 0.18) 50%,
-    rgba(255, 255, 255, 0.08) 55%,
-    transparent 70%
-  );
-  animation: cta-shimmer 4s ease-in-out infinite;
-}
+/* CTA shimmer: consolidated into a single definition below (sidebar section ~line 1917).
+   The old version used `left` positioning which triggers layout reflows;
+   the newer version uses `background-position` for GPU-friendly animation.
+   Removed the duplicate to prevent conflicting keyframe overrides. */
 
 /* ═══════════════════════════════════════════
    FILTER BAR — Premium Redesign
@@ -1880,15 +1858,8 @@ body {
   border-color: rgba(200, 148, 42, 0.15);
 }
 
-/* Smooth page transitions */
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.animate-fade-in {
-  animation: fade-in 0.3s ease-out;
-}
+/* Smooth page transitions — fade-in defined once in the FADE IN ANIMATION section below.
+   Uses opacity + translateY(8px) for a polished entrance effect. */
 
 @keyframes fade-in-up {
   from { opacity: 0; transform: translateY(8px); }
@@ -2405,10 +2376,8 @@ body {
   animation: deal-pulse 2s ease-in-out infinite;
 }
 
-@keyframes deal-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
+/* Note: @keyframes deal-pulse defined once above (tooltip section ~line 661).
+   Duplicate removed here to save ~70 bytes and prevent specificity conflicts. */
 
 /* ═══════════════════════════════════════════
    PLOT CARD STRIP — Desktop (≥640px)
