@@ -2633,6 +2633,130 @@ body {
 }
 
 /* ═══════════════════════════════════════════
+   MOBILE BOTTOM NAVIGATION — Like Madlan/Yad2
+   Fixed bottom tab bar for mobile, hidden on desktop.
+   Uses safe-area-inset for iPhone notch/home indicator.
+   ═══════════════════════════════════════════ */
+
+.mobile-bnav {
+  display: none; /* hidden on desktop */
+}
+
+@media (max-width: 639px) {
+  .mobile-bnav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 45;
+    height: calc(56px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: rgba(10, 22, 40, 0.92);
+    backdrop-filter: blur(20px) saturate(1.5);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
+    align-items: center;
+    justify-content: space-around;
+  }
+
+  .mobile-bnav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 2px;
+    padding: 6px 0;
+    color: #64748B;
+    text-decoration: none;
+    position: relative;
+    transition: color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  .mobile-bnav-item.is-active {
+    color: #E5B94E;
+  }
+
+  .mobile-bnav-icon-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+  }
+
+  .mobile-bnav-badge {
+    position: absolute;
+    top: -4px;
+    left: -6px; /* RTL: badge on left side */
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: #EF4444;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+  }
+
+  .mobile-bnav-label {
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .mobile-bnav-indicator {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 2px;
+    border-radius: 0 0 4px 4px;
+    background: linear-gradient(90deg, #C8942A, #E5B94E);
+    box-shadow: 0 2px 8px rgba(200, 148, 42, 0.4);
+  }
+
+  /* Add bottom padding to pages so content isn't hidden behind the nav */
+  body {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* CompareBar + other fixed bottom elements need to shift up */
+  .compare-bar {
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* PlotCardStrip at bottom needs space above the nav */
+  .plot-card-strip-wrap,
+  .plot-strip-wrapper {
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Mobile action bar for plot detail */
+  .mobile-plot-action-bar {
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Print: hide bottom nav */
+  @media print {
+    .mobile-bnav {
+      display: none !important;
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════
    ADMIN LAYOUT — Better mobile
    ═══════════════════════════════════════════ */
 

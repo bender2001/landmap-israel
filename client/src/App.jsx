@@ -4,6 +4,7 @@ import ScrollToTop from './components/ui/ScrollToTop'
 import Spinner from './components/ui/Spinner'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import RouteProgressBar from './components/ui/RouteProgressBar'
+import MobileBottomNav from './components/MobileBottomNav'
 import { useWebVitals } from './hooks/useWebVitals'
 
 // Lazy-load overlay components — they're all conditional (first visit, consent, PWA)
@@ -121,6 +122,11 @@ export default function App() {
           </Suspense>
         </main>
       </ErrorBoundary>
+
+      {/* Mobile bottom navigation — always visible, outside Suspense.
+          Renders nothing on desktop (CSS-hidden via .mobile-bnav display:none).
+          Imported eagerly (not lazy) because it's <1KB and renders on every mobile page. */}
+      <MobileBottomNav />
 
       <Suspense fallback={null}>
         <CookieConsent />
