@@ -2562,12 +2562,12 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               </div>
             </CollapsibleSection>
 
-            {/* Images */}
+            {/* Images — with preload for instant lightbox opening */}
             {plot.plot_images && plot.plot_images.length > 0 && (
               <CollapsibleSection
                 number={`0${++sectionNum}`}
                 icon={ImageIcon}
-                title="תמונות"
+                title={`תמונות (${plot.plot_images.length})`}
                 sectionId="section-images"
               >
                 <div className="grid grid-cols-3 gap-2 mb-2">
@@ -2575,6 +2575,14 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                     <button
                       key={img.id || i}
                       onClick={() => { setLightboxIndex(i); setLightboxOpen(true) }}
+                      onMouseEnter={() => {
+                        // Preload full-res image on hover for instant lightbox display
+                        const link = document.createElement('link')
+                        link.rel = 'preload'
+                        link.as = 'image'
+                        link.href = img.url
+                        document.head.appendChild(link)
+                      }}
                       className="aspect-square rounded-xl overflow-hidden border border-white/10 hover:border-gold/40 transition-all group relative"
                     >
                       <img
@@ -2584,10 +2592,27 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                         loading="lazy"
                         decoding="async"
                       />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                        <Maximize2 className="w-5 h-5 text-white opacity-0 group-hover:opacity-70 transition-opacity drop-shadow-lg" />
+                      </div>
+                      {/* First image label */}
+                      {i === 0 && plot.plot_images.length > 1 && (
+                        <span className="absolute bottom-1 right-1 text-[8px] font-bold text-white bg-black/50 backdrop-blur-sm px-1.5 py-0.5 rounded">
+                          ראשית
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
+                {/* View all button when more than 6 images */}
+                {plot.plot_images.length > 6 && (
+                  <button
+                    onClick={() => { setLightboxIndex(0); setLightboxOpen(true) }}
+                    className="w-full py-2 text-center text-[11px] text-gold font-medium bg-gold/5 border border-gold/15 rounded-xl hover:bg-gold/10 transition-colors"
+                  >
+                    צפה בכל {plot.plot_images.length} התמונות →
+                  </button>
+                )}
               </CollapsibleSection>
             )}
 

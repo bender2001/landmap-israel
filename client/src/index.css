@@ -2145,7 +2145,7 @@ body {
   position: relative;
   width: 100%;
   height: 72px;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .plot-card-mini-thumb-img {
@@ -2163,6 +2163,92 @@ body {
   position: absolute;
   inset: 0;
   background: linear-gradient(to bottom, transparent 40%, rgba(8, 18, 35, 0.85) 100%);
+  pointer-events: none;
+}
+
+/* ── Card Image Carousel (Madlan/Airbnb multi-image) ── */
+.plot-card-carousel {
+  cursor: pointer;
+  overflow: hidden;
+  touch-action: pan-y; /* allow vertical scroll, handle horizontal swipe in JS */
+}
+
+.plot-card-carousel .plot-card-mini-thumb-img {
+  animation: carousel-fade-in 0.25s ease-out;
+}
+
+@keyframes carousel-fade-in {
+  from { opacity: 0.6; transform: scale(1.02); }
+  to   { opacity: 1;   transform: scale(1); }
+}
+
+.card-carousel-dots {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.card-carousel-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.card-carousel-dot.active {
+  background: #fff;
+  width: 7px;
+  height: 7px;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
+}
+
+.card-carousel-dot:hover {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.card-carousel-dot-more {
+  font-size: 7px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Hover arrow zones — subtle directional hints on desktop */
+.card-carousel-arrows {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.plot-card-carousel:hover .card-carousel-arrows {
+  opacity: 1;
+}
+
+.card-carousel-arrow-zone {
+  flex: 1;
+}
+
+.card-carousel-arrow-prev {
+  background: linear-gradient(to left, transparent, rgba(0, 0, 0, 0.08));
+}
+
+.card-carousel-arrow-next {
+  background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.08));
 }
 
 .plot-card-mini-body {

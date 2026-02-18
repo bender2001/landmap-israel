@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useCallback, useMemo, memo } from 'react'
 import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows, Share2, Heart } from 'lucide-react'
 import PriceSparkline from './ui/PriceSparkline'
 import ZoningProgressBar from './ui/ZoningProgressBar'
+import CardImageCarousel from './ui/CardImageCarousel'
 import { statusColors, statusLabels } from '../utils/constants'
 import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, getInvestmentGrade, formatRelativeTime, getFreshnessColor, calcCAGR, calcMonthlyPayment, formatMonthlyPayment, calcDemandVelocity, calcBestInCategory, calcBuildableValue } from '../utils/formatters'
 import { calcTransactionCosts } from '../utils/plot'
@@ -226,42 +227,13 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
           </span>
         </div>
       )}
-      {/* Thumbnail image with error fallback — prevents broken image icons */}
-      {(() => {
-        const images = plot.plot_images
-        const thumbUrl = images && images.length > 0 ? images[0].url : null
-        if (!thumbUrl) return (
-          <div className="plot-card-mini-accent" style={{ background: isCompared ? '#8B5CF6' : color }} />
-        )
-        return (
-          <div className="plot-card-mini-thumb">
-            <img
-              src={thumbUrl}
-              alt={images[0].alt || `גוש ${blockNum}`}
-              className="plot-card-mini-thumb-img"
-              loading="lazy"
-              decoding="async"
-              onError={(e) => {
-                // Replace broken image with styled gradient placeholder
-                e.target.style.display = 'none'
-                const fallback = e.target.parentElement.querySelector('.plot-card-mini-thumb-fallback')
-                if (fallback) fallback.style.display = 'flex'
-              }}
-            />
-            <div className="plot-card-mini-thumb-fallback" style={{ display: 'none', position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${color}25, ${color}08)`, alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: '20px', opacity: 0.5 }}>🏗️</span>
-            </div>
-            <div className="plot-card-mini-thumb-overlay" />
-            {/* Photo count badge — like Madlan/Yad2 multi-image indicator */}
-            {images.length > 1 && (
-              <span className="absolute bottom-2 left-2 z-10 flex items-center gap-0.5 px-1.5 py-0.5 text-[8px] font-bold text-white bg-black/60 backdrop-blur-sm rounded-md leading-none">
-                📷 {images.length}
-              </span>
-            )}
-            <div className="plot-card-mini-accent" style={{ background: isCompared ? '#8B5CF6' : color, position: 'absolute', bottom: 0, left: 0, right: 0 }} />
-          </div>
-        )
-      })()}
+      {/* Image carousel — swipeable multi-image thumbnail like Madlan/Airbnb */}
+      <CardImageCarousel
+        images={plot.plot_images}
+        blockNum={blockNum}
+        color={color}
+        isCompared={isCompared}
+      />
 
       {/* Quick share — native share sheet (mobile) or WhatsApp/Telegram fallback (desktop) */}
       <PlotShareButtons plot={plot} blockNum={blockNum} price={price} roi={roi} />
