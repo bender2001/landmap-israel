@@ -397,52 +397,104 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
-  // Swipe-to-close gesture for mobile (swipe right in RTL = close)
-  const swipeRef = useRef({ startX: 0, startY: 0, swiping: false, translateX: 0 })
-  const [swipeOffset, setSwipeOffset] = useState(0)
+  // ── Mobile bottom-sheet drag (vertical) + desktop swipe-to-close (horizontal) ──
+  // Snap points as vh fractions
+  const SNAP_PEEK = 35
+  const SNAP_MID = 65
+  const SNAP_FULL = 92
+  const snapPoints = [SNAP_PEEK, SNAP_MID, SNAP_FULL]
+
+  const [sheetHeight, setSheetHeight] = useState(SNAP_MID) // start at mid
+  const [isDragging, setIsDragging] = useState(false)
+  const [swipeOffset, setSwipeOffset] = useState(0) // horizontal offset for desktop swipe-to-close
+
+  const dragRef = useRef({
+    startY: 0,
+    startX: 0,
+    startHeight: SNAP_MID,
+    direction: null, // 'vertical' | 'horizontal' | null
+    active: false,
+  })
+
+  // Detect mobile
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
 
   const handleTouchStart = useCallback((e) => {
     const touch = e.touches[0]
-    swipeRef.current = { startX: touch.clientX, startY: touch.clientY, swiping: false, translateX: 0 }
-  }, [])
+    dragRef.current = {
+      startY: touch.clientY,
+      startX: touch.clientX,
+      startHeight: sheetHeight,
+      direction: null,
+      active: false,
+    }
+  }, [sheetHeight])
 
   const handleTouchMove = useCallback((e) => {
     const touch = e.touches[0]
-    const state = swipeRef.current
+    const state = dragRef.current
     const dx = touch.clientX - state.startX
     const dy = touch.clientY - state.startY
 
-    // Only activate swipe if horizontal movement dominates
-    if (!state.swiping && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      state.swiping = true
+    // Determine drag direction on first significant movement
+    if (!state.direction && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      state.direction = Math.abs(dy) >= Math.abs(dx) ? 'vertical' : 'horizontal'
+      state.active = true
+      setIsDragging(true)
     }
 
-    if (state.swiping && dx < 0) {
-      // RTL: swiping left = pulling panel away (negative dx)
-      // LTR sidebar on right: swiping right = closing (positive dx)
-      // Since sidebar is on the right in RTL, swipe-right (positive dx in screen coords) = close
-      // Actually in RTL, the panel slides from the right. Swiping right (positive dx) should close it.
-    }
+    if (!state.active) return
 
-    if (state.swiping) {
-      // Only allow swiping in the "close" direction (right, positive dx)
+    if (state.direction === 'vertical' && isMobile) {
+      // Convert pixel drag to vh change: dragging down = negative dy => decrease height
+      const vhPerPx = 100 / window.innerHeight
+      const deltaVh = -dy * vhPerPx // negative dy (drag up) = increase height
+      const newHeight = Math.max(10, Math.min(95, state.startHeight + deltaVh))
+      setSheetHeight(newHeight)
+      e.preventDefault() // prevent scroll while dragging
+    } else if (state.direction === 'horizontal') {
+      // Horizontal swipe-to-close (works on both mobile & desktop)
       const offset = Math.max(0, dx)
-      state.translateX = offset
       setSwipeOffset(offset)
     }
-  }, [])
+  }, [isMobile])
 
   const handleTouchEnd = useCallback(() => {
-    const state = swipeRef.current
-    if (state.swiping && state.translateX > 80) {
-      // Threshold reached — close the sidebar
-      setSwipeOffset(0)
-      handleClose()
-    } else {
-      setSwipeOffset(0)
+    const state = dragRef.current
+    setIsDragging(false)
+
+    if (state.direction === 'vertical' && isMobile) {
+      // Snap to nearest snap point
+      let closest = snapPoints[0]
+      let minDist = Infinity
+      for (const sp of snapPoints) {
+        const dist = Math.abs(sheetHeight - sp)
+        if (dist < minDist) { minDist = dist; closest = sp }
+      }
+
+      // If dragged below peek threshold, close the sheet
+      if (sheetHeight < SNAP_PEEK - 10) {
+        handleClose()
+        return
+      }
+
+      setSheetHeight(closest)
+    } else if (state.direction === 'horizontal') {
+      if (swipeOffset > 100) {
+        setSwipeOffset(0)
+        handleClose()
+      } else {
+        setSwipeOffset(0)
+      }
     }
-    swipeRef.current = { startX: 0, startY: 0, swiping: false, translateX: 0 }
-  }, [handleClose])
+
+    dragRef.current = { startY: 0, startX: 0, startHeight: sheetHeight, direction: null, active: false }
+  }, [sheetHeight, swipeOffset, handleClose, isMobile])
+
+  // Reset sheet height when plot changes
+  useEffect(() => {
+    if (plot) setSheetHeight(SNAP_MID)
+  }, [plot?.id])
 
   const handlePrintReport = useCallback(() => {
     if (!plot) return
@@ -599,13 +651,26 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
         aria-modal="true"
         className="sidebar-panel fixed top-0 right-0 h-full w-full sm:w-[420px] md:w-[480px] max-w-full z-[60] bg-navy border-l border-white/10 shadow-2xl flex flex-col overflow-hidden sm:animate-slide-in-right"
         dir="rtl"
-        style={swipeOffset > 0 ? { transform: `translateX(${swipeOffset}px)`, transition: 'none' } : undefined}
+        style={{
+          ...(isMobile ? { height: `${sheetHeight}vh`, transition: isDragging ? 'none' : 'height 0.35s cubic-bezier(0.32, 0.72, 0, 1)' } : {}),
+          ...(swipeOffset > 0 ? { transform: `translateX(${swipeOffset}px)`, transition: 'none' } : {}),
+        }}
       >
         {/* Gold accent bar */}
         <div
           className="h-[3px] flex-shrink-0"
           style={{ background: 'linear-gradient(90deg, #C8942A, #E5B94E, #F0D078, #E5B94E, #C8942A)' }}
         />
+
+        {/* Drag handle — visible on mobile only */}
+        <div
+          className="sidebar-drag-handle"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className="sidebar-drag-handle-bar" />
+        </div>
 
         {/* Draggable header zone (drag handle + preview + title) — swipe right to close on mobile */}
         <div

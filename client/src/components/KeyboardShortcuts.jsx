@@ -1,6 +1,8 @@
 import { X, Keyboard } from 'lucide-react'
 
 const shortcuts = [
+  { keys: ['Ctrl', 'K'], label: 'פתח חיפוש' },
+  { keys: ['/'], label: 'פתח צ׳אט AI' },
   { keys: ['←', '→'], label: 'ניווט בין חלקות' },
   { keys: ['Esc'], label: 'סגירת חלון / סרגל צד' },
   { keys: ['F'], label: 'הוסף/הסר ממועדפים' },

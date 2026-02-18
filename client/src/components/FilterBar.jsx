@@ -13,16 +13,21 @@ const baseCityOptions = [
 
 const priceRangeOptions = [
   { label: 'כל המחירים', value: 'all', min: '', max: '' },
-  { label: 'עד ₪300K', value: '0-300', min: '', max: '300000' },
-  { label: '₪300K – ₪500K', value: '300-500', min: '300000', max: '500000' },
-  { label: '₪500K+', value: '500+', min: '500000', max: '' },
+  { label: 'עד ₪200K', value: '0-200', min: '', max: '200000' },
+  { label: '₪200K – ₪400K', value: '200-400', min: '200000', max: '400000' },
+  { label: '₪400K – ₪600K', value: '400-600', min: '400000', max: '600000' },
+  { label: '₪600K – ₪800K', value: '600-800', min: '600000', max: '800000' },
+  { label: '₪800K – ₪1M', value: '800-1000', min: '800000', max: '1000000' },
+  { label: '₪1M+', value: '1000+', min: '1000000', max: '' },
 ]
 
 const sizeRangeOptions = [
   { label: 'כל הגדלים', value: 'all', min: '', max: '' },
-  { label: 'עד 2 דונם', value: '0-2', min: '', max: '2' },
+  { label: 'עד 1 דונם', value: '0-1', min: '', max: '1' },
+  { label: '1–2 דונם', value: '1-2', min: '1', max: '2' },
   { label: '2–3 דונם', value: '2-3', min: '2', max: '3' },
-  { label: '3+ דונם', value: '3+', min: '3', max: '' },
+  { label: '3–5 דונם', value: '3-5', min: '3', max: '5' },
+  { label: '5+ דונם', value: '5+', min: '5', max: '' },
 ]
 
 const ripenessOptions = [
@@ -80,13 +85,13 @@ const quickPresetDefs = [
   },
   {
     id: 'budget',
-    label: 'עד ₪500K',
+    label: 'עד ₪400K',
     emoji: '💰',
     apply: (onFilterChange) => {
       onFilterChange('priceMin', '')
-      onFilterChange('priceMax', '500000')
+      onFilterChange('priceMax', '400000')
     },
-    isActive: (filters) => filters.priceMax === '500000' && !filters.priceMin,
+    isActive: (filters) => filters.priceMax === '400000' && !filters.priceMin,
   },
   {
     id: 'large',

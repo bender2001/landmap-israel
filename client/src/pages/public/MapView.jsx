@@ -279,6 +279,15 @@ export default function MapView() {
         else if (isChatOpen) setIsChatOpen(false)
         else if (selectedPlot) handleCloseSidebar()
       }
+      // Ctrl+K / Cmd+K for global search focus (like GitHub, Notion, Linear)
+      if (e.key === 'k' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault()
+        const searchInput = document.querySelector('.filter-search-input')
+        if (searchInput) {
+          searchInput.focus()
+          searchInput.select()
+        }
+      }
       // ? key for shortcuts help
       if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
         const tag = document.activeElement?.tagName

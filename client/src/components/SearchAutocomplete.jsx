@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { Search, X, MapPin, TrendingUp, Clock, ArrowLeft } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { Search, X, MapPin, TrendingUp, Clock, ArrowLeft, Eye, History } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
 import { formatPriceShort, formatDunam } from '../utils/formatters'
 
 /**
  * Search autocomplete dropdown — shows matching plots as user types.
+ * On focus without query: shows recent searches + popular/recently viewed plots.
  * Similar to Madlan's address-based search but for plots.
  */
 export default function SearchAutocomplete({ value, onChange, plots = [], onSelectPlot, placeholder }) {
@@ -29,13 +30,40 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
       .slice(0, 6) // max 6 suggestions
   })()
 
-  const showDropdown = isFocused && value && value.length >= 1
+  const showDropdown = isFocused && (value?.length >= 1 || true) // show on focus even without query
+  const hasQuery = value && value.length >= 1
 
   // Recent searches (stored in localStorage)
-  const recentSearches = (() => {
-    if (showDropdown && suggestions.length > 0) return [] // don't show when we have results
+  const recentSearches = useMemo(() => {
+    if (!isFocused || hasQuery) return []
     try { return JSON.parse(localStorage.getItem('landmap_recent_searches') || '[]').slice(0, 3) } catch { return [] }
-  })()
+  }, [isFocused, hasQuery])
+
+  // Recently viewed plots (for empty-query focus state)
+  const recentlyViewedPlots = useMemo(() => {
+    if (!isFocused || hasQuery || plots.length === 0) return []
+    try {
+      const ids = JSON.parse(localStorage.getItem('landmap_recently_viewed') || '[]').slice(0, 4)
+      if (ids.length === 0) return []
+      return ids.map(id => plots.find(p => p.id === id)).filter(Boolean)
+    } catch { return [] }
+  }, [isFocused, hasQuery, plots])
+
+  // Popular plots (highest views, for empty-query focus state)
+  const popularPlots = useMemo(() => {
+    if (!isFocused || hasQuery || plots.length === 0) return []
+    // If we already show recently viewed, limit popular to fill remaining
+    const remaining = 4 - recentlyViewedPlots.length
+    if (remaining <= 0) return []
+    const recentIds = new Set(recentlyViewedPlots.map(p => p.id))
+    return [...plots]
+      .filter(p => !recentIds.has(p.id) && (p.views ?? 0) > 0)
+      .sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
+      .slice(0, remaining)
+  }, [isFocused, hasQuery, plots, recentlyViewedPlots])
+
+  // Should we show the focus menu (recent searches + recently viewed + popular)?
+  const showFocusMenu = isFocused && !hasQuery && (recentSearches.length > 0 || recentlyViewedPlots.length > 0 || popularPlots.length > 0)
 
   const saveRecentSearch = useCallback((query) => {
     try {
@@ -120,7 +148,7 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
         <input
           ref={inputRef}
           type="text"
-          placeholder={placeholder || 'חיפוש גוש, חלקה, עיר...'}
+          placeholder={placeholder || 'חיפוש גוש, חלקה, עיר... (Ctrl+K)'}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setIsFocused(true)}
@@ -128,7 +156,7 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
           className="filter-search-input"
           autoComplete="off"
           role="combobox"
-          aria-expanded={showDropdown}
+          aria-expanded={showDropdown || showFocusMenu}
           aria-haspopup="listbox"
           aria-autocomplete="list"
         />
@@ -142,8 +170,116 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
         )}
       </div>
 
+      {/* Focus menu — recent searches + recently viewed + popular (shown when focused without query) */}
+      {showFocusMenu && (
+        <div className="search-autocomplete-dropdown" role="listbox" ref={listRef}>
+          {/* Recent searches */}
+          {recentSearches.length > 0 && (
+            <>
+              <div className="search-autocomplete-header">
+                <History className="w-3 h-3 text-slate-500" />
+                <span>חיפושים אחרונים</span>
+              </div>
+              {recentSearches.map((query, i) => (
+                <button
+                  key={`search-${i}`}
+                  className="search-autocomplete-item"
+                  onClick={() => { onChange(query); setIsFocused(true) }}
+                  role="option"
+                  aria-selected={false}
+                >
+                  <Search className="w-3 h-3 text-slate-500 flex-shrink-0 mx-1" />
+                  <span className="text-xs text-slate-300 flex-1 text-right truncate">{query}</span>
+                  <ArrowLeft className="w-3 h-3 text-slate-600 search-autocomplete-item-arrow" />
+                </button>
+              ))}
+            </>
+          )}
+          {/* Recently viewed plots */}
+          {recentlyViewedPlots.length > 0 && (
+            <>
+              <div className="search-autocomplete-header">
+                <Eye className="w-3 h-3 text-slate-500" />
+                <span>נצפו לאחרונה</span>
+              </div>
+              {recentlyViewedPlots.map(plot => {
+                const color = statusColors[plot.status]
+                const price = plot.total_price ?? plot.totalPrice
+                const blockNum = (plot.block_number ?? plot.blockNumber ?? '').toString()
+                return (
+                  <button
+                    key={`rv-${plot.id}`}
+                    className="search-autocomplete-item"
+                    onClick={() => { onSelectPlot(plot); setIsFocused(false) }}
+                    role="option"
+                    aria-selected={false}
+                  >
+                    <div className="search-autocomplete-item-color" style={{ background: color }} />
+                    <div className="search-autocomplete-item-body">
+                      <div className="search-autocomplete-item-title">
+                        <span>גוש {blockNum} | חלקה {plot.number}</span>
+                      </div>
+                      <div className="search-autocomplete-item-meta">
+                        <span className="search-autocomplete-item-city">
+                          <MapPin className="w-2.5 h-2.5" />
+                          {plot.city}
+                        </span>
+                        <span className="search-autocomplete-item-price">{formatPriceShort(price)}</span>
+                      </div>
+                    </div>
+                    <ArrowLeft className="w-3.5 h-3.5 text-slate-500 search-autocomplete-item-arrow" />
+                  </button>
+                )
+              })}
+            </>
+          )}
+          {/* Popular plots */}
+          {popularPlots.length > 0 && (
+            <>
+              <div className="search-autocomplete-header">
+                <TrendingUp className="w-3 h-3 text-slate-500" />
+                <span>פופולריים</span>
+              </div>
+              {popularPlots.map(plot => {
+                const color = statusColors[plot.status]
+                const price = plot.total_price ?? plot.totalPrice
+                const blockNum = (plot.block_number ?? plot.blockNumber ?? '').toString()
+                return (
+                  <button
+                    key={`pop-${plot.id}`}
+                    className="search-autocomplete-item"
+                    onClick={() => { onSelectPlot(plot); setIsFocused(false) }}
+                    role="option"
+                    aria-selected={false}
+                  >
+                    <div className="search-autocomplete-item-color" style={{ background: color }} />
+                    <div className="search-autocomplete-item-body">
+                      <div className="search-autocomplete-item-title">
+                        <span>גוש {blockNum} | חלקה {plot.number}</span>
+                        <span className="text-[8px] text-indigo-400/70">👁 {plot.views}</span>
+                      </div>
+                      <div className="search-autocomplete-item-meta">
+                        <span className="search-autocomplete-item-city">
+                          <MapPin className="w-2.5 h-2.5" />
+                          {plot.city}
+                        </span>
+                        <span className="search-autocomplete-item-price">{formatPriceShort(price)}</span>
+                      </div>
+                    </div>
+                    <ArrowLeft className="w-3.5 h-3.5 text-slate-500 search-autocomplete-item-arrow" />
+                  </button>
+                )
+              })}
+            </>
+          )}
+          <div className="search-autocomplete-hint">
+            <span>הקלד לחיפוש גוש, חלקה או עיר</span>
+          </div>
+        </div>
+      )}
+
       {/* Autocomplete dropdown */}
-      {showDropdown && (
+      {hasQuery && isFocused && (
         <div className="search-autocomplete-dropdown" role="listbox" ref={listRef}>
           {suggestions.length === 0 ? (
             <div className="px-4 py-5 text-center">
