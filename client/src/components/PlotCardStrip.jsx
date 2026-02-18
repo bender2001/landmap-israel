@@ -10,6 +10,7 @@ import { usePrefetchPlot } from '../hooks/usePlots'
 import { useAreaAverages } from '../hooks/useAreaAverages'
 import { whatsappShareLink, useNativeShare, buildPlotShareData } from '../utils/config'
 import { useDragScroll } from '../hooks/useDragScroll'
+import { useViewportPrefetch } from '../hooks/useViewportPrefetch'
 
 /**
  * Compute price-per-sqm percentile for each plot relative to all plots.
@@ -152,6 +153,14 @@ const PlotShareButtons = memo(function PlotShareButtons({ plot, blockNum, price,
 })
 
 const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, isFavorite, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, onToggleFavorite, prefetchPlot, priceChange, pricePercentile, categoryBadges }) {
+  // Viewport-based prefetching — loads plot detail into React Query cache when the card
+  // scrolls into (or near) the visible area. On mobile, users scroll and tap without
+  // hovering, so this ensures data is ready before the click. Skips if already selected
+  // (data already loaded). Uses 200px rootMargin to prefetch slightly ahead of the viewport.
+  const viewportRef = useViewportPrefetch(
+    () => prefetchPlot(plot.id),
+    { rootMargin: '200px', skip: isSelected }
+  )
   const color = statusColors[plot.status]
   const price = plot.total_price ?? plot.totalPrice
   const projValue = plot.projected_value ?? plot.projectedValue
@@ -176,6 +185,7 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
 
   return (
     <div
+      ref={viewportRef}
       data-plot-id={plot.id}
       role="option"
       aria-selected={isSelected}
@@ -510,6 +520,28 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
   }, [plots, checkScroll, throttledCheckScroll])
+
+  // Reset scroll to start when filtered results change (new plots from filter/sort).
+  // Without this, after changing a filter the strip stays at its old scroll position —
+  // the user might see card #5 instead of the new #1 result. Like Airbnb/Madlan,
+  // always show the top result first after a filter change.
+  const prevPlotsRef = useRef(plots)
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    // Only reset if the actual plot IDs changed (not just a re-render with same data)
+    const prev = prevPlotsRef.current
+    if (prev !== plots && plots?.length > 0) {
+      // Quick check: if first plot ID changed, the list is different
+      const prevFirst = prev?.[0]?.id
+      const currFirst = plots[0]?.id
+      if (prevFirst !== currFirst) {
+        // RTL: scrollLeft=0 is the start (rightmost)
+        el.scrollTo({ left: 0, behavior: 'smooth' })
+      }
+    }
+    prevPlotsRef.current = plots
+  }, [plots])
 
   // Scroll to selected card
   useEffect(() => {
