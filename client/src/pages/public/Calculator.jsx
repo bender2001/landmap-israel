@@ -1,8 +1,8 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Calculator as CalcIcon, TrendingUp, DollarSign, Percent, ArrowDown, Landmark, Table2, PiggyBank, Printer, Share2, Check, AlertTriangle, Target, Clock } from 'lucide-react'
+import { Calculator as CalcIcon, TrendingUp, DollarSign, Percent, ArrowDown, Landmark, Table2, PiggyBank, Printer, Share2, Check, AlertTriangle, Target, Clock, BarChart3, ShieldAlert } from 'lucide-react'
 import { roiStages, zoningLabels, ZoningStage } from '../../utils/constants'
-import { formatCurrency } from '../../utils/formatters'
+import { formatCurrency, calcAlternativeReturns } from '../../utils/formatters'
 import { calcTransactionCosts, calcExitCosts, calcAnnualHoldingCosts } from '../../utils/plot'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
@@ -135,6 +135,7 @@ export default function Calculator() {
 
     // Sensitivity analysis: ROI across different holding periods
     const sensitivityYears = [3, 5, 7, 10, 15]
+    const INFLATION_RATE = 0.03 // Israel avg CPI ~3%/yr
     const sensitivity = sensitivityYears.map(y => {
       const cagr = y > 0 ? Math.round((Math.pow(projectedValue / price, 1 / y) - 1) * 100) : 0
       const holdCosts = holding.totalAnnual * y
@@ -142,7 +143,11 @@ export default function Calculator() {
       const netCagr = y > 0 && price > 0 ? Math.round((Math.pow(Math.max(0, (price + netAfterAll)) / price, 1 / y) - 1) * 100) : 0
       const totalFinancingCost = calcMonthlyPayment(loanAmount, rate, Math.min(loanDuration, y)) * Math.min(loanDuration, y) * 12
       const netWithFinancing = netAfterAll - (totalFinancingCost - loanAmount)
-      return { years: y, cagr, netCagr, netWithFinancing, holdCosts, isSelected: y === years }
+      // Real CAGR (inflation-adjusted) — what the investor actually earns in purchasing power
+      const nominalRate = netCagr / 100
+      const realRate = ((1 + nominalRate) / (1 + INFLATION_RATE)) - 1
+      const realCagr = Math.round(realRate * 100)
+      return { years: y, cagr, netCagr, realCagr, netWithFinancing, holdCosts, isSelected: y === years }
     })
 
     return {
@@ -346,8 +351,8 @@ export default function Calculator() {
                 </div>
               ) : (
                 <>
-                  {/* KPI cards */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {/* KPI cards — key metrics at a glance (like a Bloomberg terminal summary) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="glass-panel p-4 text-center">
                       <div className="text-[10px] text-slate-400 mb-1">מחיר/מ"ר נוכחי</div>
                       <div className="text-lg font-bold text-blue-400">{result.currentPricePerSqm.toLocaleString()} ₪</div>
@@ -373,6 +378,13 @@ export default function Calculator() {
                       <div className="text-[10px] text-slate-400 mb-1">נקודת איזון</div>
                       <div className="text-lg font-bold text-amber-400">{formatCurrency(result.breakEvenPrice)}</div>
                       <div className="text-[9px] text-slate-500 mt-0.5">מינימום למכירה</div>
+                    </div>
+                    <div className="glass-panel p-4 text-center relative col-span-2 sm:col-span-1">
+                      <div className="text-[10px] text-slate-400 mb-1">תשואה ריאלית נטו</div>
+                      <div className={`text-lg font-bold ${result.netAnnualizedRoi - 3 >= 0 ? 'text-purple-400' : 'text-red-400'}`}>
+                        {result.netAnnualizedRoi - 3 >= 0 ? '+' : ''}{result.netAnnualizedRoi - 3}%
+                      </div>
+                      <div className="text-[9px] text-slate-500 mt-0.5">בניכוי אינפלציה (~3%)</div>
                     </div>
                   </div>
 
@@ -594,6 +606,11 @@ export default function Calculator() {
                             <th className="text-center py-2 font-medium">CAGR ברוטו</th>
                             <th className="text-center py-2 font-medium">CAGR נטו</th>
                             <th className="text-center py-2 font-medium">
+                              <span className="flex items-center justify-center gap-1" title="תשואה ריאלית (בניכוי אינפלציה 3%)">
+                                📊 ריאלי
+                              </span>
+                            </th>
+                            <th className="text-center py-2 font-medium">
                               <span className="flex items-center justify-center gap-1">
                                 <Clock className="w-2.5 h-2.5" />
                                 עלות החזקה
@@ -617,6 +634,9 @@ export default function Calculator() {
                               <td className={`py-2.5 text-center font-medium ${row.netCagr >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                 {row.netCagr >= 0 ? '+' : ''}{row.netCagr}%
                               </td>
+                              <td className={`py-2.5 text-center text-[11px] font-medium ${row.realCagr >= 0 ? 'text-amber-400' : 'text-red-400'}`} title="תשואה ריאלית (אחרי אינפלציה 3%)">
+                                {row.realCagr >= 0 ? '+' : ''}{row.realCagr}%
+                              </td>
                               <td className="py-2.5 text-center text-orange-400/70 text-[11px]">
                                 {formatCurrency(row.holdCosts)}
                               </td>
@@ -632,9 +652,134 @@ export default function Calculator() {
                     </div>
                     <p className="text-[9px] text-slate-600 mt-3">
                       CAGR ברוטו = תשואה שנתית לפני עלויות. CAGR נטו = אחרי כל המסים, עלויות כניסה/יציאה + החזקה שנתית.
+                      ריאלי = CAGR נטו בניכוי אינפלציה (~3% שנתי) — כוח הקנייה שנותר בפועל.
                       {showFinancing && result.loanAmount > 0 && ' רווח אחרי מימון = רווח נקי בניכוי עלויות ריבית.'}
                     </p>
                   </div>
+
+                  {/* Alternative Investment Comparison — like a financial advisor's comparison table.
+                      Shows how this land investment stacks up against bank deposits and stock market.
+                      Uses calcAlternativeReturns utility for consistent calculations.
+                      Neither Madlan nor Yad2 offer this — major competitive differentiator. */}
+                  {(() => {
+                    const price = parseFloat(purchasePrice)
+                    if (!result || !price || price <= 0) return null
+                    const alternatives = calcAlternativeReturns(price, result.netProfit, result.holdingYears)
+                    if (!alternatives) return null
+
+                    const maxValue = Math.max(
+                      alternatives.bank.futureValue,
+                      alternatives.stock.futureValue,
+                      alternatives.land.futureValue
+                    )
+
+                    const items = [alternatives.land, alternatives.stock, alternatives.bank]
+
+                    return (
+                      <div className="glass-panel p-5">
+                        <h3 className="text-sm font-bold text-slate-100 mb-1 flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4 text-gold" />
+                          השוואת אלטרנטיבות השקעה
+                        </h3>
+                        <p className="text-[10px] text-slate-500 mb-4">
+                          מה היה קורה אם השקעת {formatCurrency(price)} במסלולים אחרים ל-{result.holdingYears} שנים?
+                        </p>
+
+                        {/* Visual bar comparison */}
+                        <div className="space-y-3 mb-5">
+                          {items.map((item) => {
+                            const barW = maxValue > 0 ? (item.futureValue / maxValue) * 100 : 0
+                            const cagr = Math.round(item.rate * 1000) / 10
+                            const isLand = item.label === 'קרקע זו'
+                            return (
+                              <div key={item.label} className={`rounded-xl p-3 border ${isLand ? 'bg-gold/5 border-gold/15' : 'bg-white/[0.02] border-white/5'}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-base">{item.emoji}</span>
+                                    <span className={`text-xs font-medium ${isLand ? 'text-gold' : 'text-slate-300'}`}>{item.label}</span>
+                                    {isLand && <span className="text-[8px] font-black text-gold/60 bg-gold/10 px-1.5 py-0.5 rounded">אתה כאן</span>}
+                                  </div>
+                                  <div className="text-left">
+                                    <div className={`text-sm font-bold ${isLand ? 'text-gold' : 'text-slate-200'}`}>
+                                      {formatCurrency(item.futureValue)}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="h-2.5 rounded-full bg-white/5 overflow-hidden mb-1.5">
+                                  <div
+                                    className="h-full rounded-full transition-all duration-700"
+                                    style={{
+                                      width: `${barW}%`,
+                                      background: isLand
+                                        ? 'linear-gradient(90deg, #C8942A, #E5B94E)'
+                                        : `linear-gradient(90deg, ${item.color}80, ${item.color})`,
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span className="text-slate-500">
+                                    {cagr >= 0 ? '+' : ''}{cagr}% שנתי
+                                  </span>
+                                  <span className={`font-medium ${item.profit >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
+                                    {item.profit >= 0 ? '+' : ''}{formatCurrency(item.profit)} רווח
+                                  </span>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        {/* Real returns (inflation-adjusted) */}
+                        <div className="bg-navy-light/40 rounded-xl p-3 border border-white/5">
+                          <div className="flex items-center gap-2 mb-2.5">
+                            <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                            <span className="text-[11px] font-medium text-slate-300">תשואה ריאלית (בניכוי אינפלציה {Math.round(alternatives.inflationRate * 100)}%)</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { label: 'קרקע', value: alternatives.realReturns.land, emoji: '🏗️', isMain: true },
+                              { label: 'מניות', value: alternatives.realReturns.stock, emoji: '📊' },
+                              { label: 'פיקדון', value: alternatives.realReturns.bank, emoji: '🏦' },
+                            ].map((r) => (
+                              <div key={r.label} className={`text-center py-2 rounded-lg ${r.isMain ? 'bg-gold/8' : 'bg-white/[0.02]'}`}>
+                                <div className="text-[10px] text-slate-500 mb-0.5">{r.emoji} {r.label}</div>
+                                <div className={`text-sm font-bold ${r.value >= 0 ? (r.isMain ? 'text-gold' : 'text-emerald-400') : 'text-red-400'}`}>
+                                  {r.value >= 0 ? '+' : ''}{r.value}%
+                                </div>
+                                <div className="text-[8px] text-slate-600">לשנה</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Verdict */}
+                        {(() => {
+                          const landReturn = alternatives.land.futureValue
+                          const stockReturn = alternatives.stock.futureValue
+                          const bankReturn = alternatives.bank.futureValue
+                          const beatsStock = landReturn > stockReturn
+                          const beatsBank = landReturn > bankReturn
+                          const landAdvantage = beatsStock
+                            ? Math.round(((landReturn - stockReturn) / stockReturn) * 100)
+                            : Math.round(((stockReturn - landReturn) / landReturn) * 100)
+
+                          return (
+                            <div className={`mt-3 flex items-center gap-2 text-[11px] ${beatsStock ? 'text-emerald-400' : 'text-amber-400'}`}>
+                              <span>{beatsStock ? '🏆' : '⚠️'}</span>
+                              <span>
+                                {beatsStock
+                                  ? `הקרקע עוקפת את TA-125 ב-${landAdvantage}% — השקעה מצוינת!`
+                                  : beatsBank
+                                    ? `הקרקע עוקפת פיקדון בנקאי אך נופלת מ-TA-125 ב-${landAdvantage}%`
+                                    : `הקרקע מניבה פחות מפיקדון בנקאי — שקול אלטרנטיבות`
+                                }
+                              </span>
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    )
+                  })()}
 
                   {/* Action buttons: Print & Share */}
                   <div className="flex items-center justify-center gap-3">
@@ -647,15 +792,25 @@ export default function Calculator() {
                     </button>
                     <button
                       onClick={() => {
+                        const price = parseFloat(purchasePrice)
+                        const alternatives = price > 0 ? calcAlternativeReturns(price, result.netProfit, result.holdingYears) : null
                         const text = [
                           `📊 דוח השקעה — LandMap Israel`,
                           ``,
-                          `💰 מחיר רכישה: ${formatCurrency(parseFloat(purchasePrice))}`,
+                          `💰 מחיר רכישה: ${formatCurrency(price)}`,
                           `📐 שטח: ${parseFloat(plotSize).toLocaleString()} מ״ר`,
                           `🏗️ ייעוד: ${zoningLabels[currentZoning]} → ${zoningLabels[targetZoning]}`,
                           `📈 תשואה כוללת: +${result.roiPercent}%`,
                           `📅 CAGR (${result.holdingYears} שנים): +${result.annualizedRoi}%`,
                           `💵 רווח נקי: ${formatCurrency(result.netProfit)}`,
+                          `🎯 נקודת איזון: ${formatCurrency(result.breakEvenPrice)}`,
+                          ...(alternatives ? [
+                            ``,
+                            `📊 השוואת אלטרנטיבות:`,
+                            `🏗️ קרקע: ${formatCurrency(alternatives.land.futureValue)} (${Math.round(alternatives.land.rate * 100)}%/שנה)`,
+                            `📊 מניות: ${formatCurrency(alternatives.stock.futureValue)} (9%/שנה)`,
+                            `🏦 פיקדון: ${formatCurrency(alternatives.bank.futureValue)} (4.5%/שנה)`,
+                          ] : []),
                           ``,
                           `חושב על ${window.location.origin}/calculator`,
                         ].join('\n')
