@@ -625,6 +625,16 @@ export default function PlotDetail() {
                   <div className="flex justify-between text-sm"><span className="text-slate-400">מס רכישה (6%)</span><span className="text-slate-300">{formatCurrency(Math.round(totalPrice * 0.06))}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-slate-400">שכ"ט עו"ד (~1.5%+מע"מ)</span><span className="text-slate-300">{formatCurrency(Math.round(totalPrice * 0.0175))}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-slate-400">היטל השבחה משוער</span><span className="text-slate-300">{formatCurrency(Math.round((projectedValue - totalPrice) * 0.5))}</span></div>
+                  {(() => {
+                    const gp = projectedValue - totalPrice
+                    const costs = Math.round(totalPrice * 0.0775)
+                    const betterment = Math.round(gp * 0.5)
+                    const taxable = Math.max(0, gp - betterment - costs)
+                    const capGains = Math.round(taxable * 0.25)
+                    return (
+                      <div className="flex justify-between text-sm"><span className="text-slate-400">מס שבח (25%)</span><span className="text-slate-300">{formatCurrency(capGains)}</span></div>
+                    )
+                  })()}
                   <div className="h-px bg-white/5 my-1" />
                   <div className="flex justify-between text-sm font-medium"><span className="text-slate-300">סה"כ עלות כוללת</span><span className="text-gold">{formatCurrency(Math.round(totalPrice * 1.0775))}</span></div>
                 </div>

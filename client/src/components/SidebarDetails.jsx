@@ -589,7 +589,16 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
         <div class="row"><span class="label">שכ״ט עו״ד (~1.75%)</span><span class="val">${formatCurrency(Math.round(price * 0.0175))}</span></div>
         <div class="row"><span class="label">היטל השבחה משוער</span><span class="val">${formatCurrency(Math.round((proj - price) * 0.5))}</span></div>
         <div class="row"><span class="label">סה״כ עלות כוללת</span><span class="val" style="color:#C8942A">${formatCurrency(Math.round(price * 1.0775))}</span></div>
-        <div class="row"><span class="label">רווח נקי (אחרי עלויות)</span><span class="val" style="color:#22C55E">${formatCurrency(Math.round(proj - price * 1.0775 - (proj - price) * 0.5))}</span></div>
+        ${(() => {
+          const gp = proj - price
+          const costs = Math.round(price * 0.0775)
+          const betterment = Math.round(gp * 0.5)
+          const taxable = Math.max(0, gp - betterment - costs)
+          const capGains = Math.round(taxable * 0.25)
+          const net = gp - costs - betterment - capGains
+          return `<div class="row"><span class="label">מס שבח (25%)</span><span class="val" style="color:#EF4444">-${formatCurrency(capGains)}</span></div>
+        <div class="row"><span class="label">רווח נקי (אחרי כל המיסים)</span><span class="val" style="color:#22C55E">${formatCurrency(net)}</span></div>`
+        })()}
       </div>
       <div class="footer">
         <div>LandMap Israel — מפת קרקעות להשקעה</div>
@@ -1180,39 +1189,114 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   </div>
                 </div>
               </div>
-              {/* Quick Investment Summary */}
-              <div className="bg-gradient-to-r from-gold/5 to-gold/10 border border-gold/20 rounded-xl p-3 mb-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="w-3.5 h-3.5 text-gold" />
-                  <span className="text-xs font-medium text-slate-200">סיכום השקעה</span>
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-400">רווח צפוי (ברוטו)</span>
-                    <span className="text-emerald-400 font-medium">{formatCurrency(projectedValue - totalPrice)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-400">רווח צפוי (נטו, אחרי עלויות)</span>
-                    <span className="text-emerald-400 font-medium">{formatCurrency(Math.round(projectedValue - totalPrice * 1.0775 - (projectedValue - totalPrice) * 0.5))}</span>
-                  </div>
-                  {readinessEstimate && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-400">זמן החזר משוער</span>
-                      <span className="text-gold font-medium">{readinessEstimate}</span>
+              {/* Quick Investment Summary — includes capital gains tax (מס שבח) */}
+              {(() => {
+                const grossProfit = projectedValue - totalPrice
+                const purchaseTax = Math.round(totalPrice * 0.06)
+                const attorneyFees = Math.round(totalPrice * 0.0175)
+                const bettermentLevyAmount = Math.round(grossProfit * 0.5)
+                const totalCosts = purchaseTax + attorneyFees
+                const profitAfterBetterment = grossProfit - bettermentLevyAmount
+                // Capital gains tax (מס שבח): 25% on real profit after deducting costs
+                const taxableProfit = Math.max(0, profitAfterBetterment - totalCosts)
+                const capitalGainsTax = Math.round(taxableProfit * 0.25)
+                const netProfit = grossProfit - totalCosts - bettermentLevyAmount - capitalGainsTax
+                const netRoi = totalPrice > 0 ? Math.round((netProfit / totalPrice) * 100) : 0
+                const years = readinessEstimate?.includes('1-3') ? 2 : readinessEstimate?.includes('3-5') ? 4 : readinessEstimate?.includes('5+') ? 7 : 4
+                const netCagr = years > 0 && netRoi > 0 ? Math.round((Math.pow(1 + netRoi / 100, 1 / years) - 1) * 100 * 10) / 10 : 0
+
+                return (
+                  <div className="bg-gradient-to-r from-gold/5 to-gold/10 border border-gold/20 rounded-xl p-3 mb-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="w-3.5 h-3.5 text-gold" />
+                      <span className="text-xs font-medium text-slate-200">סיכום השקעה מלא</span>
                     </div>
-                  )}
-                  <div className="h-px bg-white/5 my-1" />
-                  <div className="flex justify-between text-xs font-medium">
-                    <span className="text-slate-300">תשואה שנתית משוערת</span>
-                    <span className="text-gold">
-                      {(() => {
-                        const years = readinessEstimate?.includes('1-3') ? 2 : readinessEstimate?.includes('3-5') ? 4 : readinessEstimate?.includes('5+') ? 6 : 3
-                        return `~${Math.round(roi / years)}%`
-                      })()}
-                    </span>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">רווח צפוי (ברוטו)</span>
+                        <span className="text-emerald-400 font-medium">{formatCurrency(grossProfit)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">עלויות רכישה</span>
+                        <span className="text-red-400/70">-{formatCurrency(totalCosts)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">היטל השבחה (50%)</span>
+                        <span className="text-red-400/70">-{formatCurrency(bettermentLevyAmount)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">מס שבח (25%)</span>
+                        <span className="text-red-400/70">-{formatCurrency(capitalGainsTax)}</span>
+                      </div>
+                      <div className="h-px bg-white/5 my-1" />
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className="text-slate-200">רווח נקי</span>
+                        <span className={netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}>{formatCurrency(netProfit)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">תשואה נטו</span>
+                        <span className={`font-medium ${netRoi >= 0 ? 'text-gold' : 'text-red-400'}`}>{netRoi}%</span>
+                      </div>
+                      {netCagr > 0 && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400">CAGR נטו ({years} שנים)</span>
+                          <span className="text-gold font-medium">{netCagr}%/שנה</span>
+                        </div>
+                      )}
+                      {readinessEstimate && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400">זמן החזר משוער</span>
+                          <span className="text-gold font-medium">{readinessEstimate}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Sensitivity Analysis — what if projected value changes? */}
+                    <div className="mt-3 pt-3 border-t border-gold/10">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <AlertTriangle className="w-3 h-3 text-slate-400" />
+                        <span className="text-[10px] font-medium text-slate-400">ניתוח רגישות</span>
+                      </div>
+                      <div className="space-y-1">
+                        {[
+                          { label: 'אופטימי (+10%)', factor: 1.1, color: 'text-emerald-400' },
+                          { label: 'בסיס', factor: 1.0, color: 'text-gold' },
+                          { label: 'שמרני (-10%)', factor: 0.9, color: 'text-orange-400' },
+                          { label: 'פסימי (-20%)', factor: 0.8, color: 'text-red-400' },
+                        ].map(scenario => {
+                          const adjProjected = Math.round(projectedValue * scenario.factor)
+                          const adjGross = adjProjected - totalPrice
+                          const adjBetterment = Math.round(Math.max(0, adjGross) * 0.5)
+                          const adjTaxable = Math.max(0, adjGross - adjBetterment - totalCosts)
+                          const adjCapGains = Math.round(adjTaxable * 0.25)
+                          const adjNet = adjGross - totalCosts - adjBetterment - adjCapGains
+                          const adjNetRoi = totalPrice > 0 ? Math.round((adjNet / totalPrice) * 100) : 0
+                          return (
+                            <div key={scenario.label} className="flex items-center justify-between text-[10px]">
+                              <span className="text-slate-500 w-24">{scenario.label}</span>
+                              <div className="flex-1 h-1.5 rounded-full bg-white/5 mx-2 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full transition-all"
+                                  style={{
+                                    width: `${Math.max(3, Math.min(100, (adjNetRoi / (netRoi * 1.3 || 100)) * 100))}%`,
+                                    background: adjNet >= 0
+                                      ? 'linear-gradient(90deg, rgba(34,197,94,0.3), rgba(34,197,94,0.6))'
+                                      : 'linear-gradient(90deg, rgba(239,68,68,0.3), rgba(239,68,68,0.6))',
+                                  }}
+                                />
+                              </div>
+                              <span className={`w-20 text-left font-medium ${scenario.color}`}>
+                                {formatCurrency(adjNet)} ({adjNetRoi >= 0 ? '+' : ''}{adjNetRoi}%)
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <p className="text-[8px] text-slate-600 mt-1.5">* הערכות בלבד. מס שבח 25% על רווח לאחר ניכוי עלויות והיטל השבחה.</p>
+                    </div>
                   </div>
-                </div>
-              </div>
+                )
+              })()}
               {/* Profitability Waterfall — visual breakdown of costs vs profit */}
               <ProfitWaterfall totalPrice={totalPrice} projectedValue={projectedValue} sizeSqM={sizeSqM} />
               {/* Mini Mortgage Calculator */}
