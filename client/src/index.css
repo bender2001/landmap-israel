@@ -891,8 +891,8 @@ body {
 
 @media (max-width: 767px) {
   .filter-bar-container {
-    top: 10px;
-    max-width: calc(100vw - 20px);
+    top: 8px;
+    max-width: calc(100vw - 16px);
   }
   .filter-pills-row {
     display: grid;

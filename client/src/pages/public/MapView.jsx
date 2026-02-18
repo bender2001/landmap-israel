@@ -28,12 +28,8 @@ const AIChat = lazy(() => import('../../components/AIChat.jsx'))
 const LeadModal = lazy(() => import('../../components/LeadModal.jsx'))
 const KeyboardShortcuts = lazy(() => import('../../components/KeyboardShortcuts.jsx'))
 const RecentlyViewed = lazy(() => import('../../components/RecentlyViewed.jsx'))
-const MarketStatsWidget = lazy(() => import('../../components/MarketStatsWidget.jsx'))
-const DealAlerts = lazy(() => import('../../components/DealAlerts.jsx'))
 const FirstVisitHints = lazy(() => import('../../components/FirstVisitHints.jsx'))
-const MarketTicker = lazy(() => import('../../components/MarketTicker.jsx'))
 const AlertSubscription = lazy(() => import('../../components/AlertSubscription.jsx'))
-const DealSpotlight = lazy(() => import('../../components/DealSpotlight.jsx'))
 
 function DataFreshnessIndicator({ updatedAt, onRefresh }) {
   const [, setTick] = useState(0)
@@ -51,7 +47,7 @@ function DataFreshnessIndicator({ updatedAt, onRefresh }) {
   return (
     <button
       onClick={onRefresh}
-      className={`fixed top-[2.75rem] left-4 sm:left-auto sm:top-auto sm:bottom-[5.5rem] sm:right-6 z-[30] items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] backdrop-blur-md border transition-all hover:scale-105 hidden sm:flex ${
+      className={`fixed top-[4rem] left-4 sm:left-auto sm:top-auto sm:bottom-[5.5rem] sm:right-6 z-[20] items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] backdrop-blur-md border transition-all hover:scale-105 hidden sm:flex ${
         isStale
           ? 'bg-orange-500/10 border-orange-500/20 text-orange-400'
           : 'bg-white/5 border-white/10 text-slate-500 hover:text-slate-400'
@@ -506,7 +502,7 @@ export default function MapView() {
 
       {selectedPlot && (
         <Suspense fallback={
-          <div className="sidebar-details-panel" dir="rtl">
+          <div className="fixed top-0 right-0 h-full w-full sm:w-[420px] md:w-[480px] max-w-full z-[60] bg-navy border-l border-white/10 shadow-2xl" dir="rtl">
             <div className="p-6 space-y-4 animate-pulse">
               <div className="flex justify-between items-center">
                 <div className="h-6 w-48 rounded bg-slate-700/50" />
@@ -598,7 +594,7 @@ export default function MapView() {
 
       {/* Floating contact CTA — desktop: full buttons, mobile: single expandable FAB */}
       {/* Desktop version */}
-      <div className="fixed bottom-44 sm:bottom-[9.5rem] left-4 z-[30] hidden sm:flex flex-col gap-2 animate-bounce-in">
+      <div className="fixed bottom-52 sm:bottom-[13rem] left-4 z-[30] hidden sm:flex flex-col gap-2 animate-bounce-in">
         <a
           href={selectedPlot
             ? whatsappLink(`שלום, אני מעוניין בפרטים על גוש ${selectedPlot.block_number ?? selectedPlot.blockNumber} חלקה ${selectedPlot.number} ב${selectedPlot.city}`)
@@ -636,7 +632,7 @@ export default function MapView() {
         </button>
       </div>
       {/* Mobile version — single WhatsApp FAB, compact */}
-      <div className="fixed bottom-36 left-3 z-[30] sm:hidden">
+      <div className="fixed bottom-44 left-3 z-[30] sm:hidden">
         <a
           href={selectedPlot
             ? whatsappLink(`שלום, אני מעוניין בפרטים על גוש ${selectedPlot.block_number ?? selectedPlot.blockNumber} חלקה ${selectedPlot.number} ב${selectedPlot.city}`)
