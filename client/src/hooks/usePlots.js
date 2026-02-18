@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useCallback } from 'react'
-import { getPlots, getPlot, getNearbyPlots, getPopularPlots, getPlotsBatch } from '../api/plots.js'
+import { getPlots, getPlot, getNearbyPlots, getPopularPlots, getFeaturedPlots, getPlotsBatch } from '../api/plots.js'
 import { plots as mockPlots } from '../data/mockData.js'
 import { useIsSlowConnection } from './useNetworkStatus.js'
 
@@ -135,6 +135,22 @@ export function usePopularPlots(limit = 6) {
     gcTime: 10 * 60_000,
     retry: 1,
     // Don't block rendering — popular plots are supplementary
+    placeholderData: [],
+  })
+}
+
+/**
+ * Fetch featured investment opportunities (server-scored).
+ * Like Madlan's "הזדמנויות חמות" — combines deal factor, ROI, freshness, and popularity.
+ * Cached server-side for 5min. UI shows a compact floating widget on the map.
+ */
+export function useFeaturedPlots(limit = 3) {
+  return useQuery({
+    queryKey: ['featuredPlots', limit],
+    queryFn: () => getFeaturedPlots(limit),
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+    retry: 1,
     placeholderData: [],
   })
 }

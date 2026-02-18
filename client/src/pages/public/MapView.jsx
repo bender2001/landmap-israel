@@ -31,6 +31,7 @@ const KeyboardShortcuts = lazy(() => import('../../components/KeyboardShortcuts.
 const RecentlyViewed = lazy(() => import('../../components/RecentlyViewed.jsx'))
 const FirstVisitHints = lazy(() => import('../../components/FirstVisitHints.jsx'))
 const AlertSubscription = lazy(() => import('../../components/AlertSubscription.jsx'))
+const FeaturedDeals = lazy(() => import('../../components/FeaturedDeals.jsx'))
 
 function DataFreshnessIndicator({ updatedAt, onRefresh }) {
   const [, setTick] = useState(0)
@@ -654,6 +655,13 @@ export default function MapView() {
       <Suspense fallback={null}>
         <WidgetErrorBoundary name="FirstVisitHints" silent>
           <FirstVisitHints />
+        </WidgetErrorBoundary>
+      </Suspense>
+
+      {/* Featured Deals widget — shows server-scored top investment opportunities (like Madlan's "הזדמנויות חמות") */}
+      <Suspense fallback={null}>
+        <WidgetErrorBoundary name="FeaturedDeals" silent>
+          <FeaturedDeals onSelectPlot={handleSelectPlot} selectedPlot={selectedPlot} />
         </WidgetErrorBoundary>
       </Suspense>
 
