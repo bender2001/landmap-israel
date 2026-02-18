@@ -1,12 +1,15 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useState, useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
-import IntroOverlay from './components/IntroOverlay'
-import CookieConsent from './components/CookieConsent'
-import InstallPrompt from './components/InstallPrompt'
 import ScrollToTop from './components/ui/ScrollToTop'
 import Spinner from './components/ui/Spinner'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import { useWebVitals } from './hooks/useWebVitals'
+
+// Lazy-load overlay components — they're all conditional (first visit, consent, PWA)
+// and don't need to be in the initial bundle (saves ~8-12KB from index.js).
+const IntroOverlay = lazy(() => import('./components/IntroOverlay'))
+const CookieConsent = lazy(() => import('./components/CookieConsent'))
+const InstallPrompt = lazy(() => import('./components/InstallPrompt'))
 
 const MapView = lazy(() => import('./pages/public/MapView'))
 const PlotDetail = lazy(() => import('./pages/public/PlotDetail'))
@@ -47,9 +50,20 @@ export default function App() {
   // Reports to analytics endpoint for real performance monitoring
   useWebVitals()
 
+  // Skip intro eagerly for returning visitors — avoids loading the IntroOverlay chunk entirely.
+  // IntroOverlay is ~3KB and includes animation logic we don't need on repeat visits.
+  const introSeen = useState(() => !!localStorage.getItem('landmap_intro_seen'))[0]
+  useEffect(() => {
+    if (introSeen && showIntro) setShowIntro(false)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <>
-      {showIntro && <IntroOverlay onComplete={() => setShowIntro(false)} />}
+      {showIntro && !introSeen && (
+        <Suspense fallback={null}>
+          <IntroOverlay onComplete={() => setShowIntro(false)} />
+        </Suspense>
+      )}
 
       <ScrollToTop />
       <ErrorBoundary>
@@ -89,8 +103,12 @@ export default function App() {
         </Suspense>
       </ErrorBoundary>
 
-      <CookieConsent />
-      <InstallPrompt />
+      <Suspense fallback={null}>
+        <CookieConsent />
+      </Suspense>
+      <Suspense fallback={null}>
+        <InstallPrompt />
+      </Suspense>
     </>
   )
 }

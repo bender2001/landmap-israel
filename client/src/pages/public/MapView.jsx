@@ -404,10 +404,60 @@ export default function MapView() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-navy">
-        <div className="flex flex-col items-center gap-4">
-          <Spinner className="w-12 h-12 text-gold" />
-          <span className="text-sm text-slate-400">טוען נתונים...</span>
+      <div className="h-screen w-screen bg-navy overflow-hidden relative" dir="rtl">
+        {/* Skeleton map area — mimics the real map with animated placeholder */}
+        <div className="absolute inset-0 bg-gradient-to-b from-navy via-navy-light/20 to-navy">
+          {/* Fake map grid lines */}
+          <div className="absolute inset-0 opacity-[0.03]" style={{
+            backgroundImage: 'linear-gradient(rgba(200,148,42,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(200,148,42,0.3) 1px, transparent 1px)',
+            backgroundSize: '60px 60px',
+          }} />
+          {/* Animated scan line */}
+          <div className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-gold/20 to-transparent animate-pulse" style={{ top: '40%' }} />
+          <div className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-gold/10 to-transparent animate-pulse" style={{ top: '60%', animationDelay: '0.5s' }} />
+        </div>
+
+        {/* Skeleton filter bar */}
+        <div className="absolute top-0 right-0 left-0 z-10 p-3">
+          <div className="bg-navy/80 backdrop-blur-md border border-white/5 rounded-2xl p-3">
+            {/* Quick presets skeleton */}
+            <div className="flex gap-2 mb-2">
+              {[1,2,3,4,5].map(i => (
+                <div key={i} className="h-7 rounded-lg bg-white/[0.03] border border-white/5 animate-pulse" style={{ width: `${60 + i * 8}px`, animationDelay: `${i * 0.1}s` }} />
+              ))}
+            </div>
+            {/* Search bar skeleton */}
+            <div className="h-10 rounded-xl bg-white/[0.03] border border-white/5 animate-pulse" />
+          </div>
+        </div>
+
+        {/* Skeleton card strip at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 z-10 p-3">
+          <div className="flex gap-3 overflow-hidden">
+            {[1,2,3,4,5,6].map(i => (
+              <div key={i} className="flex-shrink-0 w-48 h-32 rounded-xl bg-navy-light/40 border border-white/5 p-3 animate-pulse" style={{ animationDelay: `${i * 0.15}s` }}>
+                <div className="h-3 w-3/4 rounded bg-slate-700/50 mb-2" />
+                <div className="h-2.5 w-1/2 rounded bg-slate-700/30 mb-3" />
+                <div className="h-4 w-full rounded bg-slate-700/20 mb-2" />
+                <div className="flex justify-between">
+                  <div className="h-3 w-14 rounded bg-gold/10" />
+                  <div className="h-3 w-10 rounded bg-emerald-500/10" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Center loading indicator */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4 bg-navy/60 backdrop-blur-sm rounded-2xl px-8 py-6 border border-white/5">
+            <Spinner className="w-10 h-10 text-gold" />
+            <span className="text-sm text-slate-400 font-medium">טוען נתוני קרקעות...</span>
+            <div className="flex items-center gap-2 text-[10px] text-slate-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-gold/40 animate-pulse" />
+              <span>מתחבר לשרת</span>
+            </div>
+          </div>
         </div>
       </div>
     )

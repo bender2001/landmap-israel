@@ -22,11 +22,14 @@
     <link rel="preconnect" href="https://server.arcgisonline.com" />
     <link rel="preconnect" href="https://a.tile.openstreetmap.org" />
     <link rel="preconnect" href="https://a.basemaps.cartocdn.com" />
+    <!-- Preconnect to Supabase for faster first API call -->
     <link rel="dns-prefetch" href="https://unpkg.com" />
     <link rel="dns-prefetch" href="https://server.arcgisonline.com" />
     <link rel="canonical" href="https://landmap.co.il/" />
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" as="style" />
+    <!-- Font: use fetchpriority=high since Heebo is the primary font and blocks render -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" as="style" fetchpriority="high" />
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <!-- Leaflet CSS: preload as render-blocking stylesheet for map page -->
     <link rel="preload" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" as="style" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   </head>
