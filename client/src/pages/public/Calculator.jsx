@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Calculator as CalcIcon, TrendingUp, DollarSign, Percent, ArrowDown, Landmark, Table2, PiggyBank, Printer, Share2, Check, AlertTriangle, Target, Clock, BarChart3, ShieldAlert } from 'lucide-react'
 import { roiStages, zoningLabels, ZoningStage } from '../../utils/constants'
@@ -8,6 +8,26 @@ import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
 import BackToTopButton from '../../components/ui/BackToTopButton'
 import { useMetaTags } from '../../hooks/useMetaTags'
+
+// ─── Auto-save calculator inputs to localStorage ─────────────────────
+// Investors spend time configuring scenarios — losing inputs on refresh is frustrating.
+// Like Madlan's "remembered" calculator state, this persists all fields so users can
+// close the tab and return later to the exact same analysis. URL params take priority
+// over saved state (enables sharing + pre-fill from PlotDetail).
+const CALC_STORAGE_KEY = 'landmap_calculator_inputs'
+
+function loadSavedInputs() {
+  try {
+    const raw = localStorage.getItem(CALC_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
+function saveInputs(inputs) {
+  try {
+    localStorage.setItem(CALC_STORAGE_KEY, JSON.stringify(inputs))
+  } catch { /* quota exceeded — non-critical */ }
+}
 
 const zoningOptions = Object.entries(zoningLabels)
 
@@ -29,21 +49,35 @@ export default function Calculator() {
   })
 
   // Support URL pre-fill from PlotDetail (e.g., /calculator?price=500000&size=2000&zoning=AGRICULTURAL&years=5)
-  // This creates a seamless Plot → Calculator flow like Madlan's "חשב תשואה" button
-  const [purchasePrice, setPurchasePrice] = useState(() => searchParams.get('price') || '')
-  const [plotSize, setPlotSize] = useState(() => searchParams.get('size') || '')
+  // This creates a seamless Plot → Calculator flow like Madlan's "חשב תשואה" button.
+  // Fallback order: URL params → localStorage saved state → defaults
+  const saved = useMemo(() => loadSavedInputs(), [])
+  const [purchasePrice, setPurchasePrice] = useState(() => searchParams.get('price') || saved?.purchasePrice || '')
+  const [plotSize, setPlotSize] = useState(() => searchParams.get('size') || saved?.plotSize || '')
   const [currentZoning, setCurrentZoning] = useState(() => {
-    const z = searchParams.get('zoning')
+    const z = searchParams.get('zoning') || saved?.currentZoning
     return z && zoningOptions.some(([k]) => k === z) ? z : 'AGRICULTURAL'
   })
-  const [targetZoning, setTargetZoning] = useState('BUILDING_PERMIT')
-  const [holdingYears, setHoldingYears] = useState(() => searchParams.get('years') || '5')
+  const [targetZoning, setTargetZoning] = useState(() => {
+    const z = saved?.targetZoning
+    return z && zoningOptions.some(([k]) => k === z) ? z : 'BUILDING_PERMIT'
+  })
+  const [holdingYears, setHoldingYears] = useState(() => searchParams.get('years') || saved?.holdingYears || '5')
   const prefilled = searchParams.get('price') && searchParams.get('size')
-  // Financing inputs
-  const [downPaymentPct, setDownPaymentPct] = useState('30')
-  const [interestRate, setInterestRate] = useState('4.5')
-  const [loanYears, setLoanYears] = useState('15')
+  // Financing inputs — also restored from localStorage
+  const [downPaymentPct, setDownPaymentPct] = useState(() => saved?.downPaymentPct || '30')
+  const [interestRate, setInterestRate] = useState(() => saved?.interestRate || '4.5')
+  const [loanYears, setLoanYears] = useState(() => saved?.loanYears || '15')
   const [showFinancing, setShowFinancing] = useState(false)
+
+  // Auto-save all calculator inputs to localStorage on every change.
+  // Debounce isn't needed here — JSON.stringify is fast for 8 fields (~50μs).
+  useEffect(() => {
+    saveInputs({
+      purchasePrice, plotSize, currentZoning, targetZoning,
+      holdingYears, downPaymentPct, interestRate, loanYears,
+    })
+  }, [purchasePrice, plotSize, currentZoning, targetZoning, holdingYears, downPaymentPct, interestRate, loanYears])
 
   const result = useMemo(() => {
     const price = parseFloat(purchasePrice)

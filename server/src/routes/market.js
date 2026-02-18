@@ -52,6 +52,11 @@ router.get('/overview', async (req, res, next) => {
             minPriceSqm: Infinity,
             maxPriceSqm: 0,
             byZoning: {},
+            // Collect arrays for median/percentile calculations —
+            // median price is more meaningful than average in real estate
+            // (not skewed by outliers). Both Madlan and Yad2 show medians.
+            prices: [],
+            priceSqmArr: [],
           }
         }
         const c = cityMap[city]
@@ -64,15 +69,31 @@ router.get('/overview', async (req, res, next) => {
         c.totalProj += p.projected_value || 0
         c.totalArea += p.size_sqm || 0
 
-        if (price > 0 && price < c.minPrice) c.minPrice = price
+        if (price > 0) {
+          c.prices.push(price)
+          if (price < c.minPrice) c.minPrice = price
+        }
         if (price > c.maxPrice) c.maxPrice = price
 
         const priceSqm = size > 0 ? price / size : 0
-        if (priceSqm > 0 && priceSqm < c.minPriceSqm) c.minPriceSqm = priceSqm
+        if (priceSqm > 0) {
+          c.priceSqmArr.push(priceSqm)
+          if (priceSqm < c.minPriceSqm) c.minPriceSqm = priceSqm
+        }
         if (priceSqm > c.maxPriceSqm) c.maxPriceSqm = priceSqm
 
         const zoning = p.zoning_stage || 'UNKNOWN'
         c.byZoning[zoning] = (c.byZoning[zoning] || 0) + 1
+      }
+
+      // Helper: compute median of a numeric array
+      function median(arr) {
+        if (arr.length === 0) return 0
+        const sorted = [...arr].sort((a, b) => a - b)
+        const mid = Math.floor(sorted.length / 2)
+        return sorted.length % 2 === 0
+          ? Math.round((sorted[mid - 1] + sorted[mid]) / 2)
+          : Math.round(sorted[mid])
       }
 
       const cities = Object.values(cityMap).map(c => ({
@@ -81,6 +102,11 @@ router.get('/overview', async (req, res, next) => {
         available: c.available,
         avgPricePerSqm: c.totalArea > 0 ? Math.round(c.totalPrice / c.totalArea) : 0,
         avgPricePerDunam: c.totalArea > 0 ? Math.round((c.totalPrice / c.totalArea) * 1000) : 0,
+        // Median prices — more representative than averages for real estate
+        // (not skewed by a single expensive plot like averages are)
+        medianPrice: median(c.prices),
+        medianPricePerSqm: median(c.priceSqmArr),
+        medianPricePerDunam: median(c.priceSqmArr.map(v => Math.round(v * 1000))),
         avgRoi: c.totalPrice > 0 ? Math.round(((c.totalProj - c.totalPrice) / c.totalPrice) * 100) : 0,
         totalArea: c.totalArea,
         totalValue: c.totalPrice,
@@ -94,10 +120,18 @@ router.get('/overview', async (req, res, next) => {
       const totalProj = plots.reduce((s, p) => s + (p.projected_value || 0), 0)
       const totalArea = plots.reduce((s, p) => s + (p.size_sqm || 0), 0)
 
+      // Global median price — investors trust median over average in real estate
+      const allPrices = plots.map(p => p.total_price || 0).filter(v => v > 0)
+      const allPriceSqm = plots
+        .filter(p => (p.total_price || 0) > 0 && (p.size_sqm || 0) > 0)
+        .map(p => p.total_price / p.size_sqm)
+
       return {
         total: plots.length,
         available: plots.filter(p => p.status === 'AVAILABLE').length,
         avgRoi: totalPrice > 0 ? Math.round(((totalProj - totalPrice) / totalPrice) * 100) : 0,
+        medianPrice: median(allPrices),
+        medianPricePerSqm: median(allPriceSqm),
         totalArea,
         totalValue: totalPrice,
         cities,

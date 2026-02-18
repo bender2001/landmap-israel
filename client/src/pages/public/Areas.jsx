@@ -60,11 +60,20 @@ function CityCard({ city, stats }) {
           </div>
         </div>
 
-        {/* Quick stats row */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* Quick stats row — shows median alongside average for professional investors.
+            Median is more meaningful in RE: one ₪5M plot doesn't skew it like it does the average.
+            Like Madlan/Yad2 which show both average and median for area pricing. */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-white/[0.03] rounded-lg p-3 text-center">
-            <div className="text-[10px] text-slate-500 mb-1">מחיר ממוצע/דונם</div>
-            <div className="text-sm font-bold text-gold">{formatCurrency(stats.avgPricePerDunam)}</div>
+            <div className="text-[10px] text-slate-500 mb-1">מחיר חציוני</div>
+            <div className="text-sm font-bold text-gold">{stats.medianPrice ? formatCurrency(stats.medianPrice) : '—'}</div>
+            {stats.medianPricePerDunam > 0 && (
+              <div className="text-[9px] text-slate-500 mt-0.5">{formatCurrency(stats.medianPricePerDunam)}/דונם</div>
+            )}
+          </div>
+          <div className="bg-white/[0.03] rounded-lg p-3 text-center">
+            <div className="text-[10px] text-slate-500 mb-1">ממוצע/דונם</div>
+            <div className="text-sm font-bold text-slate-300">{formatCurrency(stats.avgPricePerDunam)}</div>
           </div>
           <div className="bg-white/[0.03] rounded-lg p-3 text-center">
             <div className="text-[10px] text-slate-500 mb-1">שטח כולל</div>
@@ -649,13 +658,29 @@ export default function Areas() {
           </div>
         ) : (
           <>
-            {/* Global stats */}
+            {/* Global stats — shows median alongside average because median is more
+                representative for real estate pricing (not skewed by outlier plots).
+                Professional investors always look at medians — like Madlan/Yad2. */}
             {overview && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
                 <StatCard icon={Building2} label="סה״כ חלקות" value={overview.total} color="gold" />
                 <StatCard icon={Ruler} label="שטח כולל" value={`${formatDunam(overview.totalArea)} דונם`} color="blue" />
                 <StatCard icon={TrendingUp} label="ROI ממוצע" value={`+${overview.avgRoi}%`} color="green" />
+                <StatCard
+                  icon={DollarSign}
+                  label="מחיר חציוני"
+                  value={overview.medianPrice ? formatCurrency(overview.medianPrice) : '—'}
+                  subValue={overview.medianPricePerSqm ? `₪${Math.round(overview.medianPricePerSqm).toLocaleString()}/מ״ר` : null}
+                  color="gold"
+                />
                 <StatCard icon={DollarSign} label="שווי כולל" value={formatCurrency(overview.totalValue)} subValue={`${overview.available} זמינות`} color="purple" />
+                <StatCard
+                  icon={Users}
+                  label="זמינות"
+                  value={`${overview.available}/${overview.total}`}
+                  subValue={overview.total > 0 ? `${Math.round((overview.available / overview.total) * 100)}% פתוחות` : null}
+                  color="green"
+                />
               </div>
             )}
 
