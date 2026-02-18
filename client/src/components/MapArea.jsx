@@ -243,7 +243,7 @@ function MapToolbar({ plots }) {
   const btnClass = "w-9 h-9 flex items-center justify-center hover:border-gold/20 transition-colors hover:bg-white/5"
 
   return (
-    <div className="absolute bottom-28 left-3 z-[1000] pointer-events-none">
+    <div className="absolute bottom-[11rem] sm:bottom-[13rem] left-3 z-[1000] pointer-events-none">
       <div className="glass-panel pointer-events-auto flex flex-col divide-y divide-white/10 overflow-hidden">
         <button onClick={handleLocate} disabled={locating} className={`${btnClass} disabled:opacity-50`} title="המיקום שלי">
           <Navigation className={`w-4 h-4 text-gold ${locating ? 'animate-spin' : ''}`} />

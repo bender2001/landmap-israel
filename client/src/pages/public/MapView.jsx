@@ -559,12 +559,12 @@ export default function MapView() {
       )}
       {/* Mock data warning — shown when API is unreachable and fallback demo data is used */}
       {isMockData && (
-        <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-600/90 backdrop-blur-sm text-white text-center py-2 px-4 text-xs font-medium flex items-center justify-center gap-2" dir="rtl">
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-600/90 backdrop-blur-sm text-white text-center py-1.5 px-3 text-[11px] font-medium flex items-center justify-center gap-1.5 whitespace-nowrap overflow-hidden" dir="rtl">
           <span>⚠️</span>
-          <span>השרת אינו זמין — מוצגים נתוני הדגמה. הנתונים עשויים להיות לא מעודכנים.</span>
+          <span className="truncate">השרת אינו זמין — נתוני הדגמה</span>
           <button
             onClick={() => refetchPlots()}
-            className="px-2.5 py-0.5 bg-white/20 hover:bg-white/30 rounded-md text-[11px] font-bold transition-colors mr-2"
+            className="px-2 py-0.5 bg-white/20 hover:bg-white/30 rounded-md text-[10px] font-bold transition-colors flex-shrink-0"
           >
             נסה שוב
           </button>
@@ -733,7 +733,7 @@ export default function MapView() {
 
       {/* Floating contact CTA — desktop: full buttons, mobile: single expandable FAB */}
       {/* Desktop version */}
-      <div className="fixed bottom-52 sm:bottom-[13rem] left-4 z-[30] hidden sm:flex flex-col gap-2 animate-bounce-in">
+      <div className="fixed bottom-[14rem] left-4 z-[30] hidden sm:flex flex-col gap-2 animate-bounce-in">
         <a
           href={selectedPlot
             ? whatsappLink(`שלום, אני מעוניין בפרטים על גוש ${selectedPlot.block_number ?? selectedPlot.blockNumber} חלקה ${selectedPlot.number} ב${selectedPlot.city}`)
@@ -771,7 +771,7 @@ export default function MapView() {
         </button>
       </div>
       {/* Mobile version — single WhatsApp FAB, compact */}
-      <div className="fixed bottom-44 left-3 z-[30] sm:hidden">
+      <div className="fixed bottom-[10rem] left-3 z-[30] sm:hidden">
         <a
           href={selectedPlot
             ? whatsappLink(`שלום, אני מעוניין בפרטים על גוש ${selectedPlot.block_number ?? selectedPlot.blockNumber} חלקה ${selectedPlot.number} ב${selectedPlot.city}`)

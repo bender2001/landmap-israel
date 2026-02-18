@@ -302,18 +302,28 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
     }
   }, [selectedPlot?.id])
 
-  // Aggregate stats
+  // Aggregate stats — includes total investment value and projected profit for investor decision-making
   const stats = useMemo(() => {
     if (!plots || plots.length === 0) return null
     const available = plots.filter(p => p.status === 'AVAILABLE')
-    const totalValue = plots.reduce((sum, p) => sum + (p.total_price ?? p.totalPrice ?? 0), 0)
-    const avgRoi = plots.reduce((sum, p) => {
+    let totalValue = 0
+    let totalProjected = 0
+    let roiSum = 0
+    let totalArea = 0
+
+    for (const p of plots) {
       const price = p.total_price ?? p.totalPrice ?? 0
       const proj = p.projected_value ?? p.projectedValue ?? 0
-      return sum + (price > 0 ? ((proj - price) / price) * 100 : 0)
-    }, 0) / plots.length
-    const totalArea = plots.reduce((sum, p) => sum + (p.size_sqm ?? p.sizeSqM ?? 0), 0)
-    return { available: available.length, totalValue, avgRoi: Math.round(avgRoi), totalArea }
+      totalValue += price
+      totalProjected += proj
+      totalArea += p.size_sqm ?? p.sizeSqM ?? 0
+      if (price > 0) roiSum += ((proj - price) / price) * 100
+    }
+
+    const avgRoi = Math.round(roiSum / plots.length)
+    const totalProfit = totalProjected - totalValue
+
+    return { available: available.length, totalValue, totalProjected, totalProfit, avgRoi, totalArea }
   }, [plots])
 
   // Track recently viewed plots
@@ -371,7 +381,7 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
 
   return (
     <div className="plot-strip-wrapper" dir="rtl">
-      {/* Aggregate stats bar */}
+      {/* Aggregate stats bar — key portfolio metrics for investor decision-making */}
       {stats && (
         <div className="plot-strip-stats">
           <div className="plot-strip-stat">
@@ -388,6 +398,15 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
             <Ruler className="w-3 h-3 text-blue-400" />
             <span>{(stats.totalArea / 1000).toFixed(1)} דונם סה״כ</span>
           </div>
+          {stats.totalProfit > 0 && (
+            <>
+              <div className="plot-strip-stat-divider" />
+              <div className="plot-strip-stat" title={`שווי נוכחי: ₪${stats.totalValue.toLocaleString()} → צפי: ₪${stats.totalProjected.toLocaleString()}`}>
+                <span className="text-emerald-400">💎</span>
+                <span>רווח פוטנציאלי ₪{formatPriceShort(stats.totalProfit)}</span>
+              </div>
+            </>
+          )}
         </div>
       )}
 

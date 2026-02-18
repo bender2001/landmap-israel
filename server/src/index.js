@@ -124,12 +124,17 @@ app.use((req, res, next) => {
 // Body parsing
 app.use(express.json({ limit: '10mb' }))
 
-// Global rate limiter
+// Global rate limiter — Hebrew error for consistency with errorHandler.js
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
+  message: {
+    error: 'יותר מדי בקשות — נסה שוב בעוד דקה',
+    errorCode: 'RATE_LIMIT_GLOBAL',
+    retryAfter: 900,
+  },
 })
 app.use('/api', globalLimiter)
 
@@ -343,9 +348,16 @@ app.get('/api/events', (req, res) => {
     'X-Accel-Buffering': 'no', // Nginx compatibility
   })
   res.flushHeaders()
-  res.write('data: {"type":"connected"}\n\n')
 
-  addClient(res)
+  // Connection limiting: reject if server or per-IP limit reached
+  const accepted = addClient(res, req.ip)
+  if (!accepted) {
+    res.write('data: {"type":"rejected","reason":"connection_limit"}\n\n')
+    res.end()
+    return
+  }
+
+  res.write('data: {"type":"connected"}\n\n')
   req.on('close', () => removeClient(res))
 })
 
