@@ -2832,3 +2832,53 @@ body {
   from { transform: scale(0); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
+
+/* ═══════════════════════════════════════════
+   ACCESSIBILITY — prefers-reduced-motion
+   ═══════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-pulse,
+  .animate-bounce,
+  .animate-spin,
+  .animate-pulse-gold,
+  .animate-bounce-in {
+    animation: none !important;
+  }
+
+  .intro-scanline,
+  .intro-grid {
+    transition: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   FOCUS VISIBLE — keyboard navigation
+   ═══════════════════════════════════════════ */
+:focus-visible {
+  outline: 2px solid #C8942A;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Remove outline for mouse clicks */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* High contrast mode support */
+@media (forced-colors: active) {
+  .filter-pill-trigger,
+  .filter-status-chip,
+  .plot-card-mini {
+    border: 1px solid ButtonText;
+  }
+}

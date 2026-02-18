@@ -3,6 +3,7 @@ import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler,
 import { statusColors, statusLabels } from '../utils/constants'
 import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
+import { whatsappShareLink } from '../utils/config'
 
 function useAreaAverages(plots) {
   return useMemo(() => {
@@ -242,7 +243,7 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
                   e.stopPropagation()
                   const url = `${window.location.origin}/plot/${plot.id}`
                   const text = `גוש ${blockNum} חלקה ${plot.number} | ${plot.city}\n${formatPriceShort(price)} · +${roi}% ROI\n${url}`
-                  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+                  window.open(whatsappShareLink(text), '_blank')
                 }}
                 className="plot-card-share-btn"
                 title="שתף ב-WhatsApp"

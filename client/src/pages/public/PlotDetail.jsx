@@ -12,6 +12,7 @@ import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStag
 import { formatCurrency, formatDunam } from '../../utils/formatters.js'
 import PriceTrendChart from '../../components/ui/PriceTrendChart.jsx'
 import MiniMap from '../../components/ui/MiniMap.jsx'
+import { plotInquiryLink } from '../../utils/config.js'
 
 function JsonLdSchema({ plot }) {
   const blockNum = plot.block_number ?? plot.blockNumber
@@ -442,7 +443,7 @@ export default function PlotDetail() {
                 צור קשר לפרטים מלאים
               </button>
               <a
-                href={`https://wa.me/972500000000?text=${encodeURIComponent(`שלום, אני מעוניין בפרטים על גוש ${blockNumber} חלקה ${plot.number} ב${plot.city}`)}`}
+                href={plotInquiryLink(plot)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-14 flex items-center justify-center bg-[#25D366] rounded-2xl hover:bg-[#20BD5A] transition-all shadow-lg shadow-[#25D366]/20"

@@ -3,10 +3,171 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { BarChart3, X, Map, MapPin, Waves, TreePine, Hospital, TrendingUp, Award, Clock } from 'lucide-react'
 import { useAllPlots } from '../../hooks/usePlots'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
-import { formatCurrency } from '../../utils/formatters'
+import { formatCurrency, calcInvestmentScore } from '../../utils/formatters'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
 import Spinner from '../../components/ui/Spinner'
+
+// Plot colors for visual comparison charts
+const PLOT_COLORS = ['#3B82F6', '#22C55E', '#F59E0B']
+
+/**
+ * Visual bar chart comparing a single metric across plots.
+ */
+function CompareBarChart({ plots, label, getter, formatter, unit = '', mode = 'higher-better' }) {
+  const values = plots.map(getter).filter(v => v != null)
+  if (values.length === 0) return null
+  const maxVal = Math.max(...values, 1)
+
+  return (
+    <div className="mb-6">
+      <div className="text-xs font-medium text-slate-400 mb-2">{label}</div>
+      <div className="space-y-2">
+        {plots.map((plot, i) => {
+          const val = getter(plot)
+          if (val == null) return null
+          const pct = (val / maxVal) * 100
+          const blockNum = plot.block_number ?? plot.blockNumber
+          const isBest = mode === 'higher-better' ? val === Math.max(...values) : val === Math.min(...values)
+          return (
+            <div key={plot.id} className="flex items-center gap-3">
+              <span className="text-[10px] text-slate-500 w-16 text-left flex-shrink-0 truncate">
+                {blockNum}/{plot.number}
+              </span>
+              <div className="flex-1 h-6 rounded-lg bg-white/5 overflow-hidden relative">
+                <div
+                  className="h-full rounded-lg transition-all duration-700 ease-out flex items-center justify-end px-2"
+                  style={{
+                    width: `${Math.max(pct, 8)}%`,
+                    background: `linear-gradient(90deg, ${PLOT_COLORS[i]}40, ${PLOT_COLORS[i]}90)`,
+                    borderRight: isBest ? `3px solid ${PLOT_COLORS[i]}` : 'none',
+                  }}
+                >
+                  <span className={`text-[10px] font-bold ${isBest ? 'text-white' : 'text-white/70'}`}>
+                    {formatter ? formatter(val) : val.toLocaleString()}{unit}
+                  </span>
+                </div>
+              </div>
+              {isBest && (
+                <span className="text-[9px] text-gold font-bold flex-shrink-0">👑</span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Radar chart comparing investment dimensions across plots.
+ */
+function CompareRadar({ plots }) {
+  const dimensions = ['ROI', 'שטח', 'מיקום', 'תכנון', 'ציון']
+
+  const getScores = (plot) => {
+    const price = plot.total_price ?? plot.totalPrice ?? 0
+    const proj = plot.projected_value ?? plot.projectedValue ?? 0
+    const roi = price > 0 ? ((proj - price) / price) * 100 : 0
+    const size = plot.size_sqm ?? plot.sizeSqM ?? 0
+    const distSea = plot.distance_to_sea ?? plot.distanceToSea
+    const investScore = calcInvestmentScore(plot)
+
+    const zoningOrder = ['AGRICULTURAL', 'MASTER_PLAN_DEPOSIT', 'MASTER_PLAN_APPROVED', 'DETAILED_PLAN_PREP', 'DETAILED_PLAN_DEPOSIT', 'DETAILED_PLAN_APPROVED', 'DEVELOPER_TENDER', 'BUILDING_PERMIT']
+    const zoning = plot.zoning_stage ?? plot.zoningStage ?? 'AGRICULTURAL'
+    const zoningIdx = zoningOrder.indexOf(zoning)
+
+    return [
+      Math.min(10, roi / 25),                          // ROI: 250%+ = 10
+      Math.min(10, size / 3000 * 10),                  // Size: 3000sqm = 10
+      distSea != null ? Math.max(0, 10 - distSea / 500) : 5, // Location
+      zoningIdx >= 0 ? (zoningIdx / 7) * 10 : 0,      // Planning stage
+      investScore,                                       // Score
+    ]
+  }
+
+  const cx = 100, cy = 100, r = 70
+  const n = dimensions.length
+  const angleStep = (2 * Math.PI) / n
+  const startAngle = -Math.PI / 2
+
+  const getPoint = (i, val) => {
+    const angle = startAngle + i * angleStep
+    const dist = (val / 10) * r
+    return { x: cx + dist * Math.cos(angle), y: cy + dist * Math.sin(angle) }
+  }
+
+  return (
+    <div className="glass-panel p-6 mb-6">
+      <h3 className="text-base font-bold text-slate-100 mb-4 flex items-center gap-2">
+        <Award className="w-4 h-4 text-gold" />
+        השוואה חזותית
+      </h3>
+      <svg viewBox="0 0 200 200" className="w-full max-w-[300px] mx-auto">
+        {/* Grid */}
+        {[2, 4, 6, 8, 10].map(level => {
+          const points = Array.from({ length: n }, (_, i) => {
+            const p = getPoint(i, level)
+            return `${p.x},${p.y}`
+          }).join(' ')
+          return <polygon key={level} points={points} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
+        })}
+        {/* Axes */}
+        {dimensions.map((_, i) => {
+          const p = getPoint(i, 10)
+          return <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
+        })}
+        {/* Data polygons */}
+        {plots.map((plot, pi) => {
+          const scores = getScores(plot)
+          const points = scores.map((s, i) => {
+            const p = getPoint(i, s)
+            return `${p.x},${p.y}`
+          }).join(' ')
+          return (
+            <polygon
+              key={plot.id}
+              points={points}
+              fill={`${PLOT_COLORS[pi]}15`}
+              stroke={PLOT_COLORS[pi]}
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+            />
+          )
+        })}
+        {/* Data points */}
+        {plots.map((plot, pi) => {
+          const scores = getScores(plot)
+          return scores.map((s, i) => {
+            const p = getPoint(i, s)
+            return <circle key={`${plot.id}-${i}`} cx={p.x} cy={p.y} r="3" fill={PLOT_COLORS[pi]} stroke="#1a1a2e" strokeWidth="1" />
+          })
+        })}
+        {/* Labels */}
+        {dimensions.map((d, i) => {
+          const p = getPoint(i, 12.5)
+          return (
+            <text key={i} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" className="text-[9px] fill-slate-400">
+              {d}
+            </text>
+          )
+        })}
+      </svg>
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 mt-3">
+        {plots.map((plot, i) => {
+          const blockNum = plot.block_number ?? plot.blockNumber
+          return (
+            <div key={plot.id} className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full" style={{ background: PLOT_COLORS[i] }} />
+              <span className="text-[10px] text-slate-400">גוש {blockNum}/{plot.number}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 function CompareCell({ value, highlight = false, className = '' }) {
   return (
@@ -79,6 +240,64 @@ export default function Compare() {
               </Link>
             </div>
           ) : (
+            <>
+            {/* Visual comparison charts */}
+            {plots.length >= 2 && (
+              <>
+                <CompareRadar plots={plots} />
+
+                <div className="glass-panel p-6 mb-6">
+                  <h3 className="text-base font-bold text-slate-100 mb-4 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-gold" />
+                    השוואה מספרית
+                  </h3>
+                  <CompareBarChart
+                    plots={plots}
+                    label="מחיר (נמוך יותר = טוב יותר)"
+                    getter={(p) => p.total_price ?? p.totalPrice}
+                    formatter={formatCurrency}
+                    mode="lower-better"
+                  />
+                  <CompareBarChart
+                    plots={plots}
+                    label="תשואה צפויה (%)"
+                    getter={(p) => {
+                      const price = p.total_price ?? p.totalPrice ?? 0
+                      const proj = p.projected_value ?? p.projectedValue ?? 0
+                      return price > 0 ? Math.round((proj - price) / price * 100) : 0
+                    }}
+                    unit="%"
+                    mode="higher-better"
+                  />
+                  <CompareBarChart
+                    plots={plots}
+                    label="שטח (מ״ר)"
+                    getter={(p) => p.size_sqm ?? p.sizeSqM}
+                    unit=" מ״ר"
+                    mode="higher-better"
+                  />
+                  <CompareBarChart
+                    plots={plots}
+                    label="מחיר למ״ר (נמוך = טוב)"
+                    getter={(p) => {
+                      const price = p.total_price ?? p.totalPrice ?? 0
+                      const size = p.size_sqm ?? p.sizeSqM ?? 1
+                      return Math.round(price / size)
+                    }}
+                    formatter={(v) => `₪${v.toLocaleString()}`}
+                    mode="lower-better"
+                  />
+                  <CompareBarChart
+                    plots={plots}
+                    label="ציון השקעה"
+                    getter={(p) => calcInvestmentScore(p)}
+                    unit="/10"
+                    mode="higher-better"
+                  />
+                </div>
+              </>
+            )}
+
             <div className="glass-panel p-0 overflow-hidden">
               <div
                 className="h-[3px]"
@@ -257,6 +476,7 @@ export default function Compare() {
                 </button>
               </div>
             </div>
+            </>
           )}
         </div>
       </div>

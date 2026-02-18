@@ -8,6 +8,7 @@ import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel } from 
 import AnimatedNumber from './ui/AnimatedNumber'
 import { usePlot } from '../hooks/usePlots'
 import MiniMap from './ui/MiniMap'
+import { plotInquiryLink } from '../utils/config'
 
 function getDocIcon(mimeType) {
   if (!mimeType) return File
@@ -1222,7 +1223,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               צור קשר לפרטים מלאים
             </button>
             <a
-              href={`https://wa.me/972500000000?text=${encodeURIComponent(`שלום, אני מעוניין בפרטים על גוש ${blockNumber} חלקה ${plot.number} ב${plot.city}`)}`}
+              href={plotInquiryLink(plot)}
               target="_blank"
               rel="noopener noreferrer"
               className="flex-shrink-0 w-14 py-3.5 flex items-center justify-center bg-[#25D366] rounded-2xl hover:bg-[#20BD5A] hover:-translate-y-px transition-all duration-300 shadow-lg shadow-[#25D366]/20"
