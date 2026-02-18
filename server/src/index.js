@@ -54,6 +54,16 @@ app.use(compression())
 // Request logging
 app.use(morgan('short'))
 
+// Response time header for monitoring
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint()
+  res.on('finish', () => {
+    const ms = Number(process.hrtime.bigint() - start) / 1e6
+    res.set('X-Response-Time', `${ms.toFixed(1)}ms`)
+  })
+  next()
+})
+
 // Body parsing
 app.use(express.json({ limit: '10mb' }))
 

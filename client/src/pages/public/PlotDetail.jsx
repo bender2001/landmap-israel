@@ -325,35 +325,40 @@ export default function PlotDetail() {
                 )
               })()}
 
-              {/* ROI Stages — investment growth visualization */}
+              {/* ROI Stages — appreciation by planning stage */}
               {roi > 0 && (
                 <div className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
-                  <h2 className="text-base font-bold text-slate-100 mb-3">שלבי צמיחת ההשקעה</h2>
-                  <div className="space-y-3">
+                  <h2 className="text-base font-bold text-slate-100 mb-3">צפי השבחה לפי שלבי תכנון</h2>
+                  <div className="space-y-1.5">
                     {roiStages.map((stage, i) => {
-                      const stageValue = Math.round(totalPrice * (1 + (roi / 100) * stage.pct))
-                      const profit = stageValue - totalPrice
-                      const isReached = stage.pct <= 1
+                      const isPast = i < currentStageIndex
+                      const isCurrent = i === currentStageIndex
+                      const maxPrice = roiStages[roiStages.length - 1].pricePerSqM
+                      const barWidth = (stage.pricePerSqM / maxPrice) * 100
+                      const stageValue = stage.pricePerSqM * sizeSqM
                       return (
-                        <div key={i} className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0 ${isReached ? 'bg-gold/15 border border-gold/30' : 'bg-white/5 border border-white/10'}`}>
-                            {stage.icon}
+                        <div key={i} className={`flex items-center gap-2 py-1.5 rounded-lg ${isCurrent ? 'bg-gold/5 -mx-1 px-1' : ''}`}>
+                          <div className="w-[100px] flex-shrink-0">
+                            <span className={`text-xs leading-tight ${isCurrent ? 'text-gold font-bold' : isPast ? 'text-green-400/70' : 'text-slate-500'}`}>
+                              {stage.label}
+                            </span>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-baseline">
-                              <span className={`text-sm font-medium ${isReached ? 'text-slate-200' : 'text-slate-500'}`}>{stage.label}</span>
-                              <span className={`text-sm font-bold ${isReached ? 'text-gold' : 'text-slate-600'}`}>{formatCurrency(stageValue)}</span>
-                            </div>
-                            <div className="h-1.5 rounded-full bg-white/5 mt-1 overflow-hidden">
-                              <div
-                                className="h-full rounded-full transition-all"
-                                style={{
-                                  width: `${Math.min(100, stage.pct * 100)}%`,
-                                  background: isReached ? 'linear-gradient(90deg, #C8942A, #E5B94E)' : 'rgba(255,255,255,0.08)',
-                                }}
-                              />
-                            </div>
+                          <div className="flex-1 h-2.5 rounded-full bg-white/5 overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{
+                                width: `${barWidth}%`,
+                                background: isCurrent
+                                  ? 'linear-gradient(90deg, #C8942A, #E5B94E)'
+                                  : isPast
+                                    ? 'rgba(34,197,94,0.4)'
+                                    : 'rgba(148,163,184,0.15)',
+                              }}
+                            />
                           </div>
+                          <span className={`text-[10px] w-16 text-left flex-shrink-0 ${isCurrent ? 'text-gold font-bold' : isPast ? 'text-green-400/70' : 'text-slate-500'}`}>
+                            ₪{stage.pricePerSqM.toLocaleString()}/מ״ר
+                          </span>
                         </div>
                       )
                     })}
