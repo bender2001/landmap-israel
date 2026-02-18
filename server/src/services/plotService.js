@@ -168,6 +168,24 @@ export async function getPublishedPlots(filters = {}) {
     data.sort((a, b) => (b._roi || 0) - (a._roi || 0))
   } else if (filters.sort === 'roi-asc' && data) {
     data.sort((a, b) => (a._roi || 0) - (b._roi || 0))
+  } else if (filters.sort === 'cagr-desc' && data) {
+    // CAGR sort: annualized return considering holding period.
+    // More meaningful than raw ROI — a 200% ROI over 10 years (CAGR 11.6%)
+    // is worse than 100% ROI over 3 years (CAGR 26%). Investors prefer CAGR.
+    data.sort((a, b) => {
+      const getCagr = (p) => {
+        const price = p.total_price || 0
+        const proj = p.projected_value || 0
+        if (price <= 0 || proj <= price) return 0
+        const readiness = p.readiness_estimate || ''
+        let years = 5
+        if (readiness.includes('1-3')) years = 2
+        else if (readiness.includes('3-5')) years = 4
+        else if (readiness.includes('5+')) years = 7
+        return (Math.pow(proj / price, 1 / years) - 1) * 100
+      }
+      return getCagr(b) - getCagr(a)
+    })
   }
 
   return data

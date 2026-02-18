@@ -68,6 +68,16 @@ router.get('/', sanitizePlotQuery, async (req, res, next) => {
     const cacheKey = `plots:${JSON.stringify(req.query)}`
     const plots = await plotCache.wrap(cacheKey, () => getPublishedPlots(req.query), 30_000)
 
+    // Cache observability headers — helps the frontend detect stale data
+    // and lets DevTools/monitoring show cache hit/miss status.
+    const dataAge = plotCache.getAge(cacheKey)
+    if (dataAge !== null) {
+      res.set('X-Cache', 'HIT')
+      res.set('X-Data-Age', `${Math.round(dataAge / 1000)}s`)
+    } else {
+      res.set('X-Cache', 'MISS')
+    }
+
     // ETag support — avoid re-sending unchanged data
     const etag = generateETag(plots)
     res.set('ETag', etag)
