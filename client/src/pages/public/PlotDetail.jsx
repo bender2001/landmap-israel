@@ -75,6 +75,59 @@ function BreadcrumbSchema({ plot }) {
 }
 
 /**
+ * FAQ structured data — answers common investor questions about this specific plot.
+ * Google shows these as expandable FAQ snippets in search results, dramatically improving
+ * click-through rates for "גוש X חלקה Y" queries. Like Madlan's rich snippets strategy.
+ */
+function PlotFaqSchema({ plot }) {
+  const blockNum = plot.block_number ?? plot.blockNumber
+  const price = plot.total_price ?? plot.totalPrice
+  const sizeSqM = plot.size_sqm ?? plot.sizeSqM
+  const projected = plot.projected_value ?? plot.projectedValue
+  const roi = price > 0 ? Math.round(((projected - price) / price) * 100) : 0
+  const readiness = plot.readiness_estimate ?? plot.readinessEstimate
+  const zoning = plot.zoning_stage ?? plot.zoningStage
+
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name: `מה המחיר של גוש ${blockNum} חלקה ${plot.number} ב${plot.city}?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: `המחיר המבוקש לחלקה הוא ₪${price.toLocaleString()} (₪${sizeSqM > 0 ? Math.round(price / sizeSqM).toLocaleString() : '—'} למ״ר). שטח החלקה: ${sizeSqM > 0 ? (sizeSqM / 1000).toFixed(1) : '—'} דונם.`,
+        },
+      },
+      {
+        '@type': 'Question',
+        name: `מה התשואה הצפויה של גוש ${blockNum} חלקה ${plot.number}?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: `התשואה הצפויה היא +${roi}%. שווי צפוי לאחר השבחה: ₪${projected.toLocaleString()}.${readiness ? ` זמן משוער: ${readiness}.` : ''}`,
+        },
+      },
+      {
+        '@type': 'Question',
+        name: `מה שלב התכנון של גוש ${blockNum} חלקה ${plot.number}?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: `החלקה נמצאת בשלב: ${zoningLabels[zoning] || zoning}.${readiness ? ` מוכנות משוערת לבנייה: ${readiness}.` : ''} סטטוס: ${statusLabels[plot.status] || plot.status}.`,
+        },
+      },
+    ],
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
+/**
  * Similar plots section — uses server-side geo-proximity API instead of loading ALL plots.
  * This eliminates an unnecessary full-dataset fetch on the detail page, cutting the initial
  * API payload by ~90% (one lightweight nearby query vs the entire plots table).
@@ -581,6 +634,7 @@ export default function PlotDetail() {
       <PublicNav />
       <JsonLdSchema plot={plot} />
       <BreadcrumbSchema plot={plot} />
+      <PlotFaqSchema plot={plot} />
 
       {/* Background grid */}
       <div

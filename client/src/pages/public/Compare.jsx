@@ -1,13 +1,162 @@
 import { useMemo, useState, useCallback, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { BarChart3, X, Map, MapPin, Waves, TreePine, Hospital, TrendingUp, Award, Clock, Trophy, Crown, Share2, Printer, Check, Copy, Download } from 'lucide-react'
+import { BarChart3, X, Map, MapPin, Waves, TreePine, Hospital, TrendingUp, Award, Clock, Trophy, Crown, Share2, Printer, Check, Copy, Download, DollarSign } from 'lucide-react'
 import { usePlotsBatch } from '../../hooks/usePlots'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
-import { formatCurrency, calcInvestmentScore, calcMonthlyPayment, formatMonthlyPayment } from '../../utils/formatters'
+import { formatCurrency, calcInvestmentScore, calcMonthlyPayment, formatMonthlyPayment, calcCAGR } from '../../utils/formatters'
 import { useMetaTags } from '../../hooks/useMetaTags'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
 import Spinner from '../../components/ui/Spinner'
+
+/**
+ * Calculate full investment financials for a plot — used in the Net Profit Analysis section.
+ * Mirrors the SidebarDetails/PlotDetail tax+cost calculations for consistency.
+ */
+function calcPlotFinancials(plot) {
+  const price = plot.total_price ?? plot.totalPrice ?? 0
+  const projected = plot.projected_value ?? plot.projectedValue ?? 0
+  const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
+  const readiness = plot.readiness_estimate ?? plot.readinessEstimate ?? ''
+  const roi = price > 0 ? Math.round(((projected - price) / price) * 100) : 0
+
+  const purchaseTax = Math.round(price * 0.06)       // מס רכישה 6%
+  const attorneyFees = Math.round(price * 0.0175)     // שכ״ט עו״ד ~1.75%
+  const totalInvestment = price + purchaseTax + attorneyFees
+
+  const grossProfit = projected - price
+  const bettermentLevy = Math.round(grossProfit * 0.5)  // היטל השבחה 50%
+  const costs = purchaseTax + attorneyFees
+  const taxable = Math.max(0, grossProfit - bettermentLevy - costs)
+  const capitalGains = Math.round(taxable * 0.25)        // מס שבח 25%
+  const netProfit = grossProfit - costs - bettermentLevy - capitalGains
+  const netRoi = totalInvestment > 0 ? Math.round((netProfit / totalInvestment) * 100) : 0
+
+  const cagrData = calcCAGR(roi, readiness)
+
+  return {
+    price, projected, sizeSqM, roi, readiness,
+    purchaseTax, attorneyFees, totalInvestment,
+    grossProfit, bettermentLevy, capitalGains, netProfit, netRoi,
+    cagr: cagrData,
+  }
+}
+
+/**
+ * Net Profit Analysis Card — side-by-side financial summary showing the numbers
+ * that actually matter to investors: total cost in, net profit out, and net ROI.
+ * Like a mini P&L statement per plot. No competitor shows this level of clarity in comparisons.
+ */
+function NetProfitAnalysis({ plots }) {
+  const financials = useMemo(() => plots.map(calcPlotFinancials), [plots])
+
+  const bestNetProfit = Math.max(...financials.map(f => f.netProfit))
+  const bestNetRoi = Math.max(...financials.map(f => f.netRoi))
+
+  return (
+    <div className="glass-panel p-6 mb-6 border-emerald-500/10">
+      <div className="flex items-center gap-2 mb-5">
+        <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center">
+          <DollarSign className="w-4.5 h-4.5 text-emerald-400" />
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-slate-100">ניתוח רווחיות נטו</h3>
+          <p className="text-[10px] text-slate-500">אחרי כל המיסים, היטלים ועלויות נלוות</p>
+        </div>
+      </div>
+
+      <div className={`grid gap-4 ${plots.length === 3 ? 'grid-cols-3' : plots.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        {plots.map((plot, i) => {
+          const f = financials[i]
+          const bn = plot.block_number ?? plot.blockNumber
+          const isBestProfit = f.netProfit === bestNetProfit && plots.length > 1
+          const isBestRoi = f.netRoi === bestNetRoi && plots.length > 1
+
+          return (
+            <div
+              key={plot.id}
+              className={`rounded-2xl p-4 border transition-all ${
+                isBestProfit
+                  ? 'bg-emerald-500/8 border-emerald-500/20'
+                  : 'bg-white/[0.02] border-white/5'
+              }`}
+            >
+              {/* Header */}
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/5">
+                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: PLOT_COLORS[i] }} />
+                <span className="text-sm font-bold text-slate-200 truncate">גוש {bn}/{plot.number}</span>
+                {isBestProfit && <span className="text-[9px] text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded mr-auto">👑 הכי רווחי</span>}
+              </div>
+
+              {/* Investment In */}
+              <div className="space-y-1.5 mb-3">
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-500">מחיר רכישה</span>
+                  <span className="text-slate-300">{formatCurrency(f.price)}</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-500">מס רכישה (6%)</span>
+                  <span className="text-slate-400">{formatCurrency(f.purchaseTax)}</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-500">שכ״ט עו״ד</span>
+                  <span className="text-slate-400">{formatCurrency(f.attorneyFees)}</span>
+                </div>
+                <div className="flex justify-between text-xs font-medium pt-1 border-t border-white/5">
+                  <span className="text-blue-400">💰 סה״כ השקעה</span>
+                  <span className="text-blue-400">{formatCurrency(f.totalInvestment)}</span>
+                </div>
+              </div>
+
+              {/* Deductions */}
+              <div className="space-y-1.5 mb-3">
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-500">רווח גולמי</span>
+                  <span className="text-emerald-400/70">{formatCurrency(f.grossProfit)}</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-500">היטל השבחה (50%)</span>
+                  <span className="text-red-400/70">-{formatCurrency(f.bettermentLevy)}</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-500">מס שבח (25%)</span>
+                  <span className="text-red-400/70">-{formatCurrency(f.capitalGains)}</span>
+                </div>
+              </div>
+
+              {/* Bottom Line */}
+              <div className={`rounded-xl p-3 ${f.netProfit >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs font-bold text-slate-300">✨ רווח נקי</span>
+                  <span className={`text-lg font-black ${f.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {formatCurrency(f.netProfit)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-slate-500">ROI נטו</span>
+                  <span className={`font-bold ${isBestRoi ? 'text-gold' : 'text-slate-400'}`}>
+                    {f.netRoi}%
+                    {isBestRoi && plots.length > 1 ? ' 👑' : ''}
+                  </span>
+                </div>
+                {f.cagr && (
+                  <div className="flex justify-between text-[10px] mt-0.5">
+                    <span className="text-slate-500">CAGR ({f.cagr.years} שנים)</span>
+                    <span className="text-gold/80">{f.cagr.cagr}%/שנה</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <p className="text-[9px] text-slate-600 mt-3 text-center">
+        ⚠️ חישוב משוער — אינו מהווה ייעוץ מס. מומלץ להתייעץ עם רו״ח לפני החלטת השקעה.
+      </p>
+    </div>
+  )
+}
 
 // Plot colors for visual comparison charts
 const PLOT_COLORS = ['#3B82F6', '#22C55E', '#F59E0B']
@@ -349,6 +498,11 @@ export default function Compare() {
             {/* Winner summary */}
             {plots.length >= 2 && <WinnerSummary plots={plots} />}
 
+            {/* Net Profit Analysis — the bottom line every investor wants.
+                Shows total investment cost, all deductions, and net profit side-by-side.
+                No competitor offers this level of financial transparency in comparisons. */}
+            {plots.length >= 1 && <NetProfitAnalysis plots={plots} />}
+
             {/* Visual comparison charts */}
             {plots.length >= 2 && (
               <>
@@ -528,6 +682,42 @@ export default function Compare() {
                         return <CompareCell key={p.id} value={roi != null ? `+${roi}%` : null} highlight={roi === best} />
                       })}
                     </tr>
+                    {/* CAGR */}
+                    <tr className="border-b border-white/5 hover:bg-white/[0.02]">
+                      <td className="py-3 px-4 text-sm text-slate-400 font-medium">CAGR שנתי</td>
+                      {plots.map((p) => {
+                        const f = calcPlotFinancials(p)
+                        const bestCagr = Math.max(...plots.map(pl => {
+                          const pf = calcPlotFinancials(pl)
+                          return pf.cagr ? pf.cagr.cagr : 0
+                        }))
+                        return <CompareCell key={p.id} value={f.cagr ? `${f.cagr.cagr}%/שנה (${f.cagr.years}ש׳)` : null} highlight={f.cagr && f.cagr.cagr === bestCagr} />
+                      })}
+                    </tr>
+                    {/* Net Profit */}
+                    <tr className="border-b border-white/5 hover:bg-white/[0.02] bg-emerald-500/[0.03]">
+                      <td className="py-3 px-4 text-sm text-emerald-400 font-bold">✨ רווח נקי</td>
+                      {plots.map((p) => {
+                        const f = calcPlotFinancials(p)
+                        const bestNet = Math.max(...plots.map(pl => calcPlotFinancials(pl).netProfit))
+                        return (
+                          <td key={p.id} className={`py-3 px-4 text-sm font-bold ${f.netProfit === bestNet && plots.length > 1 ? 'text-emerald-400' : f.netProfit >= 0 ? 'text-emerald-400/70' : 'text-red-400'}`}>
+                            {formatCurrency(f.netProfit)}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                    {/* Net ROI */}
+                    <tr className="border-b border-white/5 hover:bg-white/[0.02] bg-emerald-500/[0.03]">
+                      <td className="py-3 px-4 text-sm text-emerald-400/80 font-medium">ROI נטו</td>
+                      {plots.map((p) => {
+                        const f = calcPlotFinancials(p)
+                        const bestNetRoi = Math.max(...plots.map(pl => calcPlotFinancials(pl).netRoi))
+                        return <CompareCell key={p.id} value={`${f.netRoi}%`} highlight={f.netRoi === bestNetRoi && plots.length > 1} />
+                      })}
+                    </tr>
+                    {/* Section separator */}
+                    <tr><td colSpan={plots.length + 1} className="py-1 bg-white/[0.02]" /></tr>
                     {/* Readiness */}
                     <tr className="border-b border-white/5 hover:bg-white/[0.02]">
                       <td className="py-3 px-4 text-sm text-slate-400 font-medium">מוכנות לבנייה</td>
@@ -567,6 +757,33 @@ export default function Compare() {
                         const dist = p.distance_to_hospital ?? p.distanceToHospital
                         const best = bestValue((pl) => pl.distance_to_hospital ?? pl.distanceToHospital, 'min')
                         return <CompareCell key={p.id} value={dist != null ? `${dist} מ'` : null} highlight={dist === best} />
+                      })}
+                    </tr>
+                    {/* Investment Score */}
+                    <tr className="border-b border-white/5 hover:bg-white/[0.02]">
+                      <td className="py-3 px-4 text-sm text-slate-400 font-medium">ציון השקעה</td>
+                      {plots.map((p) => {
+                        const score = calcInvestmentScore(p)
+                        const bestScore = Math.max(...plots.map(pl => calcInvestmentScore(pl)))
+                        const isBest = score === bestScore && plots.length > 1
+                        return (
+                          <td key={p.id} className="py-3 px-4 text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden max-w-[80px]">
+                                <div
+                                  className="h-full rounded-full transition-all"
+                                  style={{
+                                    width: `${score * 10}%`,
+                                    background: score >= 8 ? '#22C55E' : score >= 6 ? '#84CC16' : score >= 4 ? '#F59E0B' : '#EF4444',
+                                  }}
+                                />
+                              </div>
+                              <span className={`font-bold ${isBest ? 'text-gold' : 'text-slate-300'}`}>
+                                {score}/10 {isBest ? '👑' : ''}
+                              </span>
+                            </div>
+                          </td>
+                        )
                       })}
                     </tr>
                     {/* Standard 22 */}

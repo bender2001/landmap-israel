@@ -251,6 +251,68 @@ function PriceTrendMiniChart({ trends }) {
   )
 }
 
+/**
+ * JSON-LD structured data for the Areas page — helps Google understand and index
+ * our area comparison content. Uses ItemList schema for city listings and
+ * FAQPage schema for common investor questions. Like Madlan's SEO strategy.
+ */
+function AreasJsonLd({ overview, cities }) {
+  if (!overview || !cities || cities.length === 0) return null
+
+  const itemListSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'אזורי השקעה בקרקעות — ישראל',
+    description: 'רשימת אזורים להשקעה בקרקעות בישראל עם נתוני שוק מעודכנים',
+    numberOfItems: cities.length,
+    itemListElement: cities.map((city, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: city.city,
+      url: `${window.location.origin}/?city=${encodeURIComponent(city.city)}`,
+      description: `${city.count} חלקות להשקעה ב${city.city}. מחיר ממוצע לדונם: ₪${city.avgPricePerDunam?.toLocaleString()}. תשואה ממוצעת: +${city.avgRoi}%.`,
+    })),
+  }
+
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name: 'באיזה אזור כדאי להשקיע בקרקע בישראל?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: `האזורים המובילים להשקעה כוללים ${cities.map(c => c.city).join(', ')}. תשואה ממוצעת באזורים אלו: +${overview.avgRoi}%. סה״כ ${overview.total} חלקות זמינות.`,
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'מה מחיר ממוצע לדונם קרקע להשקעה?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: cities.map(c => `${c.city}: ₪${c.avgPricePerDunam?.toLocaleString()} לדונם`).join('. ') + '.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'כמה חלקות קרקע זמינות כרגע להשקעה?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: `כרגע זמינות ${overview.available} חלקות מתוך ${overview.total} במערכת. שטח כולל: ${formatDunam(overview.totalArea)} דונם.`,
+        },
+      },
+    ],
+  }
+
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
+    </>
+  )
+}
+
 export default function Areas() {
   const { data: overview, isLoading } = useMarketOverview()
   const { data: trends } = useMarketTrends()
@@ -267,6 +329,8 @@ export default function Areas() {
   return (
     <div className="min-h-screen bg-navy" dir="rtl">
       <PublicNav />
+      {/* Structured data for SEO — helps Google index area comparisons and answer investor FAQs */}
+      <AreasJsonLd overview={overview} cities={cities} />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Hero */}
