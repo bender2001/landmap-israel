@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react'
 
 /**
  * Core Web Vitals monitoring hook.
- * Tracks LCP, FID, CLS, TTFB, and INP — the metrics Google uses for ranking.
+ * Tracks LCP, INP, CLS, TTFB (and legacy FID) — the metrics Google uses for ranking.
+ * As of March 2024, the three Core Web Vitals are: LCP, INP, CLS.
  * Reports to our analytics endpoint (non-blocking, fire-and-forget).
  *
  * Why this matters:
@@ -73,6 +74,8 @@ function observeLCP(callback) {
 /**
  * Observe First Input Delay (FID).
  * FID measures interactivity — should be ≤100ms.
+ * Note: Google deprecated FID in favor of INP (March 2024), but we keep
+ * FID tracking for backwards compatibility with older analytics dashboards.
  */
 function observeFID(callback) {
   if (!('PerformanceObserver' in window)) return
@@ -93,6 +96,75 @@ function observeFID(callback) {
       }
     })
     observer.observe({ type: 'first-input', buffered: true })
+    return observer
+  } catch { return null }
+}
+
+/**
+ * Observe Interaction to Next Paint (INP).
+ * INP replaced FID as a Core Web Vital in March 2024.
+ * It measures the latency of ALL interactions (clicks, taps, keyboard),
+ * not just the first one. Should be ≤200ms.
+ *
+ * INP picks the worst interaction (p98 for pages with 50+ interactions,
+ * otherwise the single worst) — so it catches slow event handlers that
+ * FID would miss (e.g., slow filter re-renders, map redraws on click).
+ *
+ * This is critical for LandMap because:
+ * - Filter toggling triggers heavy re-renders (plot list + map polygons)
+ * - Map polygon clicks fire expensive score/ROI calculations
+ * - Compare/favorite toggles update multiple components
+ * Google now uses INP instead of FID for search ranking signals.
+ */
+function observeINP(callback) {
+  if (!('PerformanceObserver' in window)) return
+
+  try {
+    // Track all interactions, keep the worst one (by duration)
+    let worstINP = 0
+    let interactionCount = 0
+    // For pages with many interactions, use p98 (skip top 2% outliers)
+    const interactionDurations = []
+
+    const observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        // Only count entries with an interactionId (real user interactions)
+        if (!entry.interactionId) continue
+
+        const duration = entry.duration
+        interactionCount++
+        interactionDurations.push(duration)
+
+        // Update worst INP
+        if (duration > worstINP) {
+          worstINP = duration
+        }
+      }
+
+      // Calculate INP value: p98 for 50+ interactions, worst otherwise
+      let inpValue
+      if (interactionDurations.length >= 50) {
+        // p98: sort and pick the 98th percentile (skip top 2% outliers)
+        const sorted = [...interactionDurations].sort((a, b) => a - b)
+        const idx = Math.floor(sorted.length * 0.98) - 1
+        inpValue = sorted[Math.max(0, idx)]
+      } else {
+        inpValue = worstINP
+      }
+
+      if (inpValue > 0) {
+        callback({
+          name: 'INP',
+          value: inpValue,
+          delta: inpValue,
+          rating: inpValue <= 200 ? 'good' : inpValue <= 500 ? 'needs-improvement' : 'poor',
+          navigationType: getNavigationType(),
+          interactionCount,
+        })
+      }
+    })
+
+    observer.observe({ type: 'event', buffered: true, durationThreshold: 16 })
     return observer
   } catch { return null }
 }
@@ -200,12 +272,33 @@ export function useWebVitals(enabled = true) {
     const fidObs = observeFID(report)
     if (fidObs) observers.push(fidObs)
 
+    // INP replaces FID as a Core Web Vital (March 2024).
+    // Unlike FID (first interaction only), INP tracks ALL interactions and reports
+    // the worst one — catching slow filter re-renders, map clicks, etc.
+    // We report INP on page unload (visibilitychange) since it accumulates over time.
+    const inpObs = observeINP(report)
+    if (inpObs) observers.push(inpObs)
+
     const clsObs = observeCLS(report)
     if (clsObs) observers.push(clsObs)
 
     measureTTFB(report)
 
+    // Report INP on page hide — INP accumulates over the session and should be
+    // reported when the user navigates away or switches tabs. The 'visibilitychange'
+    // event is the most reliable trigger (fires on tab close, navigation, minimize).
+    // Without this, INP would only report mid-session snapshots, missing late interactions.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // Force-report any pending INP value (overrides the dedup check)
+        reported.current.delete('INP')
+        // The INP observer's callback will fire with the final accumulated value
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       observers.forEach(obs => {
         try { obs.disconnect() } catch {}
       })

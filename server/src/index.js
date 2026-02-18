@@ -73,6 +73,12 @@ app.use(cors({
 app.use((req, res, next) => {
   res.vary('Origin')
   res.vary('Accept-Encoding')
+  // Timing-Allow-Origin — allows the browser's Resource Timing API (PerformanceObserver)
+  // to measure actual server response times for cross-origin API requests.
+  // Without this, the browser zeroes out timing details (connectStart, responseStart, etc.)
+  // for CORS requests, making our useWebVitals TTFB and LCP measurements inaccurate.
+  // Madlan/Yad2 don't set this — our Web Vitals data will be more precise than theirs.
+  res.set('Timing-Allow-Origin', '*')
   next()
 })
 
