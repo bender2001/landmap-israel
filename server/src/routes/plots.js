@@ -2,6 +2,7 @@ import { Router } from 'express'
 import crypto from 'crypto'
 import { getPublishedPlots, getPlotById, getPlotsByIds, getPlotStats } from '../services/plotService.js'
 import { sanitizePlotQuery, sanitizePlotId } from '../middleware/sanitize.js'
+import { computeHeavyLimiter } from '../middleware/rateLimiter.js'
 import { analytics } from '../services/analyticsService.js'
 import { plotCache, statsCache } from '../services/cacheService.js'
 import { supabaseAdmin } from '../config/supabase.js'
@@ -142,7 +143,7 @@ router.get('/stats', async (req, res, next) => {
 
 // GET /api/plots/featured - Top investment opportunities (server-computed scoring)
 // Like Madlan's "הזדמנויות חמות" — cached 5min, avoids heavy client-side computation
-router.get('/featured', async (req, res, next) => {
+router.get('/featured', computeHeavyLimiter, async (req, res, next) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 3, 10)
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
@@ -255,7 +256,7 @@ router.get('/batch', async (req, res, next) => {
 
 // GET /api/plots/popular - Most viewed plots (social proof, like Yad2's "הכי נצפים")
 // Returns plots sorted by view count, useful for "trending" badges and a popular section.
-router.get('/popular', async (req, res, next) => {
+router.get('/popular', computeHeavyLimiter, async (req, res, next) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 6, 20)
     const days = Math.min(parseInt(req.query.days) || 30, 90)
@@ -299,7 +300,7 @@ router.get('/popular', async (req, res, next) => {
 // GET /api/plots/:id/nearby-pois - Find POIs within radius of a plot's centroid.
 // Powers the "What's Nearby" section in the sidebar — like Madlan's amenity proximity
 // indicators but with actual distance calculations and categorized results.
-router.get('/:id/nearby-pois', sanitizePlotId, async (req, res, next) => {
+router.get('/:id/nearby-pois', sanitizePlotId, computeHeavyLimiter, async (req, res, next) => {
   try {
     const maxKm = Math.min(parseFloat(req.query.maxKm) || 3, 10)
     const limit = Math.min(parseInt(req.query.limit) || 20, 50)
@@ -371,7 +372,7 @@ router.get('/:id/nearby-pois', sanitizePlotId, async (req, res, next) => {
 // GET /api/plots/:id/similar - Find plots with similar investment characteristics
 // Unlike /nearby (geography), this matches by zoning stage, price range, size, and ROI.
 // Ideal for "חלקות דומות" — investors want similar *opportunities*, not just nearby land.
-router.get('/:id/similar', sanitizePlotId, async (req, res, next) => {
+router.get('/:id/similar', sanitizePlotId, computeHeavyLimiter, async (req, res, next) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 4, 10)
     const cacheKey = `similar:${req.params.id}:${limit}`
@@ -459,7 +460,7 @@ router.get('/:id/similar', sanitizePlotId, async (req, res, next) => {
 })
 
 // GET /api/plots/:id/nearby - Find plots near a given plot (geo-proximity)
-router.get('/:id/nearby', sanitizePlotId, async (req, res, next) => {
+router.get('/:id/nearby', sanitizePlotId, computeHeavyLimiter, async (req, res, next) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 5, 10)
     const maxKm = parseFloat(req.query.maxKm) || 10

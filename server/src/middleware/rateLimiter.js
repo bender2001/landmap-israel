@@ -63,3 +63,40 @@ export const exportLimiter = rateLimit({
     retryAfter: 900,
   },
 })
+
+/**
+ * Compute-heavy endpoint rate limiter — protects CPU-intensive routes:
+ * /api/plots/:id/similar, /api/plots/:id/nearby, /api/plots/featured, /api/plots/popular
+ *
+ * These endpoints iterate ALL plots with O(n) scoring algorithms (multi-factor similarity,
+ * geo-distance, deal scoring). Without a dedicated limiter, the global 200/15min allows
+ * a single client to hammer these ~13 times/min, each triggering a full dataset scan.
+ *
+ * Limit: 30 requests per 5 minutes per IP — sufficient for normal browsing
+ * (opening ~6 plots/min, each fetching similar+nearby), but blocks scraping/abuse.
+ */
+export const computeHeavyLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'יותר מדי בקשות כבדות — נסה שוב בעוד מספר דקות',
+    errorCode: 'RATE_LIMIT_COMPUTE',
+    retryAfter: 300,
+  },
+})
+
+/**
+ * Web Vitals beacon rate limiter — prevents flooding the vitals endpoint.
+ * Each page load reports ~5 metrics (LCP, INP, CLS, TTFB, FID).
+ * Limit: 20 per minute per IP — covers 4 page loads/min with headroom.
+ */
+export const vitalsLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Silently drop excess — don't waste bandwidth on error responses for beacons
+  handler: (req, res) => res.status(204).end(),
+})

@@ -30,6 +30,7 @@ import subscriptionRoutes from './routes/subscription.js'
 import sitemapRoutes from './routes/sitemap.js'
 import ogRoutes from './routes/og.js'
 import healthRoutes from './routes/health.js'
+import vitalsRoutes from './routes/vitals.js'
 import { errorHandler, requestId } from './middleware/errorHandler.js'
 import { requestTimeout } from './middleware/timeout.js'
 import { supabaseAdmin } from './config/supabase.js'
@@ -245,6 +246,12 @@ app.get('/api/events', (req, res) => {
   res.write('data: {"type":"connected"}\n\n')
   req.on('close', () => removeClient(res))
 })
+
+// ─── Web Vitals collection (before timeout — lightweight fire-and-forget beacons) ───
+// Previously, CWV beacons were sent to /api/admin/analytics which only had GET handlers,
+// silently dropping all Web Vitals data. This dedicated endpoint accepts POST beacons
+// without admin auth and feeds into the analytics service for p75 monitoring.
+app.use('/api/vitals', vitalsRoutes)
 
 // Request timeout — prevent hanging connections (15s for normal, 30s for chat/AI)
 app.use('/api/chat', requestTimeout(30000))

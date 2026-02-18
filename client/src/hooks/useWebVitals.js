@@ -12,7 +12,10 @@ import { useEffect, useRef } from 'react'
  * - Helps identify performance regressions before users complain
  */
 
-const ANALYTICS_ENDPOINT = '/api/admin/analytics'
+// Public endpoint — does NOT require admin auth.
+// Previously pointed to /api/admin/analytics (GET-only) which silently
+// dropped all POST beacon data. This dedicated endpoint accepts POST.
+const ANALYTICS_ENDPOINT = '/api/vitals'
 
 function reportMetric(metric) {
   // Don't report in dev mode (noisy)
