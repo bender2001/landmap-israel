@@ -166,7 +166,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
   const activeLayer = MAP_LAYERS.find(l => l.id === activeLayerId) || MAP_LAYERS[0]
 
   return (
-    <div className="h-full w-full relative">
+    <div className="h-full w-full relative z-0">
       <MapContainer
         center={[32.45, 34.87]}
         zoom={10}
