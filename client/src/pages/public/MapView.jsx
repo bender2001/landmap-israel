@@ -104,8 +104,12 @@ export default function MapView() {
     if (filters.sizeMax) f.sizeMax = filters.sizeMax
     if (filters.ripeness !== 'all') f.ripeness = filters.ripeness
     if (statusFilter.length > 0) f.status = statusFilter.join(',')
+    // Pass simple sorts to server for better performance
+    if (['price-asc', 'price-desc', 'size-asc', 'size-desc'].includes(sortBy)) {
+      f.sort = sortBy
+    }
     return f
-  }, [filters, statusFilter])
+  }, [filters, statusFilter, sortBy])
 
   const { data: plots = [], isLoading } = useAllPlots(apiFilters)
   const { data: pois = [] } = usePois()
@@ -395,6 +399,7 @@ export default function MapView() {
         onSelectPlot={handleSelectPlot}
         compareIds={compareIds}
         onToggleCompare={toggleCompare}
+        isLoading={isLoading}
       />
 
       <LeadModal

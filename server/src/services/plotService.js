@@ -30,6 +30,17 @@ export async function getPublishedPlots(filters = {}) {
     query = query.in('status', statuses)
   }
 
+  // Server-side sorting
+  if (filters.sort) {
+    switch (filters.sort) {
+      case 'price-asc': query = query.order('total_price', { ascending: true }); break
+      case 'price-desc': query = query.order('total_price', { ascending: false }); break
+      case 'size-asc': query = query.order('size_sqm', { ascending: true }); break
+      case 'size-desc': query = query.order('size_sqm', { ascending: false }); break
+      // ROI and price-per-sqm require computed columns — handled client-side
+    }
+  }
+
   const { data, error } = await query
   if (error) throw error
   return data

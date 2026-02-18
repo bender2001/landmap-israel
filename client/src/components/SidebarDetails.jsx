@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, ChevronLeft, ChevronRight, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon, Download, File, FileImage, FileSpreadsheet, Printer, ExternalLink, Eye, Navigation } from 'lucide-react'
 import ShareMenu from './ui/ShareMenu'
 import ImageLightbox from './ui/ImageLightbox'
@@ -102,16 +102,6 @@ const committeeLevels = [
   { key: 'district', label: 'מחוזית' },
   { key: 'local', label: 'מקומית' },
 ]
-
-// Snap points as % of viewport height (from bottom)
-const SNAP_PEEK = 35   // title + key info peek
-const SNAP_MID = 75    // default open
-const SNAP_FULL = 95   // fully expanded
-const SNAPS = [SNAP_PEEK, SNAP_MID, SNAP_FULL]
-
-function isMobile() {
-  return typeof window !== 'undefined' && window.innerWidth < 640
-}
 
 function SimilarPlots({ currentPlot, allPlots, onSelectPlot }) {
   const similar = useMemo(() => {
@@ -403,10 +393,8 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
 
   const scrollRef = useRef(null)
   const panelRef = useRef(null)
-  const dragRef = useRef({ startY: 0, startSnap: SNAP_MID, isDragging: false, velocity: 0, lastY: 0, lastTime: 0 })
   const [scrollShadow, setScrollShadow] = useState({ top: false, bottom: false })
   const [linkCopied, setLinkCopied] = useState(false)
-  const [sheetSnap, setSheetSnap] = useState(SNAP_PEEK) // start at peek
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
@@ -488,85 +476,6 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
     setTimeout(() => printWindow.print(), 300)
   }, [plot])
 
-  // Animate to mid after mount on mobile
-  useEffect(() => {
-    if (plot && isMobile()) {
-      // Start at peek, then animate to mid after a short delay
-      setSheetSnap(SNAP_PEEK)
-      const t = setTimeout(() => setSheetSnap(SNAP_MID), 50)
-      return () => clearTimeout(t)
-    }
-  }, [plot?.id])
-
-  // Set sheet height via CSS custom property
-  useEffect(() => {
-    if (panelRef.current && isMobile()) {
-      panelRef.current.style.height = `${sheetSnap}vh`
-    }
-  }, [sheetSnap])
-
-  // Mobile drag with velocity + multi-snap
-  const handleDragStart = useCallback((e) => {
-    if (!isMobile()) return
-    const touch = e.touches[0]
-    dragRef.current = {
-      startY: touch.clientY,
-      startSnap: sheetSnap,
-      isDragging: true,
-      velocity: 0,
-      lastY: touch.clientY,
-      lastTime: Date.now(),
-    }
-    if (panelRef.current) panelRef.current.style.transition = 'none'
-  }, [sheetSnap])
-
-  const handleDragMove = useCallback((e) => {
-    if (!dragRef.current.isDragging || !panelRef.current) return
-    const touch = e.touches[0]
-    const now = Date.now()
-    const dt = now - dragRef.current.lastTime
-    if (dt > 0) {
-      dragRef.current.velocity = (dragRef.current.lastY - touch.clientY) / dt // positive = dragging up
-    }
-    dragRef.current.lastY = touch.clientY
-    dragRef.current.lastTime = now
-
-    const deltaY = touch.clientY - dragRef.current.startY
-    const deltaPct = (deltaY / window.innerHeight) * 100
-    const newHeight = Math.max(10, Math.min(98, dragRef.current.startSnap - deltaPct))
-    panelRef.current.style.height = `${newHeight}vh`
-  }, [])
-
-  const handleDragEnd = useCallback(() => {
-    if (!dragRef.current.isDragging || !panelRef.current) return
-    dragRef.current.isDragging = false
-
-    const currentHeight = (panelRef.current.getBoundingClientRect().height / window.innerHeight) * 100
-    const vel = dragRef.current.velocity // positive = up, negative = down
-
-    // If fast fling down below peek → dismiss
-    if (vel < -0.8 && currentHeight < SNAP_PEEK + 5) {
-      panelRef.current.style.transition = 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease'
-      panelRef.current.style.height = '0vh'
-      panelRef.current.style.opacity = '0'
-      setTimeout(onClose, 300)
-      return
-    }
-
-    // Find nearest snap, biased by velocity
-    const biased = currentHeight + vel * 40
-    let bestSnap = SNAPS[0]
-    let bestDist = Math.abs(biased - SNAPS[0])
-    for (const s of SNAPS) {
-      const d = Math.abs(biased - s)
-      if (d < bestDist) { bestDist = d; bestSnap = s }
-    }
-
-    panelRef.current.style.transition = 'height 0.35s cubic-bezier(0.32, 0.72, 0, 1)'
-    panelRef.current.style.height = `${bestSnap}vh`
-    setSheetSnap(bestSnap)
-  }, [onClose])
-
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
@@ -626,11 +535,6 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
         className="sidebar-panel fixed top-0 right-0 h-full w-full sm:w-[420px] md:w-[480px] max-w-full z-[60] bg-navy border-l border-white/10 shadow-2xl flex flex-col overflow-hidden sm:animate-slide-in-right"
         dir="rtl"
       >
-        {/* Mobile drag handle (visual only — drag events on header zone below) */}
-        <div className="sidebar-drag-handle">
-          <div className="sidebar-drag-handle-bar" />
-        </div>
-
         {/* Gold accent bar */}
         <div
           className="h-[3px] flex-shrink-0"
@@ -638,12 +542,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
         />
 
         {/* Draggable header zone (drag handle + preview + title) */}
-        <div
-          className="sidebar-header-drag-zone flex-shrink-0"
-          onTouchStart={handleDragStart}
-          onTouchMove={handleDragMove}
-          onTouchEnd={handleDragEnd}
-        >
+        <div className="sidebar-header-drag-zone flex-shrink-0">
           {/* Map preview area — real satellite map like Madlan */}
           {plot.coordinates && plot.coordinates.length >= 3 ? (
             <div className="h-36 relative overflow-hidden">
@@ -654,11 +553,6 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 height="144px"
                 className="rounded-none border-0"
               />
-              {/* Mobile: tap-to-expand hint */}
-              <div className="sidebar-expand-hint">
-                <ChevronDown className="w-4 h-4 text-gold/50 rotate-180" />
-                <span>גרור למעלה לפרטים</span>
-              </div>
             </div>
           ) : (
             <div className="h-36 bg-navy-mid relative overflow-hidden">
@@ -669,10 +563,6 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 </span>
               </div>
               <div className="absolute bottom-0 w-full h-12 bg-gradient-to-t from-navy to-transparent" />
-              <div className="sidebar-expand-hint">
-                <ChevronDown className="w-4 h-4 text-gold/50 rotate-180" />
-                <span>גרור למעלה לפרטים</span>
-              </div>
             </div>
           )}
 

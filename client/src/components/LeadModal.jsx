@@ -1,13 +1,10 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, User, Phone, Mail, Lock } from 'lucide-react'
 import { useCreateLead } from '../hooks/useLeads.js'
 import { useToast } from './ui/ToastContainer.jsx'
 
 const phoneRegex = /^0[2-9]\d{7,8}$/
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-// Dismiss threshold — if dragged more than this many px downward, close
-const DISMISS_THRESHOLD = 160
 
 export default function LeadModal({ isOpen, onClose, plot }) {
   const [formData, setFormData] = useState({ name: '', phone: '', email: '' })
@@ -19,17 +16,10 @@ export default function LeadModal({ isOpen, onClose, plot }) {
   // Animation phases: 'entering' -> 'open' -> 'leaving' -> hidden
   const [phase, setPhase] = useState('hidden')
 
-  // Drag state
-  const [position, setPosition] = useState({ x: 0, y: 0 })
-  const dragRef = useRef({ isDragging: false, startX: 0, startY: 0, startPosX: 0, startPosY: 0 })
-  const modalRef = useRef(null)
-
   // Open animation
   useEffect(() => {
     if (isOpen && phase === 'hidden') {
-      setPosition({ x: 0, y: 0 })
       setPhase('entering')
-      // Wait one frame for the entering styles to apply, then transition to open
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           setPhase('open')
@@ -48,73 +38,12 @@ export default function LeadModal({ isOpen, onClose, plot }) {
     }
   }, [phase])
 
-  // Animated close with slide-down
-  const animatedClose = useCallback(() => {
-    // Slide modal down offscreen
-    if (modalRef.current) {
-      modalRef.current.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease'
-      modalRef.current.style.transform = `translate(${position.x}px, ${window.innerHeight}px)`
-      modalRef.current.style.opacity = '0'
-    }
+  const handleClose = () => {
     setPhase('leaving')
     setTimeout(() => {
       onClose()
     }, 300)
-  }, [onClose, position.x])
-
-  // Drag handlers
-  const handlePointerDown = useCallback((e) => {
-    if (e.target.closest('button') || e.target.closest('input')) return
-    e.preventDefault()
-    dragRef.current = {
-      isDragging: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      startPosX: position.x,
-      startPosY: position.y,
-    }
-    if (modalRef.current) {
-      modalRef.current.style.transition = 'none'
-    }
-  }, [position])
-
-  useEffect(() => {
-    if (phase === 'hidden') return
-
-    const handlePointerMove = (e) => {
-      if (!dragRef.current.isDragging) return
-      const dx = e.clientX - dragRef.current.startX
-      const dy = e.clientY - dragRef.current.startY
-      setPosition({
-        x: dragRef.current.startPosX + dx,
-        y: dragRef.current.startPosY + dy,
-      })
-    }
-
-    const handlePointerUp = () => {
-      if (!dragRef.current.isDragging) return
-      dragRef.current.isDragging = false
-
-      // Check if dragged past dismiss threshold (downward)
-      if (position.y > DISMISS_THRESHOLD) {
-        animatedClose()
-        return
-      }
-
-      // Snap back to center with spring
-      if (modalRef.current) {
-        modalRef.current.style.transition = 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease'
-      }
-      setPosition({ x: 0, y: 0 })
-    }
-
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp)
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-    }
-  }, [phase, position.y, animatedClose])
+  }
 
   if (phase === 'hidden') return null
 
@@ -169,44 +98,33 @@ export default function LeadModal({ isOpen, onClose, plot }) {
 
   const blockNumber = plot?.block_number ?? plot?.blockNumber
 
-  // Compute visual feedback: opacity fades as you drag down toward dismiss
-  const dragDownProgress = Math.max(0, position.y) / DISMISS_THRESHOLD
-  const modalOpacity = Math.max(0.4, 1 - dragDownProgress * 0.5)
-  const backdropOpacity = Math.max(0.15, 1 - dragDownProgress * 0.6)
-
-  // Entering: start state (scaled down, translated up, transparent)
-  // Open: normal state
-  // Leaving: animate out
   const isEntering = phase === 'entering'
   const isLeaving = phase === 'leaving'
 
   const backdropStyle = {
-    opacity: isEntering ? 0 : isLeaving ? 0 : backdropOpacity,
+    opacity: isEntering ? 0 : isLeaving ? 0 : 1,
     transition: 'opacity 0.3s ease',
   }
 
   const modalTransform = isEntering
     ? 'translate(0px, 40px) scale(0.92)'
     : isLeaving
-      ? `translate(${position.x}px, ${Math.max(position.y, 60)}px) scale(0.92)`
-      : `translate(${position.x}px, ${position.y}px) scale(1)`
+      ? 'translate(0px, 60px) scale(0.92)'
+      : 'translate(0px, 0px) scale(1)'
 
   const modalStyle = {
     transform: modalTransform,
-    opacity: isEntering ? 0 : isLeaving ? 0 : modalOpacity,
-    transition: dragRef.current.isDragging
-      ? 'none'
-      : 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease',
+    opacity: isEntering ? 0 : isLeaving ? 0 : 1,
+    transition: 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease',
   }
 
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-end sm:items-center justify-center"
       style={backdropStyle}
-      onClick={animatedClose}
+      onClick={handleClose}
     >
       <div
-        ref={modalRef}
         className="glass-panel sm:max-w-md w-full mx-0 sm:mx-4 p-0 overflow-hidden lead-modal-card"
         dir="rtl"
         onClick={(e) => e.stopPropagation()}
@@ -246,14 +164,8 @@ export default function LeadModal({ isOpen, onClose, plot }) {
           </div>
         ) : (
           <>
-            {/* Draggable Header */}
-            <div
-              className="p-5 sm:p-6 pb-3 sm:pb-4 relative cursor-grab active:cursor-grabbing select-none"
-              onPointerDown={handlePointerDown}
-            >
-              <div className="flex items-center justify-center mb-2">
-                <div className="w-10 h-1 rounded-full bg-white/20" />
-              </div>
+            {/* Header */}
+            <div className="p-5 sm:p-6 pb-3 sm:pb-4 relative select-none">
               <h2 className="text-lg sm:text-xl font-bold text-slate-100">צור קשר</h2>
               {plot && (
                 <p className="text-sm text-slate-400 mt-1">
@@ -261,7 +173,7 @@ export default function LeadModal({ isOpen, onClose, plot }) {
                 </p>
               )}
               <button
-                onClick={animatedClose}
+                onClick={handleClose}
                 className="absolute top-4 left-4 w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center"
               >
                 <X className="w-4 h-4 text-slate-400" />

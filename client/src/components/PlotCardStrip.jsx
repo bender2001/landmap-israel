@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
-import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows } from 'lucide-react'
+import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows, Share2 } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
 import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
@@ -24,7 +24,24 @@ function useAreaAverages(plots) {
   }, [plots])
 }
 
-export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare }) {
+function PlotCardSkeleton() {
+  return (
+    <div className="plot-card-mini opacity-60 pointer-events-none">
+      <div className="plot-card-mini-accent animate-pulse" style={{ background: '#334155' }} />
+      <div className="plot-card-mini-body space-y-2">
+        <div className="h-3 w-3/4 rounded bg-slate-700/50 animate-pulse" />
+        <div className="h-2.5 w-1/2 rounded bg-slate-700/30 animate-pulse" />
+        <div className="h-4 w-full rounded bg-slate-700/20 animate-pulse mt-1" />
+        <div className="flex justify-between mt-1">
+          <div className="h-3 w-16 rounded bg-gold/10 animate-pulse" />
+          <div className="h-3 w-10 rounded bg-emerald-500/10 animate-pulse" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare, isLoading = false }) {
   const prefetchPlot = usePrefetchPlot()
   const areaAverages = useAreaAverages(plots)
   const scrollRef = useRef(null)
@@ -92,6 +109,14 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
       return new Set(JSON.parse(localStorage.getItem('landmap_recently_viewed') || '[]'))
     } catch { return new Set() }
   }, [selectedPlot?.id])
+
+  if (isLoading) return (
+    <div className="plot-strip-wrapper" dir="rtl">
+      <div className="plot-strip-scroll">
+        {Array.from({ length: 6 }, (_, i) => <PlotCardSkeleton key={i} />)}
+      </div>
+    </div>
+  )
 
   if (!plots || plots.length === 0) return (
     <div className="plot-strip-wrapper" dir="rtl">
@@ -210,6 +235,20 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
                 )
               })()}
               {/* Top color line (no-image fallback handled above) */}
+
+              {/* Quick share (WhatsApp) */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const url = `${window.location.origin}/plot/${plot.id}`
+                  const text = `גוש ${blockNum} חלקה ${plot.number} | ${plot.city}\n${formatPriceShort(price)} · +${roi}% ROI\n${url}`
+                  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+                }}
+                className="plot-card-share-btn"
+                title="שתף ב-WhatsApp"
+              >
+                <Share2 className="w-3 h-3" />
+              </button>
 
               {/* Compare toggle */}
               {onToggleCompare && (
