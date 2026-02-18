@@ -144,16 +144,27 @@ export default function MiniMap({ coordinates, status, city, className = '', int
       {/* Overlay gradient */}
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-navy/60 via-transparent to-transparent" />
 
-      {/* Open in Google Maps link */}
-      <a
-        href={googleMapsUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1.5 bg-navy/80 backdrop-blur-sm border border-white/10 rounded-xl text-[11px] text-slate-300 hover:border-gold/30 hover:text-gold transition-all opacity-0 group-hover:opacity-100"
-      >
-        <ExternalLink className="w-3 h-3" />
-        פתח במפה
-      </a>
+      {/* Navigation links overlay — Google Maps + Waze (Israel's #1 nav app) */}
+      <div className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <a
+          href={googleMapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-navy/80 backdrop-blur-sm border border-white/10 rounded-xl text-[11px] text-slate-300 hover:border-gold/30 hover:text-gold transition-all"
+        >
+          <ExternalLink className="w-3 h-3" />
+          מפה
+        </a>
+        <a
+          href={`https://www.waze.com/ul?ll=${center[0]},${center[1]}&navigate=yes&zoom=17`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-navy/80 backdrop-blur-sm border border-white/10 rounded-xl text-[11px] text-slate-300 hover:border-[#33CCFF]/30 hover:text-[#33CCFF] transition-all"
+        >
+          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 6.63c-1.19-4.28-5.37-6.2-9.26-5.62C6.6 1.74 3.56 5.24 3.06 9.86c-.46 4.2 1.26 7.3 4.33 8.94.15.08.2.2.18.37-.04.47-.09.93-.14 1.4-.04.43.27.65.63.44.5-.29.98-.6 1.47-.9.16-.1.31-.12.49-.08.65.14 1.3.21 1.97.19 4.26-.12 8.24-3.19 9.12-7.49.3-1.47.28-2.9-.03-4.32z"/></svg>
+          Waze
+        </a>
+      </div>
 
       {/* City label */}
       {city && (

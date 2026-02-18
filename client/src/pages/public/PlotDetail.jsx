@@ -473,10 +473,76 @@ export default function PlotDetail() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-navy">
-        <div className="flex flex-col items-center gap-4">
-          <Spinner className="w-12 h-12 text-gold" />
-          <span className="text-sm text-slate-400">טוען פרטי חלקה...</span>
+      <div className="min-h-screen w-full bg-navy" dir="rtl">
+        <PublicNav />
+        <div className="relative z-10 pt-20 pb-28">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6">
+            {/* Breadcrumb skeleton */}
+            <div className="flex items-center gap-2 mb-6">
+              <div className="h-3 w-16 rounded bg-slate-700/50 animate-pulse" />
+              <div className="h-3 w-2 rounded bg-slate-700/30" />
+              <div className="h-3 w-12 rounded bg-slate-700/40 animate-pulse" style={{ animationDelay: '0.1s' }} />
+              <div className="h-3 w-2 rounded bg-slate-700/30" />
+              <div className="h-3 w-28 rounded bg-slate-700/40 animate-pulse" style={{ animationDelay: '0.2s' }} />
+            </div>
+
+            {/* Hero header skeleton */}
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-8">
+              <div>
+                <div className="h-9 w-72 rounded-lg bg-slate-700/40 animate-pulse mb-3" />
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="h-6 w-20 rounded-lg bg-slate-700/30 animate-pulse" />
+                  <div className="h-6 w-24 rounded-lg bg-slate-700/30 animate-pulse" style={{ animationDelay: '0.15s' }} />
+                  <div className="h-6 w-28 rounded-lg bg-slate-700/30 animate-pulse" style={{ animationDelay: '0.25s' }} />
+                  <div className="h-6 w-16 rounded-full bg-slate-700/30 animate-pulse" style={{ animationDelay: '0.35s' }} />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-xl bg-slate-700/30 animate-pulse" />
+                <div className="w-10 h-10 rounded-xl bg-slate-700/30 animate-pulse" />
+              </div>
+            </div>
+
+            {/* Map skeleton */}
+            <div className="mb-8">
+              <div className="h-[280px] rounded-2xl bg-navy-light/40 border border-white/5 animate-pulse relative overflow-hidden">
+                <div className="absolute inset-0 opacity-[0.03]" style={{
+                  backgroundImage: 'linear-gradient(rgba(200,148,42,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(200,148,42,0.3) 1px, transparent 1px)',
+                  backgroundSize: '40px 40px',
+                }} />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Spinner className="w-8 h-8 text-gold/40" />
+                </div>
+              </div>
+            </div>
+
+            {/* Financial cards skeleton */}
+            <div className="grid grid-cols-3 gap-4 mb-8">
+              {[
+                { color: 'blue', delay: '0s' },
+                { color: 'emerald', delay: '0.1s' },
+                { color: 'gold', delay: '0.2s' },
+              ].map(({ color, delay }, i) => (
+                <div key={i} className={`rounded-2xl p-5 flex flex-col items-center gap-2 bg-${color === 'gold' ? 'gold' : color + '-500'}/5 border border-white/5 animate-pulse`} style={{ animationDelay: delay }}>
+                  <div className="h-3 w-16 rounded bg-slate-700/40" />
+                  <div className="h-7 w-28 rounded bg-slate-700/30" />
+                  <div className="h-3 w-20 rounded bg-slate-700/20" />
+                </div>
+              ))}
+            </div>
+
+            {/* Two-column skeleton */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <div className="space-y-4">
+                <div className="h-32 rounded-2xl bg-navy-light/40 border border-white/5 animate-pulse" />
+                <div className="h-48 rounded-2xl bg-navy-light/40 border border-white/5 animate-pulse" style={{ animationDelay: '0.15s' }} />
+              </div>
+              <div className="space-y-4">
+                <div className="h-64 rounded-2xl bg-navy-light/40 border border-white/5 animate-pulse" style={{ animationDelay: '0.1s' }} />
+                <div className="h-40 rounded-2xl bg-navy-light/40 border border-white/5 animate-pulse" style={{ animationDelay: '0.25s' }} />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -659,6 +725,18 @@ export default function PlotDetail() {
                       >
                         <ExternalLink className="w-3 h-3" />
                         Google Maps
+                      </a>
+                      {/* Waze — the #1 navigation app in Israel, used more than Google Maps */}
+                      <a
+                        href={`https://www.waze.com/ul?ll=${lat},${lng}&navigate=yes&zoom=17`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-400 bg-white/5 border border-white/10 rounded-lg hover:text-[#33CCFF] hover:border-[#33CCFF]/20 hover:bg-[#33CCFF]/5 transition-all"
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M20.54 6.63c-1.19-4.28-5.37-6.2-9.26-5.62C6.6 1.74 3.56 5.24 3.06 9.86c-.46 4.2 1.26 7.3 4.33 8.94.15.08.2.2.18.37-.04.47-.09.93-.14 1.4-.04.43.27.65.63.44.5-.29.98-.6 1.47-.9.16-.1.31-.12.49-.08.65.14 1.3.21 1.97.19 4.26-.12 8.24-3.19 9.12-7.49.3-1.47.28-2.9-.03-4.32zm-8.29 8.93c-.64.02-1.16-.5-1.16-1.13 0-.61.5-1.13 1.14-1.14.63 0 1.15.52 1.15 1.14 0 .62-.5 1.12-1.13 1.13zm3.98 0c-.63.02-1.15-.5-1.16-1.12 0-.63.51-1.14 1.14-1.15.64 0 1.15.52 1.15 1.14 0 .62-.5 1.12-1.13 1.13zm-7.96 0c-.63.02-1.15-.5-1.16-1.12-.01-.63.51-1.14 1.14-1.15.64 0 1.16.51 1.16 1.13 0 .63-.51 1.13-1.14 1.14z"/>
+                        </svg>
+                        Waze
                       </a>
                     </div>
                   )
