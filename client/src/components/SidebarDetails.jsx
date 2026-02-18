@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, ChevronLeft, ChevronRight, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon, Download, File, FileImage, FileSpreadsheet, Printer, ExternalLink, Eye, Navigation } from 'lucide-react'
+import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon, Download, File, FileImage, FileSpreadsheet, Printer, ExternalLink, Eye, Navigation } from 'lucide-react'
 import ShareMenu from './ui/ShareMenu'
 import ImageLightbox from './ui/ImageLightbox'
 import PriceTrendChart from './ui/PriceTrendChart'
@@ -395,6 +395,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
   const scrollRef = useRef(null)
   const panelRef = useRef(null)
   const [scrollShadow, setScrollShadow] = useState({ top: false, bottom: false })
+  const [showScrollTop, setShowScrollTop] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
@@ -482,6 +483,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
     const top = scrollTop > 10
     const bottom = scrollTop + clientHeight < scrollHeight - 10
+    setShowScrollTop(scrollTop > 400)
     setScrollShadow(prev => {
       if (prev.top === top && prev.bottom === bottom) return prev
       return { top, bottom }
@@ -1006,9 +1008,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                     </span>
                   </div>
                 </div>
+              </div>
               {/* Mini Mortgage Calculator */}
               <MiniMortgageCalc totalPrice={totalPrice} />
-              </div>
             </CollapsibleSection>
 
             {/* ROI Stages - Appreciation Path */}
@@ -1212,6 +1214,18 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
             <SimilarPlots currentPlot={plot} allPlots={allPlots} onSelectPlot={onSelectPlot} />
           </div>
         </div>
+
+        {/* Scroll to top button */}
+        {showScrollTop && (
+          <button
+            onClick={() => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="absolute left-4 bottom-36 z-10 w-9 h-9 rounded-xl bg-navy-light/80 border border-white/10 hover:border-gold/30 hover:bg-navy-light transition-all flex items-center justify-center shadow-lg backdrop-blur-sm"
+            title="חזור למעלה"
+            aria-label="חזור למעלה"
+          >
+            <ChevronUp className="w-4 h-4 text-gold" />
+          </button>
+        )}
 
         {/* Sticky CTA footer */}
         <div className="sidebar-cta-footer">

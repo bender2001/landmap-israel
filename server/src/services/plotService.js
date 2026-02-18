@@ -32,11 +32,16 @@ export async function getPublishedPlots(filters = {}) {
 
   // Server-side text search — searches block_number, number, city, description
   if (filters.q && filters.q.trim()) {
+    // Sanitize: escape special PostgREST/SQL chars to prevent injection
     const q = filters.q.trim()
-    // Use Supabase text search with ilike for flexible matching
-    query = query.or(
-      `block_number.ilike.%${q}%,number.ilike.%${q}%,city.ilike.%${q}%,description.ilike.%${q}%`
-    )
+      .replace(/[%_\\]/g, c => `\\${c}`)  // escape SQL wildcards
+      .replace(/[,()]/g, '')               // strip PostgREST operators
+      .slice(0, 100)                       // limit length
+    if (q.length > 0) {
+      query = query.or(
+        `block_number.ilike.%${q}%,number.ilike.%${q}%,city.ilike.%${q}%,description.ilike.%${q}%`
+      )
+    }
   }
 
   // Server-side sorting
