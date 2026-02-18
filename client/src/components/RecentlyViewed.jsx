@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Clock, ChevronDown, X } from 'lucide-react'
 import { statusColors } from '../utils/constants'
 import { formatPriceShort } from '../utils/formatters'
@@ -10,6 +10,27 @@ import { formatPriceShort } from '../utils/formatters'
  */
 export default function RecentlyViewed({ plots, selectedPlot, onSelectPlot }) {
   const [isOpen, setIsOpen] = useState(false)
+  const panelRef = useRef(null)
+
+  // Close on outside click
+  useEffect(() => {
+    if (!isOpen) return
+    function handleClickOutside(e) {
+      if (panelRef.current && !panelRef.current.contains(e.target)) setIsOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isOpen])
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return
+    function handleKey(e) {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [isOpen])
 
   const recentPlots = useMemo(() => {
     try {
@@ -30,7 +51,7 @@ export default function RecentlyViewed({ plots, selectedPlot, onSelectPlot }) {
 
   return (
     <div className="absolute top-16 right-4 z-[25] pointer-events-none hidden sm:block" dir="rtl">
-      <div className="pointer-events-auto">
+      <div className="pointer-events-auto" ref={panelRef}>
         {/* Toggle button */}
         <button
           onClick={() => setIsOpen(prev => !prev)}

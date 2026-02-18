@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Map, Heart, Info, Phone, Menu, X, BarChart3, Calculator } from 'lucide-react'
 import { useFavorites } from '../hooks/useFavorites'
@@ -15,11 +15,52 @@ export default function PublicNav() {
   const location = useLocation()
   const { favorites } = useFavorites()
   const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef(null)
+  const hamburgerRef = useRef(null)
 
   // Close menu on route change
   useEffect(() => {
     setMenuOpen(false)
   }, [location.pathname])
+
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (menuOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [menuOpen])
+
+  // Focus trap: keep focus within mobile menu while open
+  useEffect(() => {
+    if (!menuOpen || !menuRef.current) return
+    const menu = menuRef.current
+    const focusableEls = menu.querySelectorAll('a[href], button, [tabindex]:not([tabindex="-1"])')
+    if (focusableEls.length > 0) focusableEls[0].focus()
+
+    const handleTab = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setMenuOpen(false)
+        hamburgerRef.current?.focus()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const first = focusableEls[0]
+      const last = focusableEls[focusableEls.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', handleTab)
+    return () => document.removeEventListener('keydown', handleTab)
+  }, [menuOpen])
 
   return (
     <>
@@ -72,9 +113,12 @@ export default function PublicNav() {
 
           {/* Mobile hamburger */}
           <button
+            ref={hamburgerRef}
             className="nav-hamburger"
             onClick={() => setMenuOpen((prev) => !prev)}
             aria-label={menuOpen ? 'סגור תפריט' : 'פתח תפריט'}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-nav-menu"
           >
             {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -82,7 +126,7 @@ export default function PublicNav() {
       </nav>
 
       {/* Mobile menu dropdown */}
-      <div className={`nav-mobile-menu ${menuOpen ? 'is-open' : ''}`} dir="rtl">
+      <div ref={menuRef} id="mobile-nav-menu" role="dialog" aria-modal="true" aria-label="תפריט ניווט" className={`nav-mobile-menu ${menuOpen ? 'is-open' : ''}`} dir="rtl">
         {navLinks.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname === to
           return (

@@ -145,7 +145,9 @@ function QuickPresets({ filters, statusFilter, onFilterChange, onToggleStatus, o
 
 function SelectPill({ icon: Icon, label, value, displayValue, options, onChange, isActive }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [highlightIdx, setHighlightIdx] = useState(-1)
   const ref = useRef(null)
+  const listRef = useRef(null)
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -155,27 +157,110 @@ function SelectPill({ icon: Icon, label, value, displayValue, options, onChange,
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Reset highlight to current value when opening
+  useEffect(() => {
+    if (isOpen) {
+      const idx = options.findIndex(o => o.value === value)
+      setHighlightIdx(idx >= 0 ? idx : 0)
+    }
+  }, [isOpen])
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (isOpen && highlightIdx >= 0 && listRef.current) {
+      const item = listRef.current.children[highlightIdx + 1] // +1 for header
+      if (item?.scrollIntoView) item.scrollIntoView({ block: 'nearest' })
+    }
+  }, [highlightIdx, isOpen])
+
+  // Keyboard navigation: Arrow keys, Home/End, Enter, Escape, type-ahead
+  const handleKeyDown = useCallback((e) => {
+    if (!isOpen) {
+      // Open on ArrowDown/ArrowUp/Enter/Space when closed
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
+        e.preventDefault()
+        setIsOpen(true)
+        return
+      }
+      return
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setHighlightIdx(prev => (prev < options.length - 1 ? prev + 1 : 0))
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setHighlightIdx(prev => (prev > 0 ? prev - 1 : options.length - 1))
+        break
+      case 'Home':
+        e.preventDefault()
+        setHighlightIdx(0)
+        break
+      case 'End':
+        e.preventDefault()
+        setHighlightIdx(options.length - 1)
+        break
+      case 'Enter':
+      case ' ':
+        e.preventDefault()
+        if (highlightIdx >= 0 && highlightIdx < options.length) {
+          onChange(options[highlightIdx].value)
+          setIsOpen(false)
+        }
+        break
+      case 'Escape':
+      case 'Tab':
+        setIsOpen(false)
+        break
+      default:
+        // Type-ahead: jump to first option starting with pressed character
+        if (e.key.length === 1) {
+          const char = e.key.toLowerCase()
+          const startIdx = (highlightIdx + 1) % options.length
+          for (let i = 0; i < options.length; i++) {
+            const idx = (startIdx + i) % options.length
+            if (options[idx].label.toLowerCase().startsWith(char)) {
+              setHighlightIdx(idx)
+              break
+            }
+          }
+        }
+    }
+  }, [isOpen, highlightIdx, options, onChange])
+
+  const pillId = useRef(`pill-${label.replace(/\s+/g, '-')}`).current
+
   return (
     <div className="filter-select-pill" ref={ref}>
       <button
         className={`filter-pill-trigger ${isActive ? 'is-active' : ''} ${isOpen ? 'is-open' : ''}`}
         onClick={() => setIsOpen((prev) => !prev)}
+        onKeyDown={handleKeyDown}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? `${pillId}-list` : undefined}
+        aria-label={`${label}: ${displayValue || options.find(o => o.value === value)?.label || ''}`}
       >
         <Icon className="filter-pill-icon" />
         <span className="filter-pill-label">{displayValue || label}</span>
         <ChevronDown className={`filter-pill-chevron ${isOpen ? 'rotated' : ''}`} />
       </button>
       {isOpen && (
-        <div className="filter-pill-dropdown">
+        <div className="filter-pill-dropdown" role="listbox" id={`${pillId}-list`} aria-label={label} ref={listRef}>
           <div className="filter-pill-dropdown-header">{label}</div>
-          {options.map((opt) => (
+          {options.map((opt, i) => (
             <button
               key={opt.value}
-              className={`filter-pill-option ${value === opt.value ? 'selected' : ''}`}
+              role="option"
+              aria-selected={value === opt.value}
+              className={`filter-pill-option ${value === opt.value ? 'selected' : ''} ${i === highlightIdx ? 'is-highlighted' : ''}`}
               onClick={() => {
                 onChange(opt.value)
                 setIsOpen(false)
               }}
+              onMouseEnter={() => setHighlightIdx(i)}
             >
               <span className="filter-pill-option-text">{opt.label}</span>
               {value === opt.value && <Check className="filter-pill-option-check" />}
