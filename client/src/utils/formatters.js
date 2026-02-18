@@ -119,6 +119,22 @@ export function calcCAGR(totalRoiPct, readinessEstimate) {
 }
 
 /**
+ * Calculate days on market since listing creation.
+ * Returns { days, label, color } for display.
+ */
+export function calcDaysOnMarket(createdAt) {
+  if (!createdAt) return null
+  const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24))
+  let label, color
+  if (days <= 7) { label = 'חדש בשוק'; color = '#22C55E' }
+  else if (days <= 30) { label = `${days} ימים בשוק`; color = '#84CC16' }
+  else if (days <= 90) { label = `${Math.floor(days / 7)} שבועות בשוק`; color = '#F59E0B' }
+  else if (days <= 365) { label = `${Math.floor(days / 30)} חודשים בשוק`; color = '#EF4444' }
+  else { label = `${Math.floor(days / 365)}+ שנים בשוק`; color = '#EF4444' }
+  return { days, label, color }
+}
+
+/**
  * Get a label and color for the investment score.
  */
 export function getScoreLabel(score) {

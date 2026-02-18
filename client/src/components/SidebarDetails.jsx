@@ -5,7 +5,7 @@ import ImageLightbox from './ui/ImageLightbox'
 import PriceTrendChart from './ui/PriceTrendChart'
 import ProfitWaterfall from './ui/ProfitWaterfall'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
-import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR } from '../utils/formatters'
+import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
 import PlotPercentileBadges from './ui/PlotPercentileBadges'
 import { usePlot, useNearbyPlots } from '../hooks/usePlots'
@@ -800,6 +800,25 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   {plot.views} צפו
                 </span>
               )}
+              {/* Days on Market badge — like Madlan/Yad2 "ימים במודעה" */}
+              {(() => {
+                const dom = calcDaysOnMarket(plot.created_at ?? plot.createdAt)
+                if (!dom) return null
+                return (
+                  <span
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium"
+                    style={{
+                      background: `${dom.color}14`,
+                      border: `1px solid ${dom.color}35`,
+                      color: dom.color,
+                    }}
+                    title={`${dom.days} ימים מאז פרסום`}
+                  >
+                    <Hourglass className="w-2.5 h-2.5" />
+                    {dom.label}
+                  </span>
+                )
+              })()}
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">

@@ -116,7 +116,7 @@ export function useStructuredData(plot, plots) {
 
     if (!jsonLd) return
 
-    // Also add Organization schema (always present, like Madlan)
+    // Organization schema (always present, like Madlan)
     const orgSchema = {
       '@context': 'https://schema.org',
       '@type': 'Organization',
@@ -126,10 +126,53 @@ export function useStructuredData(plot, plots) {
       sameAs: [],
     }
 
+    // FAQ schema for search rich results (boosts SEO significantly)
+    const faqSchema = !plot ? {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: [
+        {
+          '@type': 'Question',
+          name: 'מהי קרקע להשקעה?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: 'קרקע להשקעה היא חלקת אדמה הנרכשת במטרה להרוויח מעליית ערכה לאורך זמן, בדרך כלל בעקבות שינוי ייעוד מחקלאי למגורים או מסחרי. משקיעים רוכשים קרקע במחיר נמוך ומוכרים לאחר שינוי הייעוד ברווח משמעותי.'
+          }
+        },
+        {
+          '@type': 'Question',
+          name: 'כמה עולה קרקע להשקעה בישראל?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: `מחירי קרקע להשקעה באזור חדרה, נתניה וקיסריה נעים בין ₪200,000 ל-₪2,000,000 תלוי בגודל, מיקום ושלב התכנון. מחיר ממוצע לדונם: ₪150,000-₪400,000.`
+          }
+        },
+        {
+          '@type': 'Question',
+          name: 'מה התשואה הצפויה מהשקעה בקרקע?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: 'תשואות השקעה בקרקע בישראל נעות בין 50% ל-300% על ההשקעה, תלוי בשלב התכנוני, מיקום וזמן ההמתנה. טווח ההשקעה הממוצע הוא 3-7 שנים.'
+          }
+        },
+        {
+          '@type': 'Question',
+          name: 'מהם הסיכונים בהשקעה בקרקע?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: 'הסיכונים כוללים: עיכובים בתהליכי תכנון, שינויים בייעוד הקרקע, חוסר נזילות (קשה למכור מהר), היטלי השבחה גבוהים, ושינויים רגולטוריים. חשוב לבצע בדיקת נאותות מקיפה לפני רכישה.'
+          }
+        },
+      ]
+    } : null
+
+    const schemas = [jsonLd, orgSchema]
+    if (faqSchema) schemas.push(faqSchema)
+
     const script = document.createElement('script')
     script.id = SCRIPT_ID
     script.type = 'application/ld+json'
-    script.textContent = JSON.stringify([jsonLd, orgSchema])
+    script.textContent = JSON.stringify(schemas)
     document.head.appendChild(script)
 
     return () => {

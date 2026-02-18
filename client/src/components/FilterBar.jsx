@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, Link2 } from 'lucide-react'
+import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, Link2, Download } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
 import SearchAutocomplete from './SearchAutocomplete'
 import SavedSearches from './SavedSearches'
@@ -468,6 +468,24 @@ export default function FilterBar({
               {linkCopied ? <Check className="w-3 h-3 text-green-400" /> : <Link2 className="w-3 h-3" />}
               {linkCopied ? 'הועתק!' : 'שתף חיפוש'}
             </button>
+            <a
+              href={`/api/export/csv?${new URLSearchParams(
+                Object.fromEntries(Object.entries({
+                  city: filters.city !== 'all' ? filters.city : undefined,
+                  priceMin: filters.priceMin || undefined,
+                  priceMax: filters.priceMax || undefined,
+                  sizeMin: filters.sizeMin || undefined,
+                  sizeMax: filters.sizeMax || undefined,
+                  status: statusFilter.length > 0 ? statusFilter.join(',') : undefined,
+                }).filter(([, v]) => v !== undefined))
+              ).toString()}`}
+              download
+              className="filter-clear-btn"
+              title="ייצוא לאקסל (CSV)"
+            >
+              <Download className="w-3 h-3" />
+              ייצוא CSV
+            </a>
             <div className="filter-count">
               <Eye className="w-3 h-3" />
               {plotCount} חלקות
