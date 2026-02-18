@@ -564,7 +564,7 @@ export default function MapView() {
       <FirstVisitHints />
 
       {/* Floating contact CTA — always visible, like Madlan/Yad2 */}
-      <div className="fixed bottom-36 sm:bottom-6 left-4 z-[30] flex flex-col gap-2 animate-bounce-in">
+      <div className="fixed bottom-44 sm:bottom-6 left-4 z-[30] flex flex-col gap-2 animate-bounce-in">
         {/* WhatsApp quick contact */}
         <a
           href={selectedPlot

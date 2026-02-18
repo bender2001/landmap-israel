@@ -2217,6 +2217,8 @@ body {
   }
   .plot-card-mini {
     width: 168px;
+    min-width: 168px;
+    flex-shrink: 0;
   }
   .plot-card-mini-body {
     padding: 8px 10px 8px;

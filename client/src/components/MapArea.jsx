@@ -91,7 +91,7 @@ function MapLayerSwitcher({ activeLayer, onChangeLayer }) {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
-    <div className="absolute top-4 right-4 z-[1000] pointer-events-none">
+    <div className="absolute top-14 sm:top-4 right-4 z-[1000] pointer-events-none">
       <div className="pointer-events-auto relative">
         <button
           onClick={() => setIsOpen(prev => !prev)}
@@ -304,19 +304,38 @@ function GeoSearch() {
   const [isSearching, setIsSearching] = useState(false)
   const inputRef = useRef(null)
   const debounceRef = useRef(null)
+  const abortRef = useRef(null)
 
   useEffect(() => {
     if (isOpen && inputRef.current) inputRef.current.focus()
   }, [isOpen])
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      if (abortRef.current) abortRef.current.abort()
+    }
+  }, [])
+
   const search = useCallback(async (q) => {
     if (!q || q.length < 2) { setResults([]); return }
+    // Cancel previous in-flight request
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
     setIsSearching(true)
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + ' Israel')}&limit=5&accept-language=he`)
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + ' Israel')}&limit=5&accept-language=he`,
+        { signal: controller.signal }
+      )
       const data = await res.json()
       setResults(data.map(r => ({ name: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon) })))
-    } catch { setResults([]) }
+    } catch (err) {
+      if (err.name !== 'AbortError') setResults([])
+      else return // Don't clear isSearching on abort — next request handles it
+    }
     setIsSearching(false)
   }, [])
 
@@ -684,7 +703,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         </div>
       </div>
       {/* Mobile brand badge — smaller, bottom-left above zoom */}
-      <div className="absolute top-3 left-3 z-[1000] pointer-events-none sm:hidden">
+      <div className="absolute top-14 left-3 z-[1000] pointer-events-none sm:hidden">
         <div className="glass-panel px-2.5 py-1.5 pointer-events-auto">
           <div className="flex items-center gap-1.5">
             <span className="text-sm">🏗️</span>

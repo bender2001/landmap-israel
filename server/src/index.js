@@ -39,6 +39,15 @@ const PORT = process.env.PORT || 3001
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  permissionsPolicy: {
+    features: {
+      geolocation: ['self'],
+      camera: [],
+      microphone: [],
+      fullscreen: ['self'],
+    },
+  },
 }))
 
 // CORS — support multiple origins
