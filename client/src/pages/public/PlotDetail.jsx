@@ -1,6 +1,6 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart, ExternalLink } from 'lucide-react'
+import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart, ExternalLink, Calculator as CalcIcon } from 'lucide-react'
 import { usePlot, useNearbyPlots, useSimilarPlots } from '../../hooks/usePlots.js'
 import { useMarketOverview } from '../../hooks/useMarketOverview.js'
 import { useFavorites } from '../../hooks/useFavorites.js'
@@ -904,6 +904,16 @@ export default function PlotDetail() {
               {readiness && <div className="text-xs text-slate-500">{readiness}</div>}
             </div>
           </div>
+
+          {/* Calculator CTA — like Madlan's "חשב תשואה" button, pre-fills the investment calculator */}
+          <Link
+            to={`/calculator?price=${totalPrice}&size=${sizeSqM}&zoning=${encodeURIComponent(zoningStage)}&years=${readiness?.includes('1-3') ? '2' : readiness?.includes('3-5') ? '4' : '7'}`}
+            className="flex items-center justify-center gap-2 mb-6 py-3 px-5 bg-gradient-to-r from-purple-600/15 to-indigo-600/15 border border-purple-500/20 rounded-2xl text-sm font-medium text-purple-300 hover:border-purple-500/40 hover:bg-purple-600/20 transition-all group"
+          >
+            <CalcIcon className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+            <span>חשב תשואה מפורטת במחשבון ההשקעות</span>
+            <ArrowRight className="w-3.5 h-3.5 text-purple-400/60 group-hover:translate-x-[-2px] transition-transform" />
+          </Link>
 
           {/* Price trend chart — like Madlan area trends */}
           <div className="mb-8">

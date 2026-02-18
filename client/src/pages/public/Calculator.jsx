@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Calculator as CalcIcon, TrendingUp, DollarSign, Percent, ArrowDown, Landmark, Table2, PiggyBank, Printer, Share2, Check } from 'lucide-react'
 import { roiStages, zoningLabels, ZoningStage } from '../../utils/constants'
 import { formatCurrency } from '../../utils/formatters'
@@ -17,17 +18,25 @@ function calcMonthlyPayment(principal, annualRate, years) {
 }
 
 export default function Calculator() {
+  const [searchParams] = useSearchParams()
+
   useMetaTags({
     title: 'מחשבון השקעה בקרקע — חישוב תשואה, מסים ועלויות | LandMap Israel',
     description: 'חשבו תשואה צפויה, היטל השבחה, מס רכישה, CAGR ועלויות מימון להשקעה בקרקע בישראל. סימולציית מימון מלאה.',
     url: `${window.location.origin}/calculator`,
   })
 
-  const [purchasePrice, setPurchasePrice] = useState('')
-  const [plotSize, setPlotSize] = useState('')
-  const [currentZoning, setCurrentZoning] = useState('AGRICULTURAL')
+  // Support URL pre-fill from PlotDetail (e.g., /calculator?price=500000&size=2000&zoning=AGRICULTURAL&years=5)
+  // This creates a seamless Plot → Calculator flow like Madlan's "חשב תשואה" button
+  const [purchasePrice, setPurchasePrice] = useState(() => searchParams.get('price') || '')
+  const [plotSize, setPlotSize] = useState(() => searchParams.get('size') || '')
+  const [currentZoning, setCurrentZoning] = useState(() => {
+    const z = searchParams.get('zoning')
+    return z && zoningOptions.some(([k]) => k === z) ? z : 'AGRICULTURAL'
+  })
   const [targetZoning, setTargetZoning] = useState('BUILDING_PERMIT')
-  const [holdingYears, setHoldingYears] = useState('5')
+  const [holdingYears, setHoldingYears] = useState(() => searchParams.get('years') || '5')
+  const prefilled = searchParams.get('price') && searchParams.get('size')
   // Financing inputs
   const [downPaymentPct, setDownPaymentPct] = useState('30')
   const [interestRate, setInterestRate] = useState('4.5')
@@ -150,6 +159,13 @@ export default function Calculator() {
             <div className="lg:col-span-2">
               <div className="glass-panel p-6 space-y-5 sticky top-24">
                 <h2 className="text-lg font-bold text-slate-100 mb-1">פרטי העסקה</h2>
+                {/* Prefill indicator — shows when calculator was opened from PlotDetail */}
+                {prefilled && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-gold/8 border border-gold/15 rounded-lg text-[11px] text-gold">
+                    <span>✨</span>
+                    <span>הנתונים מולאו אוטומטית מפרטי החלקה</span>
+                  </div>
+                )}
 
                 {/* Purchase price */}
                 <div>

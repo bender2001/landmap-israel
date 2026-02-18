@@ -76,8 +76,10 @@ app.use((req, res, next) => {
 // Request tracing
 app.use(requestId)
 
-// Compression
-app.use(compression())
+// Compression — skip tiny responses (<1KB) where overhead exceeds savings.
+// The default threshold is 1KB, but we make it explicit for clarity.
+// Also set preferred encoding order: brotli > gzip for modern browsers.
+app.use(compression({ threshold: 1024 }))
 
 // Structured access logging — JSON format for monitoring/observability.
 // Replaces basic morgan 'short' with a single middleware that:

@@ -84,6 +84,7 @@ export default function PublicNav() {
                 <Link
                   key={to}
                   to={to}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-colors relative ${
                     isActive
                       ? 'bg-gold/15 text-gold font-medium'
@@ -133,6 +134,7 @@ export default function PublicNav() {
             <Link
               key={to}
               to={to}
+              aria-current={isActive ? 'page' : undefined}
               className={isActive ? 'active' : ''}
               onClick={() => setMenuOpen(false)}
             >
