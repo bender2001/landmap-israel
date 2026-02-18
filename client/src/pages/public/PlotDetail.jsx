@@ -5,6 +5,7 @@ import { usePlot, useNearbyPlots, useSimilarPlots } from '../../hooks/usePlots.j
 import { useMarketOverview } from '../../hooks/useMarketOverview.js'
 import { useFavorites } from '../../hooks/useFavorites.js'
 import { useViewTracker } from '../../hooks/useViewTracker.js'
+import { useLocalStorage } from '../../hooks/useLocalStorage.js'
 import LeadModal from '../../components/LeadModal.jsx'
 import ShareMenu from '../../components/ui/ShareMenu.jsx'
 import ImageLightbox from '../../components/ui/ImageLightbox.jsx'
@@ -17,6 +18,7 @@ import PriceTrendChart from '../../components/ui/PriceTrendChart.jsx'
 import MiniMap from '../../components/ui/MiniMap.jsx'
 import { plotInquiryLink } from '../../utils/config.js'
 import InvestmentBenchmark from '../../components/ui/InvestmentBenchmark.jsx'
+import InvestmentProjection from '../../components/ui/InvestmentProjection.jsx'
 import DueDiligenceChecklist from '../../components/ui/DueDiligenceChecklist.jsx'
 
 function JsonLdSchema({ plot }) {
@@ -357,13 +359,8 @@ export default function PlotDetail() {
   const favorites = useFavorites()
   const { trackView } = useViewTracker()
 
-  // Compare state (localStorage-backed, consistent with MapView)
-  const [compareIds, setCompareIds] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('landmap_compare') || '[]') } catch { return [] }
-  })
-  useEffect(() => {
-    localStorage.setItem('landmap_compare', JSON.stringify(compareIds))
-  }, [compareIds])
+  // Compare state (localStorage-backed via useLocalStorage, cross-tab sync with MapView)
+  const [compareIds, setCompareIds] = useLocalStorage('landmap_compare', [])
   const toggleCompare = useCallback((plotId) => {
     setCompareIds((prev) =>
       prev.includes(plotId) ? prev.filter((id) => id !== plotId) : prev.length < 3 ? [...prev, plotId] : prev
@@ -1055,6 +1052,17 @@ export default function PlotDetail() {
           {/* Price trend chart — like Madlan area trends */}
           <div className="mb-8">
             <PriceTrendChart totalPrice={totalPrice} sizeSqM={sizeSqM} city={plot.city} plotId={plot.id} />
+          </div>
+
+          {/* Forward-looking investment projection — year-by-year S-curve growth.
+              Differentiator: Madlan/Yad2 show history, we show the investor's future. */}
+          <div className="mb-8 bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+            <InvestmentProjection
+              totalPrice={totalPrice}
+              projectedValue={projectedValue}
+              readinessEstimate={readiness}
+              zoningStage={zoningStage}
+            />
           </div>
 
           {/* Two-column layout for details */}

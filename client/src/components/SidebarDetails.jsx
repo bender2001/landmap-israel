@@ -14,6 +14,7 @@ import PlotPercentileBadges from './ui/PlotPercentileBadges'
 import { usePlot, useNearbyPlots, useSimilarPlots } from '../hooks/usePlots'
 import MiniMap from './ui/MiniMap'
 import DueDiligenceChecklist from './ui/DueDiligenceChecklist'
+import InvestmentProjection from './ui/InvestmentProjection'
 import LocationScore from './ui/LocationScore'
 import { plotInquiryLink } from '../utils/config'
 
@@ -1629,6 +1630,15 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               {/* Associated Costs */}
               {/* Price Trend Chart — like Madlan's area price trends */}
               <PriceTrendChart totalPrice={totalPrice} sizeSqM={sizeSqM} city={plot.city} plotId={plot.id} />
+
+              {/* Investment Projection — forward-looking year-by-year value growth (S-curve model).
+                  A key differentiator: Madlan/Yad2 show historical prices, we show the investor's FUTURE. */}
+              <InvestmentProjection
+                totalPrice={totalPrice}
+                projectedValue={projectedValue}
+                readinessEstimate={readinessEstimate}
+                zoningStage={zoningStage}
+              />
 
               <div className="bg-navy-light/40 border border-white/5 rounded-xl p-3 mb-3">
                 <div className="flex items-center gap-2 mb-2">

@@ -23,6 +23,7 @@ import { whatsappLink, CONTACT, plotOgImageUrl } from '../../utils/config.js'
 import { useRealtimeUpdates } from '../../hooks/useRealtimeUpdates.js'
 import IdleRender from '../../components/ui/IdleRender.jsx'
 import { useRefreshOnReturn } from '../../hooks/usePageVisibility.js'
+import { useLocalStorage } from '../../hooks/useLocalStorage.js'
 
 // Lazy-load non-critical widgets — they're not needed for first paint.
 // This reduces the MapView initial JS from ~126KB to ~95KB, cutting Time to Interactive.
@@ -150,9 +151,7 @@ export default function MapView() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false)
   const [boundsFilter, setBoundsFilter] = useState(null)
   // Auto-search on map move — stored in localStorage for persistence (like Madlan/Airbnb)
-  const [autoSearchOnMove, setAutoSearchOnMove] = useState(() => {
-    try { return localStorage.getItem('landmap_auto_search') === 'true' } catch { return false }
-  })
+  const [autoSearchOnMove, setAutoSearchOnMove] = useLocalStorage('landmap_auto_search', false)
 
   // Capture the initial ?plot= param before any effect can clear it
   const initialPlotRef = useRef(searchParams.get('plot'))
@@ -182,13 +181,8 @@ export default function MapView() {
   const { recordPrices, getPriceChange } = usePriceTracker()
   const { searches: savedSearches, save: saveSearch, remove: removeSearch } = useSavedSearches()
 
-  // Compare state (localStorage-backed, not URL to avoid conflict with filters)
-  const [compareIds, setCompareIds] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('landmap_compare') || '[]') } catch { return [] }
-  })
-  useEffect(() => {
-    localStorage.setItem('landmap_compare', JSON.stringify(compareIds))
-  }, [compareIds])
+  // Compare state (localStorage-backed via useLocalStorage, cross-tab sync)
+  const [compareIds, setCompareIds] = useLocalStorage('landmap_compare', [])
   const toggleCompare = useCallback((plotId) => {
     setCompareIds((prev) =>
       prev.includes(plotId) ? prev.filter((id) => id !== plotId) : prev.length < 3 ? [...prev, plotId] : prev
@@ -496,10 +490,9 @@ export default function MapView() {
 
   const handleToggleAutoSearch = useCallback((enabled) => {
     setAutoSearchOnMove(enabled)
-    try { localStorage.setItem('landmap_auto_search', String(enabled)) } catch {}
     // If turning off, clear the bounds filter so all plots show again
     if (!enabled) setBoundsFilter(null)
-  }, [])
+  }, [setAutoSearchOnMove])
 
   const handleClearBounds = useCallback(() => {
     setBoundsFilter(null)
