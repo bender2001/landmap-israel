@@ -22,6 +22,8 @@ function normalizeMock(plot) {
     tax_authority_value: plot.taxAuthorityValue ?? plot.tax_authority_value,
     standard_22: plot.standard22 ?? plot.standard_22,
     plot_images: plot.plot_images || [],
+    created_at: plot.created_at ?? plot.createdAt,
+    updated_at: plot.updated_at ?? plot.updatedAt,
   }
 }
 

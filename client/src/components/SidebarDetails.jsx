@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon, Download, File, FileImage, FileSpreadsheet, Printer, ExternalLink, Eye, Navigation } from 'lucide-react'
+import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon, Download, File, FileImage, FileSpreadsheet, Printer, ExternalLink, Eye, Navigation, Clipboard } from 'lucide-react'
 import ShareMenu from './ui/ShareMenu'
 import ImageLightbox from './ui/ImageLightbox'
 import PriceTrendChart from './ui/PriceTrendChart'
@@ -468,6 +468,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
   const [scrollShadow, setScrollShadow] = useState({ top: false, bottom: false })
   const [showScrollTop, setShowScrollTop] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [gushCopied, setGushCopied] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
@@ -710,12 +711,33 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
           {/* Header */}
           <div className="flex justify-between items-start p-5 pb-3">
           <div>
-            <h2 className="text-2xl font-black">
-              <span className="bg-gradient-to-r from-gold to-gold-bright bg-clip-text text-transparent">גוש</span>
-              {' '}{blockNumber}{' | '}
-              <span className="bg-gradient-to-r from-gold to-gold-bright bg-clip-text text-transparent">חלקה</span>
-              {' '}{plot.number}
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-2xl font-black">
+                <span className="bg-gradient-to-r from-gold to-gold-bright bg-clip-text text-transparent">גוש</span>
+                {' '}{blockNumber}{' | '}
+                <span className="bg-gradient-to-r from-gold to-gold-bright bg-clip-text text-transparent">חלקה</span>
+                {' '}{plot.number}
+              </h2>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`גוש ${blockNumber} חלקה ${plot.number}`).then(() => {
+                    setGushCopied(true)
+                    setTimeout(() => setGushCopied(false), 2000)
+                  })
+                }}
+                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all flex-shrink-0 ${
+                  gushCopied
+                    ? 'bg-green-500/20 border border-green-500/30'
+                    : 'bg-white/5 border border-white/10 hover:bg-white/10 hover:border-gold/20'
+                }`}
+                title="העתק גוש/חלקה (לחיפוש בטאבו, מנהל מקרקעין)"
+              >
+                {gushCopied
+                  ? <Check className="w-3 h-3 text-green-400" />
+                  : <Copy className="w-3 h-3 text-slate-400" />
+                }
+              </button>
+            </div>
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <span className="text-xs text-slate-400 bg-white/5 px-2.5 py-1 rounded-lg">
                 {formatDunam(sizeSqM)} דונם ({sizeSqM.toLocaleString()} מ&quot;ר)
@@ -920,6 +942,48 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                     <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
                   </a>
                 </div>
+              )
+            })()}
+
+            {/* Government Registry Links — essential for Israeli real estate due diligence */}
+            <div className="flex flex-wrap gap-2 mt-2 animate-stagger-3">
+              <a
+                href={`https://www.gov.il/he/departments/topics/tabu-online`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 bg-gradient-to-r from-navy-light/50 to-navy-light/60 border border-indigo-500/15 rounded-xl px-4 py-2 text-xs text-slate-300 hover:border-gold/30 transition-all card-lift"
+              >
+                <div className="w-6 h-6 rounded-lg bg-indigo-500/15 flex items-center justify-center">
+                  <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                </div>
+                טאבו (גוש {blockNumber})
+                <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
+              </a>
+              <a
+                href={`https://ims.gov.il/he/LandRegistration`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 bg-gradient-to-r from-navy-light/50 to-navy-light/60 border border-teal-500/15 rounded-xl px-4 py-2 text-xs text-slate-300 hover:border-gold/30 transition-all card-lift"
+              >
+                <div className="w-6 h-6 rounded-lg bg-teal-500/15 flex items-center justify-center">
+                  <MapPin className="w-3.5 h-3.5 text-teal-400" />
+                </div>
+                מנהל מקרקעין
+                <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
+              </a>
+              <a
+                href={`https://www.govmap.gov.il/?lat=${(() => { const vc = plot.coordinates?.filter(c => Array.isArray(c) && c.length >= 2); return vc && vc.length > 0 ? (vc.reduce((s,c)=>s+c[0],0)/vc.length).toFixed(5) : '32.45' })()}&lon=${(() => { const vc = plot.coordinates?.filter(c => Array.isArray(c) && c.length >= 2); return vc && vc.length > 0 ? (vc.reduce((s,c)=>s+c[1],0)/vc.length).toFixed(5) : '34.87' })()}&z=15`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 bg-gradient-to-r from-navy-light/50 to-navy-light/60 border border-amber-500/15 rounded-xl px-4 py-2 text-xs text-slate-300 hover:border-gold/30 transition-all card-lift"
+              >
+                <div className="w-6 h-6 rounded-lg bg-amber-500/15 flex items-center justify-center">
+                  <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                </div>
+                GovMap
+                <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
+              </a>
+            </div>
               )
             })()}
 

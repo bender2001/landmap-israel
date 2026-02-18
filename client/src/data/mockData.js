@@ -48,6 +48,8 @@ export const plots = [
   {
     id: 'plot-1',
     blockNumber: '10006',
+    created_at: '2026-02-10T10:00:00Z',
+    updated_at: '2026-02-17T14:30:00Z',
     number: '168',
     city: '\u05D7\u05D3\u05E8\u05D4',
     sizeSqM: 2011,
@@ -105,6 +107,8 @@ export const plots = [
   {
     id: 'plot-2',
     blockNumber: '7842',
+    created_at: '2026-01-20T08:00:00Z',
+    updated_at: '2026-02-15T11:00:00Z',
     number: '54',
     city: '\u05E0\u05EA\u05E0\u05D9\u05D4',
     sizeSqM: 1500,
@@ -162,6 +166,8 @@ export const plots = [
   {
     id: 'plot-3',
     blockNumber: '10234',
+    created_at: '2025-12-01T09:00:00Z',
+    updated_at: '2026-02-10T16:00:00Z',
     number: '23',
     city: '\u05E7\u05D9\u05E1\u05E8\u05D9\u05D4',
     sizeSqM: 3200,
