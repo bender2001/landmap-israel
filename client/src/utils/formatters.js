@@ -145,6 +145,56 @@ export function getScoreLabel(score) {
 }
 
 /**
+ * Estimate monthly mortgage payment for a land purchase.
+ * Uses standard Israeli mortgage terms: 70% LTV, Prime+1.5% variable rate, 20-year term.
+ * Like Madlan's "תשלום חודשי משוער" — helps buyers understand affordability.
+ * @param {number} totalPrice - Total land price in ILS
+ * @param {Object} [options] - Override defaults
+ * @returns {Object} { monthly, downPayment, loanAmount, totalInterest, rate, years }
+ */
+export function calcMonthlyPayment(totalPrice, options = {}) {
+  if (!totalPrice || totalPrice <= 0) return null
+  const {
+    ltv = 0.5,          // Land loans typically 50% LTV (stricter than apartments)
+    annualRate = 0.06,   // ~6% for land (Prime + spread)
+    years = 15,          // 15-year term typical for land
+  } = options
+
+  const loanAmount = Math.round(totalPrice * ltv)
+  const downPayment = totalPrice - loanAmount
+  const monthlyRate = annualRate / 12
+  const numPayments = years * 12
+
+  // Standard amortization formula: M = P * [r(1+r)^n] / [(1+r)^n - 1]
+  const monthly = monthlyRate > 0
+    ? Math.round(loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1))
+    : Math.round(loanAmount / numPayments)
+
+  const totalPaid = monthly * numPayments
+  const totalInterest = totalPaid - loanAmount
+
+  return {
+    monthly,
+    downPayment,
+    loanAmount,
+    totalInterest,
+    rate: annualRate,
+    years,
+    ltv,
+  }
+}
+
+/**
+ * Format monthly payment for compact display.
+ * @param {number} monthly - Monthly payment in ILS
+ * @returns {string} e.g. "₪2,450/חודש"
+ */
+export function formatMonthlyPayment(monthly) {
+  if (!monthly) return ''
+  return `₪${monthly.toLocaleString('he-IL')}/חודש`
+}
+
+/**
  * Calculate percentile rank of a value within a sorted array.
  * Returns 0-100 (what percentage of values are below this one).
  * E.g., percentile=80 means "better than 80% of plots".

@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback, useMemo, memo } from 'react'
 import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows, Share2 } from 'lucide-react'
 import PriceSparkline from './ui/PriceSparkline'
 import { statusColors, statusLabels } from '../utils/constants'
-import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR } from '../utils/formatters'
+import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcMonthlyPayment, formatMonthlyPayment } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
 import { whatsappShareLink } from '../utils/config'
 
@@ -223,6 +223,11 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
               <PriceSparkline currentPrice={price} projectedValue={projValue} />
             </div>
             {pricePerDunam && <span className="text-[9px] text-slate-500">{pricePerDunam}/דונם</span>}
+            {(() => {
+              const payment = calcMonthlyPayment(price)
+              if (!payment) return null
+              return <span className="text-[9px] text-blue-400/70" title={`הון עצמי: ${formatPriceShort(payment.downPayment)} | הלוואה: ${formatPriceShort(payment.loanAmount)}`}>~{formatMonthlyPayment(payment.monthly)}</span>
+            })()}
           </div>
           <div className="plot-card-mini-tags">
             <span className="plot-card-mini-roi">+{roi}%</span>

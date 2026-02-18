@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { BarChart3, X, Map, MapPin, Waves, TreePine, Hospital, TrendingUp, Award, Clock } from 'lucide-react'
+import { BarChart3, X, Map, MapPin, Waves, TreePine, Hospital, TrendingUp, Award, Clock, Trophy, Crown } from 'lucide-react'
 import { useAllPlots } from '../../hooks/usePlots'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
-import { formatCurrency, calcInvestmentScore } from '../../utils/formatters'
+import { formatCurrency, calcInvestmentScore, calcMonthlyPayment, formatMonthlyPayment } from '../../utils/formatters'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
 import Spinner from '../../components/ui/Spinner'
@@ -169,6 +169,86 @@ function CompareRadar({ plots }) {
   )
 }
 
+/**
+ * Winner Summary Card — shows which plot "wins" across the most comparison dimensions.
+ * Like a TL;DR for the comparison: "Plot X is the best overall pick."
+ */
+function WinnerSummary({ plots }) {
+  const criteria = [
+    { label: 'מחיר נמוך', getter: (p) => p.total_price ?? p.totalPrice ?? Infinity, mode: 'min' },
+    { label: 'שטח גדול', getter: (p) => p.size_sqm ?? p.sizeSqM ?? 0, mode: 'max' },
+    { label: 'תשואה גבוהה', getter: (p) => { const pr = p.total_price ?? p.totalPrice ?? 0; const pj = p.projected_value ?? p.projectedValue ?? 0; return pr > 0 ? (pj - pr) / pr : 0 }, mode: 'max' },
+    { label: 'מחיר/מ״ר', getter: (p) => { const pr = p.total_price ?? p.totalPrice ?? 0; const sz = p.size_sqm ?? p.sizeSqM ?? 1; return sz > 0 ? pr / sz : Infinity }, mode: 'min' },
+    { label: 'ציון השקעה', getter: (p) => calcInvestmentScore(p), mode: 'max' },
+    { label: 'קרבה לים', getter: (p) => p.distance_to_sea ?? p.distanceToSea ?? Infinity, mode: 'min' },
+  ]
+
+  // Count wins per plot
+  const wins = {}
+  plots.forEach(p => { wins[p.id] = { count: 0, categories: [] } })
+
+  criteria.forEach(({ label, getter, mode }) => {
+    const values = plots.map(p => ({ id: p.id, val: getter(p) }))
+    const best = mode === 'max'
+      ? Math.max(...values.map(v => v.val))
+      : Math.min(...values.map(v => v.val))
+    values.forEach(v => {
+      if (v.val === best && isFinite(best)) {
+        wins[v.id].count++
+        wins[v.id].categories.push(label)
+      }
+    })
+  })
+
+  const sorted = plots.map(p => ({ plot: p, ...wins[p.id] })).sort((a, b) => b.count - a.count)
+  const winner = sorted[0]
+  if (!winner || winner.count === 0) return null
+
+  const blockNum = winner.plot.block_number ?? winner.plot.blockNumber
+  const isTie = sorted.length > 1 && sorted[1].count === winner.count
+
+  return (
+    <div className="glass-panel p-5 mb-6 border-gold/20">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-10 h-10 rounded-xl bg-gold/15 border border-gold/30 flex items-center justify-center">
+          <Trophy className="w-5 h-5 text-gold" />
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-slate-100">
+            {isTie ? 'תיקו!' : `🏆 המנצח: גוש ${blockNum} חלקה ${winner.plot.number}`}
+          </h3>
+          <p className="text-[11px] text-slate-400">
+            {isTie
+              ? `שתי חלקות מובילות ב-${winner.count} קטגוריות כל אחת`
+              : `מוביל ב-${winner.count} מתוך ${criteria.length} קטגוריות`
+            }
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {sorted.map(({ plot, count, categories }, i) => {
+          const bn = plot.block_number ?? plot.blockNumber
+          return (
+            <div
+              key={plot.id}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs ${
+                i === 0 ? 'bg-gold/10 border border-gold/20 text-gold' : 'bg-white/5 border border-white/5 text-slate-400'
+              }`}
+            >
+              {i === 0 && <Crown className="w-3.5 h-3.5" />}
+              <span className="font-medium">{bn}/{plot.number}</span>
+              <span className="text-[10px] opacity-70">{count} ניצחונות</span>
+              {categories.length > 0 && (
+                <span className="text-[9px] opacity-50">({categories.slice(0, 3).join(', ')})</span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function CompareCell({ value, highlight = false, className = '' }) {
   return (
     <td className={`py-3 px-4 text-sm ${highlight ? 'text-gold font-bold' : 'text-slate-300'} ${className}`}>
@@ -241,6 +321,9 @@ export default function Compare() {
             </div>
           ) : (
             <>
+            {/* Winner summary */}
+            {plots.length >= 2 && <WinnerSummary plots={plots} />}
+
             {/* Visual comparison charts */}
             {plots.length >= 2 && (
               <>
@@ -352,6 +435,19 @@ export default function Compare() {
                         return <CompareCell key={p.id} value={formatCurrency(price)} highlight={price === best} />
                       })}
                     </tr>
+                    {/* Monthly Payment */}
+                    <tr className="border-b border-white/5 hover:bg-white/[0.02]">
+                      <td className="py-3 px-4 text-sm text-slate-400 font-medium">תשלום חודשי*</td>
+                      {plots.map((p) => {
+                        const price = p.total_price ?? p.totalPrice
+                        const payment = calcMonthlyPayment(price)
+                        const best = bestValue((pl) => {
+                          const pm = calcMonthlyPayment(pl.total_price ?? pl.totalPrice)
+                          return pm ? pm.monthly : null
+                        }, 'min')
+                        return <CompareCell key={p.id} value={payment ? formatMonthlyPayment(payment.monthly) : null} highlight={payment && payment.monthly === best} />
+                      })}
+                    </tr>
                     {/* Size */}
                     <tr className="border-b border-white/5 hover:bg-white/[0.02]">
                       <td className="py-3 px-4 text-sm text-slate-400 font-medium">שטח</td>
@@ -458,6 +554,11 @@ export default function Compare() {
                     </tr>
                   </tbody>
                 </table>
+              </div>
+
+              {/* Footnote */}
+              <div className="px-4 pt-2 pb-0">
+                <p className="text-[9px] text-slate-600">* תשלום חודשי משוער: 50% הון עצמי, ריבית 6%, תקופה 15 שנה. לסימולציה מלאה ראה מחשבון המימון בעמוד החלקה.</p>
               </div>
 
               {/* Actions */}
