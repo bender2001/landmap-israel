@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { Calculator as CalcIcon, TrendingUp, DollarSign, Percent, ArrowDown, Landmark, Table2, PiggyBank } from 'lucide-react'
+import { useState, useMemo, useRef, useCallback } from 'react'
+import { Calculator as CalcIcon, TrendingUp, DollarSign, Percent, ArrowDown, Landmark, Table2, PiggyBank, Printer, Share2, Check } from 'lucide-react'
 import { roiStages, zoningLabels, ZoningStage } from '../../utils/constants'
 import { formatCurrency } from '../../utils/formatters'
 import PublicNav from '../../components/PublicNav'
@@ -457,6 +457,38 @@ export default function Calculator() {
                     <p className="text-[9px] text-slate-600 mt-3">
                       CAGR ברוטו = תשואה שנתית לפני עלויות. CAGR נטו = אחרי מסים, עו"ד והיטל השבחה.
                     </p>
+                  </div>
+
+                  {/* Action buttons: Print & Share */}
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      onClick={() => window.print()}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-white/[0.05] border border-white/10 rounded-xl text-sm text-slate-300 hover:border-gold/30 hover:text-gold transition-all"
+                    >
+                      <Printer className="w-4 h-4" />
+                      הדפס דוח
+                    </button>
+                    <button
+                      onClick={() => {
+                        const text = [
+                          `📊 דוח השקעה — LandMap Israel`,
+                          ``,
+                          `💰 מחיר רכישה: ${formatCurrency(parseFloat(purchasePrice))}`,
+                          `📐 שטח: ${parseFloat(plotSize).toLocaleString()} מ״ר`,
+                          `🏗️ ייעוד: ${zoningLabels[currentZoning]} → ${zoningLabels[targetZoning]}`,
+                          `📈 תשואה כוללת: +${result.roiPercent}%`,
+                          `📅 CAGR (${result.holdingYears} שנים): +${result.annualizedRoi}%`,
+                          `💵 רווח נקי: ${formatCurrency(result.netProfit)}`,
+                          ``,
+                          `חושב על ${window.location.origin}/calculator`,
+                        ].join('\n')
+                        navigator.clipboard.writeText(text).catch(() => {})
+                      }}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-gold/10 border border-gold/20 rounded-xl text-sm text-gold hover:bg-gold/20 transition-all"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      שתף תוצאות
+                    </button>
                   </div>
 
                   {/* Disclaimer */}

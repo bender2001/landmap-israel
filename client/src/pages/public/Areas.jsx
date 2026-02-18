@@ -337,6 +337,61 @@ export default function Areas() {
             {/* Price trends chart */}
             {trends && <PriceTrendMiniChart trends={trends} />}
 
+            {/* City comparison table — like Madlan's area comparison */}
+            {cityData.length > 1 && (
+              <div className="glass-panel p-5 mt-6">
+                <h3 className="text-sm font-bold text-slate-100 mb-4 flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-gold" />
+                  השוואת אזורים
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-[10px] text-slate-500 border-b border-white/5">
+                        <th className="text-right py-2.5 font-medium pr-2">עיר</th>
+                        <th className="text-center py-2.5 font-medium">חלקות</th>
+                        <th className="text-center py-2.5 font-medium">מחיר/דונם ממוצע</th>
+                        <th className="text-center py-2.5 font-medium">ROI ממוצע</th>
+                        <th className="text-center py-2.5 font-medium">שטח כולל</th>
+                        <th className="text-center py-2.5 font-medium">זמינות</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cityData.map(({ city, stats }) => {
+                        const avgPriceDunam = stats.totalArea > 0 ? Math.round((stats.totalPrice / stats.totalArea) * 1000) : 0
+                        const roi = stats.totalPrice > 0 ? Math.round(((stats.totalProj - stats.totalPrice) / stats.totalPrice) * 100) : 0
+                        const availPct = stats.count > 0 ? Math.round(((stats.byStatus.AVAILABLE || 0) / stats.count) * 100) : 0
+                        // Heatmap coloring: higher ROI = greener
+                        const roiColor = roi >= 150 ? 'text-emerald-400' : roi >= 100 ? 'text-emerald-500' : roi >= 50 ? 'text-yellow-400' : 'text-slate-400'
+                        return (
+                          <tr key={city} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                            <td className="py-3 pr-2">
+                              <Link to={`/?city=${encodeURIComponent(city)}`} className="flex items-center gap-2 text-slate-200 hover:text-gold transition-colors font-medium">
+                                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: CITY_COLORS[city] || '#94A3B8' }} />
+                                {city}
+                              </Link>
+                            </td>
+                            <td className="py-3 text-center text-slate-300">{stats.count}</td>
+                            <td className="py-3 text-center text-gold font-medium">{formatCurrency(avgPriceDunam)}</td>
+                            <td className={`py-3 text-center font-bold ${roiColor}`}>+{roi}%</td>
+                            <td className="py-3 text-center text-slate-400">{formatDunam(stats.totalArea)} דונם</td>
+                            <td className="py-3 text-center">
+                              <div className="inline-flex items-center gap-1.5">
+                                <div className="w-12 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                                  <div className="h-full rounded-full bg-emerald-400/60" style={{ width: `${availPct}%` }} />
+                                </div>
+                                <span className="text-[10px] text-slate-500">{availPct}%</span>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* City cards */}
             <div className="space-y-4 mt-6">
               {cityData.map(({ city, stats }) => (

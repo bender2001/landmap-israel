@@ -1,7 +1,24 @@
-import { Link } from 'react-router-dom'
-import { Map, ArrowRight } from 'lucide-react'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Map, Search, Calculator, MapPin, ArrowLeft } from 'lucide-react'
 
 export default function NotFound() {
+  const [query, setQuery] = useState('')
+  const navigate = useNavigate()
+
+  const handleSearch = (e) => {
+    e.preventDefault()
+    if (query.trim()) {
+      navigate(`/?q=${encodeURIComponent(query.trim())}`)
+    }
+  }
+
+  const quickLinks = [
+    { to: '/', icon: Map, label: 'מפת חלקות', desc: 'צפה בכל החלקות על המפה' },
+    { to: '/areas', icon: MapPin, label: 'סקירת אזורים', desc: 'השוואת ערים ואזורים' },
+    { to: '/calculator', icon: Calculator, label: 'מחשבון השקעה', desc: 'חשב תשואה צפויה' },
+  ]
+
   return (
     <div className="min-h-screen bg-navy flex flex-col items-center justify-center px-4" dir="rtl">
       {/* Animated 404 */}
@@ -14,8 +31,8 @@ export default function NotFound() {
         </div>
       </div>
 
-      {/* Message */}
-      <div className="glass-panel p-8 max-w-md w-full text-center animate-fade-in-up">
+      {/* Message + Quick Search */}
+      <div className="glass-panel p-8 max-w-lg w-full text-center animate-fade-in-up">
         <h2 className="text-2xl font-bold text-slate-100 mb-3">
           הדף לא נמצא
         </h2>
@@ -23,13 +40,42 @@ export default function NotFound() {
           מצטערים, הדף שחיפשת לא קיים או שהקישור שגוי.
         </p>
 
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-gold to-gold-bright rounded-xl text-navy font-bold hover:shadow-lg hover:shadow-gold/30 transition"
-        >
-          <Map className="w-5 h-5" />
-          חזרה למפה
-        </Link>
+        {/* Quick search — reduce bounce rate by letting users search directly */}
+        <form onSubmit={handleSearch} className="relative mb-6">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="חיפוש גוש, חלקה, עיר..."
+            className="w-full pr-10 pl-4 py-3 bg-navy-light/60 border border-white/10 rounded-xl text-slate-200 placeholder-slate-500 focus:border-gold/50 focus:outline-none transition text-sm"
+          />
+          {query.trim() && (
+            <button
+              type="submit"
+              className="absolute left-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gold/20 border border-gold/30 text-gold text-xs font-bold rounded-lg hover:bg-gold/30 transition"
+            >
+              חפש
+            </button>
+          )}
+        </form>
+
+        {/* Quick links */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {quickLinks.map(({ to, icon: Icon, label, desc }) => (
+            <Link
+              key={to}
+              to={to}
+              className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-gold/30 hover:bg-gold/5 transition-all group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-gold/10 border border-gold/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Icon className="w-5 h-5 text-gold" />
+              </div>
+              <span className="text-sm font-bold text-slate-200">{label}</span>
+              <span className="text-[10px] text-slate-500">{desc}</span>
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* Footer links */}
