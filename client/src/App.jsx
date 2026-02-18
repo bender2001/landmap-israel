@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom'
 import ScrollToTop from './components/ui/ScrollToTop'
 import Spinner from './components/ui/Spinner'
 import ErrorBoundary from './components/ui/ErrorBoundary'
+import RouteProgressBar from './components/ui/RouteProgressBar'
 import { useWebVitals } from './hooks/useWebVitals'
 
 // Lazy-load overlay components — they're all conditional (first visit, consent, PWA)
@@ -37,7 +38,7 @@ const Settings = lazy(() => import('./pages/admin/Settings'))
 
 function PageLoader() {
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-navy">
+    <div className="h-screen w-screen flex items-center justify-center bg-navy" data-page-loader>
       <Spinner className="w-12 h-12 text-gold" />
     </div>
   )
@@ -65,6 +66,7 @@ export default function App() {
         </Suspense>
       )}
 
+      <RouteProgressBar />
       <ScrollToTop />
       <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>

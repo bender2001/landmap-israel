@@ -743,6 +743,68 @@ export default function PlotDetail() {
             )
           })()}
 
+          {/* Price per sqm visual comparison — bar chart vs city average (like Madlan's price benchmark) */}
+          {(() => {
+            if (!marketData?.cities || sizeSqM <= 0) return null
+            const cityData = marketData.cities.find(c => c.city === plot.city)
+            if (!cityData || !cityData.avgPricePerSqm || cityData.count < 3) return null
+            const plotPsm = Math.round(totalPrice / sizeSqM)
+            const avgPsm = Math.round(cityData.avgPricePerSqm)
+            const maxPsm = Math.max(plotPsm, avgPsm) * 1.15
+            const plotPct = (plotPsm / maxPsm) * 100
+            const avgPct = (avgPsm / maxPsm) * 100
+            const isBelow = plotPsm < avgPsm
+            return (
+              <div className="bg-navy-light/40 border border-white/5 rounded-2xl p-5 mb-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <BarChart className="w-4 h-4 text-gold" />
+                  <h2 className="text-sm font-bold text-slate-200">מחיר למ״ר — השוואה אזורית</h2>
+                </div>
+                <div className="space-y-3">
+                  {/* This plot */}
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-slate-400">חלקה זו</span>
+                      <span className={`font-bold ${isBelow ? 'text-emerald-400' : 'text-amber-400'}`}>
+                        ₪{plotPsm.toLocaleString()}/מ״ר
+                      </span>
+                    </div>
+                    <div className="h-3 rounded-full bg-white/5 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${plotPct}%`,
+                          background: isBelow
+                            ? 'linear-gradient(90deg, #22C55E, #4ADE80)'
+                            : 'linear-gradient(90deg, #F59E0B, #FBBF24)',
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {/* City average */}
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-slate-400">ממוצע {plot.city} ({cityData.count} חלקות)</span>
+                      <span className="text-slate-300 font-medium">₪{avgPsm.toLocaleString()}/מ״ר</span>
+                    </div>
+                    <div className="h-3 rounded-full bg-white/5 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700 bg-slate-500/50"
+                        style={{ width: `${avgPct}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="text-[10px] text-slate-600 mt-2">
+                  {isBelow
+                    ? `💡 המחיר למ״ר נמוך ב-${Math.round(((avgPsm - plotPsm) / avgPsm) * 100)}% מהממוצע האזורי`
+                    : `📊 המחיר למ״ר גבוה ב-${Math.round(((plotPsm - avgPsm) / avgPsm) * 100)}% מהממוצע האזורי`
+                  }
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Financial cards grid */}
           <div className="grid grid-cols-3 gap-4 mb-8">
             <div className="rounded-2xl p-5 flex flex-col items-center gap-2 text-center bg-gradient-to-b from-blue-500/15 to-blue-500/8 border border-blue-500/20 relative overflow-hidden">
@@ -999,10 +1061,10 @@ export default function PlotDetail() {
                 }
               </button>
               <button
-                onClick={() => window.history.length > 2 ? navigate(-1) : navigate('/')}
+                onClick={() => navigate(`/?plot=${id}`)}
                 className="w-12 sm:w-14 flex items-center justify-center bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-gold/20 transition-all"
-                aria-label="חזרה למפה"
-                title="חזרה למפה (שומר סינונים)"
+                aria-label="הצג במפה"
+                title="הצג במפה (עם סימון החלקה)"
               >
                 <MapPin className="w-5 h-5 text-gold" />
               </button>
