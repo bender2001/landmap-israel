@@ -213,9 +213,44 @@ function SimilarPlots({ currentPlot, allPlots, onSelectPlot }) {
       .slice(0, 3)
   }, [currentPlot?.id, allPlots, similarPlots, nearbyPlots])
 
+  // Cross-city alternatives — show best-value plots in OTHER cities with similar ROI.
+  // Helps investors discover opportunities they wouldn't find in a single-city view.
+  // Like Madlan's "חלקות באזורים אחרים" — increases engagement and cross-selling.
+  const crossCityAlternatives = useMemo(() => {
+    if (!currentPlot || !allPlots || allPlots.length < 4) return []
+    const currentCity = currentPlot.city
+    const currentRoi = (() => {
+      const price = currentPlot.total_price ?? currentPlot.totalPrice ?? 0
+      const proj = currentPlot.projected_value ?? currentPlot.projectedValue ?? 0
+      return price > 0 ? ((proj - price) / price) * 100 : 0
+    })()
+
+    // Find plots in other cities with similar ROI range (±30%) and AVAILABLE status
+    return allPlots
+      .filter(p => {
+        if (p.id === currentPlot.id || p.city === currentCity) return false
+        if (p.status !== 'AVAILABLE') return false
+        const price = p.total_price ?? p.totalPrice ?? 0
+        const proj = p.projected_value ?? p.projectedValue ?? 0
+        if (price <= 0) return false
+        const roi = ((proj - price) / price) * 100
+        return Math.abs(roi - currentRoi) <= 30
+      })
+      .map(p => {
+        const price = p.total_price ?? p.totalPrice ?? 0
+        const proj = p.projected_value ?? p.projectedValue ?? 0
+        const roi = price > 0 ? ((proj - price) / price) * 100 : 0
+        const roiMatch = 1 - Math.abs(roi - currentRoi) / 100
+        return { ...p, _matchReasons: [`ROI דומה +${Math.round(roi)}%`, p.city] , _crossScore: roiMatch }
+      })
+      .sort((a, b) => b._crossScore - a._crossScore)
+      .slice(0, 3)
+  }, [currentPlot?.id, allPlots])
+
   const hasSimilar = (similarPlots && similarPlots.length > 0) || fallbackSimilar.length > 0
   const hasNearby = nearbyFiltered.length > 0
-  if (!hasSimilar && !hasNearby) return null
+  const hasCrossCity = crossCityAlternatives.length > 0
+  if (!hasSimilar && !hasNearby && !hasCrossCity) return null
 
   const renderPlotRow = (p, showDistance = false, showReasons = false) => {
     const bn = p.block_number ?? p.blockNumber
@@ -279,6 +314,20 @@ function SimilarPlots({ currentPlot, allPlots, onSelectPlot }) {
           </h4>
           <div className="space-y-2">
             {nearbyFiltered.map(p => renderPlotRow(p, true, false))}
+          </div>
+        </div>
+      )}
+
+      {/* Cross-city alternatives — help investors discover opportunities in other areas */}
+      {hasCrossCity && (
+        <div>
+          <h4 className="text-xs font-bold text-slate-400 mb-3 flex items-center gap-2">
+            <span className="w-5 h-5 rounded bg-gold/15 flex items-center justify-center text-[10px]">🌍</span>
+            חלופות בערים אחרות
+            <span className="text-[9px] text-slate-600 font-normal">ROI דומה, עיר שונה</span>
+          </h4>
+          <div className="space-y-2">
+            {crossCityAlternatives.map(p => renderPlotRow(p, false, true))}
           </div>
         </div>
       )}

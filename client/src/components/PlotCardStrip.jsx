@@ -26,6 +26,68 @@ function useAreaAverages(plots) {
   }, [plots])
 }
 
+/**
+ * Compute price-per-sqm percentile for each plot relative to all plots.
+ * Returns a Map<plotId, number> where number is 0-100 percentile.
+ * Used by the MarketPositionDot to show where each plot sits in the price distribution.
+ */
+function usePricePercentiles(plots) {
+  return useMemo(() => {
+    if (!plots || plots.length < 3) return new Map()
+    // Collect price/sqm for all plots with valid data
+    const entries = []
+    for (const p of plots) {
+      const price = p.total_price ?? p.totalPrice ?? 0
+      const size = p.size_sqm ?? p.sizeSqM ?? 0
+      if (price > 0 && size > 0) {
+        entries.push({ id: p.id, ppsqm: price / size })
+      }
+    }
+    if (entries.length < 3) return new Map()
+    // Sort by price/sqm ascending
+    entries.sort((a, b) => a.ppsqm - b.ppsqm)
+    const result = new Map()
+    for (let i = 0; i < entries.length; i++) {
+      result.set(entries[i].id, Math.round((i / (entries.length - 1)) * 100))
+    }
+    return result
+  }, [plots])
+}
+
+/**
+ * MarketPositionDot — tiny gradient bar with a dot showing where a plot's price/sqm
+ * sits relative to all plots. Green = cheap, Gold = mid, Red = expensive.
+ * Gives instant market context without opening the sidebar.
+ */
+function MarketPositionDot({ percentile }) {
+  if (percentile == null) return null
+  const label = percentile <= 25 ? 'זול' : percentile <= 50 ? 'מתחת לממוצע' : percentile <= 75 ? 'מעל הממוצע' : 'יקר'
+  return (
+    <div
+      className="flex items-center gap-1 mt-0.5"
+      title={`מיקום בשוק: ${label} (${percentile}% מהחלקות זולות יותר)`}
+    >
+      <span className="text-[7px] text-slate-600">זול</span>
+      <div className="relative w-14 h-1.5 rounded-full overflow-hidden bg-white/5">
+        <div
+          className="absolute inset-0 rounded-full"
+          style={{
+            background: 'linear-gradient(90deg, #22C55E40, #F59E0B40, #EF444440)',
+          }}
+        />
+        <div
+          className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full border border-white/40 shadow-sm transition-all duration-500"
+          style={{
+            left: `calc(${percentile}% - 4px)`,
+            background: percentile <= 30 ? '#22C55E' : percentile <= 70 ? '#F59E0B' : '#EF4444',
+          }}
+        />
+      </div>
+      <span className="text-[7px] text-slate-600">יקר</span>
+    </div>
+  )
+}
+
 function PlotCardSkeleton() {
   return (
     <div className="plot-card-mini opacity-60 pointer-events-none">
@@ -43,7 +105,7 @@ function PlotCardSkeleton() {
   )
 }
 
-const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, prefetchPlot, priceChange }) {
+const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, prefetchPlot, priceChange, pricePercentile }) {
   const color = statusColors[plot.status]
   const price = plot.total_price ?? plot.totalPrice
   const projValue = plot.projected_value ?? plot.projectedValue
@@ -257,6 +319,7 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
               if (!payment) return null
               return <span className="text-[9px] text-blue-400/70" title={`הון עצמי: ${formatPriceShort(payment.downPayment)} | הלוואה: ${formatPriceShort(payment.loanAmount)}`}>~{formatMonthlyPayment(payment.monthly)}</span>
             })()}
+            <MarketPositionDot percentile={pricePercentile} />
           </div>
           <div className="plot-card-mini-tags">
             <span className="plot-card-mini-roi">+{roi}%</span>
@@ -285,6 +348,7 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
 export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare, isLoading = false, onClearFilters, getPriceChange }) {
   const prefetchPlot = usePrefetchPlot()
   const areaAverages = useAreaAverages(plots)
+  const pricePercentiles = usePricePercentiles(plots)
   const scrollRef = useRef(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
@@ -496,6 +560,7 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
             onToggleCompare={onToggleCompare}
             prefetchPlot={prefetchPlot}
             priceChange={getPriceChange ? getPriceChange(plot.id) : null}
+            pricePercentile={pricePercentiles.get(plot.id) ?? null}
           />
         ))}
       </div>
