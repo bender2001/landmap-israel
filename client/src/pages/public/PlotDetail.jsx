@@ -1,6 +1,6 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows } from 'lucide-react'
+import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart } from 'lucide-react'
 import { usePlot, useNearbyPlots } from '../../hooks/usePlots.js'
 import { useFavorites } from '../../hooks/useFavorites.js'
 import { useViewTracker } from '../../hooks/useViewTracker.js'
@@ -216,6 +216,19 @@ export default function PlotDetail() {
   const [linkCopied, setLinkCopied] = useState(false)
   const favorites = useFavorites()
   const { trackView } = useViewTracker()
+
+  // Compare state (localStorage-backed, consistent with MapView)
+  const [compareIds, setCompareIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('landmap_compare') || '[]') } catch { return [] }
+  })
+  useEffect(() => {
+    localStorage.setItem('landmap_compare', JSON.stringify(compareIds))
+  }, [compareIds])
+  const toggleCompare = useCallback((plotId) => {
+    setCompareIds((prev) =>
+      prev.includes(plotId) ? prev.filter((id) => id !== plotId) : prev.length < 3 ? [...prev, plotId] : prev
+    )
+  }, [])
 
   // Track view on mount (fire-and-forget, deduped by plotId)
   useEffect(() => {
@@ -804,7 +817,7 @@ export default function PlotDetail() {
           {/* Similar Plots — lightweight: uses server-side geo-proximity API */}
           <SimilarPlotsSection plotId={id} />
 
-          {/* Sticky CTA — enhanced with print, share, and map actions (like Madlan/Yad2 bottom bars) */}
+          {/* Sticky CTA — enhanced with print, share, compare, and map actions (like Madlan/Yad2 bottom bars) */}
           <div className="fixed bottom-0 left-0 right-0 z-40 bg-navy/90 backdrop-blur-xl border-t border-white/10 px-4 py-3">
             <div className="max-w-4xl mx-auto flex gap-2">
               <button
@@ -822,6 +835,18 @@ export default function PlotDetail() {
               >
                 <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </a>
+              <button
+                onClick={() => toggleCompare(id)}
+                className={`w-12 sm:w-14 flex items-center justify-center border rounded-2xl transition-all ${
+                  compareIds.includes(id)
+                    ? 'bg-purple-600/30 border-purple-500/50'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-purple-500/30'
+                }`}
+                aria-label={compareIds.includes(id) ? 'הסר מהשוואה' : 'הוסף להשוואה'}
+                title={compareIds.includes(id) ? 'בהשוואה ✓' : 'הוסף להשוואה'}
+              >
+                <BarChart className={`w-5 h-5 ${compareIds.includes(id) ? 'text-purple-300' : 'text-slate-400'}`} />
+              </button>
               <button
                 onClick={handlePrintReport}
                 className="w-12 sm:w-14 flex items-center justify-center bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-gold/20 transition-all"
@@ -854,6 +879,18 @@ export default function PlotDetail() {
                 <MapPin className="w-5 h-5 text-gold" />
               </button>
             </div>
+            {/* Compare count indicator — shows when plots are in compare list */}
+            {compareIds.length > 0 && (
+              <div className="max-w-4xl mx-auto mt-2">
+                <Link
+                  to="/compare"
+                  className="flex items-center justify-center gap-2 py-2 bg-purple-600/20 border border-purple-500/30 rounded-xl text-purple-300 text-sm font-medium hover:bg-purple-600/30 transition-colors"
+                >
+                  <GitCompareArrows className="w-4 h-4" />
+                  השווה {compareIds.length} חלקות
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>

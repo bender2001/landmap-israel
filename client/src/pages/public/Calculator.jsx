@@ -441,6 +441,9 @@ export default function Calculator() {
                             <th className="text-right py-2 font-medium">שנים</th>
                             <th className="text-center py-2 font-medium">CAGR ברוטו</th>
                             <th className="text-center py-2 font-medium">CAGR נטו</th>
+                            {showFinancing && result.loanAmount > 0 && (
+                              <th className="text-center py-2 font-medium">רווח אחרי מימון</th>
+                            )}
                           </tr>
                         </thead>
                         <tbody>
@@ -456,6 +459,11 @@ export default function Calculator() {
                               <td className={`py-2.5 text-center font-medium ${row.netCagr >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                 {row.netCagr >= 0 ? '+' : ''}{row.netCagr}%
                               </td>
+                              {showFinancing && result.loanAmount > 0 && (
+                                <td className={`py-2.5 text-center font-medium ${row.netWithFinancing >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
+                                  {formatCurrency(row.netWithFinancing)}
+                                </td>
+                              )}
                             </tr>
                           ))}
                         </tbody>
@@ -463,6 +471,7 @@ export default function Calculator() {
                     </div>
                     <p className="text-[9px] text-slate-600 mt-3">
                       CAGR ברוטו = תשואה שנתית לפני עלויות. CAGR נטו = אחרי מסים, עו"ד והיטל השבחה.
+                      {showFinancing && result.loanAmount > 0 && ' רווח אחרי מימון = רווח נקי בניכוי עלויות ריבית.'}
                     </p>
                   </div>
 
