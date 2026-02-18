@@ -147,12 +147,14 @@ export default function MapView() {
     if (filters.sizeMax) f.sizeMax = filters.sizeMax
     if (filters.ripeness !== 'all') f.ripeness = filters.ripeness
     if (statusFilter.length > 0) f.status = statusFilter.join(',')
+    // Pass search query to server for DB-level text search (faster than client-side)
+    if (debouncedSearch) f.q = debouncedSearch
     // Pass simple sorts to server for better performance
     if (['price-asc', 'price-desc', 'size-asc', 'size-desc'].includes(sortBy)) {
       f.sort = sortBy
     }
     return f
-  }, [filters, statusFilter, sortBy])
+  }, [filters, statusFilter, sortBy, debouncedSearch])
 
   const { data: plots = [], isLoading, error: plotsError, refetch: refetchPlots, isPlaceholderData, dataUpdatedAt } = useAllPlots(apiFilters)
   const { data: pois = [] } = usePois()
@@ -178,10 +180,14 @@ export default function MapView() {
     })
   }, [plots, filters.minRoi])
 
-  // Client-side search filter
+  // Client-side search filter — acts as secondary filter for instant feedback
+  // while server-side q param handles the primary DB-level search
   const searchedPlots = useMemo(() => {
-    if (!debouncedSearch) return roiFilteredPlots
-    const q = debouncedSearch.toLowerCase()
+    // When search is passed to API (debouncedSearch), server already filtered — skip client filter
+    // Only apply client-side filter for the brief moment between typing and debounce
+    const activeSearch = filters.search && filters.search !== debouncedSearch ? filters.search : ''
+    if (!activeSearch) return roiFilteredPlots
+    const q = activeSearch.toLowerCase()
     return roiFilteredPlots.filter((p) => {
       const bn = (p.block_number ?? p.blockNumber ?? '').toString()
       const num = (p.number ?? '').toString()
@@ -189,7 +195,7 @@ export default function MapView() {
       const desc = (p.description ?? '').toLowerCase()
       return bn.includes(q) || num.includes(q) || city.includes(q) || desc.includes(q)
     })
-  }, [roiFilteredPlots, debouncedSearch])
+  }, [roiFilteredPlots, filters.search, debouncedSearch])
 
   // Sort
   const sortedPlots = useMemo(() => {

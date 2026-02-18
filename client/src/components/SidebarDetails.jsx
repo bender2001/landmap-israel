@@ -869,6 +869,36 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
           <QuickNavBar scrollRef={scrollRef} />
 
           <div className="px-6 pb-6">
+            {/* Total Investment Summary — the #1 thing investors want to see upfront */}
+            {(() => {
+              const purchaseTax = Math.round(totalPrice * 0.06)
+              const attorneyFees = Math.round(totalPrice * 0.0175)
+              const totalCashNeeded = totalPrice + purchaseTax + attorneyFees
+              const grossProfit = projectedValue - totalPrice
+              const bettermentLevyAmt = Math.round(grossProfit * 0.5)
+              const costs = purchaseTax + attorneyFees
+              const taxable = Math.max(0, grossProfit - bettermentLevyAmt - costs)
+              const capGains = Math.round(taxable * 0.25)
+              const netProfit = grossProfit - costs - bettermentLevyAmt - capGains
+              const netRoi = totalPrice > 0 ? Math.round((netProfit / totalCashNeeded) * 100) : 0
+              return (
+                <div className="bg-gradient-to-r from-navy-light/60 to-navy-light/40 border border-gold/15 rounded-2xl p-4 mb-4 animate-stagger-1">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="text-center">
+                      <div className="text-[10px] text-slate-500 mb-0.5">💰 סה״כ השקעה נדרשת</div>
+                      <div className="text-lg font-black text-blue-400">{formatCurrency(totalCashNeeded)}</div>
+                      <div className="text-[9px] text-slate-600">כולל מיסים ושכ״ט</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[10px] text-slate-500 mb-0.5">✨ רווח נקי צפוי</div>
+                      <div className={`text-lg font-black ${netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatCurrency(netProfit)}</div>
+                      <div className="text-[9px] text-slate-600">אחרי כל המיסים · {netRoi}% ROI נטו</div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Description */}
             {plot.description && (
               <p className="text-sm text-slate-300 leading-relaxed mb-1 animate-stagger-1">{plot.description}</p>

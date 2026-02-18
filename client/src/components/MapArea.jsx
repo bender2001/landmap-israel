@@ -1,6 +1,6 @@
 ﻿import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, ZoomControl, useMap, LayersControl } from 'react-leaflet'
 import L from 'leaflet'
-import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, memo, forwardRef } from 'react'
 import { MapPin, Eye, Check, ArrowLeft, Navigation, Layers, Map as MapIcon } from 'lucide-react'
 import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
 import { formatCurrency, formatPriceShort, formatDunam, calcInvestmentScore, getScoreLabel } from '../utils/formatters'
@@ -386,12 +386,160 @@ function GeoSearch() {
   )
 }
 
+/**
+ * Memoized individual plot polygon — prevents re-rendering ALL polygons
+ * when only one is hovered/selected. Each polygon only re-renders when
+ * its own props change (hover state, color mode, favorites, compare).
+ */
+const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelectPlot, onHover, onHoverEnd, prefetchPlot, favorites, compareIds, onToggleCompare, areaAvgPsm }) {
+  const price = plot.total_price ?? plot.totalPrice
+  const projValue = plot.projected_value ?? plot.projectedValue
+  const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
+  const blockNum = plot.block_number ?? plot.blockNumber
+  const sizeSqM = plot.size_sqm ?? plot.sizeSqM
+  const zoningStage = plot.zoning_stage ?? plot.zoningStage
+  const readiness = plot.readiness_estimate ?? plot.readinessEstimate
+
+  const handleClick = useCallback(() => onSelectPlot(plot), [onSelectPlot, plot])
+  const handleMouseOver = useCallback(() => { onHover(plot.id); prefetchPlot(plot.id) }, [onHover, prefetchPlot, plot.id])
+  const handleMouseOut = useCallback(() => onHoverEnd(), [onHoverEnd])
+
+  return (
+    <Polygon
+      positions={plot.coordinates}
+      pathOptions={{
+        color: isHovered ? '#FFFFFF' : color,
+        fillColor: color,
+        fillOpacity: isHovered ? 0.6 : 0.45,
+        weight: isHovered ? 4 : 2.5,
+        dashArray: isHovered ? '' : '6 4',
+      }}
+      eventHandlers={{
+        click: handleClick,
+        mouseover: handleMouseOver,
+        mouseout: handleMouseOut,
+      }}
+    >
+      <Tooltip permanent direction="center" className="price-tooltip">
+        <span className="tooltip-main-price">{favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{plot.plot_images?.length > 0 ? '📷 ' : ''}{formatPriceShort(price)}</span>
+        <span className="tooltip-sub">{formatDunam(sizeSqM)} דונם · +{roi}% · ⭐{calcInvestmentScore(plot)}</span>
+        {(() => {
+          const avg = areaAvgPsm?.[plot.city]
+          if (!avg || sizeSqM <= 0) return null
+          const plotPsm = price / sizeSqM
+          const diffPct = Math.round(((plotPsm - avg) / avg) * 100)
+          if (diffPct >= -5) return null
+          return <span className="tooltip-deal-badge">🔥 {Math.abs(diffPct)}% מתחת לממוצע</span>
+        })()}
+      </Tooltip>
+
+      <Popup>
+        <div className="plot-popup">
+          {plot.plot_images && plot.plot_images.length > 0 && (
+            <div className="plot-popup-images">
+              {plot.plot_images.slice(0, 3).map((img, i) => (
+                <div key={img.id || i} className="plot-popup-image-thumb">
+                  <img src={img.url} alt={img.alt || `תמונה ${i + 1}`} loading="lazy" />
+                </div>
+              ))}
+              {plot.plot_images.length > 3 && (
+                <div className="plot-popup-image-more">+{plot.plot_images.length - 3}</div>
+              )}
+            </div>
+          )}
+          <div className="plot-popup-header">
+            <span className="plot-popup-title">
+              גוש {blockNum} | חלקה {plot.number}
+            </span>
+            <span className="plot-popup-status" style={{ background: `${color}20`, color }}>
+              {statusLabels[plot.status]}
+            </span>
+          </div>
+          <div className="plot-popup-row">
+            <span className="plot-popup-label">שטח</span>
+            <span className="plot-popup-value">{formatDunam(sizeSqM)} דונם ({sizeSqM.toLocaleString()} מ&quot;ר)</span>
+          </div>
+          <div className="plot-popup-row">
+            <span className="plot-popup-label">מחיר</span>
+            <span className="plot-popup-value gold">{formatCurrency(price)}</span>
+          </div>
+          <div className="plot-popup-row">
+            <span className="plot-popup-label">ייעוד</span>
+            <span className="plot-popup-value">{zoningLabels[zoningStage]}</span>
+          </div>
+          <div className="plot-popup-badges">
+            <span className="plot-popup-badge plot-popup-badge-roi">+{roi}% ROI</span>
+            {readiness && <span className="plot-popup-badge plot-popup-badge-time">{readiness}</span>}
+            {(() => {
+              const score = calcInvestmentScore(plot)
+              const { label, color: scoreColor } = getScoreLabel(score)
+              return (
+                <span className="plot-popup-badge" style={{ background: `${scoreColor}20`, color: scoreColor, border: `1px solid ${scoreColor}40` }}>
+                  {score}/10 {label}
+                </span>
+              )
+            })()}
+            {(() => {
+              const avg = areaAvgPsm?.[plot.city]
+              if (!avg || sizeSqM <= 0) return null
+              const plotPsm = price / sizeSqM
+              const diffPct = Math.round(((plotPsm - avg) / avg) * 100)
+              if (diffPct >= -5) return null
+              return (
+                <span className="plot-popup-badge" style={{ background: 'rgba(255,165,0,0.15)', color: '#FFA500', border: '1px solid rgba(255,165,0,0.3)' }}>
+                  🔥 {Math.abs(diffPct)}% מתחת לממוצע
+                </span>
+              )
+            })()}
+          </div>
+          <div className="plot-popup-actions">
+            <button className="plot-popup-cta" onClick={(e) => { e.stopPropagation(); onSelectPlot(plot) }}>
+              <span>צפה בפרטים</span>
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            {favorites && (
+              <button
+                className={`plot-popup-action-btn ${favorites.isFavorite(plot.id) ? 'is-active' : ''}`}
+                onClick={(e) => { e.stopPropagation(); favorites.toggle(plot.id) }}
+                title={favorites.isFavorite(plot.id) ? 'הסר ממועדפים' : 'הוסף למועדפים'}
+              >
+                {favorites.isFavorite(plot.id) ? '❤️' : '🤍'}
+              </button>
+            )}
+            {onToggleCompare && (
+              <button
+                className={`plot-popup-action-btn ${compareIds.includes(plot.id) ? 'is-active' : ''}`}
+                onClick={(e) => { e.stopPropagation(); onToggleCompare(plot.id) }}
+                title={compareIds.includes(plot.id) ? 'הסר מהשוואה' : 'הוסף להשוואה'}
+              >
+                {compareIds.includes(plot.id) ? '⚖️' : '📊'}
+              </button>
+            )}
+          </div>
+        </div>
+      </Popup>
+    </Polygon>
+  )
+})
+
+/** Helper to validate plot coordinates */
+function hasValidCoordinates(plot) {
+  if (!plot.coordinates || !Array.isArray(plot.coordinates) || plot.coordinates.length < 3) return false
+  return plot.coordinates.every(
+    (c) => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number' && isFinite(c[0]) && isFinite(c[1])
+  )
+}
+
 export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites, compareIds = [], onToggleCompare }) {
   const [hoveredId, setHoveredId] = useState(null)
   const [activeLayerId, setActiveLayerId] = useState('satellite')
   const [colorMode, setColorMode] = useState('status')
   const prefetchPlot = usePrefetchPlot()
   const activeLayer = MAP_LAYERS.find(l => l.id === activeLayerId) || MAP_LAYERS[0]
+
+  // Stable callbacks for polygon hover (avoid re-creating on each render)
+  const handleHover = useCallback((id) => setHoveredId(id), [])
+  const handleHoverEnd = useCallback(() => setHoveredId(null), [])
 
   // Count plots per status for legend
   const statusCounts = useMemo(() => {
@@ -434,6 +582,26 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
     return result
   }, [plots])
 
+  // Precompute colors per plot to pass as stable props
+  const plotColors = useMemo(() => {
+    const colors = {}
+    plots.forEach(plot => {
+      const price = plot.total_price ?? plot.totalPrice ?? 0
+      const projValue = plot.projected_value ?? plot.projectedValue ?? 0
+      const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 1
+      const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
+      if (colorMode === 'price') {
+        const ppsm = sizeSqM > 0 ? price / sizeSqM : 0
+        colors[plot.id] = getHeatColor(ppsm, priceRange.min, priceRange.max)
+      } else if (colorMode === 'roi') {
+        colors[plot.id] = getRoiColor(roi)
+      } else {
+        colors[plot.id] = statusColors[plot.status]
+      }
+    })
+    return colors
+  }, [plots, colorMode, priceRange])
+
   return (
     <div className="h-full w-full relative z-0">
       <MapContainer
@@ -468,167 +636,22 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         <GeoSearch />
 
         {plots.map((plot) => {
-          // Validate coordinates before rendering polygon
-          if (!plot.coordinates || !Array.isArray(plot.coordinates) || plot.coordinates.length < 3) return null
-          const hasValidCoords = plot.coordinates.every(
-            (c) => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number' && isFinite(c[0]) && isFinite(c[1])
-          )
-          if (!hasValidCoords) return null
-
-          const isHovered = hoveredId === plot.id
-          const price = plot.total_price ?? plot.totalPrice
-          const projValue = plot.projected_value ?? plot.projectedValue
-          const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
-          const blockNum = plot.block_number ?? plot.blockNumber
-          const sizeSqM = plot.size_sqm ?? plot.sizeSqM
-          const zoningStage = plot.zoning_stage ?? plot.zoningStage
-          const readiness = plot.readiness_estimate ?? plot.readinessEstimate
-
-          // Dynamic color based on color mode
-          let color
-          if (colorMode === 'price') {
-            const ppsm = sizeSqM > 0 ? price / sizeSqM : 0
-            color = getHeatColor(ppsm, priceRange.min, priceRange.max)
-          } else if (colorMode === 'roi') {
-            color = getRoiColor(roi)
-          } else {
-            color = statusColors[plot.status]
-          }
-
+          if (!hasValidCoordinates(plot)) return null
           return (
-            <Polygon
+            <PlotPolygon
               key={plot.id}
-              positions={plot.coordinates}
-              pathOptions={{
-                color: isHovered ? '#FFFFFF' : color,
-                fillColor: color,
-                fillOpacity: isHovered ? 0.6 : 0.45,
-                weight: isHovered ? 4 : 2.5,
-                dashArray: isHovered ? '' : '6 4',
-              }}
-              eventHandlers={{
-                click: () => onSelectPlot(plot),
-                mouseover: () => { setHoveredId(plot.id); prefetchPlot(plot.id) },
-                mouseout: () => setHoveredId(null),
-              }}
-            >
-              <Tooltip permanent direction="center" className="price-tooltip">
-                <span className="tooltip-main-price">{favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{plot.plot_images?.length > 0 ? '📷 ' : ''}{formatPriceShort(price)}</span>
-                <span className="tooltip-sub">{formatDunam(sizeSqM)} דונם · +{roi}% · ⭐{calcInvestmentScore(plot)}</span>
-                {(() => {
-                  const avg = areaAvgPsm[plot.city]
-                  if (!avg || sizeSqM <= 0) return null
-                  const plotPsm = price / sizeSqM
-                  const diffPct = Math.round(((plotPsm - avg) / avg) * 100)
-                  if (diffPct >= -5) return null
-                  return <span className="tooltip-deal-badge">🔥 {Math.abs(diffPct)}% מתחת לממוצע</span>
-                })()}
-              </Tooltip>
-
-              <Popup>
-                <div className="plot-popup">
-                  {/* Image thumbnail strip — like Madlan's inline property previews */}
-                  {plot.plot_images && plot.plot_images.length > 0 && (
-                    <div className="plot-popup-images">
-                      {plot.plot_images.slice(0, 3).map((img, i) => (
-                        <div key={img.id || i} className="plot-popup-image-thumb">
-                          <img src={img.url} alt={img.alt || `תמונה ${i + 1}`} loading="lazy" />
-                        </div>
-                      ))}
-                      {plot.plot_images.length > 3 && (
-                        <div className="plot-popup-image-more">+{plot.plot_images.length - 3}</div>
-                      )}
-                    </div>
-                  )}
-                  <div className="plot-popup-header">
-                    <span className="plot-popup-title">
-                      גוש {blockNum} | חלקה {plot.number}
-                    </span>
-                    <span
-                      className="plot-popup-status"
-                      style={{ background: `${color}20`, color }}
-                    >
-                      {statusLabels[plot.status]}
-                    </span>
-                  </div>
-                  <div className="plot-popup-row">
-                    <span className="plot-popup-label">שטח</span>
-                    <span className="plot-popup-value">{formatDunam(sizeSqM)} דונם ({sizeSqM.toLocaleString()} מ&quot;ר)</span>
-                  </div>
-                  <div className="plot-popup-row">
-                    <span className="plot-popup-label">מחיר</span>
-                    <span className="plot-popup-value gold">{formatCurrency(price)}</span>
-                  </div>
-                  <div className="plot-popup-row">
-                    <span className="plot-popup-label">ייעוד</span>
-                    <span className="plot-popup-value">{zoningLabels[zoningStage]}</span>
-                  </div>
-
-                  <div className="plot-popup-badges">
-                    <span className="plot-popup-badge plot-popup-badge-roi">
-                      +{roi}% ROI
-                    </span>
-                    {readiness && (
-                      <span className="plot-popup-badge plot-popup-badge-time">
-                        {readiness}
-                      </span>
-                    )}
-                    {(() => {
-                      const score = calcInvestmentScore(plot)
-                      const { label, color: scoreColor } = getScoreLabel(score)
-                      return (
-                        <span className="plot-popup-badge" style={{ background: `${scoreColor}20`, color: scoreColor, border: `1px solid ${scoreColor}40` }}>
-                          {score}/10 {label}
-                        </span>
-                      )
-                    })()}
-                    {(() => {
-                      const avg = areaAvgPsm[plot.city]
-                      if (!avg || sizeSqM <= 0) return null
-                      const plotPsm = price / sizeSqM
-                      const diffPct = Math.round(((plotPsm - avg) / avg) * 100)
-                      if (diffPct >= -5) return null
-                      return (
-                        <span className="plot-popup-badge" style={{ background: 'rgba(255,165,0,0.15)', color: '#FFA500', border: '1px solid rgba(255,165,0,0.3)' }}>
-                          🔥 {Math.abs(diffPct)}% מתחת לממוצע
-                        </span>
-                      )
-                    })()}
-                  </div>
-
-                  <div className="plot-popup-actions">
-                    <button
-                      className="plot-popup-cta"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onSelectPlot(plot)
-                      }}
-                    >
-                      <span>צפה בפרטים</span>
-                      <ArrowLeft className="w-4 h-4" />
-                    </button>
-                    {favorites && (
-                      <button
-                        className={`plot-popup-action-btn ${favorites.isFavorite(plot.id) ? 'is-active' : ''}`}
-                        onClick={(e) => { e.stopPropagation(); favorites.toggle(plot.id) }}
-                        title={favorites.isFavorite(plot.id) ? 'הסר ממועדפים' : 'הוסף למועדפים'}
-                      >
-                        {favorites.isFavorite(plot.id) ? '❤️' : '🤍'}
-                      </button>
-                    )}
-                    {onToggleCompare && (
-                      <button
-                        className={`plot-popup-action-btn ${compareIds.includes(plot.id) ? 'is-active' : ''}`}
-                        onClick={(e) => { e.stopPropagation(); onToggleCompare(plot.id) }}
-                        title={compareIds.includes(plot.id) ? 'הסר מהשוואה' : 'הוסף להשוואה'}
-                      >
-                        {compareIds.includes(plot.id) ? '⚖️' : '📊'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </Popup>
-            </Polygon>
+              plot={plot}
+              color={plotColors[plot.id] || statusColors[plot.status]}
+              isHovered={hoveredId === plot.id}
+              onSelectPlot={onSelectPlot}
+              onHover={handleHover}
+              onHoverEnd={handleHoverEnd}
+              prefetchPlot={prefetchPlot}
+              favorites={favorites}
+              compareIds={compareIds}
+              onToggleCompare={onToggleCompare}
+              areaAvgPsm={areaAvgPsm}
+            />
           )
         })}
 
