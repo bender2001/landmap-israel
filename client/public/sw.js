@@ -1,5 +1,5 @@
 // LandMap Israel — Service Worker (Cache-first for static, Network-first for API)
-const CACHE_NAME = 'landmap-v1'
+const CACHE_NAME = 'landmap-v2'
 const STATIC_ASSETS = ['/', '/manifest.json']
 
 self.addEventListener('install', (event) => {
