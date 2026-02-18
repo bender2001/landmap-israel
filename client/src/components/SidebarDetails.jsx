@@ -47,19 +47,25 @@ function CollapsibleSection({ number, icon, title, children, animClass = '', sec
 
   return (
     <div className={animClass} id={sectionId}>
-      <div
-        className="section-header"
+      <button
+        type="button"
+        className="section-header w-full"
         onClick={() => setIsOpen((prev) => !prev)}
+        aria-expanded={isOpen}
+        aria-controls={sectionId ? `${sectionId}-content` : undefined}
       >
         <span className="section-number">{number}</span>
         <SectionIcon icon={icon} />
-        <h3 className="text-base font-bold text-slate-100 flex-1">{title}</h3>
+        <h3 className="text-base font-bold text-slate-100 flex-1 text-right">{title}</h3>
         <ChevronDown
           className={`w-4 h-4 text-slate-400 section-chevron ${!isOpen ? 'collapsed' : ''}`}
         />
-      </div>
+      </button>
       <div
         ref={contentRef}
+        id={sectionId ? `${sectionId}-content` : undefined}
+        role="region"
+        aria-labelledby={sectionId ? `${sectionId}-heading` : undefined}
         className="section-collapse"
         style={{ maxHeight: isOpen ? maxHeight : '0px', opacity: isOpen ? 1 : 0 }}
       >
