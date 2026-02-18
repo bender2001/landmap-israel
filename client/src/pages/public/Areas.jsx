@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { MapPin, TrendingUp, Ruler, DollarSign, ArrowLeft, BarChart3, Building2, Users, ChevronDown, ChevronUp, Activity } from 'lucide-react'
+import { MapPin, TrendingUp, Ruler, DollarSign, ArrowLeft, BarChart3, Building2, Users, ChevronDown, ChevronUp, Activity, ArrowUpDown } from 'lucide-react'
 import { useMarketOverview } from '../../hooks/useMarketOverview.js'
 import { useMarketTrends } from '../../hooks/useMarketTrends.js'
 import { useMetaTags } from '../../hooks/useMetaTags.js'
@@ -314,6 +314,140 @@ function AreasJsonLd({ overview, cities }) {
   )
 }
 
+/**
+ * Sortable comparison table — click any column header to sort ascending/descending.
+ * Like Madlan's area comparison but interactive. Helps investors quickly find
+ * the cheapest area, highest ROI, or most available plots.
+ */
+const SORT_COLUMNS = [
+  { key: 'city', label: 'עיר', align: 'text-right', getValue: (c) => c.city },
+  { key: 'count', label: 'חלקות', align: 'text-center', getValue: (c) => c.count },
+  { key: 'avgPricePerDunam', label: 'מחיר/דונם', align: 'text-center', getValue: (c) => c.avgPricePerDunam || 0 },
+  { key: 'avgRoi', label: 'ROI ממוצע', align: 'text-center', getValue: (c) => c.avgRoi || 0 },
+  { key: 'totalArea', label: 'שטח כולל', align: 'text-center', getValue: (c) => c.totalArea || 0 },
+  { key: 'availability', label: 'זמינות', align: 'text-center', getValue: (c) => c.count > 0 ? c.available / c.count : 0 },
+]
+
+function SortableComparisonTable({ cities }) {
+  const [sortKey, setSortKey] = useState(null)
+  const [sortDir, setSortDir] = useState('desc') // 'asc' | 'desc'
+
+  const handleSort = useCallback((key) => {
+    if (sortKey === key) {
+      // Toggle direction, then reset
+      if (sortDir === 'desc') setSortDir('asc')
+      else { setSortKey(null); setSortDir('desc') }
+    } else {
+      setSortKey(key)
+      setSortDir('desc')
+    }
+  }, [sortKey, sortDir])
+
+  const sortedCities = useMemo(() => {
+    if (!sortKey) return cities
+    const col = SORT_COLUMNS.find(c => c.key === sortKey)
+    if (!col) return cities
+    const sorted = [...cities].sort((a, b) => {
+      const va = col.getValue(a)
+      const vb = col.getValue(b)
+      if (typeof va === 'string') return sortDir === 'asc' ? va.localeCompare(vb, 'he') : vb.localeCompare(va, 'he')
+      return sortDir === 'asc' ? va - vb : vb - va
+    })
+    return sorted
+  }, [cities, sortKey, sortDir])
+
+  return (
+    <div className="glass-panel p-5 mt-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-gold" />
+          השוואת אזורים
+        </h3>
+        {sortKey && (
+          <button
+            onClick={() => { setSortKey(null); setSortDir('desc') }}
+            className="text-[10px] text-slate-500 hover:text-gold flex items-center gap-1 transition-colors"
+          >
+            <ArrowUpDown className="w-3 h-3" />
+            איפוס מיון
+          </button>
+        )}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm" role="grid" aria-label="טבלת השוואת אזורים — לחץ על כותרת עמודה למיון">
+          <thead>
+            <tr className="text-[10px] text-slate-500 border-b border-white/5">
+              {SORT_COLUMNS.map((col) => {
+                const isActive = sortKey === col.key
+                return (
+                  <th
+                    key={col.key}
+                    className={`${col.align} py-2.5 font-medium ${col.key === 'city' ? 'pr-2' : ''} cursor-pointer select-none hover:text-gold transition-colors group`}
+                    onClick={() => handleSort(col.key)}
+                    aria-sort={isActive ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                    title={`מיין לפי ${col.label}`}
+                    role="columnheader"
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {col.label}
+                      {isActive ? (
+                        sortDir === 'asc' ? (
+                          <ChevronUp className="w-3 h-3 text-gold" />
+                        ) : (
+                          <ChevronDown className="w-3 h-3 text-gold" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="w-2.5 h-2.5 opacity-0 group-hover:opacity-40 transition-opacity" />
+                      )}
+                    </span>
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {sortedCities.map((city, rowIdx) => {
+              const availPct = city.count > 0 ? Math.round((city.available / city.count) * 100) : 0
+              const roiColor = city.avgRoi >= 150 ? 'text-emerald-400' : city.avgRoi >= 100 ? 'text-emerald-500' : city.avgRoi >= 50 ? 'text-yellow-400' : 'text-slate-400'
+              // Highlight the "winner" row for each sorted column
+              const isTopRow = sortKey && rowIdx === 0
+              return (
+                <tr
+                  key={city.city}
+                  className={`border-b border-white/5 hover:bg-white/[0.02] transition-colors ${isTopRow ? 'bg-gold/[0.03]' : ''}`}
+                >
+                  <td className="py-3 pr-2">
+                    <Link to={`/?city=${encodeURIComponent(city.city)}`} className="flex items-center gap-2 text-slate-200 hover:text-gold transition-colors font-medium">
+                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: CITY_COLORS[city.city] || '#94A3B8' }} />
+                      {city.city}
+                      {isTopRow && <span className="text-[8px] text-gold bg-gold/10 px-1.5 py-0.5 rounded-full">🏆</span>}
+                    </Link>
+                  </td>
+                  <td className="py-3 text-center text-slate-300">{city.count}</td>
+                  <td className="py-3 text-center text-gold font-medium">{formatCurrency(city.avgPricePerDunam)}</td>
+                  <td className={`py-3 text-center font-bold ${roiColor}`}>+{city.avgRoi}%</td>
+                  <td className="py-3 text-center text-slate-400">{formatDunam(city.totalArea)} דונם</td>
+                  <td className="py-3 text-center">
+                    <div className="inline-flex items-center gap-1.5">
+                      <div className="w-12 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                        <div className="h-full rounded-full bg-emerald-400/60" style={{ width: `${availPct}%` }} />
+                      </div>
+                      <span className="text-[10px] text-slate-500">{availPct}%</span>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[9px] text-slate-600 mt-3 text-center">
+        💡 לחצו על כותרת עמודה כדי למיין. לחיצה חוזרת משנה כיוון.
+      </p>
+    </div>
+  )
+}
+
 export default function Areas() {
   const { data: overview, isLoading } = useMarketOverview()
   const { data: trends } = useMarketTrends()
@@ -364,57 +498,8 @@ export default function Areas() {
             {/* Price trends chart */}
             {trends && <PriceTrendMiniChart trends={trends} />}
 
-            {/* City comparison table — like Madlan's area comparison */}
-            {cities.length > 1 && (
-              <div className="glass-panel p-5 mt-6">
-                <h3 className="text-sm font-bold text-slate-100 mb-4 flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-gold" />
-                  השוואת אזורים
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-[10px] text-slate-500 border-b border-white/5">
-                        <th className="text-right py-2.5 font-medium pr-2">עיר</th>
-                        <th className="text-center py-2.5 font-medium">חלקות</th>
-                        <th className="text-center py-2.5 font-medium">מחיר/דונם ממוצע</th>
-                        <th className="text-center py-2.5 font-medium">ROI ממוצע</th>
-                        <th className="text-center py-2.5 font-medium">שטח כולל</th>
-                        <th className="text-center py-2.5 font-medium">זמינות</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cities.map((city) => {
-                        const availPct = city.count > 0 ? Math.round((city.available / city.count) * 100) : 0
-                        const roiColor = city.avgRoi >= 150 ? 'text-emerald-400' : city.avgRoi >= 100 ? 'text-emerald-500' : city.avgRoi >= 50 ? 'text-yellow-400' : 'text-slate-400'
-                        return (
-                          <tr key={city.city} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                            <td className="py-3 pr-2">
-                              <Link to={`/?city=${encodeURIComponent(city.city)}`} className="flex items-center gap-2 text-slate-200 hover:text-gold transition-colors font-medium">
-                                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: CITY_COLORS[city.city] || '#94A3B8' }} />
-                                {city.city}
-                              </Link>
-                            </td>
-                            <td className="py-3 text-center text-slate-300">{city.count}</td>
-                            <td className="py-3 text-center text-gold font-medium">{formatCurrency(city.avgPricePerDunam)}</td>
-                            <td className={`py-3 text-center font-bold ${roiColor}`}>+{city.avgRoi}%</td>
-                            <td className="py-3 text-center text-slate-400">{formatDunam(city.totalArea)} דונם</td>
-                            <td className="py-3 text-center">
-                              <div className="inline-flex items-center gap-1.5">
-                                <div className="w-12 h-1.5 rounded-full bg-white/5 overflow-hidden">
-                                  <div className="h-full rounded-full bg-emerald-400/60" style={{ width: `${availPct}%` }} />
-                                </div>
-                                <span className="text-[10px] text-slate-500">{availPct}%</span>
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            {/* City comparison table — sortable like Madlan's area comparison */}
+            {cities.length > 1 && <SortableComparisonTable cities={cities} />}
 
             {/* City cards */}
             <div className="space-y-4 mt-6">

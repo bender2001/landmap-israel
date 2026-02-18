@@ -3571,3 +3571,162 @@ body {
   from { width: 100%; }
   to { width: 0%; }
 }
+
+/* ═══════════════════════════════════════════
+   PRINT STYLES — clean printing for plot details,
+   areas page, and calculator results.
+   Users can Ctrl+P on any page and get a usable printout.
+   Hides all interactive/decorative elements.
+   ═══════════════════════════════════════════ */
+@media print {
+  /* Reset dark theme for print — white background, dark text */
+  html, body, #root {
+    background: #fff !important;
+    color: #1a1a2e !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Hide non-printable elements */
+  nav,
+  .nav-mobile-menu,
+  .plot-strip-wrapper,
+  .filter-bar-container,
+  .sidebar-cta-footer,
+  .sidebar-drag-handle,
+  .map-vignette,
+  .map-noise,
+  .leaflet-control-zoom,
+  .leaflet-control-attribution,
+  .plot-strip-arrow,
+  .plot-strip-fade-right,
+  .plot-strip-fade-left,
+  .plot-strip-stats,
+  [role="status"][aria-live],
+  .skip-to-content,
+  .alert-sub-container,
+  button[aria-label="צור קשר ב-WhatsApp"],
+  button[aria-label="צור קשר בטלגרם"],
+  button[aria-label="צור קשר לפרטים"],
+  .plot-card-share-btn,
+  .plot-card-compare-btn,
+  .cta-shimmer,
+  .connection-status,
+  .scroll-shadow-top,
+  .scroll-shadow-bottom,
+  [data-action="print-report"],
+  .market-ticker,
+  .plot-popup-actions,
+  .filter-mobile-toggle,
+  .back-to-top-btn {
+    display: none !important;
+  }
+
+  /* Make sidebar full-width for printing */
+  .sidebar-panel {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  /* Ensure all collapsible sections are open for print */
+  .section-collapse {
+    max-height: none !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+  }
+
+  /* Glass panels — remove glass effect, add subtle border */
+  .glass-panel {
+    background: #f8f9fa !important;
+    border: 1px solid #e2e8f0 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Fix text colors for print */
+  .text-slate-100, .text-slate-200, .text-slate-300 {
+    color: #1a1a2e !important;
+  }
+  .text-slate-400, .text-slate-500 {
+    color: #475569 !important;
+  }
+  .text-gold, .brand-text {
+    color: #92702a !important;
+    -webkit-text-fill-color: #92702a !important;
+  }
+
+  /* Investment cards — readable on print */
+  .bg-gradient-to-b,
+  .bg-gradient-to-r,
+  .bg-navy-light\/40,
+  .bg-navy-light\/30,
+  [class*="bg-navy"] {
+    background: #f8f9fa !important;
+  }
+
+  /* Page breaks */
+  .section-header {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  .glass-panel {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Show URLs for links */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 9px;
+    color: #666;
+    word-break: break-all;
+  }
+  /* Don't show URL for internal links or icon-only links */
+  a[href^="/"]::after,
+  a[aria-label]::after,
+  .plot-popup-action-btn::after {
+    content: none !important;
+  }
+
+  /* Footer credit */
+  .public-footer {
+    border-top: 1px solid #e2e8f0 !important;
+    background: none !important;
+    color: #64748b !important;
+  }
+
+  /* Ensure print-color-adjust for status colors */
+  .plot-popup-status,
+  .filter-status-dot,
+  [style*="background"] {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Map container — show at fixed height when printing map view */
+  .leaflet-container {
+    height: 400px !important;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  /* Table styles for print */
+  table {
+    border-collapse: collapse !important;
+  }
+  th, td {
+    border-bottom: 1px solid #e2e8f0 !important;
+    padding: 8px !important;
+  }
+  th {
+    background: #f1f5f9 !important;
+    font-weight: 600 !important;
+  }
+}
