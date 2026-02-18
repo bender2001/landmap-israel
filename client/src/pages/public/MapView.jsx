@@ -32,6 +32,7 @@ const RecentlyViewed = lazy(() => import('../../components/RecentlyViewed.jsx'))
 const FirstVisitHints = lazy(() => import('../../components/FirstVisitHints.jsx'))
 const AlertSubscription = lazy(() => import('../../components/AlertSubscription.jsx'))
 const FeaturedDeals = lazy(() => import('../../components/FeaturedDeals.jsx'))
+const MarketTicker = lazy(() => import('../../components/MarketTicker.jsx'))
 
 function DataFreshnessIndicator({ updatedAt, onRefresh }) {
   const [, setTick] = useState(0)
@@ -49,14 +50,14 @@ function DataFreshnessIndicator({ updatedAt, onRefresh }) {
   return (
     <button
       onClick={onRefresh}
-      className={`fixed top-[4rem] left-4 sm:left-auto sm:top-auto sm:bottom-[5.5rem] sm:right-6 z-[20] items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] backdrop-blur-md border transition-all hover:scale-105 hidden sm:flex ${
+      className={`fixed top-[4rem] left-4 sm:left-auto sm:top-auto sm:bottom-[5.5rem] sm:right-6 z-[20] flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[9px] sm:text-[10px] backdrop-blur-md border transition-all hover:scale-105 ${
         isStale
           ? 'bg-orange-500/10 border-orange-500/20 text-orange-400'
           : 'bg-white/5 border-white/10 text-slate-500 hover:text-slate-400'
       }`}
       title="לחץ לרענון הנתונים"
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${isStale ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400'}`} />
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isStale ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400'}`} />
       {label}
     </button>
   )
@@ -577,6 +578,12 @@ export default function MapView() {
           </button>
         </div>
       )}
+      {/* Market Ticker — Bloomberg-style rotating market insights (desktop only) */}
+      <Suspense fallback={null}>
+        <WidgetErrorBoundary name="MarketTicker" silent>
+          <MarketTicker plots={filteredPlots} />
+        </WidgetErrorBoundary>
+      </Suspense>
       {/* Skip navigation for accessibility */}
       <a
         href="#map-content"
