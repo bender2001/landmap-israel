@@ -17,6 +17,7 @@ import RecentlyViewed from '../../components/RecentlyViewed.jsx'
 import ConnectionStatus from '../../components/ui/ConnectionStatus.jsx'
 import { useMetaTags } from '../../hooks/useMetaTags.js'
 import { formatCurrency, calcInvestmentScore } from '../../utils/formatters.js'
+import { useSavedSearches } from '../../hooks/useSavedSearches.js'
 import { Phone } from 'lucide-react'
 
 const initialFilters = {
@@ -57,6 +58,7 @@ export default function MapView() {
   })
   const [sortBy, setSortBy] = useState(() => searchParams.get('sort') || 'default')
   const favorites = useFavorites()
+  const { searches: savedSearches, save: saveSearch, remove: removeSearch } = useSavedSearches()
 
   // Compare state (localStorage-backed, not URL to avoid conflict with filters)
   const [compareIds, setCompareIds] = useState(() => {
@@ -249,6 +251,12 @@ export default function MapView() {
     setStatusFilter([])
   }, [])
 
+  const handleLoadSearch = useCallback((search) => {
+    setFilters(search.filters)
+    setStatusFilter(search.statusFilter || [])
+    setSortBy(search.sortBy || 'default')
+  }, [])
+
   const handleToggleStatus = useCallback((status) => {
     setStatusFilter((prev) =>
       prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
@@ -311,6 +319,10 @@ export default function MapView() {
         onSortChange={setSortBy}
         allPlots={plots}
         onSelectPlot={handleSelectPlot}
+        savedSearches={savedSearches}
+        onSaveSearch={saveSearch}
+        onLoadSearch={handleLoadSearch}
+        onRemoveSearch={removeSearch}
       />
 
       <SidebarDetails

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { SlidersHorizontal, X, ChevronDown, Check, MapPin, Banknote, Ruler, Clock, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, Link2 } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
 import SearchAutocomplete from './SearchAutocomplete'
+import SavedSearches from './SavedSearches'
 
 const baseCityOptions = [
   { label: 'כל הערים', value: 'all' },
@@ -108,6 +109,10 @@ export default function FilterBar({
   onSortChange,
   allPlots = [],
   onSelectPlot,
+  savedSearches,
+  onSaveSearch,
+  onLoadSearch,
+  onRemoveSearch,
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
@@ -334,6 +339,23 @@ export default function FilterBar({
                 options={sortOptions}
                 onChange={onSortChange}
                 isActive={sortBy !== 'default'}
+              />
+            </>
+          )}
+
+          {/* Saved Searches — like Madlan's שמור חיפוש */}
+          {savedSearches && (
+            <>
+              <div className="filter-separator" />
+              <SavedSearches
+                searches={savedSearches}
+                onSave={onSaveSearch}
+                onLoad={onLoadSearch}
+                onRemove={onRemoveSearch}
+                currentFilters={filters}
+                currentStatusFilter={statusFilter}
+                currentSortBy={sortBy}
+                activeCount={activeCount}
               />
             </>
           )}
