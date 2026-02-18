@@ -3,7 +3,7 @@ import L from 'leaflet'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapPin, Eye, Check, ArrowLeft, Navigation, Layers, Map as MapIcon } from 'lucide-react'
 import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
-import { formatCurrency, formatPriceShort, formatDunam } from '../utils/formatters'
+import { formatCurrency, formatPriceShort, formatDunam, calcInvestmentScore, getScoreLabel } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
 import MapClusterLayer from './MapClusterLayer'
 import MapRuler from './MapRuler'
@@ -314,6 +314,26 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
     return { min: Math.min(...values), max: Math.max(...values) }
   }, [plots])
 
+  // Precompute area average price/sqm for deal indicators on tooltips
+  const areaAvgPsm = useMemo(() => {
+    if (!plots || plots.length === 0) return {}
+    const byCity = {}
+    plots.forEach(p => {
+      const city = p.city || 'unknown'
+      const price = p.total_price ?? p.totalPrice ?? 0
+      const size = p.size_sqm ?? p.sizeSqM ?? 1
+      if (size <= 0) return
+      if (!byCity[city]) byCity[city] = { total: 0, count: 0 }
+      byCity[city].total += price / size
+      byCity[city].count += 1
+    })
+    const result = {}
+    for (const [city, data] of Object.entries(byCity)) {
+      result[city] = Math.round(data.total / data.count)
+    }
+    return result
+  }, [plots])
+
   return (
     <div className="h-full w-full relative z-0">
       <MapContainer
@@ -393,6 +413,14 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
               <Tooltip permanent direction="center" className="price-tooltip">
                 <span className="tooltip-main-price">{favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{plot.plot_images?.length > 0 ? '📷 ' : ''}{formatPriceShort(price)}</span>
                 <span className="tooltip-sub">{formatDunam(sizeSqM)} דונם · +{roi}% · ₪{sizeSqM > 0 ? Math.round(price / sizeSqM).toLocaleString() : '—'}/מ״ר</span>
+                {(() => {
+                  const avg = areaAvgPsm[plot.city]
+                  if (!avg || sizeSqM <= 0) return null
+                  const plotPsm = price / sizeSqM
+                  const diffPct = Math.round(((plotPsm - avg) / avg) * 100)
+                  if (diffPct >= -5) return null
+                  return <span className="tooltip-deal-badge">🔥 {Math.abs(diffPct)}% מתחת לממוצע</span>
+                })()}
               </Tooltip>
 
               <Popup>
@@ -430,6 +458,27 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
                         {readiness}
                       </span>
                     )}
+                    {(() => {
+                      const score = calcInvestmentScore(plot)
+                      const { label, color: scoreColor } = getScoreLabel(score)
+                      return (
+                        <span className="plot-popup-badge" style={{ background: `${scoreColor}20`, color: scoreColor, border: `1px solid ${scoreColor}40` }}>
+                          {score}/10 {label}
+                        </span>
+                      )
+                    })()}
+                    {(() => {
+                      const avg = areaAvgPsm[plot.city]
+                      if (!avg || sizeSqM <= 0) return null
+                      const plotPsm = price / sizeSqM
+                      const diffPct = Math.round(((plotPsm - avg) / avg) * 100)
+                      if (diffPct >= -5) return null
+                      return (
+                        <span className="plot-popup-badge" style={{ background: 'rgba(255,165,0,0.15)', color: '#FFA500', border: '1px solid rgba(255,165,0,0.3)' }}>
+                          🔥 {Math.abs(diffPct)}% מתחת לממוצע
+                        </span>
+                      )
+                    })()}
                   </div>
 
                   <button

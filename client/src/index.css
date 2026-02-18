@@ -518,6 +518,25 @@ body {
   letter-spacing: 0.02em;
 }
 
+.leaflet-tooltip.price-tooltip .tooltip-deal-badge {
+  font-size: 8px;
+  font-weight: 800;
+  color: #FFA500;
+  text-shadow: 0 0 6px rgba(255, 165, 0, 0.3);
+  background: rgba(255, 165, 0, 0.12);
+  border: 1px solid rgba(255, 165, 0, 0.25);
+  border-radius: 6px;
+  padding: 1px 5px;
+  margin-top: 1px;
+  letter-spacing: 0.01em;
+  animation: deal-pulse 2s ease-in-out infinite;
+}
+
+@keyframes deal-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
 .leaflet-tooltip.price-tooltip::before {
   display: none !important;
 }
