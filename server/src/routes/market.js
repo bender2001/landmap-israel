@@ -15,83 +15,89 @@ router.get('/overview', async (req, res, next) => {
   try {
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
 
-    const { data: plots, error } = await supabaseAdmin
-      .from('plots')
-      .select('city, status, total_price, projected_value, size_sqm, zoning_stage, readiness_estimate')
-      .eq('is_published', true)
+    // Wrap in marketCache — this is an expensive aggregation query that doesn't change often.
+    // Without caching, every Areas page load / market widget triggers a full Supabase scan.
+    const overview = await marketCache.wrap('market-overview', async () => {
+      const { data: plots, error } = await supabaseAdmin
+        .from('plots')
+        .select('city, status, total_price, projected_value, size_sqm, zoning_stage, readiness_estimate')
+        .eq('is_published', true)
 
-    if (error) throw error
-    if (!plots || plots.length === 0) {
-      return res.json({ total: 0, cities: [] })
-    }
-
-    // Per-city aggregation
-    const cityMap = {}
-    for (const p of plots) {
-      const city = p.city || 'אחר'
-      if (!cityMap[city]) {
-        cityMap[city] = {
-          city,
-          count: 0,
-          available: 0,
-          totalPrice: 0,
-          totalProj: 0,
-          totalArea: 0,
-          minPrice: Infinity,
-          maxPrice: 0,
-          minPriceSqm: Infinity,
-          maxPriceSqm: 0,
-          byZoning: {},
-        }
+      if (error) throw error
+      if (!plots || plots.length === 0) {
+        return { total: 0, cities: [] }
       }
-      const c = cityMap[city]
-      const price = p.total_price || 0
-      const size = p.size_sqm || 1
 
-      c.count += 1
-      if (p.status === 'AVAILABLE') c.available += 1
-      c.totalPrice += price
-      c.totalProj += p.projected_value || 0
-      c.totalArea += p.size_sqm || 0
+      // Per-city aggregation
+      const cityMap = {}
+      for (const p of plots) {
+        const city = p.city || 'אחר'
+        if (!cityMap[city]) {
+          cityMap[city] = {
+            city,
+            count: 0,
+            available: 0,
+            totalPrice: 0,
+            totalProj: 0,
+            totalArea: 0,
+            minPrice: Infinity,
+            maxPrice: 0,
+            minPriceSqm: Infinity,
+            maxPriceSqm: 0,
+            byZoning: {},
+          }
+        }
+        const c = cityMap[city]
+        const price = p.total_price || 0
+        const size = p.size_sqm || 1
 
-      if (price > 0 && price < c.minPrice) c.minPrice = price
-      if (price > c.maxPrice) c.maxPrice = price
+        c.count += 1
+        if (p.status === 'AVAILABLE') c.available += 1
+        c.totalPrice += price
+        c.totalProj += p.projected_value || 0
+        c.totalArea += p.size_sqm || 0
 
-      const priceSqm = size > 0 ? price / size : 0
-      if (priceSqm > 0 && priceSqm < c.minPriceSqm) c.minPriceSqm = priceSqm
-      if (priceSqm > c.maxPriceSqm) c.maxPriceSqm = priceSqm
+        if (price > 0 && price < c.minPrice) c.minPrice = price
+        if (price > c.maxPrice) c.maxPrice = price
 
-      const zoning = p.zoning_stage || 'UNKNOWN'
-      c.byZoning[zoning] = (c.byZoning[zoning] || 0) + 1
-    }
+        const priceSqm = size > 0 ? price / size : 0
+        if (priceSqm > 0 && priceSqm < c.minPriceSqm) c.minPriceSqm = priceSqm
+        if (priceSqm > c.maxPriceSqm) c.maxPriceSqm = priceSqm
 
-    const cities = Object.values(cityMap).map(c => ({
-      city: c.city,
-      count: c.count,
-      available: c.available,
-      avgPricePerSqm: c.totalArea > 0 ? Math.round(c.totalPrice / c.totalArea) : 0,
-      avgPricePerDunam: c.totalArea > 0 ? Math.round((c.totalPrice / c.totalArea) * 1000) : 0,
-      avgRoi: c.totalPrice > 0 ? Math.round(((c.totalProj - c.totalPrice) / c.totalPrice) * 100) : 0,
-      totalArea: c.totalArea,
-      totalValue: c.totalPrice,
-      priceRange: { min: c.minPrice === Infinity ? 0 : c.minPrice, max: c.maxPrice },
-      priceSqmRange: { min: c.minPriceSqm === Infinity ? 0 : Math.round(c.minPriceSqm), max: Math.round(c.maxPriceSqm) },
-      byZoning: c.byZoning,
-    })).sort((a, b) => b.count - a.count)
+        const zoning = p.zoning_stage || 'UNKNOWN'
+        c.byZoning[zoning] = (c.byZoning[zoning] || 0) + 1
+      }
 
-    // Global aggregates
-    const totalPrice = plots.reduce((s, p) => s + (p.total_price || 0), 0)
-    const totalProj = plots.reduce((s, p) => s + (p.projected_value || 0), 0)
-    const totalArea = plots.reduce((s, p) => s + (p.size_sqm || 0), 0)
+      const cities = Object.values(cityMap).map(c => ({
+        city: c.city,
+        count: c.count,
+        available: c.available,
+        avgPricePerSqm: c.totalArea > 0 ? Math.round(c.totalPrice / c.totalArea) : 0,
+        avgPricePerDunam: c.totalArea > 0 ? Math.round((c.totalPrice / c.totalArea) * 1000) : 0,
+        avgRoi: c.totalPrice > 0 ? Math.round(((c.totalProj - c.totalPrice) / c.totalPrice) * 100) : 0,
+        totalArea: c.totalArea,
+        totalValue: c.totalPrice,
+        priceRange: { min: c.minPrice === Infinity ? 0 : c.minPrice, max: c.maxPrice },
+        priceSqmRange: { min: c.minPriceSqm === Infinity ? 0 : Math.round(c.minPriceSqm), max: Math.round(c.maxPriceSqm) },
+        byZoning: c.byZoning,
+      })).sort((a, b) => b.count - a.count)
 
-    res.json({
-      total: plots.length,
-      available: plots.filter(p => p.status === 'AVAILABLE').length,
-      avgRoi: totalPrice > 0 ? Math.round(((totalProj - totalPrice) / totalPrice) * 100) : 0,
-      totalArea,
-      totalValue: totalPrice,
-      cities,
-    })
+      // Global aggregates
+      const totalPrice = plots.reduce((s, p) => s + (p.total_price || 0), 0)
+      const totalProj = plots.reduce((s, p) => s + (p.projected_value || 0), 0)
+      const totalArea = plots.reduce((s, p) => s + (p.size_sqm || 0), 0)
+
+      return {
+        total: plots.length,
+        available: plots.filter(p => p.status === 'AVAILABLE').length,
+        avgRoi: totalPrice > 0 ? Math.round(((totalProj - totalPrice) / totalPrice) * 100) : 0,
+        totalArea,
+        totalValue: totalPrice,
+        cities,
+      }
+    }, 300_000) // 5 min TTL — matches Cache-Control max-age
+
+    res.json(overview)
   } catch (err) {
     next(err)
   }

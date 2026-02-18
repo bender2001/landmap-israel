@@ -275,8 +275,9 @@ router.get('/:id/nearby', sanitizePlotId, async (req, res, next) => {
     const centLat = valid.reduce((s, c) => s + c[0], 0) / valid.length
     const centLng = valid.reduce((s, c) => s + c[1], 0) / valid.length
 
-    // Get all plots and compute distance
-    const allPlots = await getPublishedPlots({})
+    // Get all plots (cached) and compute distance — avoids redundant Supabase queries.
+    // Previously called getPublishedPlots({}) directly, bypassing the 30s plot cache.
+    const allPlots = await plotCache.wrap('plots:{}', () => getPublishedPlots({}), 30_000)
 
     const nearby = allPlots
       .filter(p => p.id !== req.params.id && p.coordinates && p.coordinates.length > 0)
