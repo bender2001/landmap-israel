@@ -25,6 +25,35 @@ import { useViewTracker } from '../../hooks/useViewTracker.js'
 import { useSavedSearches } from '../../hooks/useSavedSearches.js'
 import { Phone } from 'lucide-react'
 
+function DataFreshnessIndicator({ updatedAt, onRefresh }) {
+  const [, setTick] = useState(0)
+
+  // Re-render every 30s to update relative time
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 30_000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const ago = Math.round((Date.now() - updatedAt) / 1000)
+  const label = ago < 60 ? 'עכשיו' : ago < 300 ? `לפני ${Math.floor(ago / 60)} דק׳` : `לפני ${Math.floor(ago / 60)} דק׳`
+  const isStale = ago > 300 // >5 min
+
+  return (
+    <button
+      onClick={onRefresh}
+      className={`fixed top-3 left-16 sm:left-auto sm:top-auto sm:bottom-6 sm:right-6 z-[30] flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] backdrop-blur-md border transition-all hover:scale-105 ${
+        isStale
+          ? 'bg-orange-500/10 border-orange-500/20 text-orange-400'
+          : 'bg-white/5 border-white/10 text-slate-500 hover:text-slate-400'
+      }`}
+      title="לחץ לרענון הנתונים"
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${isStale ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400'}`} />
+      {label}
+    </button>
+  )
+}
+
 const initialFilters = {
   city: 'all',
   priceMin: '',
@@ -117,7 +146,7 @@ export default function MapView() {
     return f
   }, [filters, statusFilter, sortBy])
 
-  const { data: plots = [], isLoading, error: plotsError, refetch: refetchPlots, isPlaceholderData } = useAllPlots(apiFilters)
+  const { data: plots = [], isLoading, error: plotsError, refetch: refetchPlots, isPlaceholderData, dataUpdatedAt } = useAllPlots(apiFilters)
   const { data: pois = [] } = usePois()
 
   // Debounce search for performance
@@ -397,6 +426,10 @@ export default function MapView() {
         דלג לתוכן המפה
       </a>
       <ConnectionStatus />
+      {/* Data freshness indicator — shows when data was last synced (like Madlan's real-time feel) */}
+      {dataUpdatedAt > 0 && (
+        <DataFreshnessIndicator updatedAt={dataUpdatedAt} onRefresh={refetchPlots} />
+      )}
       <MarketStatsWidget plots={filteredPlots} />
       <DealAlerts plots={filteredPlots} onSelectPlot={handleSelectPlot} />
       <MapArea

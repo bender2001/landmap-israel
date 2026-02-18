@@ -8,15 +8,31 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+// In-flight request tracking for deduplication & cancellation
+const inflightRequests = new Map()
+
 async function request(path, options = {}) {
   const token = localStorage.getItem('auth_token')
   const headers = { 'Content-Type': 'application/json', ...options.headers }
   if (token) headers.Authorization = `Bearer ${token}`
 
+  // For GET requests, deduplicate: cancel previous in-flight request to same path
+  const isGet = !options.method || options.method === 'GET'
+  if (isGet && inflightRequests.has(path)) {
+    inflightRequests.get(path).abort()
+    inflightRequests.delete(path)
+  }
+
+  const controller = new AbortController()
+  if (isGet) inflightRequests.set(path, controller)
+
+  // Merge external signal if provided
+  const signal = controller.signal
+
   let lastError
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const res = await fetch(`${BASE}${path}`, { ...options, headers })
+      const res = await fetch(`${BASE}${path}`, { ...options, headers, signal })
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
@@ -40,8 +56,11 @@ async function request(path, options = {}) {
 
       return res.json()
     } catch (err) {
+      // Abort errors should propagate immediately (not retry)
+      if (err.name === 'AbortError') throw err
+
       // Network errors — retry on GET
-      if (err instanceof TypeError && (!options.method || options.method === 'GET') && attempt < MAX_RETRIES) {
+      if (err instanceof TypeError && isGet && attempt < MAX_RETRIES) {
         const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 200
         await sleep(delay)
         lastError = err
@@ -54,7 +73,7 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  get: (path) => request(path),
+  get: (path) => request(path).finally(() => inflightRequests.delete(path)),
   post: (path, data) => request(path, { method: 'POST', body: JSON.stringify(data) }),
   patch: (path, data) => request(path, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (path) => request(path, { method: 'DELETE' }),

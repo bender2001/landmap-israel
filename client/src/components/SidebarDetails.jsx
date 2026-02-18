@@ -412,6 +412,53 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
+  // Swipe-to-close gesture for mobile (swipe right in RTL = close)
+  const swipeRef = useRef({ startX: 0, startY: 0, swiping: false, translateX: 0 })
+  const [swipeOffset, setSwipeOffset] = useState(0)
+
+  const handleTouchStart = useCallback((e) => {
+    const touch = e.touches[0]
+    swipeRef.current = { startX: touch.clientX, startY: touch.clientY, swiping: false, translateX: 0 }
+  }, [])
+
+  const handleTouchMove = useCallback((e) => {
+    const touch = e.touches[0]
+    const state = swipeRef.current
+    const dx = touch.clientX - state.startX
+    const dy = touch.clientY - state.startY
+
+    // Only activate swipe if horizontal movement dominates
+    if (!state.swiping && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      state.swiping = true
+    }
+
+    if (state.swiping && dx < 0) {
+      // RTL: swiping left = pulling panel away (negative dx)
+      // LTR sidebar on right: swiping right = closing (positive dx)
+      // Since sidebar is on the right in RTL, swipe-right (positive dx in screen coords) = close
+      // Actually in RTL, the panel slides from the right. Swiping right (positive dx) should close it.
+    }
+
+    if (state.swiping) {
+      // Only allow swiping in the "close" direction (right, positive dx)
+      const offset = Math.max(0, dx)
+      state.translateX = offset
+      setSwipeOffset(offset)
+    }
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    const state = swipeRef.current
+    if (state.swiping && state.translateX > 80) {
+      // Threshold reached — close the sidebar
+      setSwipeOffset(0)
+      onClose()
+    } else {
+      setSwipeOffset(0)
+    }
+    swipeRef.current = { startX: 0, startY: 0, swiping: false, translateX: 0 }
+  }, [onClose])
+
   const handlePrintReport = useCallback(() => {
     if (!plot) return
     const bn = plot.block_number ?? plot.blockNumber
@@ -553,6 +600,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
         ref={panelRef}
         className="sidebar-panel fixed top-0 right-0 h-full w-full sm:w-[420px] md:w-[480px] max-w-full z-[60] bg-navy border-l border-white/10 shadow-2xl flex flex-col overflow-hidden sm:animate-slide-in-right"
         dir="rtl"
+        style={swipeOffset > 0 ? { transform: `translateX(${swipeOffset}px)`, transition: 'none' } : undefined}
       >
         {/* Gold accent bar */}
         <div
@@ -560,8 +608,13 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
           style={{ background: 'linear-gradient(90deg, #C8942A, #E5B94E, #F0D078, #E5B94E, #C8942A)' }}
         />
 
-        {/* Draggable header zone (drag handle + preview + title) */}
-        <div className="sidebar-header-drag-zone flex-shrink-0">
+        {/* Draggable header zone (drag handle + preview + title) — swipe right to close on mobile */}
+        <div
+          className="sidebar-header-drag-zone flex-shrink-0"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
           {/* Map preview area — real satellite map like Madlan */}
           {plot.coordinates && plot.coordinates.length >= 3 ? (
             <div className="h-36 relative overflow-hidden">
