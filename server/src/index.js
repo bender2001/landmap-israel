@@ -25,6 +25,7 @@ import adminPoiRoutes from './routes/admin/pois.js'
 import adminActivityRoutes from './routes/admin/activity.js'
 import adminSettingsRoutes from './routes/admin/settings.js'
 import adminAnalyticsRoutes from './routes/admin/analytics.js'
+import alertRoutes from './routes/alerts.js'
 import sitemapRoutes from './routes/sitemap.js'
 import { errorHandler, requestId } from './middleware/errorHandler.js'
 import { requestTimeout } from './middleware/timeout.js'
@@ -97,6 +98,7 @@ app.use('/api/chat', chatRoutes)
 app.use('/api/pois', poiRoutes)
 app.use('/api/market', marketRoutes)
 app.use('/api/export', exportRoutes)
+app.use('/api/alerts', alertRoutes)
 
 // ─── Admin routes ───
 app.use('/api/admin/plots', adminPlotRoutes)
