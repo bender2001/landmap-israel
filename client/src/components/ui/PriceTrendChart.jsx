@@ -1,8 +1,7 @@
 import { useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { TrendingUp, TrendingDown, Database } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatters'
-import { getPlotPriceHistory } from '../../api/market'
+import { usePlotPriceHistory } from '../../hooks/usePriceHistory'
 
 /**
  * Price trend chart — fetches real historical data from the price_snapshots API.
@@ -40,14 +39,8 @@ function generateSyntheticTrend(currentPricePerSqm, city, months = 12) {
 export default function PriceTrendChart({ totalPrice, sizeSqM, city, plotId }) {
   const pricePerSqm = sizeSqM > 0 ? totalPrice / sizeSqM : 0
 
-  // Fetch real price history if plotId is available
-  const { data: realHistory } = useQuery({
-    queryKey: ['plotPriceHistory', plotId],
-    queryFn: () => getPlotPriceHistory(plotId, 365),
-    enabled: !!plotId,
-    staleTime: 5 * 60_000,
-    retry: 1,
-  })
+  // Fetch real price history using the reusable hook (DRY — same config as Compare/PlotDetail)
+  const { data: realHistory } = usePlotPriceHistory(plotId)
 
   const { trend, isRealData } = useMemo(() => {
     if (pricePerSqm <= 0) return { trend: null, isRealData: false }

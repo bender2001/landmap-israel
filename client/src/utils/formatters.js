@@ -994,3 +994,297 @@ export function calcCommuteTimes(lat, lng) {
     }
   }).sort((a, b) => a.distanceKm - b.distanceKm)
 }
+
+/**
+ * Investment score breakdown — returns individual factor scores with labels
+ * and explanations. Enables radar charts, progress bars, and transparent
+ * scoring in the UI. Like Madlan's property rating breakdown.
+ *
+ * Each factor has:
+ *   - key: machine id
+ *   - label: Hebrew display name
+ *   - score: 0-1 normalized
+ *   - maxPoints: weight in the composite score
+ *   - points: actual points earned
+ *   - explanation: Hebrew text explaining the rating
+ *   - emoji: visual indicator
+ *
+ * @param {Object} plot - Plot data
+ * @param {Object} [context] - Optional context { areaAvgPriceSqm, totalPlots }
+ * @returns {{ total: number, grade: Object, factors: Array, narrative: string }}
+ */
+export function calcInvestmentScoreBreakdown(plot, context = {}) {
+  if (!plot) return null
+
+  const price = plot.total_price ?? plot.totalPrice ?? 0
+  const projected = plot.projected_value ?? plot.projectedValue ?? 0
+  const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
+  const roi = price > 0 ? ((projected - price) / price) * 100 : 0
+  const readiness = plot.readiness_estimate ?? plot.readinessEstimate ?? ''
+  const zoning = plot.zoning_stage ?? plot.zoningStage ?? 'AGRICULTURAL'
+  const views = plot.views ?? 0
+  const createdAt = plot.created_at ?? plot.createdAt
+
+  const ZONING_ORDER = [
+    'AGRICULTURAL', 'MASTER_PLAN_DEPOSIT', 'MASTER_PLAN_APPROVED',
+    'DETAILED_PLAN_PREP', 'DETAILED_PLAN_DEPOSIT', 'DETAILED_PLAN_APPROVED',
+    'DEVELOPER_TENDER', 'BUILDING_PERMIT',
+  ]
+  const ZONING_LABELS = {
+    'AGRICULTURAL': 'חקלאית',
+    'MASTER_PLAN_DEPOSIT': 'הפקדת מתאר',
+    'MASTER_PLAN_APPROVED': 'מתאר מאושר',
+    'DETAILED_PLAN_PREP': 'הכנת מפורטת',
+    'DETAILED_PLAN_DEPOSIT': 'הפקדת מפורטת',
+    'DETAILED_PLAN_APPROVED': 'מפורטת מאושרת',
+    'DEVELOPER_TENDER': 'מכרז יזמים',
+    'BUILDING_PERMIT': 'היתר בנייה',
+  }
+  const zoningIdx = ZONING_ORDER.indexOf(zoning)
+
+  // ── Factor 1: ROI (0-4 points, weight: 40%) ──
+  const roiScore = Math.min(4, roi / 50)
+  const roiNorm = roiScore / 4
+  let roiExplanation
+  if (roi >= 200) roiExplanation = `תשואה יוצאת דופן +${Math.round(roi)}% — פוטנציאל הכפלה כפולה`
+  else if (roi >= 150) roiExplanation = `תשואה גבוהה מאוד +${Math.round(roi)}% — מעל הממוצע בשוק`
+  else if (roi >= 100) roiExplanation = `תשואה טובה +${Math.round(roi)}% — הכפלת ההשקעה`
+  else if (roi >= 50) roiExplanation = `תשואה סבירה +${Math.round(roi)}% — מעל פיקדון בנקאי`
+  else roiExplanation = `תשואה נמוכה +${Math.round(roi)}% — יש לבדוק חלופות`
+
+  // ── Factor 2: Zoning Progress (0-3 points, weight: 30%) ──
+  const zoningScore = zoningIdx >= 0 ? (zoningIdx / (ZONING_ORDER.length - 1)) * 3 : 0
+  const zoningNorm = zoningScore / 3
+  const zoningLabel = ZONING_LABELS[zoning] || zoning
+  let zoningExplanation
+  if (zoningIdx >= 6) zoningExplanation = `שלב ${zoningLabel} — קרוב מאוד לבנייה, סיכון נמוך`
+  else if (zoningIdx >= 4) zoningExplanation = `שלב ${zoningLabel} — התקדמות טובה בתכנון`
+  else if (zoningIdx >= 2) zoningExplanation = `שלב ${zoningLabel} — בתהליך, 3-5 שנים להערכה`
+  else zoningExplanation = `שלב ${zoningLabel} — שלב מוקדם, אופק ארוך`
+
+  // ── Factor 3: Readiness / Time Horizon (0-3 points, weight: 30%) ──
+  let readinessScore = 1.5
+  let readinessExplanation
+  if (readiness.includes('1-3')) {
+    readinessScore = 3
+    readinessExplanation = 'אופק 1-3 שנים — תשואה מהירה, נזילות גבוהה'
+  } else if (readiness.includes('3-5')) {
+    readinessScore = 2
+    readinessExplanation = 'אופק 3-5 שנים — השקעה לטווח בינוני'
+  } else if (readiness.includes('5+') || readiness.includes('5-')) {
+    readinessScore = 0.5
+    readinessExplanation = 'אופק 5+ שנים — השקעה ארוכת טווח, צריך סבלנות'
+  } else {
+    readinessExplanation = 'אופק לא ידוע — מומלץ לברר עם יועץ'
+  }
+  const readinessNorm = readinessScore / 3
+
+  // ── Factor 4: Market Position (bonus 0-1, contextual) ──
+  let marketScore = 0
+  let marketExplanation = 'אין מספיק נתונים להשוואה אזורית'
+  if (context.areaAvgPriceSqm && sizeSqM > 0 && price > 0) {
+    const plotPsm = price / sizeSqM
+    const deviation = ((plotPsm - context.areaAvgPriceSqm) / context.areaAvgPriceSqm) * 100
+    if (deviation < -15) {
+      marketScore = 1
+      marketExplanation = `${Math.abs(Math.round(deviation))}% מתחת לממוצע — עסקה אטרקטיבית`
+    } else if (deviation < -5) {
+      marketScore = 0.6
+      marketExplanation = `${Math.abs(Math.round(deviation))}% מתחת לממוצע — מחיר תחרותי`
+    } else if (deviation <= 10) {
+      marketScore = 0.3
+      marketExplanation = 'מחיר סביר ביחס לאזור'
+    } else {
+      marketScore = 0
+      marketExplanation = `${Math.round(deviation)}% מעל הממוצע — מחיר גבוה`
+    }
+  }
+  const marketNorm = marketScore
+
+  // ── Factor 5: Demand Signal (bonus 0-0.5) ──
+  let demandScore = 0
+  let demandExplanation = 'ללא נתוני ביקוש'
+  if (views > 0) {
+    if (views >= 20) {
+      demandScore = 0.5
+      demandExplanation = `${views} צפיות — ביקוש גבוה, חלקה פופולרית`
+    } else if (views >= 10) {
+      demandScore = 0.3
+      demandExplanation = `${views} צפיות — עניין מתון`
+    } else {
+      demandScore = 0.1
+      demandExplanation = `${views} צפיות — עדיין מתחת לרדאר`
+    }
+  }
+
+  // ── Composite score (same formula as calcInvestmentScore + bonuses) ──
+  const rawBase = roiScore + zoningScore + readinessScore
+  const bonusPoints = marketScore + demandScore
+  const total = Math.max(1, Math.min(10, Math.round(rawBase + bonusPoints)))
+  const grade = getInvestmentGrade(total)
+
+  const factors = [
+    {
+      key: 'roi',
+      label: 'תשואה צפויה',
+      emoji: '📈',
+      score: roiNorm,
+      maxPoints: 4,
+      points: Math.round(roiScore * 100) / 100,
+      explanation: roiExplanation,
+      color: roiNorm >= 0.7 ? '#22C55E' : roiNorm >= 0.4 ? '#F59E0B' : '#EF4444',
+    },
+    {
+      key: 'zoning',
+      label: 'שלב תכנוני',
+      emoji: '🏗️',
+      score: zoningNorm,
+      maxPoints: 3,
+      points: Math.round(zoningScore * 100) / 100,
+      explanation: zoningExplanation,
+      color: zoningNorm >= 0.7 ? '#22C55E' : zoningNorm >= 0.4 ? '#F59E0B' : '#EF4444',
+    },
+    {
+      key: 'readiness',
+      label: 'אופק זמן',
+      emoji: '⏱️',
+      score: readinessNorm,
+      maxPoints: 3,
+      points: Math.round(readinessScore * 100) / 100,
+      explanation: readinessExplanation,
+      color: readinessNorm >= 0.7 ? '#22C55E' : readinessNorm >= 0.4 ? '#F59E0B' : '#EF4444',
+    },
+    {
+      key: 'market',
+      label: 'מיקום בשוק',
+      emoji: '🏷️',
+      score: marketNorm,
+      maxPoints: 1,
+      points: Math.round(marketScore * 100) / 100,
+      explanation: marketExplanation,
+      color: marketNorm >= 0.7 ? '#22C55E' : marketNorm >= 0.3 ? '#F59E0B' : '#94A3B8',
+    },
+    {
+      key: 'demand',
+      label: 'ביקוש',
+      emoji: '👁️',
+      score: demandScore / 0.5,
+      maxPoints: 0.5,
+      points: Math.round(demandScore * 100) / 100,
+      explanation: demandExplanation,
+      color: demandScore >= 0.3 ? '#22C55E' : demandScore > 0 ? '#F59E0B' : '#94A3B8',
+    },
+  ]
+
+  return { total, grade, factors }
+}
+
+/**
+ * Generate a professional Hebrew investment narrative for a plot.
+ * Like Madlan's auto-generated property descriptions — provides instant
+ * textual context that helps investors understand the opportunity at a glance.
+ *
+ * The narrative covers: location, pricing, ROI, zoning status, timeline,
+ * and a concluding assessment. Written in professional Hebrew investment language.
+ *
+ * @param {Object} plot - Plot data
+ * @param {Object} [context] - Optional { areaAvgPriceSqm, cityName }
+ * @returns {string} Hebrew investment narrative paragraph
+ */
+export function generateInvestmentNarrative(plot, context = {}) {
+  if (!plot) return ''
+
+  const price = plot.total_price ?? plot.totalPrice ?? 0
+  const projected = plot.projected_value ?? plot.projectedValue ?? 0
+  const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
+  const roi = price > 0 ? ((projected - price) / price) * 100 : 0
+  const blockNum = plot.block_number ?? plot.blockNumber ?? ''
+  const city = plot.city || ''
+  const zoning = plot.zoning_stage ?? plot.zoningStage ?? 'AGRICULTURAL'
+  const readiness = plot.readiness_estimate ?? plot.readinessEstimate ?? ''
+  const dunam = sizeSqM > 0 ? (sizeSqM / 1000).toFixed(1) : '?'
+  const priceSqm = sizeSqM > 0 ? Math.round(price / sizeSqM) : 0
+  const priceFormatted = price >= 1_000_000
+    ? `₪${(price / 1_000_000).toFixed(1)}M`
+    : `₪${Math.round(price / 1000).toLocaleString()}K`
+
+  const ZONING_LABELS = {
+    'AGRICULTURAL': 'חקלאית',
+    'MASTER_PLAN_DEPOSIT': 'הפקדת מתאר',
+    'MASTER_PLAN_APPROVED': 'מתאר מאושר',
+    'DETAILED_PLAN_PREP': 'הכנת תכנית מפורטת',
+    'DETAILED_PLAN_DEPOSIT': 'הפקדת מפורטת',
+    'DETAILED_PLAN_APPROVED': 'מפורטת מאושרת',
+    'DEVELOPER_TENDER': 'מכרז יזמים',
+    'BUILDING_PERMIT': 'היתר בנייה',
+  }
+
+  const parts = []
+
+  // Opening — location & size
+  parts.push(`חלקה ${plot.number} בגוש ${blockNum} ב${city} — שטח של ${dunam} דונם (${sizeSqM.toLocaleString()} מ״ר)`)
+
+  // Price positioning
+  if (context.areaAvgPriceSqm && priceSqm > 0) {
+    const deviation = ((priceSqm - context.areaAvgPriceSqm) / context.areaAvgPriceSqm) * 100
+    if (deviation < -10) {
+      parts.push(`במחיר ${priceFormatted} (₪${priceSqm.toLocaleString()}/מ״ר), ${Math.abs(Math.round(deviation))}% מתחת לממוצע האזורי — מחיר אטרקטיבי`)
+    } else if (deviation > 10) {
+      parts.push(`במחיר ${priceFormatted} (₪${priceSqm.toLocaleString()}/מ״ר), מעל הממוצע — ייתכן שמשקף מיקום או פוטנציאל פרימיום`)
+    } else {
+      parts.push(`במחיר ${priceFormatted} (₪${priceSqm.toLocaleString()}/מ״ר), תואם את הממוצע האזורי`)
+    }
+  } else {
+    parts.push(`במחיר ${priceFormatted}${priceSqm > 0 ? ` (₪${priceSqm.toLocaleString()}/מ״ר)` : ''}`)
+  }
+
+  // ROI assessment
+  if (roi >= 200) {
+    parts.push(`פוטנציאל תשואה של +${Math.round(roi)}% — הכפלה כפולה ומעלה של ההון`)
+  } else if (roi >= 100) {
+    parts.push(`תשואה צפויה +${Math.round(roi)}% — הכפלת ההשקעה`)
+  } else if (roi >= 50) {
+    parts.push(`תשואה צפויה +${Math.round(roi)}% — מעל תשואת שוק ההון`)
+  } else if (roi > 0) {
+    parts.push(`תשואה צפויה +${Math.round(roi)}%`)
+  }
+
+  // Zoning status
+  const zoningLabel = ZONING_LABELS[zoning] || zoning
+  const ZONING_ORDER = [
+    'AGRICULTURAL', 'MASTER_PLAN_DEPOSIT', 'MASTER_PLAN_APPROVED',
+    'DETAILED_PLAN_PREP', 'DETAILED_PLAN_DEPOSIT', 'DETAILED_PLAN_APPROVED',
+    'DEVELOPER_TENDER', 'BUILDING_PERMIT',
+  ]
+  const zoningIdx = ZONING_ORDER.indexOf(zoning)
+  if (zoningIdx >= 6) {
+    parts.push(`הקרקע בשלב מתקדם (${zoningLabel}) — קרובה מאוד למימוש`)
+  } else if (zoningIdx >= 3) {
+    parts.push(`שלב תכנוני: ${zoningLabel} — בתהליך התקדמות`)
+  } else {
+    parts.push(`שלב תכנוני: ${zoningLabel} — השקעה לטווח ארוך`)
+  }
+
+  // Timeline
+  if (readiness.includes('1-3')) {
+    parts.push('אופק מימוש של 1-3 שנים')
+  } else if (readiness.includes('3-5')) {
+    parts.push('אופק מימוש של 3-5 שנים')
+  } else if (readiness.includes('5+') || readiness.includes('5-')) {
+    parts.push('אופק מימוש של 5 שנים ומעלה')
+  }
+
+  // Verdict
+  const score = calcInvestmentScore(plot)
+  if (score >= 8) {
+    parts.push('סיכום: הזדמנות השקעה יוצאת דופן — מומלץ לבחון בהקדם.')
+  } else if (score >= 6) {
+    parts.push('סיכום: השקעה מבטיחה עם יחס סיכון-תשואה טוב.')
+  } else if (score >= 4) {
+    parts.push('סיכום: דורש בדיקת נאותות מעמיקה, אך יש פוטנציאל.')
+  } else {
+    parts.push('סיכום: סיכון גבוה — מומלץ ייעוץ מקצועי לפני קבלת החלטה.')
+  }
+
+  return parts.join('. ') + '.'
+}

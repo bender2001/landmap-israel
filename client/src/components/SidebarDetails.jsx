@@ -20,6 +20,7 @@ import DueDiligenceChecklist from './ui/DueDiligenceChecklist'
 import InvestmentProjection from './ui/InvestmentProjection'
 import LocationScore from './ui/LocationScore'
 import QuickInquiryTemplates from './ui/QuickInquiryTemplates'
+import InvestmentScoreBreakdown from './ui/InvestmentScoreBreakdown'
 import ZoningProgressBar from './ui/ZoningProgressBar'
 import { plotInquiryLink } from '../utils/config'
 
@@ -2103,6 +2104,26 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               {/* Associated Costs */}
               {/* Price Trend Chart — like Madlan's area price trends */}
               <PriceTrendChart totalPrice={totalPrice} sizeSqM={sizeSqM} city={plot.city} plotId={plot.id} />
+
+              {/* Investment Score Breakdown — transparent factor-by-factor scoring.
+                  Shows WHY a plot scored what it did — ROI, zoning, timeline, market position.
+                  Like Madlan's rating breakdown but more granular. Includes auto-generated narrative. */}
+              <InvestmentScoreBreakdown
+                plot={plot}
+                areaAvgPriceSqm={(() => {
+                  if (!allPlots || allPlots.length < 2) return undefined
+                  const sameCityPlots = allPlots.filter(p => p.city === plot.city && p.id !== plot.id)
+                  const benchPlots = sameCityPlots.length >= 2 ? sameCityPlots : allPlots.filter(p => p.id !== plot.id)
+                  if (benchPlots.length === 0) return undefined
+                  let total = 0, count = 0
+                  for (const p of benchPlots) {
+                    const pp = p.total_price ?? p.totalPrice ?? 0
+                    const ps = p.size_sqm ?? p.sizeSqM ?? 0
+                    if (pp > 0 && ps > 0) { total += pp / ps; count++ }
+                  }
+                  return count > 0 ? Math.round(total / count) : undefined
+                })()}
+              />
 
               {/* Investment Projection — forward-looking year-by-year value growth (S-curve model).
                   A key differentiator: Madlan/Yad2 show historical prices, we show the investor's FUTURE. */}
