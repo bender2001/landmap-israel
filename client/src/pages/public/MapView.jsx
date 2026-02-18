@@ -19,7 +19,7 @@ import ConnectionStatus from '../../components/ui/ConnectionStatus.jsx'
 import MarketStatsWidget from '../../components/MarketStatsWidget.jsx'
 import { useMetaTags } from '../../hooks/useMetaTags.js'
 import { useStructuredData } from '../../hooks/useStructuredData.js'
-import { formatCurrency, calcInvestmentScore } from '../../utils/formatters.js'
+import { formatCurrency, calcInvestmentScore, calcCAGR } from '../../utils/formatters.js'
 import { useViewTracker } from '../../hooks/useViewTracker.js'
 import { useSavedSearches } from '../../hooks/useSavedSearches.js'
 import { Phone } from 'lucide-react'
@@ -177,6 +177,17 @@ export default function MapView() {
         return bPpsqm - aPpsqm
       }); break
       case 'score-desc': sorted.sort((a, b) => calcInvestmentScore(b) - calcInvestmentScore(a)); break
+      case 'cagr-desc': sorted.sort((a, b) => {
+        const getCagr = (p) => {
+          const price = p.total_price ?? p.totalPrice ?? 0
+          const proj = p.projected_value ?? p.projectedValue ?? 0
+          const roiPct = price > 0 ? ((proj - price) / price) * 100 : 0
+          const readiness = p.readiness_estimate ?? p.readinessEstimate ?? ''
+          const data = calcCAGR(roiPct, readiness)
+          return data ? data.cagr : 0
+        }
+        return getCagr(b) - getCagr(a)
+      }); break
     }
     return sorted
   }, [searchedPlots, sortBy])

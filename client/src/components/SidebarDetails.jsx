@@ -4,7 +4,7 @@ import ShareMenu from './ui/ShareMenu'
 import ImageLightbox from './ui/ImageLightbox'
 import PriceTrendChart from './ui/PriceTrendChart'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
-import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel } from '../utils/formatters'
+import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
 import { usePlot, useNearbyPlots } from '../hooks/usePlots'
 import MiniMap from './ui/MiniMap'
@@ -463,6 +463,10 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
           <div class="card"><div class="label">שווי צפוי</div><div class="value green">${formatCurrency(proj)}</div></div>
           <div class="card"><div class="label">תשואה צפויה</div><div class="value gold">+${roi}%</div></div>
         </div>
+        ${(() => {
+          const cagrData = calcCAGR(roi, readiness)
+          return cagrData ? `<div class="row" style="margin-top:8px"><span class="label">תשואה שנתית (CAGR)</span><span class="val" style="color:#C8942A">${cagrData.cagr}% לשנה (${cagrData.years} שנים)</span></div>` : ''
+        })()}
       </div>
       <div class="section">
         <h2>פרטי חלקה</h2>
@@ -904,6 +908,30 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   <div className="text-[10px] text-slate-500 hidden sm:block">ROI</div>
                 </div>
               </div>
+
+              {/* CAGR — annualized return like professional investment platforms */}
+              {(() => {
+                const cagrData = calcCAGR(roi, readinessEstimate)
+                if (!cagrData) return null
+                const { cagr, years } = cagrData
+                const cagrColor = cagr >= 20 ? '#22C55E' : cagr >= 12 ? '#84CC16' : cagr >= 6 ? '#EAB308' : '#EF4444'
+                return (
+                  <div className="bg-navy-light/40 border border-white/5 rounded-xl p-3 mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${cagrColor}15` }}>
+                        <TrendingUp className="w-3.5 h-3.5" style={{ color: cagrColor }} />
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-300">תשואה שנתית (CAGR)</div>
+                        <div className="text-[10px] text-slate-500">על בסיס {years} שנות החזקה</div>
+                      </div>
+                    </div>
+                    <div className="text-lg font-black" style={{ color: cagrColor }}>
+                      {cagr}%
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* Tax authority comparison */}
               {taxAuthorityValue && (

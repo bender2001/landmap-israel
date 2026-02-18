@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback, useMemo, memo } from 'react'
 import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows, Share2 } from 'lucide-react'
 import PriceSparkline from './ui/PriceSparkline'
 import { statusColors, statusLabels } from '../utils/constants'
-import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor } from '../utils/formatters'
+import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR } from '../utils/formatters'
 import { usePrefetchPlot } from '../hooks/usePlots'
 import { whatsappShareLink } from '../utils/config'
 
@@ -195,6 +195,15 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
           </div>
           <div className="plot-card-mini-tags">
             <span className="plot-card-mini-roi">+{roi}%</span>
+            {(() => {
+              const cagrData = calcCAGR(roi, readiness)
+              if (!cagrData) return null
+              return (
+                <span className="plot-card-mini-cagr" title={`תשואה שנתית על בסיס ${cagrData.years} שנים`}>
+                  {cagrData.cagr}%/שנה
+                </span>
+              )
+            })()}
             {readiness && (
               <span className="plot-card-mini-time">
                 <Clock className="w-2.5 h-2.5" />

@@ -50,6 +50,7 @@ const sortOptions = [
   { label: 'תשואה: גבוהה לנמוכה', value: 'roi-desc', icon: ArrowDown },
   { label: 'תשואה: נמוכה לגבוהה', value: 'roi-asc', icon: ArrowUp },
   { label: 'ציון השקעה: גבוה לנמוך', value: 'score-desc', icon: ArrowDown },
+  { label: 'CAGR: גבוה לנמוך', value: 'cagr-desc', icon: ArrowDown },
 ]
 
 const statusEntries = Object.entries(statusColors)

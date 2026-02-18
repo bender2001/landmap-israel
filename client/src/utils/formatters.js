@@ -97,6 +97,28 @@ export function calcInvestmentScore(plot) {
 }
 
 /**
+ * Calculate annualized ROI (CAGR) based on total ROI and estimated holding period.
+ * Returns percentage per year. E.g. 100% over 5 years → ~14.87% CAGR.
+ */
+export function calcCAGR(totalRoiPct, readinessEstimate) {
+  if (!totalRoiPct || totalRoiPct <= 0) return null
+  // Parse years from readiness estimate string
+  let years = 5 // default
+  if (readinessEstimate) {
+    if (readinessEstimate.includes('1-3')) years = 2
+    else if (readinessEstimate.includes('3-5')) years = 4
+    else if (readinessEstimate.includes('5+') || readinessEstimate.includes('5-')) years = 7
+    else {
+      const match = readinessEstimate.match(/(\d+)/)
+      if (match) years = parseInt(match[1], 10)
+    }
+  }
+  if (years <= 0) return null
+  const cagr = (Math.pow(1 + totalRoiPct / 100, 1 / years) - 1) * 100
+  return { cagr: Math.round(cagr * 10) / 10, years }
+}
+
+/**
  * Get a label and color for the investment score.
  */
 export function getScoreLabel(score) {

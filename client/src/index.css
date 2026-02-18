@@ -1991,6 +1991,15 @@ body {
   border-radius: 6px;
 }
 
+.plot-card-mini-cagr {
+  font-size: 9px;
+  font-weight: 600;
+  color: #60A5FA;
+  background: rgba(96, 165, 250, 0.1);
+  padding: 2px 5px;
+  border-radius: 6px;
+}
+
 .plot-card-mini-time {
   display: flex;
   align-items: center;
