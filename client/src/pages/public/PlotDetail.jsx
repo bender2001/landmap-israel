@@ -1,6 +1,6 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart } from 'lucide-react'
+import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart, ExternalLink } from 'lucide-react'
 import { usePlot, useNearbyPlots } from '../../hooks/usePlots.js'
 import { useMarketOverview } from '../../hooks/useMarketOverview.js'
 import { useFavorites } from '../../hooks/useFavorites.js'
@@ -486,11 +486,17 @@ export default function PlotDetail() {
       <div className="relative z-10 pt-20 pb-28">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
 
-          {/* Breadcrumb */}
-          <nav className="flex items-center gap-2 text-xs text-slate-500 mb-6">
-            <button onClick={() => navigate('/')} className="hover:text-gold transition-colors">מפת קרקעות</button>
+          {/* Breadcrumb — uses history.back() when possible to preserve filter state from MapView */}
+          <nav className="flex items-center gap-2 text-xs text-slate-500 mb-6" aria-label="ניווט">
+            <button
+              onClick={() => window.history.length > 2 ? navigate(-1) : navigate('/')}
+              className="hover:text-gold transition-colors flex items-center gap-1"
+            >
+              <ArrowRight className="w-3 h-3" />
+              מפת קרקעות
+            </button>
             <span>/</span>
-            <button onClick={() => navigate(`/?city=${plot.city}`)} className="hover:text-gold transition-colors">{plot.city}</button>
+            <Link to={`/?city=${plot.city}`} className="hover:text-gold transition-colors">{plot.city}</Link>
             <span>/</span>
             <span className="text-slate-300">גוש {blockNumber} חלקה {plot.number}</span>
           </nav>
@@ -582,10 +588,41 @@ export default function PlotDetail() {
           {/* Location mini-map — like Madlan always shows location context */}
           {plot.coordinates && plot.coordinates.length >= 3 && (
             <div className="mb-8">
-              <h2 className="text-base font-bold text-slate-100 mb-3 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-gold" />
-                מיקום החלקה
-              </h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-gold" />
+                  מיקום החלקה
+                </h2>
+                {/* Google Street View link — like Madlan/Yad2's "סטריט וויו" */}
+                {(() => {
+                  const valid = plot.coordinates.filter(c => Array.isArray(c) && c.length >= 2 && isFinite(c[0]) && isFinite(c[1]))
+                  if (valid.length === 0) return null
+                  const lat = (valid.reduce((s, c) => s + c[0], 0) / valid.length).toFixed(6)
+                  const lng = (valid.reduce((s, c) => s + c[1], 0) / valid.length).toFixed(6)
+                  return (
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={`https://www.google.com/maps/@${lat},${lng},3a,75y,0h,90t/data=!3m4!1e1!3m2!1s!2e0`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-400 bg-white/5 border border-white/10 rounded-lg hover:text-gold hover:border-gold/20 hover:bg-gold/5 transition-all"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Street View
+                      </a>
+                      <a
+                        href={`https://www.google.com/maps?q=${lat},${lng}&z=17`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-400 bg-white/5 border border-white/10 rounded-lg hover:text-gold hover:border-gold/20 hover:bg-gold/5 transition-all"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Google Maps
+                      </a>
+                    </div>
+                  )
+                })()}
+              </div>
               <MiniMap
                 coordinates={plot.coordinates}
                 status={plot.status}
@@ -921,10 +958,10 @@ export default function PlotDetail() {
                 }
               </button>
               <button
-                onClick={() => navigate('/')}
+                onClick={() => window.history.length > 2 ? navigate(-1) : navigate('/')}
                 className="w-12 sm:w-14 flex items-center justify-center bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-gold/20 transition-all"
                 aria-label="חזרה למפה"
-                title="חזרה למפה"
+                title="חזרה למפה (שומר סינונים)"
               >
                 <MapPin className="w-5 h-5 text-gold" />
               </button>

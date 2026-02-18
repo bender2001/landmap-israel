@@ -1,4 +1,4 @@
-﻿import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, ZoomControl, useMap, LayersControl } from 'react-leaflet'
+﻿import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, Circle, ZoomControl, useMap, LayersControl } from 'react-leaflet'
 import L from 'leaflet'
 import { useState, useEffect, useCallback, useRef, useMemo, memo, forwardRef } from 'react'
 import { MapPin, Eye, Check, ArrowLeft, Navigation, Layers, Map as MapIcon } from 'lucide-react'
@@ -123,6 +123,53 @@ function MapLayerSwitcher({ activeLayer, onChangeLayer }) {
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * User location blue dot — renders a pulsing blue circle at the user's geolocation.
+ * Like Google Maps / Madlan's "you are here" indicator. Appears after geolocation is triggered
+ * and stays visible until the component unmounts or location changes.
+ */
+function UserLocationMarker() {
+  const map = useMap()
+  const [position, setPosition] = useState(null)
+  const [accuracy, setAccuracy] = useState(0)
+
+  useEffect(() => {
+    const onFound = (e) => {
+      setPosition(e.latlng)
+      setAccuracy(e.accuracy)
+    }
+    map.on('locationfound', onFound)
+    return () => { map.off('locationfound', onFound) }
+  }, [map])
+
+  if (!position) return null
+
+  const blueDotIcon = L.divIcon({
+    className: 'user-location-marker',
+    html: `<div class="user-dot-outer"><div class="user-dot-inner"></div></div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  })
+
+  return (
+    <>
+      {/* Accuracy circle — shows GPS precision radius */}
+      {accuracy > 0 && accuracy < 2000 && (
+        <Circle
+          center={position}
+          radius={accuracy}
+          pathOptions={{ color: '#4285F4', fillColor: '#4285F4', fillOpacity: 0.08, weight: 1, opacity: 0.3 }}
+        />
+      )}
+      <Marker position={position} icon={blueDotIcon} zIndexOffset={9999}>
+        <Tooltip direction="top" offset={[0, -14]} className="user-location-tooltip">
+          <span className="text-[11px]">📍 המיקום שלך</span>
+        </Tooltip>
+      </Marker>
+    </>
   )
 }
 
@@ -805,6 +852,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         <AutoFitBounds plots={plots} />
         <FlyToSelected plot={selectedPlot} />
         <MapToolbar plots={plots} />
+        <UserLocationMarker />
         <MapClusterLayer plots={plots} onSelectPlot={onSelectPlot} />
         <MapRuler />
         <MapHeatLayer plots={plots} visible={colorMode === 'heatmap'} metric="priceSqm" />
