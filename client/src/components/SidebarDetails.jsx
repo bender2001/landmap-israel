@@ -6,7 +6,7 @@ import PriceTrendChart from './ui/PriceTrendChart'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import ProfitWaterfall from './ui/ProfitWaterfall'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
-import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict, generatePlotSummary } from '../utils/formatters'
+import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict, calcRiskLevel, generatePlotSummary } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
 import NeighborhoodRadar from './ui/NeighborhoodRadar'
 import InvestmentBenchmark from './ui/InvestmentBenchmark'
@@ -1086,6 +1086,49 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               )
             })()}
 
+            {/* Investment Risk Level — differentiator vs Madlan/Yad2 (they don't show risk) */}
+            {(() => {
+              const risk = calcRiskLevel(plot, allPlots)
+              if (!risk) return null
+              // Visual gauge: 5 segments representing risk levels 1-5
+              const segments = [1, 2, 3, 4, 5]
+              return (
+                <div className="flex items-center gap-3 rounded-2xl p-3 mb-3 border bg-navy-light/30 border-white/5 animate-stagger-1">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-base" style={{ background: `${risk.color}15` }}>
+                    {risk.emoji}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold" style={{ color: risk.color }}>{risk.label}</span>
+                      <span className="text-[9px] text-slate-500">{risk.level}/5</span>
+                    </div>
+                    {/* Risk gauge bar */}
+                    <div className="flex gap-0.5 mb-1.5">
+                      {segments.map(s => (
+                        <div
+                          key={s}
+                          className="h-1.5 flex-1 rounded-full transition-colors"
+                          style={{
+                            background: s <= risk.level
+                              ? s <= 2 ? '#22C55E' : s <= 3 ? '#F59E0B' : '#EF4444'
+                              : 'rgba(255,255,255,0.06)',
+                          }}
+                        />
+                      ))}
+                    </div>
+                    {/* Risk factors */}
+                    {risk.factors.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {risk.factors.map((factor, i) => (
+                          <span key={i} className="text-[8px] text-slate-500 bg-white/[0.03] px-1.5 py-0.5 rounded">{factor}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Description */}
             {plot.description && (
               <p className="text-sm text-slate-300 leading-relaxed mb-1 animate-stagger-1">{plot.description}</p>
@@ -1837,6 +1880,25 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
             {/* Due Diligence Checklist — like Madlan's buyer guides */}
             <div id="section-dd">
               <DueDiligenceChecklist plotId={plot.id} />
+            </div>
+
+            {/* Report Inaccuracy — trust-building pattern from Madlan (דיווח על שגיאה) */}
+            <div className="mt-6 mb-2 pt-4 border-t border-white/5 flex items-center justify-between">
+              <a
+                href={`mailto:info@landmapisrael.com?subject=${encodeURIComponent(`דיווח על אי-דיוק — גוש ${blockNumber} חלקה ${plot.number}`)}&body=${encodeURIComponent(`שלום,\n\nמצאתי אי-דיוק בנתוני חלקה:\nגוש ${blockNumber} | חלקה ${plot.number} | ${plot.city}\n\nהפרט השגוי:\n\nהנתון הנכון:\n\nתודה`)}`}
+                className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+                title="דווח על מידע שגוי בחלקה זו"
+              >
+                <AlertTriangle className="w-3 h-3" />
+                <span>דיווח על אי-דיוק</span>
+              </a>
+              <span className="text-[9px] text-slate-600">
+                עודכן {(() => {
+                  const d = plot.updated_at ?? plot.updatedAt ?? plot.created_at ?? plot.createdAt
+                  if (!d) return '—'
+                  return new Date(d).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' })
+                })()}
+              </span>
             </div>
           </div>
         </div>

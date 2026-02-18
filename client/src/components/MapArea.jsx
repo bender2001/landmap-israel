@@ -658,11 +658,22 @@ function hasValidCoordinates(plot) {
  * sidebar, etc.) to only plots visible in the current viewport.
  * Hides after click, reappears on next manual move.
  */
-function SearchThisAreaButton({ onSearchArea }) {
+function SearchThisAreaButton({ onSearchArea, autoSearch, onToggleAutoSearch }) {
   const map = useMap()
   const [visible, setVisible] = useState(false)
   const initialFitRef = useRef(true)
   const timeoutRef = useRef(null)
+
+  // Get current bounds as a search filter object
+  const getBoundsFilter = useCallback(() => {
+    const bounds = map.getBounds()
+    return {
+      north: bounds.getNorth(),
+      south: bounds.getSouth(),
+      east: bounds.getEast(),
+      west: bounds.getWest(),
+    }
+  }, [map])
 
   useEffect(() => {
     // Ignore the first few moves (auto fit-bounds on load)
@@ -670,7 +681,17 @@ function SearchThisAreaButton({ onSearchArea }) {
     const handler = () => {
       if (Date.now() < ignoreUntil) return
       initialFitRef.current = false
-      // Debounce to avoid flicker
+
+      // Auto-search mode: trigger immediately on map move (debounced)
+      if (autoSearch) {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current)
+        timeoutRef.current = setTimeout(() => {
+          onSearchArea(getBoundsFilter())
+        }, 400)
+        return
+      }
+
+      // Manual mode: show the button
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
       timeoutRef.current = setTimeout(() => setVisible(true), 300)
     }
@@ -681,32 +702,42 @@ function SearchThisAreaButton({ onSearchArea }) {
       map.off('zoomend', handler)
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
     }
-  }, [map])
+  }, [map, autoSearch, onSearchArea, getBoundsFilter])
 
   const handleClick = useCallback(() => {
-    const bounds = map.getBounds()
-    onSearchArea({
-      north: bounds.getNorth(),
-      south: bounds.getSouth(),
-      east: bounds.getEast(),
-      west: bounds.getWest(),
-    })
+    onSearchArea(getBoundsFilter())
     setVisible(false)
-  }, [map, onSearchArea])
-
-  if (!visible) return null
+  }, [onSearchArea, getBoundsFilter])
 
   return (
-    <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[1001] pointer-events-none">
-      <button
-        onClick={handleClick}
-        className="pointer-events-auto glass-panel px-4 py-2 flex items-center gap-2 hover:border-gold/30 transition-all hover:shadow-lg hover:shadow-gold/10 animate-fade-in"
-        dir="rtl"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gold"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <span className="text-xs font-medium text-slate-200">חפש באזור זה</span>
-      </button>
-    </div>
+    <>
+      {/* Auto-search toggle — like Madlan/Airbnb "חפש בעת הזזת המפה" */}
+      <div className="absolute top-[4.2rem] left-4 z-[1001] pointer-events-none" dir="rtl">
+        <label className="pointer-events-auto glass-panel px-3 py-1.5 flex items-center gap-2 cursor-pointer hover:border-gold/20 transition-all select-none">
+          <input
+            type="checkbox"
+            checked={autoSearch}
+            onChange={() => onToggleAutoSearch(!autoSearch)}
+            className="w-3.5 h-3.5 rounded accent-gold cursor-pointer"
+          />
+          <span className="text-[10px] text-slate-400 whitespace-nowrap">חפש בעת הזזת המפה</span>
+        </label>
+      </div>
+
+      {/* Manual search button — only shown when auto-search is OFF */}
+      {visible && !autoSearch && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[1001] pointer-events-none">
+          <button
+            onClick={handleClick}
+            className="pointer-events-auto glass-panel px-4 py-2 flex items-center gap-2 hover:border-gold/30 transition-all hover:shadow-lg hover:shadow-gold/10 animate-fade-in"
+            dir="rtl"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gold"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span className="text-xs font-medium text-slate-200">חפש באזור זה</span>
+          </button>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -875,7 +906,7 @@ function ViewportCulledPolygons({ plots, plotColors, hoveredId, onSelectPlot, on
   ))
 }
 
-export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites, compareIds = [], onToggleCompare, onClearFilters, onFilterChange, onSearchArea }) {
+export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites, compareIds = [], onToggleCompare, onClearFilters, onFilterChange, onSearchArea, autoSearch = false, onToggleAutoSearch }) {
   const [hoveredId, setHoveredId] = useState(null)
   const [activeLayerId, setActiveLayerId] = useState('satellite')
   const [colorMode, setColorMode] = useState('status')
@@ -978,7 +1009,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         <MapRuler />
         <MapHeatLayer plots={plots} visible={colorMode === 'heatmap'} metric="priceSqm" />
         <GeoSearch />
-        {onSearchArea && <SearchThisAreaButton onSearchArea={onSearchArea} />}
+        {onSearchArea && <SearchThisAreaButton onSearchArea={onSearchArea} autoSearch={autoSearch} onToggleAutoSearch={onToggleAutoSearch} />}
         <MapViewportCounter plots={plots} totalCount={plots.length} />
 
         {/* Viewport-culled polygons: only renders plots visible in the current map viewport.

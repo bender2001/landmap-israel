@@ -83,6 +83,10 @@ export default function MapView() {
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false)
   const [boundsFilter, setBoundsFilter] = useState(null)
+  // Auto-search on map move — stored in localStorage for persistence (like Madlan/Airbnb)
+  const [autoSearchOnMove, setAutoSearchOnMove] = useState(() => {
+    try { return localStorage.getItem('landmap_auto_search') === 'true' } catch { return false }
+  })
 
   // Capture the initial ?plot= param before any effect can clear it
   const initialPlotRef = useRef(searchParams.get('plot'))
@@ -414,6 +418,13 @@ export default function MapView() {
     setBoundsFilter(bounds)
   }, [])
 
+  const handleToggleAutoSearch = useCallback((enabled) => {
+    setAutoSearchOnMove(enabled)
+    try { localStorage.setItem('landmap_auto_search', String(enabled)) } catch {}
+    // If turning off, clear the bounds filter so all plots show again
+    if (!enabled) setBoundsFilter(null)
+  }, [])
+
   const handleClearBounds = useCallback(() => {
     setBoundsFilter(null)
   }, [])
@@ -633,6 +644,8 @@ export default function MapView() {
           onClearFilters={handleClearFilters}
           onFilterChange={handleFilterChange}
           onSearchArea={handleSearchArea}
+          autoSearch={autoSearchOnMove}
+          onToggleAutoSearch={handleToggleAutoSearch}
         />
       </MapErrorBoundary>
 
