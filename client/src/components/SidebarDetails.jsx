@@ -1028,9 +1028,10 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
 
   return (
     <>
-      {/* Backdrop — click to close (WCAG: backdrop should be dismissible) */}
+      {/* Backdrop — click to close (WCAG: backdrop should be dismissible).
+          sidebar-backdrop class adds fade-in animation for smooth appearance. */}
       <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[50]"
+        className="sidebar-backdrop fixed inset-0 bg-black/40 backdrop-blur-sm z-[50]"
         onClick={handleClose}
         aria-hidden="true"
       />

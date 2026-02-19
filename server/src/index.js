@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename)
 import helmet from 'helmet'
 import compression from 'compression'
 import { rateLimit } from 'express-rate-limit'
+import { plotCache, statsCache } from './services/cacheService.js'
 import plotRoutes from './routes/plots.js'
 import leadRoutes from './routes/leads.js'
 import chatRoutes from './routes/chat.js'

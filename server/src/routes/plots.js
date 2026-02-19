@@ -91,29 +91,15 @@ function applySparseFields(plots, fieldsParam) {
     for (const field of requested) {
       if (field in p) sparse[field] = p[field]
     }
-    // Always include computed enrichment fields (lightweight, ~100 bytes each)
-    if (p._investmentScore != null) sparse._investmentScore = p._investmentScore
-    if (p._grade != null) sparse._grade = p._grade
-    if (p._roi != null) sparse._roi = p._roi
-    if (p._pricePerSqm != null) sparse._pricePerSqm = p._pricePerSqm
-    if (p._monthlyPayment != null) sparse._monthlyPayment = p._monthlyPayment
-    if (p._daysOnMarket != null) sparse._daysOnMarket = p._daysOnMarket
-    if (p._riskLevel != null) sparse._riskLevel = p._riskLevel
-    if (p._riskScore != null) sparse._riskScore = p._riskScore
-    if (p._riskFactors != null) sparse._riskFactors = p._riskFactors
-    if (p._cagr != null) sparse._cagr = p._cagr
-    if (p._holdingYears != null) sparse._holdingYears = p._holdingYears
-    if (p._marketTrend != null) sparse._marketTrend = p._marketTrend
-    if (p._dealDiscount != null) sparse._dealDiscount = p._dealDiscount
-    if (p._investmentRank != null) sparse._investmentRank = p._investmentRank
-    if (p._totalRanked != null) sparse._totalRanked = p._totalRanked
-    if (p._netRoi != null) sparse._netRoi = p._netRoi
-    if (p._totalEntryCost != null) sparse._totalEntryCost = p._totalEntryCost
-    if (p._netProfit != null) sparse._netProfit = p._netProfit
-    if (p._totalCosts != null) sparse._totalCosts = p._totalCosts
-    if (p._paybackYears != null) sparse._paybackYears = p._paybackYears
-    if (p._buySignal != null) sparse._buySignal = p._buySignal
-    if (p._cityAvgPriceSqm != null) sparse._cityAvgPriceSqm = p._cityAvgPriceSqm
+    // Always include computed enrichment fields (prefixed with _).
+    // Uses a single loop over Object.keys instead of 20+ individual null checks.
+    // Automatically picks up any new enrichment fields added by plotService —
+    // no more forgetting to update this list when adding _newMetric to enrichment.
+    for (const key of Object.keys(p)) {
+      if (key.charCodeAt(0) === 95 /* '_' */ && p[key] != null) {
+        sparse[key] = p[key]
+      }
+    }
     return sparse
   })
 }
