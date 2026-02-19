@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../config/supabase.js'
 import { plotCache, statsCache, marketCache } from '../services/cacheService.js'
 import { getClientCount } from '../services/sseService.js'
 import { responseTracker } from '../services/responseTimeTracker.js'
+import { serverState } from '../services/serverState.js'
 
 const router = Router()
 
@@ -85,6 +86,15 @@ router.get('/', async (req, res) => {
 
   const statusCode = overallStatus === 'error' ? 503 : 200
 
+  // 6. Cache warming status — indicates whether startup pre-population completed.
+  // Until caches are warm, the first few requests hit Supabase with cold-start latency.
+  const warmedAt = serverState.cacheWarmedAt
+  checks.cacheWarming = {
+    warmed: !!warmedAt,
+    warmedAt: warmedAt ? new Date(warmedAt).toISOString() : null,
+    warmedAgoSec: warmedAt ? Math.round((Date.now() - warmedAt) / 1000) : null,
+  }
+
   // No caching — health checks should always be fresh
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate')
 
@@ -109,6 +119,29 @@ router.get('/', async (req, res) => {
 router.get('/ping', (req, res) => {
   res.set('Cache-Control', 'no-cache, no-store')
   res.json({ pong: true, ts: Date.now() })
+})
+
+/**
+ * GET /api/health/ready
+ * Readiness probe — returns 200 only when the server has warmed caches
+ * and is fully ready to serve traffic with optimal latency.
+ * Used by Kubernetes readinessProbe, Docker HEALTHCHECK, and blue-green deploys.
+ *
+ * Difference from /ping:
+ * - /ping: "process is alive" (liveness) — always 200
+ * - /ready: "ready for traffic" (readiness) — 200 after cache warming, 503 before
+ *
+ * Difference from /:
+ * - /: full diagnostics with DB check (50-200ms) — for monitoring dashboards
+ * - /ready: instant response (0ms) — for frequent polling by orchestrators
+ */
+router.get('/ready', (req, res) => {
+  res.set('Cache-Control', 'no-cache, no-store')
+  const warmedAt = serverState.cacheWarmedAt
+  if (warmedAt) {
+    return res.json({ ready: true, warmedAt: new Date(warmedAt).toISOString() })
+  }
+  res.status(503).json({ ready: false, reason: 'Cache warming in progress' })
 })
 
 // ─── Client Error Reporting ────────────────────────────────────────────

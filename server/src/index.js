@@ -504,11 +504,36 @@ app.use(errorHandler)
 // SSE service imports (used by /api/events above and shutdown below)
 import { addClient, removeClient, closeAll as closeSSE, getClientCount, startKeepalive, stopKeepalive } from './services/sseService.js'
 
+import { serverState } from './services/serverState.js'
+
 const server = app.listen(PORT, async () => {
   // Start SSE keepalive heartbeat — prevents proxy/LB timeout on idle connections.
   // Sends a comment ping every 25s (below Nginx's default 60s proxy_read_timeout).
   startKeepalive()
   console.log(`[server] Running on http://localhost:${PORT}`)
+
+  // ─── Cache warming — pre-populate plot cache on startup ──────────────
+  // Without this, the first user request after deploy/restart hits Supabase with
+  // full cold-start latency (200-500ms). Pre-warming ensures instant responses
+  // from the very first request. Classic Google SRE pattern for latency-sensitive services.
+  try {
+    const warmStart = performance.now()
+    const { getPublishedPlots, getPlotStats } = await import('./services/plotService.js')
+
+    // Warm the main plots cache (most frequently hit endpoint)
+    const plots = await getPublishedPlots({})
+    plotCache.set('plots:{}', plots, 30_000)
+
+    // Warm the stats cache (polled by dashboard widgets)
+    const stats = await getPlotStats()
+    statsCache.set('plot-stats', stats, 120_000)
+
+    const warmMs = Math.round(performance.now() - warmStart)
+    serverState.cacheWarmedAt = Date.now()
+    console.log(`[cache] Warmed: ${plots.length} plots + stats in ${warmMs}ms`)
+  } catch (err) {
+    console.warn(`[cache] Warming failed (non-fatal): ${err.message}`)
+  }
 
   // Take daily price snapshot on startup (idempotent, non-blocking)
   try {

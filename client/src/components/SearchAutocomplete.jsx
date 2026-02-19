@@ -16,19 +16,26 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
   const listRef = useRef(null)
 
   // Filter plots based on search query — memoized to avoid recomputing on every render.
-  // Without useMemo this IIFE ran on every keystroke AND on unrelated state changes (focus, highlight).
+  // Uses early termination (stops after MAX_SUGGESTIONS matches) instead of .filter().slice()
+  // which iterates ALL plots even after finding enough matches. With 12 plots this saves little,
+  // but at 200+ plots (growth target) it avoids iterating the remaining 194 plots after finding 6.
+  const MAX_SUGGESTIONS = 6
   const suggestions = useMemo(() => {
     if (!value || value.length < 1) return []
     const q = value.toLowerCase()
-    return plots
-      .filter((p) => {
-        const bn = (p.block_number ?? p.blockNumber ?? '').toString()
-        const num = (p.number ?? '').toString()
-        const city = (p.city ?? '').toLowerCase()
-        const desc = (p.description ?? '').toLowerCase()
-        return bn.includes(q) || num.includes(q) || city.includes(q) || desc.includes(q)
-      })
-      .slice(0, 6) // max 6 suggestions
+    const results = []
+    for (let i = 0; i < plots.length; i++) {
+      if (results.length >= MAX_SUGGESTIONS) break // early termination — skip remaining plots
+      const p = plots[i]
+      const bn = (p.block_number ?? p.blockNumber ?? '').toString()
+      const num = (p.number ?? '').toString()
+      const city = (p.city ?? '').toLowerCase()
+      const desc = (p.description ?? '').toLowerCase()
+      if (bn.includes(q) || num.includes(q) || city.includes(q) || desc.includes(q)) {
+        results.push(p)
+      }
+    }
+    return results
   }, [value, plots])
 
   const hasQuery = value && value.length >= 1
