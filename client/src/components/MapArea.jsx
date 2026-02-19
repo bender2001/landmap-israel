@@ -1562,6 +1562,85 @@ function CityAggregateLabels({ plots }) {
   return null
 }
 
+/**
+ * ShareViewButton — copies the current URL (with filters + map viewport hash) to clipboard.
+ * Positioned below the brand badge on desktop, above the legend on mobile.
+ * Uses the Web Share API on mobile (opens system share sheet), clipboard on desktop.
+ * Like Madlan's "share this search" and Airbnb's "share this view" patterns.
+ */
+function ShareViewButton() {
+  const [copied, setCopied] = useState(false)
+  const timerRef = useRef(null)
+
+  const handleShare = useCallback(async () => {
+    const url = window.location.href
+
+    // Mobile: use native Web Share API for system share sheet (WhatsApp, Telegram, etc.)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'LandMap Israel — מפת קרקעות',
+          text: 'תסתכל על החלקות האלה ב-LandMap',
+          url,
+        })
+        return
+      } catch {
+        // User cancelled or share failed — fall through to clipboard
+      }
+    }
+
+    // Desktop: copy to clipboard
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea')
+      textarea.value = url
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      setCopied(true)
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setCopied(false), 2000)
+    }
+  }, [])
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+
+  return (
+    <div className="absolute top-4 left-4 sm:top-[4.5rem] z-[1000]">
+      <button
+        onClick={handleShare}
+        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-medium backdrop-blur-md border shadow-lg transition-all hover:scale-105 ${
+          copied
+            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+            : 'bg-navy/80 border-white/10 text-slate-400 hover:text-gold hover:border-gold/20'
+        }`}
+        title="שתף את תצוגת המפה הנוכחית"
+        aria-label={copied ? 'הקישור הועתק!' : 'שתף תצוגה'}
+      >
+        {copied ? (
+          <>
+            <Check className="w-3.5 h-3.5" />
+            <span>הועתק!</span>
+          </>
+        ) : (
+          <>
+            <Link2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">שתף תצוגה</span>
+          </>
+        )}
+      </button>
+    </div>
+  )
+}
+
 export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites, compareIds = [], onToggleCompare, onClearFilters, onFilterChange, onSearchArea, autoSearch = false, onToggleAutoSearch }) {
   const [hoveredId, setHoveredId] = useState(null)
   const [activeLayerId, setActiveLayerId] = useState('satellite')
@@ -1688,6 +1767,11 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
 
       {/* Color mode toggle — price heatmap / ROI / status */}
       <ColorModeToggle colorMode={colorMode} onChangeColorMode={setColorMode} />
+
+      {/* Share current view button — copies the full URL (filters + map position) to clipboard.
+          Like Madlan/Airbnb's share button that lets users share a specific map view with partners.
+          Investors commonly share specific filter configurations ("check out Hadera plots under 500K"). */}
+      <ShareViewButton />
 
       {/* Map vignette overlay */}
       <div className="map-vignette" />

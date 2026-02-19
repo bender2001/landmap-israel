@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Search, X, MapPin, TrendingUp, Clock, ArrowLeft, Eye, History } from 'lucide-react'
+import { Search, X, MapPin, TrendingUp, Clock, ArrowLeft, Eye, History, Flame } from 'lucide-react'
 import { statusColors, statusLabels } from '../utils/constants'
 import { formatPriceShort, formatDunam } from '../utils/formatters'
+import { useTrendingSearches } from '../hooks/usePlots'
 
 /**
  * Search autocomplete dropdown — shows matching plots as user types.
- * On focus without query: shows recent searches + popular/recently viewed plots.
+ * On focus without query: shows recent searches + trending/popular/recently viewed plots.
  * Similar to Madlan's address-based search but for plots.
  */
 export default function SearchAutocomplete({ value, onChange, plots = [], onSelectPlot, placeholder }) {
@@ -69,8 +70,18 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
       .slice(0, remaining)
   }, [isFocused, hasQuery, plots, recentlyViewedPlots])
 
-  // Should we show the focus menu (recent searches + recently viewed + popular)?
-  const showFocusMenu = isFocused && !hasQuery && (recentSearches.length > 0 || recentlyViewedPlots.length > 0 || popularPlots.length > 0)
+  // Trending searches from the server — queries that other users search frequently.
+  // Like Google's trending searches or Madlan's "חיפושים פופולריים".
+  // Deduplicated against recentSearches to avoid showing the same term twice.
+  const { data: trendingRaw = [] } = useTrendingSearches()
+  const trendingSearches = useMemo(() => {
+    if (!isFocused || hasQuery) return []
+    const recentSet = new Set(recentSearches.map(s => s.toLowerCase()))
+    return trendingRaw.filter(s => !recentSet.has(s.toLowerCase())).slice(0, 3)
+  }, [isFocused, hasQuery, trendingRaw, recentSearches])
+
+  // Should we show the focus menu (recent searches + trending + recently viewed + popular)?
+  const showFocusMenu = isFocused && !hasQuery && (recentSearches.length > 0 || trendingSearches.length > 0 || recentlyViewedPlots.length > 0 || popularPlots.length > 0)
 
   const saveRecentSearch = useCallback((query) => {
     try {
@@ -198,6 +209,30 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
                   aria-selected={false}
                 >
                   <Search className="w-3 h-3 text-slate-500 flex-shrink-0 mx-1" />
+                  <span className="text-xs text-slate-300 flex-1 text-right truncate">{query}</span>
+                  <ArrowLeft className="w-3 h-3 text-slate-600 search-autocomplete-item-arrow" />
+                </button>
+              ))}
+            </>
+          )}
+          {/* Trending searches — queries that other users search frequently.
+              Like Google's trending queries or Madlan's "חיפושים פופולריים".
+              Shows only terms not already in the user's recent searches. */}
+          {trendingSearches.length > 0 && (
+            <>
+              <div className="search-autocomplete-header">
+                <Flame className="w-3 h-3 text-orange-400" />
+                <span>חיפושים פופולריים</span>
+              </div>
+              {trendingSearches.map((query, i) => (
+                <button
+                  key={`trend-${i}`}
+                  className="search-autocomplete-item"
+                  onClick={() => { onChange(query); setIsFocused(true) }}
+                  role="option"
+                  aria-selected={false}
+                >
+                  <TrendingUp className="w-3 h-3 text-orange-400/60 flex-shrink-0 mx-1" />
                   <span className="text-xs text-slate-300 flex-1 text-right truncate">{query}</span>
                   <ArrowLeft className="w-3 h-3 text-slate-600 search-autocomplete-item-arrow" />
                 </button>

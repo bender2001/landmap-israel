@@ -67,3 +67,12 @@ export function getPlotsBatch(ids) {
 export function getNearbyPois(plotId, maxKm = 3) {
   return api.get(`/plots/${plotId}/nearby-pois?maxKm=${maxKm}`)
 }
+
+/**
+ * Fetch trending search queries — powers "Popular Searches" in SearchAutocomplete.
+ * Returns search terms that other users have searched for frequently.
+ * Like Google's trending searches or Madlan's "חיפושים פופולריים".
+ */
+export function getTrendingSearches(limit = 5) {
+  return api.get(`/plots/trending-searches?limit=${limit}`)
+}

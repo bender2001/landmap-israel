@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { useCallback, useRef } from 'react'
-import { getPlots, getPlot, getNearbyPlots, getSimilarPlots, getPopularPlots, getFeaturedPlots, getPlotsBatch, getNearbyPois } from '../api/plots.js'
+import { useCallback, useRef, useEffect } from 'react'
+import { getPlots, getPlot, getNearbyPlots, getSimilarPlots, getPopularPlots, getFeaturedPlots, getPlotsBatch, getNearbyPois, getTrendingSearches } from '../api/plots.js'
 import { plots as mockPlots } from '../data/mockData.js'
 import { useIsSlowConnection } from './useNetworkStatus.js'
 
@@ -109,6 +109,30 @@ export function useAllPlots(filters) {
     }))
   }
   prevSourceRef.current = currentSource
+
+  // ─── Stale data auto-retry with exponential backoff ───────────────────
+  // When the server returned 5xx and we're serving cached ETag data, automatically
+  // retry fetching fresh data on a backoff schedule (15s → 30s → 60s → 120s).
+  // This recovers transparently when the server comes back — the user doesn't need
+  // to manually refresh. Like Google Maps' seamless recovery from network issues.
+  // Max 5 retries to avoid infinite background requests on a dead server.
+  const staleRetryRef = useRef({ count: 0, timer: null })
+  useEffect(() => {
+    const ref = staleRetryRef.current
+    if (isStaleData && !isMockData) {
+      if (ref.count < 5) {
+        const delay = Math.min(15000 * Math.pow(2, ref.count), 120000) // 15s, 30s, 60s, 120s
+        ref.timer = setTimeout(() => {
+          ref.count++
+          query.refetch()
+        }, delay)
+      }
+    } else {
+      // Data is fresh — reset retry counter
+      ref.count = 0
+    }
+    return () => { if (ref.timer) clearTimeout(ref.timer) }
+  }, [isStaleData, isMockData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     ...query,
@@ -243,6 +267,31 @@ export function useNearbyPois(plotId) {
     gcTime: 10 * 60_000,
     retry: 1,
     placeholderData: { pois: [], categories: {}, count: 0 },
+  })
+}
+
+/**
+ * Fetch trending search queries — powers the "Popular Searches" section in SearchAutocomplete.
+ * Returns search terms that real users have searched for frequently.
+ * Like Google Trends suggestions or Madlan's "חיפושים פופולריים".
+ * Long stale time (10 min) and refresh interval (15 min) — trending data changes slowly.
+ */
+export function useTrendingSearches() {
+  return useQuery({
+    queryKey: ['trendingSearches'],
+    queryFn: async () => {
+      try {
+        const data = await getTrendingSearches(5)
+        return data?.searches || []
+      } catch {
+        return []
+      }
+    },
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
+    refetchInterval: 15 * 60_000,
+    refetchIntervalInBackground: false,
+    placeholderData: [],
   })
 }
 

@@ -101,6 +101,33 @@ function applySparseFields(plots, fieldsParam) {
   })
 }
 
+// GET /api/plots/trending-searches - Public popular search terms for autocomplete suggestions.
+// Returns the top N search queries from the analytics service (in-memory, no DB hit).
+// Feeds into SearchAutocomplete's "Popular Searches" section when the input is focused
+// without a query — like Google's trending searches or Madlan's "חיפושים פופולריים".
+// Cached 2 minutes to avoid hammering the analytics singleton.
+router.get('/trending-searches', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 5, 15)
+    res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300')
+
+    const topSearches = analytics.getTopSearches(limit)
+    // Only return searches with 2+ occurrences to filter out noise
+    const meaningful = topSearches.filter(s => s.count >= 2).map(s => s.query)
+
+    const etag = generateETag(meaningful)
+    res.set('ETag', etag)
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end()
+    }
+
+    res.json({ searches: meaningful })
+  } catch {
+    // Non-critical — return empty on error
+    res.json({ searches: [] })
+  }
+})
+
 // GET /api/plots - List published plots with optional filters
 router.get('/', sanitizePlotQuery, async (req, res, next) => {
   try {
