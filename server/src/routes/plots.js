@@ -8,6 +8,7 @@ import { analytics } from '../services/analyticsService.js'
 import { plotCache, statsCache } from '../services/cacheService.js'
 import { supabaseAdmin } from '../config/supabase.js'
 import { haversineKm, calcCentroid, formatDistance, estimateTravelTime } from '../utils/geo.js'
+import { viewBatcher } from '../services/viewBatcher.js'
 
 const router = Router()
 
@@ -678,7 +679,9 @@ router.get('/:id/nearby', sanitizePlotId, computeHeavyLimiter, requestAbortSigna
 })
 
 // POST /api/plots/:id/view - Track a plot view (fire-and-forget, no auth needed)
-// Rate-limited: 1 view per IP+plotId per 5 minutes to prevent inflation
+// Rate-limited: 1 view per IP+plotId per 5 minutes to prevent inflation.
+// Uses ViewBatcher to accumulate views in memory and flush every 30s — reduces
+// DB writes from N per minute to 1 batch every 30s (60x fewer writes at scale).
 router.post('/:id/view', sanitizePlotId, async (req, res) => {
   const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown'
   const plotId = req.params.id
@@ -688,31 +691,14 @@ router.post('/:id/view', sanitizePlotId, async (req, res) => {
     return res.json({ ok: true, cached: true })
   }
 
-  // Track in analytics
+  // Track in analytics (in-memory, instant)
   analytics.trackPlotClick(plotId)
+
+  // Queue for batch DB write — ViewBatcher flushes every 30s
+  viewBatcher.record(plotId)
+
   // Always respond immediately — view tracking is non-critical
   res.json({ ok: true })
-
-  try {
-    // Try RPC first (atomic increment, best approach)
-    const { error: rpcError } = await supabaseAdmin.rpc('increment_views', { plot_id: plotId })
-    if (rpcError) {
-      // Fallback: read-then-write (acceptable race condition for view counts)
-      const { data: plot } = await supabaseAdmin
-        .from('plots')
-        .select('views')
-        .eq('id', plotId)
-        .single()
-      if (plot) {
-        await supabaseAdmin
-          .from('plots')
-          .update({ views: (plot.views || 0) + 1 })
-          .eq('id', plotId)
-      }
-    }
-  } catch {
-    // Silently ignore — view tracking failure is not user-facing
-  }
 })
 
 // GET /api/plots/by-gush/:block/:parcel — SEO-friendly plot lookup by gush/helka numbers.

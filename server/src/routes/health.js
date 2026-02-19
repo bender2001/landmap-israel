@@ -4,6 +4,7 @@ import { plotCache, statsCache, marketCache } from '../services/cacheService.js'
 import { getClientCount } from '../services/sseService.js'
 import { responseTracker } from '../services/responseTimeTracker.js'
 import { serverState } from '../services/serverState.js'
+import { viewBatcher } from '../services/viewBatcher.js'
 
 const router = Router()
 
@@ -107,6 +108,7 @@ router.get('/', async (req, res) => {
     pid: process.pid,
     env: process.env.NODE_ENV || 'development',
     sseClients: getClientCount(),
+    viewBatcher: viewBatcher.stats(),
     checks,
   })
 })

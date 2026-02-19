@@ -281,7 +281,8 @@ export default function MapView() {
     // score, ROI, CAGR, price/sqm, and monthly payment. Server enriches plots with
     // pre-computed _pricePerSqm, _monthlyPayment, _daysOnMarket fields, enabling
     // these sorts without redundant client-side computation.
-    if (['price-asc', 'price-desc', 'size-asc', 'size-desc', 'updated-desc', 'score-desc', 'roi-desc', 'roi-asc', 'cagr-desc', 'newest-first', 'ppsqm-asc', 'ppsqm-desc', 'monthly-asc', 'deal-desc', 'net-roi-desc'].includes(sortBy)) {
+    // Pass sorts to server — 'default' means no sort param, server applies smart discovery relevance.
+    if (['price-asc', 'price-desc', 'size-asc', 'size-desc', 'updated-desc', 'score-desc', 'roi-desc', 'roi-asc', 'cagr-desc', 'newest-first', 'ppsqm-asc', 'ppsqm-desc', 'monthly-asc', 'deal-desc', 'net-roi-desc', 'relevance'].includes(sortBy)) {
       f.sort = sortBy
     }
     return f

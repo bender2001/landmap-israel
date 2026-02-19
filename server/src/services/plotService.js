@@ -79,6 +79,71 @@ async function refreshAreaMarketTrends() {
 }
 
 /**
+ * Compute a composite "discovery relevance" score for smart default sorting.
+ * Combines multiple signals to surface the most interesting plots first:
+ * - Investment quality (score, grade, buy signal)
+ * - Freshness (new listings get a temporary boost, decays over 14 days)
+ * - Deal quality (below-average price = higher score)
+ * - Engagement (view count / velocity as social proof)
+ * - Availability (available > reserved > sold)
+ *
+ * This replaces the naive `created_at DESC` default, making the initial view
+ * immediately engaging — like Google's PageRank for real estate listings.
+ * Neither Madlan nor Yad2 use composite relevance sorting; they default to
+ * recency or price which buries hidden gems.
+ *
+ * Score range: 0-100 (higher = more relevant)
+ */
+function computeDiscoveryScore(plot, nowMs) {
+  let score = 0
+
+  // ── Investment Quality (0-35 pts) ──────────────────────────────────
+  // The core signal: how good is this investment objectively?
+  const investScore = plot._investmentScore || 0
+  score += (investScore / 10) * 20 // 0-20 pts from investment score
+
+  // Buy signal bonus
+  const buySignal = plot._buySignal
+  if (buySignal) {
+    if (buySignal.signal === 'BUY') score += 15
+    else if (buySignal.signal === 'HOLD') score += 8
+    // WATCH gets no bonus
+  }
+
+  // ── Freshness Boost (0-20 pts) ─────────────────────────────────────
+  // New listings get a decaying boost: 20pts on day 0, ~10pts on day 7, 0 at day 14.
+  // Like HackerNews gravity: new items surface but decay naturally.
+  const daysOnMarket = plot._daysOnMarket ?? 30
+  if (daysOnMarket <= 14) {
+    score += Math.round(20 * (1 - daysOnMarket / 14))
+  }
+
+  // ── Deal Discount (0-20 pts) ───────────────────────────────────────
+  // Plots priced below city average are interesting to investors.
+  // 20% below avg = 20pts, 10% below = 10pts, at/above avg = 0pts.
+  const discount = plot._dealDiscount ?? 0
+  if (discount > 0) {
+    score += Math.min(20, Math.round(discount * 1))
+  }
+
+  // ── Engagement Signal (0-10 pts) ───────────────────────────────────
+  // View count as social proof — popular plots are interesting.
+  // Logarithmic scale: 1 view = 0pts, 5 views = 5pts, 25+ views = 10pts.
+  const views = plot.views || 0
+  if (views > 0) {
+    score += Math.min(10, Math.round(Math.log2(views + 1) * 2))
+  }
+
+  // ── Availability Premium (0-15 pts) ────────────────────────────────
+  // Available plots are more actionable; sold plots are less relevant for discovery.
+  if (plot.status === 'AVAILABLE') score += 15
+  else if (plot.status === 'RESERVED') score += 8
+  // SOLD gets no bonus (but stays in results for market context)
+
+  return Math.max(0, Math.min(100, score))
+}
+
+/**
  * Compute an investment score (1-10) for a plot — server-side equivalent
  * of the client's calcInvestmentScore(). Running this server-side:
  * - Eliminates redundant client computation on every render cycle
@@ -829,6 +894,24 @@ export async function getPublishedPlots(filters = {}) {
         const bDiscount = b._dealDiscount ?? Infinity
         return aDiscount - bDiscount || tieBreak(a, b)
       })
+    }
+  } else if (filters.sort === 'relevance' && data) {
+    // Explicit relevance sort — same algorithm as the smart default but user-requested.
+    const now = Date.now()
+    data.sort((a, b) => computeDiscoveryScore(b, now) - computeDiscoveryScore(a, now) || tieBreak(a, b))
+  }
+
+  // ── Smart Default Sort ──────────────────────────────────────────────
+  // When no explicit sort is requested, apply composite "discovery relevance" sort
+  // instead of plain `created_at DESC`. This surfaces the most interesting plots
+  // first: high investment score + fresh listings + good deals + popular.
+  // Like Google's search ranking vs chronological — dramatically improves first impression.
+  // Falls back gracefully: only applied when enrichment data is available.
+  if (!filters.sort && data && data.length > 1) {
+    const now = Date.now()
+    // Check if enrichment was applied (at least one plot has _investmentScore)
+    if (data[0]._investmentScore != null) {
+      data.sort((a, b) => computeDiscoveryScore(b, now) - computeDiscoveryScore(a, now) || tieBreak(a, b))
     }
   }
 

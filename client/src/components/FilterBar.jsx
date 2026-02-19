@@ -113,8 +113,9 @@ const zoningOptions = [
 ]
 
 const sortOptions = [
-  { label: 'ברירת מחדל', value: 'default', icon: ArrowUpDown },
+  { label: '✨ מומלצות', value: 'default', icon: ArrowUpDown },
   { label: '🔥 עסקה הכי טובה', value: 'deal-desc', icon: ArrowDown },
+  { label: '🕐 חדשות ראשונות', value: 'newest-first', icon: ArrowDown },
   { label: 'הכי קרוב אליי 📍', value: 'distance-asc', icon: Navigation },
   { label: 'מחיר: נמוך לגבוה', value: 'price-asc', icon: ArrowUp },
   { label: 'מחיר: גבוה לנמוך', value: 'price-desc', icon: ArrowDown },
@@ -128,7 +129,6 @@ const sortOptions = [
   { label: 'ציון השקעה: גבוה לנמוך', value: 'score-desc', icon: ArrowDown },
   { label: 'CAGR: גבוה לנמוך', value: 'cagr-desc', icon: ArrowDown },
   { label: 'עודכן לאחרונה', value: 'updated-desc', icon: ArrowDown },
-  { label: 'חדש בשוק (ימים)', value: 'newest-first', icon: ArrowDown },
   { label: 'תשלום חודשי: נמוך לגבוה', value: 'monthly-asc', icon: ArrowUp },
 ]
 

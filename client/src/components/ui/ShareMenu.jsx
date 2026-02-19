@@ -1,9 +1,13 @@
-import { useState, useRef, useEffect } from 'react'
-import { Share2, MessageCircle, Send, Copy, Check, Mail, X } from 'lucide-react'
+import { useState, useRef, useEffect, lazy, Suspense } from 'react'
+import { Share2, MessageCircle, Send, Copy, Check, Mail, X, QrCode } from 'lucide-react'
+
+// Lazy-load QR modal — only loaded when user clicks the QR button (~11KB)
+const QRCodeModal = lazy(() => import('./QRCodeModal'))
 
 export default function ShareMenu({ plotTitle, plotPrice, plotUrl, className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showQR, setShowQR] = useState(false)
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -112,6 +116,16 @@ export default function ShareMenu({ plotTitle, plotPrice, plotUrl, className = '
             </button>
           )}
 
+          {/* QR Code — unique to LandMap, not available on Madlan/Yad2.
+              Opens a modal with downloadable/printable QR code for offline marketing. */}
+          <button
+            onClick={() => { setShowQR(true); setIsOpen(false) }}
+            className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gold bg-gold/5 hover:bg-gold/15 transition-colors border-t border-white/5"
+          >
+            <QrCode className="w-4 h-4" />
+            קוד QR להדפסה
+          </button>
+
           {/* Copy link */}
           <button
             onClick={() => { handleCopy(); setIsOpen(false) }}
@@ -121,6 +135,19 @@ export default function ShareMenu({ plotTitle, plotPrice, plotUrl, className = '
             {copied ? 'הועתק!' : 'העתק קישור'}
           </button>
         </div>
+      )}
+
+      {/* QR Code Modal — lazy-loaded, only renders when showQR is true */}
+      {showQR && (
+        <Suspense fallback={null}>
+          <QRCodeModal
+            isOpen={showQR}
+            onClose={() => setShowQR(false)}
+            url={plotUrl}
+            title={plotTitle}
+            subtitle={plotPrice}
+          />
+        </Suspense>
       )}
     </div>
   )
