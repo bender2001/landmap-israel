@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Map, Calculator, BarChart3, Heart, Info, Phone, FileText, Shield, MapPin } from 'lucide-react'
+import { Map, Calculator, BarChart3, Heart, Info, Phone, FileText, Shield, MapPin, CreditCard } from 'lucide-react'
 
 const footerLinks = [
   {
@@ -8,6 +8,7 @@ const footerLinks = [
       { to: '/about', label: 'אודות', icon: Info },
       { to: '/contact', label: 'צור קשר', icon: Phone },
       { to: '/areas', label: 'סקירת אזורים', icon: MapPin },
+      { to: '/pricing', label: 'מסלולים ומחירים', icon: CreditCard },
     ],
   },
   {

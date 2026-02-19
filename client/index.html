@@ -7,6 +7,12 @@
          Plot numbers (גוש 10043), prices (₪450,000), and coordinates get incorrectly
          styled as clickable phone links without this. -->
     <meta name="format-detection" content="telephone=no" />
+    <!-- Security headers via meta tags — defense-in-depth alongside server headers.
+         Referrer-Policy: send full URL to same-origin (analytics), only origin to cross-origin
+         (privacy). Permissions-Policy: opt out of APIs we don't use (camera, mic, payment)
+         to reduce attack surface. Like Google's security best practices. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()" />
     <title>LandMap Israel — מפת קרקעות להשקעה</title>
     <meta name="description" content="פלטפורמת השקעות קרקעות בישראל — מפה אינטראקטיבית, נתוני תכנון, ועדות, שמאות ו-AI יועץ השקעות" />
     <meta name="keywords" content="קרקעות להשקעה, נדלן ישראל, מפת קרקעות, השקעות נדלן, land investment Israel" />
