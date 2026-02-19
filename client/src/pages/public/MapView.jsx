@@ -642,17 +642,29 @@ export default function MapView() {
   // JSON-LD structured data for SEO (like Madlan/Yad2)
   useStructuredData(selectedPlot, filteredPlots)
 
-  // Dynamic OG meta tags for social sharing
+  // Dynamic OG meta tags + document.title for SEO and social sharing.
+  // The title now reflects the active filter context — "5 חלקות בחדרה | LandMap Israel"
+  // so users with multiple tabs can distinguish them (like Madlan's "12 נכסים בחדרה | מדלן").
+  // Google also uses document.title as the primary SERP heading.
+  const dynamicMapTitle = useMemo(() => {
+    if (selectedPlot) {
+      return `גוש ${selectedPlot.block_number ?? selectedPlot.blockNumber} חלקה ${selectedPlot.number} — ${selectedPlot.city} | LandMap Israel`
+    }
+    const cityLabel = filters.city !== 'all' ? ` ב${filters.city}` : ''
+    const countLabel = filteredPlots.length > 0 ? `${filteredPlots.length} חלקות` : 'חלקות'
+    return `${countLabel}${cityLabel} להשקעה | LandMap Israel`
+  }, [selectedPlot, filters.city, filteredPlots.length])
+
   useMetaTags(
     selectedPlot
       ? {
-          title: `גוש ${selectedPlot.block_number ?? selectedPlot.blockNumber} חלקה ${selectedPlot.number} | LandMap Israel`,
+          title: dynamicMapTitle,
           description: `${selectedPlot.city} · ${formatCurrency(selectedPlot.total_price ?? selectedPlot.totalPrice)} · ${((selectedPlot.size_sqm ?? selectedPlot.sizeSqM) / 1000).toFixed(1)} דונם`,
           url: window.location.href,
           image: plotOgImageUrl(selectedPlot.id),
         }
       : {
-          title: `LandMap Israel — ${filteredPlots.length} חלקות להשקעה`,
+          title: dynamicMapTitle,
           description: 'מפת קרקעות להשקעה בישראל — חדרה, נתניה, קיסריה. מחירים, תשואות, ייעודי קרקע.',
         }
   )

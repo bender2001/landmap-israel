@@ -551,7 +551,27 @@ async function enrichPlotsWithScores(plots) {
   return plots
 }
 
+// ─── In-flight request coalescing (deduplication) ──────────────────────────
+// When multiple clients request the same plots simultaneously (common during page loads,
+// search-as-you-type debounce, or multiple browser tabs), only ONE Supabase query runs.
+// All concurrent callers share the same Promise result. Like GraphQL DataLoader or
+// Next.js fetch deduplication — prevents O(n) Supabase queries for n simultaneous requests.
+// The in-flight map auto-cleans when the Promise resolves/rejects.
+const _inflightPlots = new Map()
+
 export async function getPublishedPlots(filters = {}) {
+  // Build a canonical cache key from filter params (deterministic JSON for same inputs)
+  const cacheKey = JSON.stringify(filters, Object.keys(filters).sort())
+  const inflight = _inflightPlots.get(cacheKey)
+  if (inflight) return inflight // Re-use the in-flight Promise — no duplicate DB query
+
+  const promise = _getPublishedPlotsImpl(filters)
+    .finally(() => _inflightPlots.delete(cacheKey)) // Clean up after resolution
+  _inflightPlots.set(cacheKey, promise)
+  return promise
+}
+
+async function _getPublishedPlotsImpl(filters = {}) {
   // Support count-only mode for pagination metadata
   const countOnly = filters._countOnly === true
 

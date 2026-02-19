@@ -8,6 +8,14 @@ export function useMetaTags({ title, description, url, image }) {
   useEffect(() => {
     if (!title) return
 
+    // ── Dynamic document.title ──────────────────────────────────────────
+    // Previously this hook only set OG/Twitter meta tags — the browser tab title
+    // stayed as the static "LandMap Israel — מפת קרקעות להשקעה" from index.html.
+    // Madlan shows "12 נכסים בחדרה | מדלן" — dynamic titles help users with multiple
+    // tabs and improve SEO (Google uses document.title as the primary SERP heading).
+    const prevTitle = document.title
+    document.title = title
+
     // Helper to upsert a meta tag
     const setMeta = (property, content) => {
       if (!content) return
@@ -53,8 +61,9 @@ export function useMetaTags({ title, description, url, image }) {
     }
     canonicalEl.setAttribute('href', canonicalUrl)
 
-    // Cleanup: remove canonical on unmount to prevent stale tags
+    // Cleanup: restore previous title and remove canonical on unmount to prevent stale tags
     return () => {
+      document.title = prevTitle
       const el = document.querySelector('link[rel="canonical"]')
       if (el) el.remove()
     }

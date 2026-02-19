@@ -707,17 +707,27 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, isSelect
         {zoomLevel >= 13 && (
           <span className="tooltip-sub">{plot.status === 'SOLD' ? 'נמכר · ' : ''}{formatDunam(sizeSqM)} דונם · {sizeSqM > 0 ? `₪${Math.round(price / sizeSqM).toLocaleString()}/מ״ר` : ''} · +{roi}%{(plot.views ?? 0) >= 5 ? ` · 👁${plot.views}` : ''}</span>
         )}
-        {/* Level 3: Investment grade + CAGR (zoom >= 14) */}
+        {/* Level 3: Investment grade + CAGR + risk level (zoom >= 14) */}
         {zoomLevel >= 14 && (() => {
           const score = plot._investmentScore ?? calcInvestmentScore(plot)
           const { grade, color: gradeColor } = getInvestmentGrade(score)
           const displayGrade = plot._grade || grade
           const cagrData = calcCAGR(roi, readiness)
+          // Risk level badge — instant risk context without opening sidebar.
+          // Like Bloomberg terminal's risk indicators: green/yellow/red at a glance.
+          // Server pre-computes _riskLevel in enrichPlotsWithScores().
+          const riskLevel = plot._riskLevel
+          const riskConfig = riskLevel === 'low' ? { emoji: '🟢', label: 'סיכון נמוך', color: '#22C55E' }
+            : riskLevel === 'medium' ? { emoji: '🟡', label: 'סיכון בינוני', color: '#EAB308' }
+            : riskLevel === 'high' ? { emoji: '🟠', label: 'סיכון גבוה', color: '#F97316' }
+            : riskLevel === 'very_high' ? { emoji: '🔴', label: 'סיכון גבוה מאוד', color: '#EF4444' }
+            : null
           return (
             <span className="tooltip-score-row">
               <span className="tooltip-grade-badge" style={{ color: gradeColor, borderColor: `${gradeColor}40`, background: `${gradeColor}15` }}>{displayGrade}</span>
               <span style={{ color: gradeColor }}>⭐{score}/10</span>
               {cagrData && <span> · {cagrData.cagr}%/שנה</span>}
+              {riskConfig && <span style={{ color: riskConfig.color }}> · {riskConfig.emoji}</span>}
             </span>
           )
         })()}
