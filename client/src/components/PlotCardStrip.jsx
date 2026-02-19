@@ -4,7 +4,7 @@ import PriceSparkline from './ui/PriceSparkline'
 import ZoningProgressBar from './ui/ZoningProgressBar'
 import CardImageCarousel from './ui/CardImageCarousel'
 import { statusColors, statusLabels } from '../utils/constants'
-import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, getInvestmentGrade, formatRelativeTime, getFreshnessColor, calcCAGR, calcMonthlyPayment, formatMonthlyPayment, calcDemandVelocity, calcBestInCategory, calcBuildableValue, plotCenter, haversineKm, formatDistanceKm } from '../utils/formatters'
+import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, getInvestmentGrade, formatRelativeTime, getFreshnessColor, calcCAGR, calcMonthlyPayment, formatMonthlyPayment, calcDemandVelocity, calcBestInCategory, calcBuildableValue, plotCenter, plotNavigateUrl, haversineKm, formatDistanceKm } from '../utils/formatters'
 import { calcTransactionCosts } from '../utils/plot'
 import { usePrefetchPlot } from '../hooks/usePlots'
 import { useAreaAverages } from '../hooks/useAreaAverages'
@@ -294,6 +294,30 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
           Investors need to paste plot info into WhatsApp/email/notes constantly.
           Like Google Maps' "copy address" — instant and practical. */}
       <QuickCopyButton plot={plot} />
+
+      {/* Navigate to plot — opens Google Maps/Waze directions.
+          Critical for the investor workflow: browse cards → visit plot in person.
+          Like Madlan/Yad2's "הנחיות הגעה" but accessible directly from the card strip,
+          not just the popup. Mobile users browse via cards, not map popups. */}
+      {(() => {
+        const navUrl = plotNavigateUrl(plot.coordinates)
+        if (!navUrl) return null
+        return (
+          <a
+            href={navUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="plot-card-navigate-btn"
+            onClick={(e) => e.stopPropagation()}
+            title="נווט לחלקה (Google Maps)"
+            aria-label="נווט לחלקה"
+          >
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="3 11 22 2 13 21 11 13 3 11" />
+            </svg>
+          </a>
+        )
+      })()}
 
       {/* Favorite toggle — like Madlan/Yad2's heart on every listing card.
           Allows one-click save without opening the sidebar. */}

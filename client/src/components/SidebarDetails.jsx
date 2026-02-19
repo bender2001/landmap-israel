@@ -1177,6 +1177,24 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               <span className="text-xs text-slate-400 bg-white/5 px-2.5 py-1 rounded-lg">
                 {formatDunam(sizeSqM)} דונם ({sizeSqM.toLocaleString()} מ&quot;ר)
               </span>
+              {/* Plot perimeter — boundary distance in meters, critical for physical site visits.
+                  Investors need this for fencing cost estimates, boundary surveys, and infrastructure planning.
+                  Like Yad2's property dimensions but for land plots — uses Haversine distance. */}
+              {(() => {
+                const perimeter = calcPlotPerimeter(plot.coordinates)
+                if (!perimeter || perimeter < 10) return null
+                const formatted = perimeter >= 1000
+                  ? `${(perimeter / 1000).toFixed(1)} ק״מ`
+                  : `${Math.round(perimeter)} מ׳`
+                return (
+                  <span
+                    className="text-xs text-blue-400/80 bg-blue-500/8 px-2.5 py-1 rounded-lg"
+                    title={`היקף החלקה: ${Math.round(perimeter)} מטר — שימושי להערכת עלויות גידור ותשתיות`}
+                  >
+                    📏 היקף: {formatted}
+                  </span>
+                )
+              })()}
               <span className="text-xs text-slate-300 bg-white/5 px-2.5 py-1 rounded-lg">
                 {zoningLabels[zoningStage]}
               </span>

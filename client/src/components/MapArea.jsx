@@ -1240,7 +1240,7 @@ function ViewportCulledPolygons({ plots, plotColors, hoveredId, selectedPlotId, 
  * A floating button that expands into a compact legend matching the active color mode.
  * Inspired by Madlan's mobile map UX — users need color context to understand the map.
  */
-function MobileLegend({ colorMode, statusFilter, onToggleStatus, statusCounts }) {
+function MobileLegend({ colorMode, statusFilter, onToggleStatus, statusCounts, priceRange }) {
   const [isOpen, setIsOpen] = useState(false)
   const ref = useRef(null)
 
@@ -1305,8 +1305,8 @@ function MobileLegend({ colorMode, statusFilter, onToggleStatus, statusCounts })
                 <div className="text-[9px] text-slate-500">💰 מחיר/מ״ר</div>
                 <div className="h-1.5 rounded-full" style={{ background: 'linear-gradient(90deg, rgb(0,255,60), rgb(255,255,60), rgb(255,0,60))' }} />
                 <div className="flex justify-between text-[8px] text-slate-600">
-                  <span>זול</span>
-                  <span>יקר</span>
+                  <span>{priceRange.minLabel}</span>
+                  <span>{priceRange.maxLabel}</span>
                 </div>
               </div>
             ) : colorMode === 'roi' ? (
@@ -1696,9 +1696,11 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
     return counts
   }, [plots])
 
-  // Precompute price/sqm range for heatmap
+  // Precompute price/sqm range for heatmap — includes formatted labels for the legend.
+  // Shows actual data-driven min/max values so investors know exactly what the gradient means.
+  // Like Madlan's heatmap legend that shows "₪X/מ״ר - ₪Y/מ״ר" — context-specific, not generic.
   const priceRange = useMemo(() => {
-    if (!plots || plots.length === 0) return { min: 0, max: 1 }
+    if (!plots || plots.length === 0) return { min: 0, max: 1, minLabel: '—', maxLabel: '—', midLabel: '—' }
     const values = plots
       .map(p => {
         const price = p.total_price ?? p.totalPrice ?? 0
@@ -1706,7 +1708,11 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         return size > 0 ? price / size : 0
       })
       .filter(v => v > 0)
-    return { min: Math.min(...values), max: Math.max(...values) }
+    const min = Math.min(...values)
+    const max = Math.max(...values)
+    const mid = (min + max) / 2
+    const fmt = (v) => v >= 1000 ? `₪${Math.round(v / 1000)}K` : `₪${Math.round(v)}`
+    return { min, max, minLabel: fmt(min), maxLabel: fmt(max), midLabel: fmt(mid) }
   }, [plots])
 
   // Area average price/sqm for deal indicators on tooltips (shared hook — DRY)
@@ -1836,6 +1842,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         statusFilter={statusFilter}
         onToggleStatus={onToggleStatus}
         statusCounts={statusCounts}
+        priceRange={priceRange}
       />
 
       {/* Bottom-right: Interactive Legend — adapts to color mode (desktop only) */}
@@ -1875,9 +1882,9 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
                 <div className="h-2 flex-1 rounded-full" style={{ background: 'linear-gradient(90deg, rgb(0,255,60), rgb(255,255,60), rgb(255,0,60))' }} />
               </div>
               <div className="flex justify-between text-[9px] text-slate-500">
-                <span>זול</span>
-                <span>ממוצע</span>
-                <span>יקר</span>
+                <span title={`${priceRange.minLabel}/מ״ר`}>{priceRange.minLabel}</span>
+                <span title={`${priceRange.midLabel}/מ״ר`}>{priceRange.midLabel}</span>
+                <span title={`${priceRange.maxLabel}/מ״ר`}>{priceRange.maxLabel}</span>
               </div>
             </div>
           ) : colorMode === 'roi' ? (
