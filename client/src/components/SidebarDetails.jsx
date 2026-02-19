@@ -1041,7 +1041,7 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
         role="dialog"
         aria-label={`פרטי חלקה — גוש ${plot?.block_number ?? plot?.blockNumber} חלקה ${plot?.number}`}
         aria-modal="true"
-        className="sidebar-panel fixed top-0 right-0 h-full w-full sm:w-[420px] md:w-[480px] max-w-full z-[60] bg-navy border-l border-white/10 shadow-2xl flex flex-col overflow-hidden sm:animate-slide-in-right"
+        className="sidebar-panel fixed top-0 right-0 h-full w-full sm:w-[420px] md:w-[480px] lg:w-[520px] xl:w-[560px] max-w-full z-[60] bg-navy border-l border-white/10 shadow-2xl flex flex-col overflow-hidden sm:animate-slide-in-right"
         dir="rtl"
         style={{
           ...(isMobile ? { height: `${sheetHeight}vh`, transition: isDragging ? 'none' : 'height 0.35s cubic-bezier(0.32, 0.72, 0, 1)' } : {}),

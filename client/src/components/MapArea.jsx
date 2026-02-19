@@ -1703,8 +1703,23 @@ function ShareViewButton() {
 
 export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, statusFilter, onToggleStatus, favorites, compareIds = [], onToggleCompare, onClearFilters, onFilterChange, onSearchArea, autoSearch = false, onToggleAutoSearch }) {
   const [hoveredId, setHoveredId] = useState(null)
-  const [activeLayerId, setActiveLayerId] = useState('satellite')
-  const [colorMode, setColorMode] = useState('status')
+  // Persist map layer & color mode in localStorage — users shouldn't have to re-select
+  // their preferred map style every time they visit. Like Google Maps remembering
+  // satellite vs. street view, and Madlan remembering your last view preference.
+  const [activeLayerId, setActiveLayerId] = useState(() => {
+    try { return localStorage.getItem('landmap_map_layer') || 'satellite' } catch { return 'satellite' }
+  })
+  const [colorMode, setColorMode] = useState(() => {
+    try { return localStorage.getItem('landmap_color_mode') || 'status' } catch { return 'status' }
+  })
+  const handleLayerChange = useCallback((id) => {
+    setActiveLayerId(id)
+    try { localStorage.setItem('landmap_map_layer', id) } catch {}
+  }, [])
+  const handleColorModeChange = useCallback((mode) => {
+    setColorMode(mode)
+    try { localStorage.setItem('landmap_color_mode', mode) } catch {}
+  }, [])
   const prefetchPlot = usePrefetchPlot()
   const activeLayer = MAP_LAYERS.find(l => l.id === activeLayerId) || MAP_LAYERS[0]
 
@@ -1830,10 +1845,10 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
       </MapContainer>
 
       {/* Map layer switcher */}
-      <MapLayerSwitcher activeLayer={activeLayerId} onChangeLayer={setActiveLayerId} />
+      <MapLayerSwitcher activeLayer={activeLayerId} onChangeLayer={handleLayerChange} />
 
       {/* Color mode toggle — price heatmap / ROI / status */}
-      <ColorModeToggle colorMode={colorMode} onChangeColorMode={setColorMode} />
+      <ColorModeToggle colorMode={colorMode} onChangeColorMode={handleColorModeChange} />
 
       {/* Share current view button — copies the full URL (filters + map position) to clipboard.
           Like Madlan/Airbnb's share button that lets users share a specific map view with partners.

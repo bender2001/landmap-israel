@@ -48,7 +48,7 @@ const Settings = lazy(() => import('./pages/admin/Settings'))
 
 function PageLoader() {
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-navy" data-page-loader>
+    <div className="h-dvh w-screen flex items-center justify-center bg-navy" data-page-loader>
       <Spinner className="w-12 h-12 text-gold" />
     </div>
   )

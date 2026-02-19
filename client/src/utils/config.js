@@ -46,6 +46,18 @@ export function plotInquiryLink(plot) {
 }
 
 /**
+ * Build a "Report Data Issue" link for a specific plot.
+ * Pre-fills a WhatsApp message with plot identification so the team can investigate.
+ * Like Google Maps' "Suggest an edit" — crowdsourced data quality improvement.
+ * Returns null if no contact number is configured.
+ */
+export function plotReportIssueLink(plot) {
+  const blockNum = plot.block_number ?? plot.blockNumber
+  const msg = `🚩 דיווח על בעיה בנתונים\n\nגוש ${blockNum} חלקה ${plot.number} — ${plot.city}\nקישור: ${window.location.origin}/plot/${plot.id}\n\nתיאור הבעיה:\n`
+  return whatsappLink(msg)
+}
+
+/**
  * Native Web Share API — uses the system share sheet on supported platforms (mobile).
  * Like Madlan/Yad2/Airbnb: one button → opens native share with WhatsApp, Telegram,
  * Messages, etc. Falls back gracefully when not supported.

@@ -15,6 +15,30 @@ html, body, #root {
   overflow: auto;
 }
 
+/* ─── Dynamic Viewport Height ────────────────────────────────────
+   Mobile browsers (Safari, Chrome Android) have a dynamic address bar
+   that makes `100vh` taller than the actual visible area. This causes
+   the bottom of the map to be hidden behind the browser chrome.
+   
+   `100dvh` (dynamic viewport height) accounts for the address bar state.
+   We set a CSS custom property with fallback for older browsers.
+   Used by `.h-dvh` utility class on map views.
+   Like Madlan and Google Maps — the map should fill exactly the visible area. */
+:root {
+  --vh-dynamic: 100vh;
+}
+@supports (height: 100dvh) {
+  :root {
+    --vh-dynamic: 100dvh;
+  }
+}
+.h-dvh {
+  height: var(--vh-dynamic);
+}
+.min-h-dvh {
+  min-height: var(--vh-dynamic);
+}
+
 body {
   font-family: 'Heebo', sans-serif;
   background: #050D1A;
@@ -981,10 +1005,17 @@ body {
     pointer-events: auto;
     margin-top: 0;
   }
-  /* Shift filter bar when sidebar is open */
+  /* Shift filter bar when sidebar is open — responsive to sidebar width.
+     Desktop sidebar is 420px(sm) → 480px(md) → 520px(lg) → 560px(xl).
+     Subtract sidebar width + 60px gap to prevent overlap. */
   .sidebar-open .filter-bar-container {
     max-width: min(900px, calc(100vw - 540px));
     transition: max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+@media (min-width: 1280px) {
+  .sidebar-open .filter-bar-container {
+    max-width: min(900px, calc(100vw - 620px));
   }
 }
 
@@ -2463,13 +2494,29 @@ body {
   .plot-strip-arrow-right {
     right: 80px;
   }
-  /* Shift card strip when sidebar is open */
+  /* Shift card strip when sidebar is open — matches sidebar width per breakpoint.
+     Desktop sidebar: sm=420px, md=480px, lg=520px, xl=560px. */
   .sidebar-open .plot-strip-wrapper {
     right: 420px;
     transition: right 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .sidebar-open .plot-strip-scroll {
     padding-right: 20px;
+  }
+}
+@media (min-width: 768px) {
+  .sidebar-open .plot-strip-wrapper {
+    right: 480px;
+  }
+}
+@media (min-width: 1024px) {
+  .sidebar-open .plot-strip-wrapper {
+    right: 520px;
+  }
+}
+@media (min-width: 1280px) {
+  .sidebar-open .plot-strip-wrapper {
+    right: 560px;
   }
 }
 

@@ -1,6 +1,6 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react'
-import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart, ExternalLink, Calculator as CalcIcon, FileText, Download, File, FileImage, FileSpreadsheet, Map as MapIcon } from 'lucide-react'
+import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart, ExternalLink, Calculator as CalcIcon, FileText, Download, File, FileImage, FileSpreadsheet, Map as MapIcon, Flag } from 'lucide-react'
 import { usePlot, useNearbyPlots, useSimilarPlots } from '../../hooks/usePlots.js'
 import { useMarketOverview } from '../../hooks/useMarketOverview.js'
 import { useLastVisitPrice } from '../../hooks/useLastVisitPrice.js'
@@ -15,7 +15,7 @@ import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStag
 import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcInvestmentVerdict, calcDaysOnMarket, calcInvestmentTimeline } from '../../utils/formatters.js'
 import MiniMap from '../../components/ui/MiniMap.jsx'
 import Breadcrumb from '../../components/ui/Breadcrumb.jsx'
-import { plotInquiryLink } from '../../utils/config.js'
+import { plotInquiryLink, plotReportIssueLink } from '../../utils/config.js'
 import ZoningProgressBar from '../../components/ui/ZoningProgressBar.jsx'
 import WidgetErrorBoundary from '../../components/ui/WidgetErrorBoundary.jsx'
 
@@ -1333,12 +1333,25 @@ export default function PlotDetail() {
             </div>
           )}
 
-          {/* Data Completeness — Bloomberg-style data quality bar.
-              Investors need to know how much they can trust the data for this specific plot.
-              Shows percentage of available data fields (coordinates, images, enrichment, etc.).
-              Unique to LandMap — builds trust through radical transparency. */}
+          {/* Data Completeness + Report Issue — Bloomberg-style data quality bar with
+              user feedback mechanism. Like Google Maps' "Suggest an edit" pattern.
+              Investors who spot wrong coordinates, prices, or zoning status can report
+              it instantly. Crowdsourced data quality is how Google Maps became accurate.
+              Neither Madlan nor Yad2 have public data correction workflows. */}
           <div className="mb-6">
             <DataCompletenessBar plot={plot} variant="full" />
+            <div className="flex items-center justify-end mt-2">
+              <a
+                href={plotReportIssueLink(plot)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-slate-500 bg-white/[0.02] border border-white/5 rounded-lg hover:text-orange-400 hover:border-orange-400/20 hover:bg-orange-400/5 transition-all"
+                title="דווח על שגיאה בנתונים — מחיר, מיקום, ייעוד או מידע אחר"
+              >
+                <Flag className="w-3 h-3" />
+                דווח על שגיאה בנתונים
+              </a>
+            </div>
           </div>
 
           {/* Location mini-map — like Madlan always shows location context */}

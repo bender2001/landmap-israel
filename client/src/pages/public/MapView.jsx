@@ -26,10 +26,11 @@ import IdleRender from '../../components/ui/IdleRender.jsx'
 import OfflineBanner from '../../components/ui/OfflineBanner.jsx'
 import ViewportSummary from '../../components/ViewportSummary.jsx'
 import ActiveFilterChips from '../../components/ActiveFilterChips.jsx'
+import DataFreshnessIndicator from '../../components/DataFreshnessIndicator.jsx'
+import FilterSuggestions from '../../components/FilterSuggestions.jsx'
 import { useRefreshOnReturn } from '../../hooks/usePageVisibility.js'
 import { useLocalStorage } from '../../hooks/useLocalStorage.js'
 import { usePriceChanges } from '../../hooks/usePriceChanges.js'
-import { useVisibilityInterval } from '../../hooks/useVisibilityInterval.js'
 import { usePersonalNotes } from '../../hooks/usePersonalNotes.js'
 
 // Lazy-load non-critical widgets — they're not needed for first paint.
@@ -55,103 +56,6 @@ const DealSpotlight = lazy(() => import('../../components/DealSpotlight.jsx'))
 // the PlotDetail route's JS chunk in the background. This way, clicking "View Full Page"
 // in the sidebar navigates instantly — no loading spinner for the full page.
 const plotDetailPreload = () => import('../../pages/public/PlotDetail.jsx')
-
-function DataFreshnessIndicator({ updatedAt, onRefresh }) {
-  const [, setTick] = useState(0)
-
-  // Re-render every 30s to update relative time — pauses when tab is hidden.
-  // Standard setInterval wastes CPU ticking in background tabs; useVisibilityInterval
-  // stops and restarts automatically, catching up when the user returns.
-  useVisibilityInterval(() => setTick(t => t + 1), 30_000)
-
-  const ago = Math.round((Date.now() - updatedAt) / 1000)
-  const label = ago < 60 ? 'עכשיו' : ago < 3600 ? `לפני ${Math.floor(ago / 60)} דק׳` : `לפני ${Math.floor(ago / 3600)} שע׳`
-  const isStale = ago > 300 // >5 min
-
-  return (
-    <button
-      onClick={onRefresh}
-      className={`fixed top-[4rem] left-4 sm:left-auto sm:top-auto sm:bottom-[5.5rem] sm:right-6 z-[20] flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[9px] sm:text-[10px] backdrop-blur-md border transition-all hover:scale-105 ${
-        isStale
-          ? 'bg-orange-500/10 border-orange-500/20 text-orange-400'
-          : 'bg-white/5 border-white/10 text-slate-500 hover:text-slate-400'
-      }`}
-      title="לחץ לרענון הנתונים"
-    >
-      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isStale ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400'}`} />
-      {label}
-    </button>
-  )
-}
-
-/**
- * Smart filter suggestions — when active filters produce very few results (<4),
- * this component suggests which specific filter to loosen. Like Madlan's
- * "הרחב חיפוש" nudge that keeps users engaged instead of hitting a dead end.
- */
-function FilterSuggestions({ filteredCount, totalCount, filters, statusFilter, onFilterChange, onToggleStatus, onClearFilters }) {
-  // Only show when results are very low AND filters are active
-  const activeCount =
-    (filters.city !== 'all' ? 1 : 0) +
-    (filters.priceMin || filters.priceMax ? 1 : 0) +
-    (filters.sizeMin || filters.sizeMax ? 1 : 0) +
-    (filters.ripeness !== 'all' ? 1 : 0) +
-    (filters.minRoi && filters.minRoi !== 'all' ? 1 : 0) +
-    (filters.zoning && filters.zoning !== 'all' ? 1 : 0) +
-    (filters.maxDays ? 1 : 0) +
-    (filters.maxMonthly ? 1 : 0) +
-    (filters.search ? 1 : 0) +
-    statusFilter.length
-
-  if (filteredCount >= 4 || activeCount === 0 || totalCount === 0) return null
-
-  // Build suggestions: which filter, if removed, would give the most results
-  const suggestions = []
-  if (filters.city !== 'all') suggestions.push({ label: `הסר סינון "${filters.city}"`, action: () => onFilterChange('city', 'all'), icon: '🏙️' })
-  if (filters.priceMin || filters.priceMax) suggestions.push({ label: 'הרחב טווח מחירים', action: () => { onFilterChange('priceMin', ''); onFilterChange('priceMax', '') }, icon: '💰' })
-  if (filters.sizeMin || filters.sizeMax) suggestions.push({ label: 'הרחב טווח שטח', action: () => { onFilterChange('sizeMin', ''); onFilterChange('sizeMax', '') }, icon: '📐' })
-  if (filters.minRoi && filters.minRoi !== 'all') suggestions.push({ label: 'הסר סינון תשואה', action: () => onFilterChange('minRoi', 'all'), icon: '📈' })
-  if (filters.zoning && filters.zoning !== 'all') suggestions.push({ label: 'הסר סינון תכנוני', action: () => onFilterChange('zoning', 'all'), icon: '🗺️' })
-  if (filters.ripeness !== 'all') suggestions.push({ label: 'הסר סינון בשלות', action: () => onFilterChange('ripeness', 'all'), icon: '⏱️' })
-  if (filters.maxDays) suggestions.push({ label: 'הסר סינון חדשות', action: () => onFilterChange('maxDays', ''), icon: '🆕' })
-  if (filters.maxMonthly) suggestions.push({ label: 'הסר סינון תשלום חודשי', action: () => onFilterChange('maxMonthly', ''), icon: '🏦' })
-  statusFilter.forEach(s => suggestions.push({ label: `הסר סטטוס "${s === 'AVAILABLE' ? 'זמין' : s === 'SOLD' ? 'נמכר' : s}"`, action: () => onToggleStatus(s), icon: '🏷️' }))
-
-  if (suggestions.length === 0) return null
-
-  return (
-    <div className="fixed bottom-[18rem] sm:bottom-[19rem] left-1/2 -translate-x-1/2 z-[35] animate-bounce-in" dir="rtl">
-      <div className="bg-navy/90 backdrop-blur-md border border-gold/15 rounded-2xl px-4 py-3 shadow-xl max-w-sm">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-sm">💡</span>
-          <span className="text-[11px] text-gold font-medium">
-            {filteredCount === 0 ? 'אין תוצאות' : `רק ${filteredCount} תוצאות`} — נסה להרחיב:
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {suggestions.slice(0, 3).map((s, i) => (
-            <button
-              key={i}
-              onClick={s.action}
-              className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium text-slate-300 bg-white/5 border border-white/10 rounded-lg hover:bg-gold/10 hover:border-gold/20 hover:text-gold transition-all"
-            >
-              <span>{s.icon}</span>
-              <span>{s.label}</span>
-            </button>
-          ))}
-          {activeCount > 1 && (
-            <button
-              onClick={onClearFilters}
-              className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-gold bg-gold/10 border border-gold/20 rounded-lg hover:bg-gold/15 transition-all"
-            >
-              🔄 נקה הכל
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 const initialFilters = {
   city: 'all',
@@ -754,7 +658,7 @@ export default function MapView() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen bg-navy overflow-hidden relative" dir="rtl" role="main" aria-busy="true" aria-label="טוען מפת קרקעות">
+      <div className="h-dvh w-screen bg-navy overflow-hidden relative" dir="rtl" role="main" aria-busy="true" aria-label="טוען מפת קרקעות">
         {/* Skeleton map area — mimics the real map with animated placeholder */}
         <div className="absolute inset-0 bg-gradient-to-b from-navy via-navy-light/20 to-navy">
           {/* Fake map grid lines */}
@@ -815,7 +719,7 @@ export default function MapView() {
 
   if (plotsError && plots.length === 0) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-navy" dir="rtl" role="alert">
+      <div className="h-dvh w-screen flex items-center justify-center bg-navy" dir="rtl" role="alert">
         <div className="flex flex-col items-center gap-4 max-w-sm text-center px-6">
           <div className="w-16 h-16 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center">
             <span className="text-2xl">⚠️</span>
@@ -835,7 +739,7 @@ export default function MapView() {
 
   return (
     <div
-      className={`relative h-screen w-screen overflow-hidden bg-navy ${selectedPlot ? 'sidebar-open' : ''}`}
+      className={`relative h-dvh w-screen overflow-hidden bg-navy ${selectedPlot ? 'sidebar-open' : ''}`}
       aria-busy={isLoading || isPlaceholderData}
     >
       {/* Filter transition indicator */}
@@ -1074,7 +978,7 @@ export default function MapView() {
 
       {selectedPlot && (
         <Suspense fallback={
-          <div className="fixed top-0 right-0 h-full w-full sm:w-[420px] md:w-[480px] max-w-full z-[60] bg-navy border-l border-white/10 shadow-2xl" dir="rtl">
+          <div className="fixed top-0 right-0 h-full w-full sm:w-[420px] md:w-[480px] lg:w-[520px] xl:w-[560px] max-w-full z-[60] bg-navy border-l border-white/10 shadow-2xl" dir="rtl">
             <div className="p-6 space-y-4 animate-pulse">
               <div className="flex justify-between items-center">
                 <div className="h-6 w-48 rounded bg-slate-700/50" />
