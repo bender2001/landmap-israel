@@ -112,6 +112,59 @@ function AutoFitBounds({ plots }) {
   return null
 }
 
+/**
+ * FitToFilteredBounds — auto-zooms the map when the city composition of visible
+ * plots changes (e.g., user selects "חדרה" from the city filter). Like Madlan's
+ * automatic zoom when selecting a city — keeps the map focused on relevant plots.
+ *
+ * Tracks the sorted set of cities in the current plot array. When it changes
+ * (city filter applied/removed), smoothly flies the map to the new bounds.
+ * Skips the initial render (AutoFitBounds handles that) and doesn't trigger
+ * on non-city filter changes (price/size/ROI don't change city composition).
+ */
+function FitToFilteredBounds({ plots }) {
+  const map = useMap()
+  const prevCityHash = useRef(null)
+  const isInitialized = useRef(false)
+
+  useEffect(() => {
+    if (!plots || plots.length === 0) return
+
+    // Build a hash of which cities are present in the current filtered set
+    const cities = [...new Set(plots.map(p => p.city).filter(Boolean))].sort().join(',')
+
+    // Skip the very first render — AutoFitBounds handles initial positioning
+    if (!isInitialized.current) {
+      prevCityHash.current = cities
+      isInitialized.current = true
+      return
+    }
+
+    // Only re-fit when the city composition actually changes
+    if (cities === prevCityHash.current) return
+    prevCityHash.current = cities
+
+    // Collect all coordinates from the filtered plots
+    const allCoords = []
+    plots.forEach(p => {
+      if (!p.coordinates || !Array.isArray(p.coordinates)) return
+      p.coordinates.forEach(c => {
+        if (Array.isArray(c) && c.length >= 2 && isFinite(c[0]) && isFinite(c[1])) {
+          allCoords.push(c)
+        }
+      })
+    })
+    if (allCoords.length < 2) return
+
+    const bounds = L.latLngBounds(allCoords)
+    if (bounds.isValid()) {
+      map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 15, duration: 1.2 })
+    }
+  }, [plots, map])
+
+  return null
+}
+
 const MAP_LAYERS = [
   {
     id: 'satellite',
@@ -1589,6 +1642,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
         <ZoomControl position="bottomleft" />
         <MapUrlSync />
         <AutoFitBounds plots={plots} />
+        <FitToFilteredBounds plots={plots} />
         <FlyToSelected plot={selectedPlot} />
         <MapToolbar plots={plots} />
         <UserLocationMarker />

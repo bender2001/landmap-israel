@@ -5,6 +5,49 @@ import SearchAutocomplete from './SearchAutocomplete'
 import SavedSearches from './SavedSearches'
 import { useHapticFeedback } from '../hooks/useHapticFeedback'
 
+/**
+ * AnimatedCount — smooth counting animation when the number changes.
+ * Like Madlan's result count that rolls up/down when filters change.
+ * Uses requestAnimationFrame for 60fps interpolation over ~300ms.
+ */
+function AnimatedCount({ value, className = '' }) {
+  const [displayValue, setDisplayValue] = useState(value)
+  const animRef = useRef(null)
+  const prevValue = useRef(value)
+
+  useEffect(() => {
+    if (prevValue.current === value) return
+    const from = prevValue.current
+    const to = value
+    prevValue.current = value
+
+    const startTime = performance.now()
+    const duration = 300 // ms
+
+    if (animRef.current) cancelAnimationFrame(animRef.current)
+
+    const animate = (now) => {
+      const elapsed = now - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      // Ease-out cubic for smooth deceleration
+      const eased = 1 - Math.pow(1 - progress, 3)
+      const current = Math.round(from + (to - from) * eased)
+      setDisplayValue(current)
+
+      if (progress < 1) {
+        animRef.current = requestAnimationFrame(animate)
+      }
+    }
+    animRef.current = requestAnimationFrame(animate)
+
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current)
+    }
+  }, [value])
+
+  return <span className={`tabular-nums ${className}`}>{displayValue}</span>
+}
+
 // Known cities for stable ordering; any new cities found in data are appended dynamically
 const KNOWN_CITIES = ['חדרה', 'נתניה', 'קיסריה']
 
@@ -954,9 +997,9 @@ export default function FilterBar({
           </a>
           <div className="filter-count" style={activeCount > 0 ? { color: '#C8942A', fontWeight: 600 } : undefined}>
             <Eye className="w-3 h-3" />
-            {plotCount} {plotCount === 1 ? 'חלקה' : 'חלקות'}
+            <AnimatedCount value={plotCount} /> {plotCount === 1 ? 'חלקה' : 'חלקות'}
             {activeCount > 0 && allPlots.length !== plotCount && (
-              <span className="text-slate-600 font-normal"> מתוך {allPlots.length}</span>
+              <span className="text-slate-600 font-normal"> מתוך <AnimatedCount value={allPlots.length} /></span>
             )}
           </div>
         </div>
