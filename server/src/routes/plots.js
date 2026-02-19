@@ -660,6 +660,14 @@ router.get('/:id', sanitizePlotId, async (req, res, next) => {
       return res.status(304).end()
     }
 
+    // Last-Modified — enables If-Modified-Since conditional requests from CDNs/proxies.
+    // The list endpoint already sets this; matching it here ensures consistent caching
+    // behavior across all plot endpoints (CDNs can validate both ways: ETag or time-based).
+    const updatedAt = plot.updated_at || plot.created_at
+    if (updatedAt) {
+      res.set('Last-Modified', new Date(updatedAt).toUTCString())
+    }
+
     res.json(plot)
   } catch (err) {
     next(err)

@@ -296,13 +296,12 @@ export async function getPlotById(id) {
 
   if (error) throw error
 
-  // Enrich single plot with computed metrics
+  // Enrich single plot with ALL computed metrics — same as list endpoint.
+  // Previously only computed score/grade/roi, missing _pricePerSqm, _monthlyPayment,
+  // and _daysOnMarket. This caused inconsistency between list and detail views:
+  // the sidebar would recalculate metrics client-side that the card strip got for free.
   if (data) {
-    const price = data.total_price || 0
-    const projected = data.projected_value || 0
-    data._investmentScore = computeInvestmentScore(data)
-    data._grade = computeGrade(data._investmentScore)
-    data._roi = price > 0 ? Math.round(((projected - price) / price) * 100) : 0
+    enrichPlotsWithScores([data])
   }
 
   return data
@@ -385,6 +384,13 @@ export async function getPlotsByIds(ids) {
     .in('id', safeIds)
 
   if (error) throw error
+
+  // Enrich with server-computed investment metrics — previously missing,
+  // causing the Compare page to show plots without _investmentScore, _grade,
+  // _roi, _pricePerSqm, _monthlyPayment, and _daysOnMarket. This forced
+  // redundant client-side recalculation and inconsistent score display.
+  enrichPlotsWithScores(data)
+
   return data || []
 }
 
