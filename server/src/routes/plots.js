@@ -761,6 +761,200 @@ router.get('/by-gush/:block/:parcel', async (req, res, next) => {
   }
 })
 
+// GET /api/plots/recommendations - Personalized plot recommendations based on favorites.
+// Analyzes the user's favorite plots to build a preference profile (price range, city,
+// zoning stage, ROI level, size) and returns non-favorited plots that match that profile.
+// Like Netflix's "Because you liked..." or Madlan's "מומלץ עבורך" — a proven engagement
+// pattern that increases time-on-site and conversion rates.
+// No auth required — favorites are client-side, IDs are sent as a query param.
+router.get('/recommendations', computeHeavyLimiter, requestAbortSignal, async (req, res, next) => {
+  try {
+    const favParam = req.query.favorites
+    if (!favParam || typeof favParam !== 'string') {
+      return res.status(400).json({ error: 'חסר פרמטר favorites', errorCode: 'MISSING_FAVORITES' })
+    }
+    const favIds = favParam.split(',').map(id => id.trim()).filter(Boolean)
+    if (favIds.length === 0) {
+      return res.json([])
+    }
+    if (favIds.length > 20) {
+      return res.status(400).json({ error: 'עד 20 מועדפים', errorCode: 'TOO_MANY_FAVORITES' })
+    }
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!favIds.every(id => uuidRegex.test(id))) {
+      return res.status(400).json({ error: 'פורמט ID לא תקין', errorCode: 'INVALID_ID_FORMAT' })
+    }
+
+    const limit = Math.min(parseInt(req.query.limit) || 6, 12)
+    res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300')
+
+    const cacheKey = `recommendations:${favIds.sort().join(',')}:${limit}`
+    const recommendations = await plotCache.wrap(cacheKey, async () => {
+      // Fetch all published plots (from cache — very fast after first call)
+      const allPlots = await plotCache.wrap('plots:{}', () => getPublishedPlots({}), 30_000)
+      if (!allPlots || allPlots.length === 0) return []
+
+      const favSet = new Set(favIds)
+      const favPlots = allPlots.filter(p => favSet.has(p.id))
+      if (favPlots.length === 0) return []
+
+      // ── Build preference profile from favorites ───────────────────
+      // Extract the statistical center of the user's favorites for each dimension.
+      // Using median instead of mean to resist outlier skew (e.g., one ₪5M plot
+      // among ₪200K plots shouldn't shift the entire profile).
+      const sortedNum = arr => [...arr].sort((a, b) => a - b)
+      const median = arr => {
+        if (arr.length === 0) return 0
+        const mid = Math.floor(arr.length / 2)
+        return arr.length % 2 !== 0 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2
+      }
+
+      const prices = sortedNum(favPlots.map(p => p.total_price || 0).filter(x => x > 0))
+      const sizes = sortedNum(favPlots.map(p => p.size_sqm || 0).filter(x => x > 0))
+      const rois = sortedNum(favPlots.map(p => {
+        const price = p.total_price || 0
+        const proj = p.projected_value || 0
+        return price > 0 ? ((proj - price) / price) * 100 : 0
+      }).filter(x => x !== 0))
+
+      const medianPrice = median(prices)
+      const medianSize = median(sizes)
+      const medianRoi = median(rois)
+
+      // Preferred cities (frequency-weighted)
+      const cityCounts = {}
+      favPlots.forEach(p => { cityCounts[p.city || ''] = (cityCounts[p.city || ''] || 0) + 1 })
+      const topCities = Object.entries(cityCounts).sort((a, b) => b[1] - a[1]).map(([city]) => city)
+
+      // Preferred zoning stages
+      const ZONING_ORDER = [
+        'AGRICULTURAL', 'MASTER_PLAN_DEPOSIT', 'MASTER_PLAN_APPROVED',
+        'DETAILED_PLAN_PREP', 'DETAILED_PLAN_DEPOSIT', 'DETAILED_PLAN_APPROVED',
+        'DEVELOPER_TENDER', 'BUILDING_PERMIT',
+      ]
+      const zoningIdxes = favPlots
+        .map(p => ZONING_ORDER.indexOf(p.zoning_stage || 'AGRICULTURAL'))
+        .filter(i => i >= 0)
+      const medianZoningIdx = zoningIdxes.length > 0
+        ? Math.round(median(sortedNum(zoningIdxes)))
+        : 3
+
+      // Compute centroid of favorite plots for geographic proximity scoring
+      let avgLat = 0, avgLng = 0, geoCount = 0
+      for (const p of favPlots) {
+        const center = calcCentroid(p.coordinates)
+        if (center) {
+          avgLat += center.lat
+          avgLng += center.lng
+          geoCount++
+        }
+      }
+      const favCentroid = geoCount > 0 ? { lat: avgLat / geoCount, lng: avgLng / geoCount } : null
+
+      // ── Score each candidate plot against the preference profile ────
+      const candidates = allPlots
+        .filter(p => !favSet.has(p.id) && p.status !== 'SOLD')
+        .map(p => {
+          const price = p.total_price || 0
+          const size = p.size_sqm || 0
+          const proj = p.projected_value || 0
+          const roi = price > 0 ? ((proj - price) / price) * 100 : 0
+          const zoningIdx = ZONING_ORDER.indexOf(p.zoning_stage || 'AGRICULTURAL')
+
+          // Price similarity (0-3): closer to median = higher score
+          let priceScore = 0
+          if (medianPrice > 0 && price > 0) {
+            const diff = Math.abs(price - medianPrice) / medianPrice
+            priceScore = Math.max(0, 3 - diff * 4)
+          }
+
+          // Size similarity (0-2)
+          let sizeScore = 0
+          if (medianSize > 0 && size > 0) {
+            const diff = Math.abs(size - medianSize) / medianSize
+            sizeScore = Math.max(0, 2 - diff * 3)
+          }
+
+          // ROI similarity (0-2): prefer equal or better ROI
+          let roiScore = 0
+          if (medianRoi > 0) {
+            if (roi >= medianRoi) roiScore = 2 // Equal or better ROI = max
+            else {
+              const diff = (medianRoi - roi) / medianRoi
+              roiScore = Math.max(0, 2 - diff * 3)
+            }
+          }
+
+          // City preference (0-2): top city = 2, second = 1, other = 0
+          const cityRank = topCities.indexOf(p.city || '')
+          const cityScore = cityRank === 0 ? 2 : cityRank === 1 ? 1.5 : cityRank >= 2 ? 0.5 : 0
+
+          // Zoning proximity (0-2): closer stage to median = higher
+          const zoningDist = Math.abs(zoningIdx - medianZoningIdx)
+          const zoningScore = zoningDist === 0 ? 2 : zoningDist === 1 ? 1.5 : zoningDist === 2 ? 0.5 : 0
+
+          // Geographic proximity (0-2): closer to favorites cluster = higher
+          let geoScore = 0
+          let distKm = null
+          if (favCentroid) {
+            const pCenter = calcCentroid(p.coordinates)
+            if (pCenter) {
+              distKm = haversineKm(favCentroid.lat, favCentroid.lng, pCenter.lat, pCenter.lng)
+              if (distKm <= 3) geoScore = 2
+              else if (distKm <= 8) geoScore = 1.5
+              else if (distKm <= 15) geoScore = 1
+              else if (distKm <= 25) geoScore = 0.5
+            }
+          }
+
+          // Freshness bonus (0-1): newer listings are more relevant
+          const daysOld = p.created_at
+            ? Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000)
+            : 999
+          const freshBonus = daysOld <= 3 ? 1 : daysOld <= 7 ? 0.7 : daysOld <= 14 ? 0.3 : 0
+
+          const totalScore = priceScore + sizeScore + roiScore + cityScore + zoningScore + geoScore + freshBonus
+
+          // Build explanation of why this was recommended
+          const reasons = [
+            priceScore >= 2 && 'טווח מחיר דומה',
+            sizeScore >= 1.5 && 'שטח דומה',
+            roiScore >= 1.5 && (roi >= medianRoi ? 'תשואה גבוהה יותר' : 'תשואה דומה'),
+            cityScore >= 1.5 && `${p.city}`,
+            zoningScore >= 1.5 && 'שלב תכנוני דומה',
+            geoScore >= 1.5 && 'קרוב למועדפים שלך',
+            freshBonus >= 0.7 && 'חדש בשוק',
+          ].filter(Boolean)
+
+          return {
+            ...p,
+            _recScore: Math.round(totalScore * 100) / 100,
+            _recReasons: reasons.slice(0, 3),
+            _distanceKm: distKm !== null ? Math.round(distKm * 10) / 10 : null,
+            _roi: Math.round(roi),
+          }
+        })
+        .filter(p => p._recScore > 3) // minimum relevance threshold
+        .sort((a, b) => b._recScore - a._recScore)
+        .slice(0, limit)
+
+      return candidates
+    }, 120_000) // Cache for 2 minutes
+
+    const etag = generateETag(recommendations)
+    res.set('ETag', etag)
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end()
+    }
+
+    res.json(recommendations)
+  } catch (err) {
+    if (isAbortError(err)) return
+    next(err)
+  }
+})
+
 // GET /api/plots/:id - Single plot with documents & images
 router.get('/:id', sanitizePlotId, async (req, res, next) => {
   try {

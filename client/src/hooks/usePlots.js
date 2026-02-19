@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useCallback, useRef, useEffect } from 'react'
-import { getPlots, getPlot, getNearbyPlots, getSimilarPlots, getPopularPlots, getFeaturedPlots, getPlotsBatch, getNearbyPois, getTrendingSearches } from '../api/plots.js'
+import { getPlots, getPlot, getNearbyPlots, getSimilarPlots, getPopularPlots, getFeaturedPlots, getPlotsBatch, getNearbyPois, getTrendingSearches, getRecommendations } from '../api/plots.js'
 import { plots as mockPlots } from '../data/mockData.js'
 import { useIsSlowConnection } from './useNetworkStatus.js'
 
@@ -309,4 +309,36 @@ export function usePrefetchPlot() {
       staleTime: 60_000,
     })
   }, [queryClient])
+}
+
+/**
+ * Fetch personalized plot recommendations based on the user's favorite plots.
+ * Builds a preference profile from favorites (price, size, city, zoning, ROI)
+ * and returns plots the user hasn't favorited yet that match their profile.
+ * Like Netflix/Spotify's "Recommended for You" — a proven engagement pattern.
+ *
+ * @param {string[]} favoriteIds - Array of favorited plot UUIDs
+ * @param {number} limit - Max recommendations (default 6)
+ */
+export function useRecommendations(favoriteIds, limit = 6) {
+  // Sort for stable cache key; minimum 2 favorites for meaningful profile
+  const sortedIds = favoriteIds && favoriteIds.length >= 2 ? [...favoriteIds].sort() : []
+  const enabled = sortedIds.length >= 2
+
+  return useQuery({
+    queryKey: ['recommendations', sortedIds, limit],
+    queryFn: async () => {
+      try {
+        const data = await getRecommendations(sortedIds, limit)
+        return Array.isArray(data) ? data : []
+      } catch {
+        return []
+      }
+    },
+    enabled,
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+    retry: 1,
+    placeholderData: [],
+  })
 }

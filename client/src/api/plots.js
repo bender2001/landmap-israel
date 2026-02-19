@@ -76,3 +76,15 @@ export function getNearbyPois(plotId, maxKm = 3) {
 export function getTrendingSearches(limit = 5) {
   return api.get(`/plots/trending-searches?limit=${limit}`)
 }
+
+/**
+ * Fetch personalized plot recommendations based on the user's favorite plots.
+ * Analyzes favorites to build a preference profile (price, size, city, zoning, ROI)
+ * and returns non-favorited plots that match. Like Netflix's recommendation engine.
+ * @param {string[]} favoriteIds - Array of favorite plot UUIDs
+ * @param {number} limit - Max results (default 6)
+ */
+export function getRecommendations(favoriteIds, limit = 6) {
+  if (!favoriteIds || favoriteIds.length === 0) return Promise.resolve([])
+  return api.get(`/plots/recommendations?favorites=${favoriteIds.join(',')}&limit=${limit}`)
+}

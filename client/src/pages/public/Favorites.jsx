@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Heart, Map, MapPin, TrendingUp, Trash2, Clock, GitCompareArrows, Share2, Printer, Copy, Check, Download, ArrowUpDown, ArrowDown, ArrowUp, FileSpreadsheet, Eye, Calculator as CalcIcon, ChevronDown, ChevronUp } from 'lucide-react'
-import { usePlotsBatch } from '../../hooks/usePlots'
+import { usePlotsBatch, useRecommendations } from '../../hooks/usePlots'
 import { useFavorites } from '../../hooks/useFavorites'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
 import { formatCurrency, formatPriceShort, calcInvestmentScore, getScoreLabel, getInvestmentGrade, calcCAGR, formatRelativeTime } from '../../utils/formatters'
@@ -218,6 +218,190 @@ function PortfolioAnalytics({ plots }) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * RecommendedForYou — personalized plot suggestions based on the user's favorites.
+ * Analyzes the preference profile (price, size, city, zoning, ROI) of saved plots
+ * and shows plots the user hasn't favorited yet that match their profile.
+ * Like Netflix's "Because you watched..." or Madlan's "מומלץ עבורך".
+ * Requires 2+ favorites for a meaningful preference signal.
+ */
+function RecommendedForYou({ favoriteIds, toggle }) {
+  const { data: recommendations = [], isLoading } = useRecommendations(favoriteIds)
+  const [isExpanded, setIsExpanded] = useState(true)
+  const navigate = useNavigate()
+
+  // Don't render if insufficient favorites or no recommendations
+  if (favoriteIds.length < 2) return null
+  if (!isLoading && recommendations.length === 0) return null
+
+  return (
+    <div className="mb-8">
+      <button
+        onClick={() => setIsExpanded(prev => !prev)}
+        className="flex items-center gap-3 mb-4 w-full group"
+      >
+        <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+          <span className="text-lg">✨</span>
+        </div>
+        <div className="text-right flex-1">
+          <h2 className="text-lg font-bold text-slate-200 group-hover:text-slate-100 transition-colors">
+            מומלץ עבורך
+          </h2>
+          <p className="text-[11px] text-slate-500">
+            חלקות דומות למועדפים שלך שאולי פספסת
+          </p>
+        </div>
+        {isExpanded
+          ? <ChevronUp className="w-4 h-4 text-slate-500" />
+          : <ChevronDown className="w-4 h-4 text-slate-500" />}
+      </button>
+
+      {isExpanded && (
+        isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="flex flex-col items-center gap-2">
+              <Spinner className="w-6 h-6 text-purple-400" />
+              <span className="text-[11px] text-slate-500">מנתח את המועדפים שלך...</span>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {recommendations.map((plot) => {
+              const price = plot.total_price ?? plot.totalPrice ?? 0
+              const projValue = plot.projected_value ?? plot.projectedValue ?? 0
+              const roi = plot._roi ?? (price > 0 ? Math.round(((projValue - price) / price) * 100) : 0)
+              const blockNum = plot.block_number ?? plot.blockNumber
+              const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
+              const color = statusColors[plot.status]
+              const readiness = plot.readiness_estimate ?? plot.readinessEstimate
+              const reasons = plot._recReasons || []
+
+              return (
+                <div
+                  key={plot.id}
+                  className="glass-panel p-0 overflow-hidden group hover:border-purple-500/20 transition-all cursor-pointer"
+                  onClick={() => navigate(`/plot/${plot.id}`)}
+                  role="link"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/plot/${plot.id}`) }}
+                >
+                  {/* Purple accent bar — distinguishes recommendations from favorites (red) */}
+                  <div className="h-1 bg-gradient-to-r from-purple-500/60 via-purple-400/40 to-indigo-500/30" />
+
+                  <div className="p-4">
+                    {/* Recommendation reasons — shows WHY this was suggested */}
+                    {reasons.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2.5">
+                        {reasons.map((reason, i) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-0.5 px-2 py-0.5 text-[9px] font-medium text-purple-300 bg-purple-500/10 border border-purple-500/15 rounded-lg"
+                          >
+                            {reason}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-2.5">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-200">
+                          גוש {blockNum} | חלקה {plot.number}
+                        </h3>
+                        <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-0.5">
+                          <MapPin className="w-2.5 h-2.5" />
+                          {plot.city}
+                          {plot._distanceKm != null && (
+                            <span className="text-purple-400/70 mr-1">
+                              · 📍 {plot._distanceKm < 1 ? `${Math.round(plot._distanceKm * 1000)}מ׳` : `${plot._distanceKm}ק״מ`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Add to favorites */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggle(plot.id) }}
+                        className="w-8 h-8 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center hover:bg-gold/20 transition"
+                        title="שמור למועדפים"
+                        aria-label="שמור למועדפים"
+                      >
+                        <Heart className="w-3.5 h-3.5 text-gold" />
+                      </button>
+                    </div>
+
+                    {/* Status badge */}
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                        style={{ background: `${color}20`, color }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+                        {statusLabels[plot.status]}
+                      </span>
+                      {readiness && (
+                        <span className="text-[10px] text-slate-500 flex items-center gap-0.5">
+                          <Clock className="w-2.5 h-2.5" />
+                          {readiness}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Price + ROI */}
+                    <div className="flex items-end justify-between mb-2">
+                      <div>
+                        <div className="text-[10px] text-slate-500">מחיר</div>
+                        <div className="text-base font-bold text-gold">{formatPriceShort(price)}</div>
+                        {sizeSqM > 0 && (
+                          <div className="text-[9px] text-slate-500">
+                            {formatPriceShort(Math.round(price / sizeSqM * 1000))}/דונם
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-left">
+                        <div className="text-[10px] text-slate-500">תשואה צפויה</div>
+                        <div className="flex items-center gap-1">
+                          <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-sm font-bold text-emerald-400">+{roi}%</span>
+                        </div>
+                        {(() => {
+                          const cagrData = calcCAGR(roi, readiness)
+                          if (!cagrData) return null
+                          return (
+                            <div className="text-[9px] text-slate-500">
+                              {cagrData.cagr}%/שנה CAGR
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                      <span className="text-[10px] text-slate-500">
+                        {sizeSqM > 0 ? `${(sizeSqM / 1000).toFixed(1)} דונם` : ''}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          to={`/plot/${plot.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[10px] text-purple-400 hover:underline font-medium"
+                        >
+                          פרטים מלאים →
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      )}
     </div>
   )
 }
@@ -590,6 +774,14 @@ export default function Favorites() {
                 )
               })}
             </div>
+          )}
+
+          {/* Personalized recommendations — "Because you saved X, you might also like..."
+              Shows non-favorited plots that match the user's preference profile.
+              Requires 2+ favorites for a meaningful signal. Server computes similarity.
+              Like Netflix/Spotify's recommendation engine — keeps investors browsing. */}
+          {!isLoading && favorites.length >= 2 && (
+            <RecommendedForYou favoriteIds={favorites} toggle={toggle} />
           )}
 
           {/* Recently Viewed section — shows plots the user browsed but didn't save.
