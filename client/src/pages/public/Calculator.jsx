@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Calculator as CalcIcon, TrendingUp, DollarSign, Percent, ArrowDown, Landmark, Table2, PiggyBank, Printer, Share2, Check, AlertTriangle, Target, Clock, BarChart3, ShieldAlert } from 'lucide-react'
+import { Calculator as CalcIcon, TrendingUp, DollarSign, Percent, ArrowDown, Landmark, Table2, PiggyBank, Printer, Share2, Check, AlertTriangle, Target, Clock, BarChart3, ShieldAlert, Link2, Copy } from 'lucide-react'
 import { roiStages, zoningLabels, ZoningStage } from '../../utils/constants'
 import { formatCurrency, calcAlternativeReturns } from '../../utils/formatters'
 import { calcTransactionCosts, calcExitCosts, calcAnnualHoldingCosts } from '../../utils/plot'
@@ -31,6 +31,114 @@ function saveInputs(inputs) {
 
 const zoningOptions = Object.entries(zoningLabels)
 
+/**
+ * ShareAnalysis — action bar with Copy Link, WhatsApp share, and Print.
+ * The Copy Link button copies the current URL (which includes all calculator params
+ * via the bidirectional URL sync above). Recipients get the exact same analysis.
+ * Like Madlan's "שתף ניתוח" but with the full calculator configuration embedded in URL.
+ */
+function ShareAnalysis({ result, purchasePrice, plotSize, currentZoning, targetZoning }) {
+  const [linkCopied, setLinkCopied] = useState(false)
+
+  const handleCopyLink = useCallback(() => {
+    // URL already contains all params via the bidirectional sync effect
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2500)
+    }).catch(() => {})
+  }, [])
+
+  const handleWhatsApp = useCallback(() => {
+    if (!result) return
+    const price = parseFloat(purchasePrice)
+    const alternatives = price > 0 ? calcAlternativeReturns(price, result.netProfit, result.holdingYears) : null
+    const text = [
+      `📊 דוח השקעה — LandMap Israel`,
+      ``,
+      `💰 מחיר רכישה: ${formatCurrency(price)}`,
+      `📐 שטח: ${parseFloat(plotSize).toLocaleString()} מ״ר`,
+      `🏗️ ייעוד: ${zoningLabels[currentZoning]} → ${zoningLabels[targetZoning]}`,
+      `📈 תשואה כוללת: +${result.roiPercent}%`,
+      `📅 CAGR (${result.holdingYears} שנים): +${result.annualizedRoi}%`,
+      `💵 רווח נקי: ${formatCurrency(result.netProfit)}`,
+      `🎯 נקודת איזון: ${formatCurrency(result.breakEvenPrice)}`,
+      ...(alternatives ? [
+        ``,
+        `📊 השוואת אלטרנטיבות:`,
+        `🏗️ קרקע: ${formatCurrency(alternatives.land.futureValue)} (${Math.round(alternatives.land.rate * 100)}%/שנה)`,
+        `📊 מניות: ${formatCurrency(alternatives.stock.futureValue)} (9%/שנה)`,
+        `🏦 פיקדון: ${formatCurrency(alternatives.bank.futureValue)} (4.5%/שנה)`,
+      ] : []),
+      ``,
+      `🔗 ראה ניתוח מלא:`,
+      window.location.href,
+    ].join('\n')
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+  }, [result, purchasePrice, plotSize, currentZoning, targetZoning])
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-3">
+      <button
+        onClick={handleCopyLink}
+        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+          linkCopied
+            ? 'bg-emerald-500/15 border border-emerald-500/25 text-emerald-400'
+            : 'bg-gold/10 border border-gold/20 text-gold hover:bg-gold/20'
+        }`}
+      >
+        {linkCopied ? <Check className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}
+        {linkCopied ? 'הקישור הועתק!' : 'העתק קישור'}
+      </button>
+      <button
+        onClick={handleWhatsApp}
+        className="flex items-center gap-2 px-5 py-2.5 bg-[#25D366]/10 border border-[#25D366]/20 rounded-xl text-sm text-[#25D366] hover:bg-[#25D366]/20 transition-all"
+      >
+        <Share2 className="w-4 h-4" />
+        שתף ב-WhatsApp
+      </button>
+      <button
+        onClick={() => window.print()}
+        className="flex items-center gap-2 px-5 py-2.5 bg-white/[0.05] border border-white/10 rounded-xl text-sm text-slate-300 hover:border-gold/30 hover:text-gold transition-all"
+      >
+        <Printer className="w-4 h-4" />
+        הדפס דוח
+      </button>
+    </div>
+  )
+}
+
+/**
+ * Calculator JSON-LD — helps Google surface the calculator in search results.
+ * Implements WebApplication schema with "FinanceApplication" applicationCategory.
+ * Like financial calculator rich snippets on NerdWallet, Bankrate, etc.
+ */
+function CalculatorJsonLd() {
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'מחשבון השקעה בקרקע — LandMap Israel',
+    applicationCategory: 'FinanceApplication',
+    operatingSystem: 'All',
+    url: window.location.origin + '/calculator',
+    description: 'מחשבון תשואה מלא להשקעה בקרקע בישראל — חישוב CAGR, מסים, היטל השבחה, עלויות מימון והשוואת אלטרנטיבות.',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'ILS',
+    },
+    provider: {
+      '@type': 'Organization',
+      name: 'LandMap Israel',
+      url: window.location.origin,
+    },
+    featureList: 'חישוב ROI, CAGR, מס רכישה, היטל השבחה, מס שבח, סימולציית מימון, ניתוח רגישות, השוואת אלטרנטיבות',
+    inLanguage: 'he',
+  }
+  return (
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
+  )
+}
+
 /** Calculate monthly mortgage payment using standard amortization formula */
 function calcMonthlyPayment(principal, annualRate, years) {
   if (principal <= 0 || annualRate <= 0 || years <= 0) return 0
@@ -48,6 +156,8 @@ export default function Calculator() {
     url: `${window.location.origin}/calculator`,
   })
 
+  const [, setSearchParams] = useSearchParams()
+
   // Support URL pre-fill from PlotDetail (e.g., /calculator?price=500000&size=2000&zoning=AGRICULTURAL&years=5)
   // This creates a seamless Plot → Calculator flow like Madlan's "חשב תשואה" button.
   // Fallback order: URL params → localStorage saved state → defaults
@@ -59,16 +169,17 @@ export default function Calculator() {
     return z && zoningOptions.some(([k]) => k === z) ? z : 'AGRICULTURAL'
   })
   const [targetZoning, setTargetZoning] = useState(() => {
-    const z = saved?.targetZoning
+    const z = searchParams.get('target') || saved?.targetZoning
     return z && zoningOptions.some(([k]) => k === z) ? z : 'BUILDING_PERMIT'
   })
   const [holdingYears, setHoldingYears] = useState(() => searchParams.get('years') || saved?.holdingYears || '5')
   const prefilled = searchParams.get('price') && searchParams.get('size')
-  // Financing inputs — also restored from localStorage
-  const [downPaymentPct, setDownPaymentPct] = useState(() => saved?.downPaymentPct || '30')
-  const [interestRate, setInterestRate] = useState(() => saved?.interestRate || '4.5')
-  const [loanYears, setLoanYears] = useState(() => saved?.loanYears || '15')
-  const [showFinancing, setShowFinancing] = useState(false)
+  // Financing inputs — restored from URL params → localStorage → defaults
+  const [downPaymentPct, setDownPaymentPct] = useState(() => searchParams.get('dp') || saved?.downPaymentPct || '30')
+  const [interestRate, setInterestRate] = useState(() => searchParams.get('rate') || saved?.interestRate || '4.5')
+  const [loanYears, setLoanYears] = useState(() => searchParams.get('loan') || saved?.loanYears || '15')
+  // Auto-open financing section if URL contains financing params
+  const [showFinancing, setShowFinancing] = useState(() => !!(searchParams.get('dp') || searchParams.get('rate') || searchParams.get('loan')))
 
   // Auto-save all calculator inputs to localStorage on every change.
   // Debounce isn't needed here — JSON.stringify is fast for 8 fields (~50μs).
@@ -78,6 +189,34 @@ export default function Calculator() {
       holdingYears, downPaymentPct, interestRate, loanYears,
     })
   }, [purchasePrice, plotSize, currentZoning, targetZoning, holdingYears, downPaymentPct, interestRate, loanYears])
+
+  // ── Bidirectional URL sync — shareable calculator links ─────────────
+  // Writes all inputs back to URL params as the user changes them.
+  // This means copy-pasting the URL gives the exact same analysis —
+  // like Madlan's shareable property analysis. Combined with the existing
+  // URL-read on mount, this creates a fully bidirectional URL ↔ state sync.
+  // Uses replaceState (replace: true) to avoid polluting browser history.
+  const syncTimerRef = useRef(null)
+  useEffect(() => {
+    // Debounce URL writes by 400ms — rapid typing shouldn't thrash the URL bar.
+    // Shorter than localStorage save (instant) because URL changes are more visible.
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
+    syncTimerRef.current = setTimeout(() => {
+      const params = new URLSearchParams()
+      if (purchasePrice) params.set('price', purchasePrice)
+      if (plotSize) params.set('size', plotSize)
+      if (currentZoning !== 'AGRICULTURAL') params.set('zoning', currentZoning)
+      if (targetZoning !== 'BUILDING_PERMIT') params.set('target', targetZoning)
+      if (holdingYears && holdingYears !== '5') params.set('years', holdingYears)
+      if (showFinancing) {
+        if (downPaymentPct && downPaymentPct !== '30') params.set('dp', downPaymentPct)
+        if (interestRate && interestRate !== '4.5') params.set('rate', interestRate)
+        if (loanYears && loanYears !== '15') params.set('loan', loanYears)
+      }
+      setSearchParams(params, { replace: true })
+    }, 400)
+    return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current) }
+  }, [purchasePrice, plotSize, currentZoning, targetZoning, holdingYears, downPaymentPct, interestRate, loanYears, showFinancing])
 
   const result = useMemo(() => {
     const price = parseFloat(purchasePrice)
@@ -223,6 +362,7 @@ export default function Calculator() {
   return (
     <div className="min-h-screen bg-navy" dir="rtl">
       <PublicNav />
+      <CalculatorJsonLd />
 
       <div className="pt-28 pb-16 px-4">
         <div className="max-w-4xl mx-auto">
@@ -815,47 +955,19 @@ export default function Calculator() {
                     )
                   })()}
 
-                  {/* Action buttons: Print & Share */}
-                  <div className="flex items-center justify-center gap-3">
-                    <button
-                      onClick={() => window.print()}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-white/[0.05] border border-white/10 rounded-xl text-sm text-slate-300 hover:border-gold/30 hover:text-gold transition-all"
-                    >
-                      <Printer className="w-4 h-4" />
-                      הדפס דוח
-                    </button>
-                    <button
-                      onClick={() => {
-                        const price = parseFloat(purchasePrice)
-                        const alternatives = price > 0 ? calcAlternativeReturns(price, result.netProfit, result.holdingYears) : null
-                        const text = [
-                          `📊 דוח השקעה — LandMap Israel`,
-                          ``,
-                          `💰 מחיר רכישה: ${formatCurrency(price)}`,
-                          `📐 שטח: ${parseFloat(plotSize).toLocaleString()} מ״ר`,
-                          `🏗️ ייעוד: ${zoningLabels[currentZoning]} → ${zoningLabels[targetZoning]}`,
-                          `📈 תשואה כוללת: +${result.roiPercent}%`,
-                          `📅 CAGR (${result.holdingYears} שנים): +${result.annualizedRoi}%`,
-                          `💵 רווח נקי: ${formatCurrency(result.netProfit)}`,
-                          `🎯 נקודת איזון: ${formatCurrency(result.breakEvenPrice)}`,
-                          ...(alternatives ? [
-                            ``,
-                            `📊 השוואת אלטרנטיבות:`,
-                            `🏗️ קרקע: ${formatCurrency(alternatives.land.futureValue)} (${Math.round(alternatives.land.rate * 100)}%/שנה)`,
-                            `📊 מניות: ${formatCurrency(alternatives.stock.futureValue)} (9%/שנה)`,
-                            `🏦 פיקדון: ${formatCurrency(alternatives.bank.futureValue)} (4.5%/שנה)`,
-                          ] : []),
-                          ``,
-                          `חושב על ${window.location.origin}/calculator`,
-                        ].join('\n')
-                        navigator.clipboard.writeText(text).catch(() => {})
-                      }}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-gold/10 border border-gold/20 rounded-xl text-sm text-gold hover:bg-gold/20 transition-all"
-                    >
-                      <Share2 className="w-4 h-4" />
-                      שתף תוצאות
-                    </button>
-                  </div>
+                  {/* Action buttons: Print, Copy Link, Share WhatsApp ─────────────
+                      Three sharing modes for different investor workflows:
+                      1. Print — formal PDF for advisors/partners
+                      2. Copy Link — shareable URL with all params (bidirectional sync!)
+                      3. WhatsApp — rich text summary with link for quick sharing
+                      Like Madlan's "שתף ניתוח" but with full calculator state in URL. */}
+                  <ShareAnalysis
+                    result={result}
+                    purchasePrice={purchasePrice}
+                    plotSize={plotSize}
+                    currentZoning={currentZoning}
+                    targetZoning={targetZoning}
+                  />
 
                   {/* Disclaimer */}
                   <p className="text-[10px] text-slate-600 text-center">

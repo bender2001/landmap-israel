@@ -1,10 +1,29 @@
 import { Router } from 'express'
 import crypto from 'crypto'
+import { rateLimit } from 'express-rate-limit'
 import { supabaseAdmin } from '../config/supabase.js'
 import { takeDailySnapshot, getPlotPriceHistory, getCityPriceHistory } from '../services/priceHistoryService.js'
 import { marketCache } from '../services/cacheService.js'
 import { auth } from '../middleware/auth.js'
 import { adminOnly } from '../middleware/adminOnly.js'
+
+// ─── Dedicated rate limiter for data-heavy endpoints ───────────────────
+// Price history and city history endpoints return large datasets and hit the DB.
+// Without a tighter limiter, a scraper could enumerate all plots and download
+// the entire price history database via the global 200/15min limit.
+// 30 requests per 5 minutes is generous for real users but blocks bulk scraping.
+const historyLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip || req.connection?.remoteAddress || 'unknown',
+  message: {
+    error: 'יותר מדי בקשות לנתוני מחירים — נסה שוב בעוד מספר דקות',
+    errorCode: 'RATE_LIMIT_HISTORY',
+    retryAfter: 300,
+  },
+})
 
 function generateETag(data) {
   return '"' + crypto.createHash('md5').update(JSON.stringify(data)).digest('hex').slice(0, 16) + '"'
@@ -434,8 +453,9 @@ router.post('/snapshot', auth, adminOnly, async (req, res, next) => {
 /**
  * GET /api/market/price-history/:plotId
  * Get historical price data for a specific plot.
+ * Rate-limited: 30 req/5min per IP to prevent bulk scraping of price history data.
  */
-router.get('/price-history/:plotId', async (req, res, next) => {
+router.get('/price-history/:plotId', historyLimiter, async (req, res, next) => {
   try {
     const days = Math.min(parseInt(req.query.days) || 365, 730)
     res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=7200')
@@ -449,8 +469,9 @@ router.get('/price-history/:plotId', async (req, res, next) => {
 /**
  * GET /api/market/city-history/:city
  * Get aggregated price history for a city.
+ * Rate-limited: 30 req/5min per IP to prevent bulk scraping of price history data.
  */
-router.get('/city-history/:city', async (req, res, next) => {
+router.get('/city-history/:city', historyLimiter, async (req, res, next) => {
   try {
     const days = Math.min(parseInt(req.query.days) || 365, 730)
     res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=7200')

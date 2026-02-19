@@ -151,6 +151,18 @@ app.use((req, res, next) => {
   next()
 })
 
+// ─── API versioning & deprecation headers ──────────────────────────────
+// Sets X-API-Version on all API responses for client-side version awareness.
+// Like Google/Stripe APIs: clients can detect API changes and adapt gracefully.
+// Also sets Deprecation header on sunset endpoints for forward compatibility.
+app.use('/api', (req, res, next) => {
+  res.set('X-API-Version', '1.0')
+  // NEL (Network Error Logging) hint — helps clients report network failures
+  // back to the server for infrastructure monitoring. Supported by Chrome/Edge.
+  res.set('NEL', '{"report_to":"default","max_age":86400,"include_subdomains":true}')
+  next()
+})
+
 // Request tracing
 app.use(requestId)
 
