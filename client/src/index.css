@@ -3732,6 +3732,116 @@ body {
 }
 
 /* ═══════════════════════════════════════════
+   PRINT STYLESHEET — Compare Page
+   Professional comparison print for investor meetings.
+   Like Bloomberg terminal print mode — clean, data-focused,
+   readable on paper without dark backgrounds.
+   ═══════════════════════════════════════════ */
+@media print {
+  /* Compare page — full-width layout, no dark background */
+  .compare-page-container {
+    background: white !important;
+    padding: 0 !important;
+  }
+
+  .compare-page-container .glass-panel {
+    display: block !important;
+    background: #f8f8f8 !important;
+    border: 1px solid #ddd !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    break-inside: avoid;
+    margin-bottom: 16px !important;
+  }
+
+  /* Table rows — keep borders visible for print legibility */
+  .compare-page-container table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+  .compare-page-container th,
+  .compare-page-container td {
+    border: 1px solid #ddd !important;
+    padding: 8px 12px !important;
+    font-size: 11px !important;
+    color: #1a1a1a !important;
+  }
+  .compare-page-container th {
+    background: #f0f0f0 !important;
+    font-weight: 700 !important;
+  }
+
+  /* Winner/highlight badges for print */
+  .compare-page-container .text-gold {
+    color: #B8860B !important;
+    -webkit-text-fill-color: #B8860B !important;
+    font-weight: 700 !important;
+  }
+  .compare-page-container .text-emerald-400 {
+    color: #0A7C42 !important;
+    -webkit-text-fill-color: #0A7C42 !important;
+  }
+  .compare-page-container .text-red-400 {
+    color: #C0392B !important;
+    -webkit-text-fill-color: #C0392B !important;
+  }
+
+  /* Bar charts — ensure gradient bars print with colors */
+  .compare-page-container [style*="background: linear-gradient"] {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  /* Radar SVG — make it print-friendly */
+  .compare-page-container svg {
+    max-width: 220px !important;
+    margin: 0 auto !important;
+  }
+  .compare-page-container svg polygon[fill] {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  /* Hide interactive elements */
+  .compare-page-container button:not([data-print-keep]),
+  .compare-page-container a[href*="whatsapp"],
+  .compare-page-container a[href*="telegram"],
+  .compare-page-container [data-print-hide] {
+    display: none !important;
+  }
+
+  /* Print header */
+  .compare-page-container::before {
+    content: "LandMap Israel — דוח השוואת חלקות";
+    display: block;
+    font-size: 22px;
+    font-weight: 800;
+    color: #1a1a1a;
+    border-bottom: 3px solid #B8860B;
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  /* Net profit analysis cards — ensure they print side by side */
+  .compare-page-container .grid {
+    display: grid !important;
+  }
+  .compare-page-container .grid-cols-2 {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .compare-page-container .grid-cols-3 {
+    grid-template-columns: 1fr 1fr 1fr !important;
+  }
+
+  /* Disclaimer/notes — visible in print for legal compliance */
+  .compare-page-container .text-\[9px\] {
+    font-size: 8px !important;
+    color: #888 !important;
+  }
+}
+
+/* ═══════════════════════════════════════════
    MAP RULER TOOL
    ═══════════════════════════════════════════ */
 .ruler-tooltip {

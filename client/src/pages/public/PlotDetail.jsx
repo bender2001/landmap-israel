@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } fro
 import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart, ExternalLink, Calculator as CalcIcon, FileText, Download, File, FileImage, FileSpreadsheet } from 'lucide-react'
 import { usePlot, useNearbyPlots, useSimilarPlots } from '../../hooks/usePlots.js'
 import { useMarketOverview } from '../../hooks/useMarketOverview.js'
+import { useLastVisitPrice } from '../../hooks/useLastVisitPrice.js'
 import { calcAnnualHoldingCosts, calcExitCosts, calcTransactionCosts } from '../../utils/plot.js'
 import { useFavorites } from '../../hooks/useFavorites.js'
 import { useViewTracker } from '../../hooks/useViewTracker.js'
@@ -816,6 +817,11 @@ export default function PlotDetail() {
     return { totalPrice, projectedValue, sizeSqM, blockNumber, roi, pricePerDunam, readiness, zoningStage, currentStageIndex }
   }, [plot])
 
+  // Track per-user price changes across visits — like Yad2's "המחיר ירד מאז הביקור שלך".
+  // Shows a personalized badge when the price changed since the user's last visit to this plot.
+  // More impactful than generic price change badges because it's relative to the user's awareness.
+  const lastVisitPrice = useLastVisitPrice(id, computed?.totalPrice)
+
   if (isLoading) {
     return (
       <div className="min-h-screen w-full bg-navy" dir="rtl">
@@ -1060,6 +1066,25 @@ export default function PlotDetail() {
                     </span>
                   )
                 })()}
+                {/* Price changed since last visit — personalized Yad2-style "המחיר ירד!" badge.
+                    Shows only if this isn't the user's first visit AND the price actually changed.
+                    More impactful than generic price alerts: relative to the user's awareness. */}
+                {lastVisitPrice.hasChange && (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border animate-bounce-in ${
+                      lastVisitPrice.direction === 'down'
+                        ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                        : 'text-orange-400 bg-orange-500/10 border-orange-500/20'
+                    }`}
+                    title={`מחיר קודם: ${formatCurrency(lastVisitPrice.previousPrice)} (${lastVisitPrice.lastVisit?.toLocaleDateString('he-IL')})`}
+                  >
+                    {lastVisitPrice.direction === 'down' ? '📉' : '📈'}
+                    {lastVisitPrice.direction === 'down' ? 'המחיר ירד' : 'המחיר עלה'}
+                    {' '}
+                    {Math.abs(lastVisitPrice.changePct)}%
+                    {' מאז ביקורך'}
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">

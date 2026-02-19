@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { BarChart3, X, Map, MapPin, Waves, TreePine, Hospital, TrendingUp, Award, Clock, Trophy, Crown, Share2, Printer, Check, Copy, Download, DollarSign } from 'lucide-react'
+import { BarChart3, X, Map, MapPin, Waves, TreePine, Hospital, TrendingUp, Award, Clock, Trophy, Crown, Share2, Printer, Check, Copy, Download, DollarSign, FileText } from 'lucide-react'
 import { usePlotsBatch } from '../../hooks/usePlots'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
 import { formatCurrency, calcInvestmentScore, calcMonthlyPayment, formatMonthlyPayment, calcCAGR } from '../../utils/formatters'
@@ -477,7 +477,7 @@ export default function Compare() {
   }
 
   return (
-    <div className="min-h-screen bg-navy" dir="rtl">
+    <div className="min-h-screen bg-navy compare-page-container" dir="rtl">
       <PublicNav />
 
       <div className="pt-28 pb-16 px-4">
@@ -502,7 +502,17 @@ export default function Compare() {
             {/* Share comparison — generates a shareable URL with all compared plot IDs.
                 Essential for investor teams who discuss deals via WhatsApp/email. */}
             {plots.length >= 2 && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" data-print-hide>
+                {/* Print comparison — like Bloomberg's "Print Report" for investor meetings.
+                    Uses @media print styles in index.css for clean paper output. */}
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 hover:border-gold/20 hover:text-gold transition-all"
+                  title="הדפס השוואה"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span className="hidden sm:inline">הדפס</span>
+                </button>
                 <button
                   onClick={handleShareComparison}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
