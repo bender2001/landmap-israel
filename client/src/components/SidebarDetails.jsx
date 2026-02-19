@@ -15,6 +15,7 @@ import { usePlot, useNearbyPlots, useSimilarPlots, usePrefetchPlot, useNearbyPoi
 import MiniMap from './ui/MiniMap'
 import ZoningProgressBar from './ui/ZoningProgressBar'
 import { plotInquiryLink, govMapUrl, tabuCheckUrl } from '../utils/config'
+import PlotNotes from './ui/PlotNotes'
 
 // ─── Lazy-loaded sub-components ──────────────────────────────────────────
 // These are inside collapsed (defaultOpen=false) sections or below the fold.
@@ -719,7 +720,7 @@ function NearbyPoisSection({ plotId }) {
   )
 }
 
-export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal, favorites, compareIds = [], onToggleCompare, allPlots = [], onSelectPlot, priceChange }) {
+export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal, favorites, compareIds = [], onToggleCompare, allPlots = [], onSelectPlot, priceChange, personalNotes }) {
   // Enrich plot data: fetch full plot when images/documents are missing (e.g. from list endpoint)
   const needsEnrich = rawPlot && !rawPlot.plot_images && !rawPlot.plot_documents
   const { data: enrichedPlot, isLoading: isEnriching } = usePlot(needsEnrich ? rawPlot.id : null)
@@ -1239,6 +1240,23 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   </span>
                 )
               })()}
+              {/* Investment Rank badge — "Rank #X of Y" among available plots.
+                  Powerful social proof: investors instantly see if this is a top-ranked opportunity.
+                  Like Bloomberg's "Top Pick" or Morningstar's star rating — unique to LandMap. */}
+              {plot._investmentRank && plot._totalRanked && plot._investmentRank <= 5 && (
+                <span
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold"
+                  style={{
+                    background: plot._investmentRank === 1 ? 'rgba(200,148,42,0.15)' : 'rgba(99,102,241,0.12)',
+                    border: `1px solid ${plot._investmentRank === 1 ? 'rgba(200,148,42,0.35)' : 'rgba(99,102,241,0.25)'}`,
+                    color: plot._investmentRank === 1 ? '#E5B84B' : '#A5B4FC',
+                  }}
+                  title={`דירוג ${plot._investmentRank} מתוך ${plot._totalRanked} חלקות זמינות`}
+                >
+                  {plot._investmentRank === 1 ? '🥇' : plot._investmentRank === 2 ? '🥈' : plot._investmentRank === 3 ? '🥉' : '🏅'}
+                  #{plot._investmentRank}/{plot._totalRanked}
+                </span>
+              )}
               {plot.views > 0 && (
                 <span
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium"
@@ -1597,6 +1615,15 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 </div>
               )
             })()}
+
+            {/* Personal Notes — private investor notes for this plot.
+                Unique to LandMap: investors can tag and annotate plots with personal notes.
+                Stored in localStorage (private, no server needed). Neither Madlan nor Yad2 has this. */}
+            {personalNotes && (
+              <div className="mb-3 animate-stagger-1">
+                <PlotNotes plotId={plot.id} notes={personalNotes} />
+              </div>
+            )}
 
             {/* Below Market Price Indicator — like Madlan's "מחיר נמוך ממדלן" badge */}
             {(() => {

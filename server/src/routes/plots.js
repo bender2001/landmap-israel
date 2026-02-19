@@ -104,6 +104,8 @@ function applySparseFields(plots, fieldsParam) {
     if (p._holdingYears != null) sparse._holdingYears = p._holdingYears
     if (p._marketTrend != null) sparse._marketTrend = p._marketTrend
     if (p._dealDiscount != null) sparse._dealDiscount = p._dealDiscount
+    if (p._investmentRank != null) sparse._investmentRank = p._investmentRank
+    if (p._totalRanked != null) sparse._totalRanked = p._totalRanked
     return sparse
   })
 }

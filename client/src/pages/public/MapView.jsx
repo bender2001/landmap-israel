@@ -30,6 +30,7 @@ import { useRefreshOnReturn } from '../../hooks/usePageVisibility.js'
 import { useLocalStorage } from '../../hooks/useLocalStorage.js'
 import { usePriceChanges } from '../../hooks/usePriceChanges.js'
 import { useVisibilityInterval } from '../../hooks/useVisibilityInterval.js'
+import { usePersonalNotes } from '../../hooks/usePersonalNotes.js'
 
 // Lazy-load non-critical widgets — they're not needed for first paint.
 // This reduces the MapView initial JS from ~126KB to ~95KB, cutting Time to Interactive.
@@ -211,6 +212,7 @@ export default function MapView() {
   const { trackView, isPopular } = useViewTracker()
   const { recordPrices, getPriceChange } = usePriceTracker()
   const { searches: savedSearches, save: saveSearch, remove: removeSearch } = useSavedSearches()
+  const personalNotes = usePersonalNotes()
 
   // User geolocation — used for "sort by distance" (like Madlan's proximity sort).
   // Requested lazily when user selects distance sort, persisted in state for the session.
@@ -1091,6 +1093,7 @@ export default function MapView() {
             allPlots={filteredPlots}
             onSelectPlot={handleSelectPlot}
             priceChange={getMergedPriceChange(selectedPlot.id)}
+            personalNotes={personalNotes}
           />
         </Suspense>
       )}

@@ -287,7 +287,33 @@ async function enrichPlotsWithScores(plots) {
     p._riskLevel = risk.level     // 'low'|'medium'|'high'|'very_high'
     p._riskScore = risk.score     // 0-100
     p._riskFactors = risk.factors // top 3 risk factors (Hebrew strings)
+
+    // Deal discount — how far below city average price/sqm this plot is.
+    // Positive = below average (good deal). Used for "🔥 X% below average" badges.
+    // Pre-computed to avoid redundant city-average lookups on every tooltip render.
+    if (size > 0 && price > 0 && cityAvgPsm[p.city]) {
+      const plotPsm = price / size
+      const discountPct = Math.round(((cityAvgPsm[p.city] - plotPsm) / cityAvgPsm[p.city]) * 100)
+      p._dealDiscount = discountPct // positive = below avg, negative = above avg
+    } else {
+      p._dealDiscount = null
+    }
   }
+
+  // ── Investment Ranking ────────────────────────────────────────────────
+  // Rank plots by investment score (highest first) among AVAILABLE plots.
+  // Shows investors "Rank #3 out of 12 available plots" — powerful social proof
+  // and urgency signal. Like Bloomberg's "Top Pick" or Morningstar's star rating.
+  // Neither Madlan nor Yad2 provides explicit ranking — a unique differentiator.
+  const availablePlots = plots
+    .filter(p => p.status === 'AVAILABLE' && p._investmentScore != null)
+    .sort((a, b) => (b._investmentScore - a._investmentScore) || ((b._roi || 0) - (a._roi || 0)))
+  const totalAvailable = availablePlots.length
+  for (let i = 0; i < availablePlots.length; i++) {
+    availablePlots[i]._investmentRank = i + 1
+    availablePlots[i]._totalRanked = totalAvailable
+  }
+
   return plots
 }
 
