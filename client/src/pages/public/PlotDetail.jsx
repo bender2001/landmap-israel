@@ -1542,7 +1542,7 @@ export default function PlotDetail() {
           })()}
 
           {/* Financial cards grid */}
-          <div id="section-financial" className="grid grid-cols-3 gap-4 mb-8">
+          <div id="section-financial" className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
             <div className="rounded-2xl p-5 flex flex-col items-center gap-2 text-center bg-gradient-to-b from-blue-500/15 to-blue-500/8 border border-blue-500/20 relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-400 to-blue-600" />
               <div className="text-xs text-slate-400">מחיר מבוקש</div>
@@ -1561,6 +1561,47 @@ export default function PlotDetail() {
               <div className="text-xl sm:text-2xl font-bold text-gold">{roi}%</div>
               {readiness && <div className="text-xs text-slate-500">{readiness}</div>}
             </div>
+            {/* Buy Signal + Payback — Bloomberg-style investment recommendation card.
+                Synthesizes all analysis into a single actionable signal with payback timeline.
+                The #1 thing investors want to know: "Should I buy?" and "When do I break even?"
+                No Israeli RE competitor offers algorithmic investment signals. */}
+            {plot._buySignal ? (
+              <div className={`rounded-2xl p-5 flex flex-col items-center gap-2 text-center relative overflow-hidden ${
+                plot._buySignal.signal === 'BUY'
+                  ? 'bg-gradient-to-b from-emerald-500/15 to-emerald-500/8 border border-emerald-500/20'
+                  : plot._buySignal.signal === 'HOLD'
+                    ? 'bg-gradient-to-b from-amber-500/15 to-amber-500/8 border border-amber-500/20'
+                    : 'bg-gradient-to-b from-slate-500/15 to-slate-500/8 border border-slate-500/20'
+              }`}>
+                <div className={`absolute top-0 left-0 right-0 h-0.5 ${
+                  plot._buySignal.signal === 'BUY'
+                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
+                    : plot._buySignal.signal === 'HOLD'
+                      ? 'bg-gradient-to-r from-amber-400 to-amber-600'
+                      : 'bg-gradient-to-r from-slate-400 to-slate-600'
+                }`} />
+                <div className="text-xs text-slate-400">אות השקעה</div>
+                <div className={`text-xl sm:text-2xl font-bold ${
+                  plot._buySignal.signal === 'BUY' ? 'text-emerald-400'
+                  : plot._buySignal.signal === 'HOLD' ? 'text-amber-400'
+                  : 'text-slate-400'
+                }`}>
+                  {plot._buySignal.label}
+                </div>
+                {plot._paybackYears != null && plot._paybackYears > 0 ? (
+                  <div className="text-xs text-slate-500">החזר: ~{plot._paybackYears} שנים</div>
+                ) : (
+                  <div className="text-xs text-slate-500">ציון {plot._buySignal.strength}/10</div>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-2xl p-5 flex flex-col items-center gap-2 text-center bg-gradient-to-b from-purple-500/15 to-purple-500/8 border border-purple-500/20 relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-400 to-purple-600" />
+                <div className="text-xs text-slate-400">ציון השקעה</div>
+                <div className="text-xl sm:text-2xl font-bold text-purple-400">{calcInvestmentScore(plot)}/10</div>
+                {readiness && <div className="text-xs text-slate-500">{readiness}</div>}
+              </div>
+            )}
           </div>
 
           {/* Calculator CTA — like Madlan's "חשב תשואה" button, pre-fills the investment calculator */}

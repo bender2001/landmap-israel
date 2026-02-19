@@ -155,13 +155,18 @@ const PlotShareButtons = memo(function PlotShareButtons({ plot, blockNum, price,
 })
 
 /**
- * QuickCopyButton — one-click clipboard copy of plot essentials.
- * Copies: "גוש X חלקה Y · City · ₪Price · +ROI%"
- * 
+ * QuickCopyButton — one-click clipboard copy of a formatted investment summary.
+ * Copies a rich multi-line summary like a mini investment report:
+ *   "גוש X חלקה Y · City
+ *    💰 ₪450K · 2.1 דונם · +180% ROI
+ *    📊 נטו +45% · החזר 2.3 שנים · דירוג A+
+ *    🟢 קנייה · ₪3,800/חודש"
+ *
  * Investors constantly need to paste plot info into WhatsApp, email, or notes.
  * The full share flow (WhatsApp/Telegram) is overkill for a quick text paste.
  * This button gives instant clipboard access — a pattern Google Maps uses
- * for addresses and coordinates. No Israeli RE competitor has this.
+ * for addresses and coordinates. Enhanced with all enrichment data for
+ * a complete investment snapshot in the clipboard. No Israeli RE competitor has this.
  */
 const QuickCopyButton = memo(function QuickCopyButton({ plot }) {
   const [copied, setCopied] = useState(false)
@@ -175,9 +180,27 @@ const QuickCopyButton = memo(function QuickCopyButton({ plot }) {
     const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
     const dunam = sizeSqM > 0 ? (sizeSqM / 1000).toFixed(1) : '?'
 
-    const netRoiStr = plot._netRoi != null ? ` · נטו +${plot._netRoi}%` : ''
-    const text = `גוש ${blockNum} חלקה ${plot.number} · ${plot.city} · ${formatPriceShort(price)} · ${dunam} דונם · +${roi}% ROI${netRoiStr}`
+    // Build rich multi-line summary
+    const lines = [`📍 גוש ${blockNum} חלקה ${plot.number} · ${plot.city}`]
+    lines.push(`💰 ${formatPriceShort(price)} · ${dunam} דונם · +${roi}% ROI`)
 
+    // Add enrichment data when available
+    const extras = []
+    if (plot._netRoi != null) extras.push(`נטו +${plot._netRoi}%`)
+    if (plot._paybackYears != null) extras.push(`החזר ${plot._paybackYears} שנ׳`)
+    if (plot._grade) extras.push(`דירוג ${plot._grade}`)
+    if (extras.length > 0) lines.push(`📊 ${extras.join(' · ')}`)
+
+    const signals = []
+    if (plot._buySignal) signals.push(plot._buySignal.label)
+    if (plot._cagr) signals.push(`${plot._cagr}%/שנה`)
+    if (plot._monthlyPayment) signals.push(`~₪${plot._monthlyPayment.toLocaleString()}/חודש`)
+    if (signals.length > 0) lines.push(signals.join(' · '))
+
+    // Add link
+    lines.push(`🔗 ${window.location.origin}/plot/${plot.id}`)
+
+    const text = lines.join('\n')
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
@@ -188,8 +211,8 @@ const QuickCopyButton = memo(function QuickCopyButton({ plot }) {
     <button
       onClick={handleCopy}
       className={`plot-card-copy-btn ${copied ? 'is-copied' : ''}`}
-      title={copied ? 'הועתק!' : 'העתק פרטי חלקה'}
-      aria-label={copied ? 'הועתק ללוח' : 'העתק פרטי חלקה ללוח'}
+      title={copied ? 'הועתק!' : 'העתק סיכום השקעה'}
+      aria-label={copied ? 'הועתק ללוח' : 'העתק סיכום השקעה ללוח'}
     >
       {copied ? <Check className="w-3 h-3" /> : <Clipboard className="w-3 h-3" />}
     </button>
@@ -481,11 +504,32 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
           return <ZoningProgressBar currentStage={zoningStage} variant="compact" className="mt-0.5" />
         })()}
 
+        {/* Buy Signal — Bloomberg-style composite recommendation.
+            Combines deal discount, net ROI, risk, market trend, and investment score
+            into a single actionable signal. No Israeli RE competitor has this. */}
+        {plot._buySignal && (
+          <div
+            className={`flex items-center gap-1 mt-0.5 text-[8px] font-bold ${
+              plot._buySignal.signal === 'BUY' ? 'text-emerald-400'
+              : plot._buySignal.signal === 'HOLD' ? 'text-amber-400'
+              : 'text-slate-500'
+            }`}
+            title={`אות השקעה: ${plot._buySignal.label} (ציון ${plot._buySignal.strength}/10) — מבוסס על מחיר מול ממוצע, תשואה נטו, סיכון, מגמת אזור ודירוג`}
+          >
+            <span>{plot._buySignal.label}</span>
+            {plot._paybackYears != null && plot._paybackYears > 0 && (
+              <span className="text-[7px] text-slate-500 font-medium" title={`החזר השקעה מלא תוך ~${plot._paybackYears} שנים (כולל כל העלויות)`}>
+                · החזר {plot._paybackYears}שנ׳
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Risk level badge — server-computed investment risk indicator.
             Like credit rating agencies' risk grades — gives instant risk context.
             Neither Madlan nor Yad2 surface risk assessment; this is a pro-investor feature.
             Uses server-side _riskLevel to avoid expensive client computation. */}
-        {plot._riskLevel && plot._riskLevel !== 'low' && (
+        {plot._riskLevel && plot._riskLevel !== 'low' && !plot._buySignal && (
           <div
             className="flex items-center gap-1 mt-0.5 text-[8px] font-medium"
             title={plot._riskFactors?.length > 0 ? `גורמי סיכון: ${plot._riskFactors.join(', ')}` : `סיכון: ${plot._riskScore}/100`}

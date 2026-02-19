@@ -382,6 +382,86 @@ async function enrichPlotsWithScores(plots) {
       p._netProfit = null
       p._totalCosts = null
     }
+
+    // ── Payback Period ───────────────────────────────────────────────────
+    // THE #1 question investors ask: "When do I get my money back?"
+    // Computes the year when cumulative appreciation exceeds total invested capital
+    // (price + entry costs + holding costs). Uses straight-line appreciation model
+    // from current price to projected value over the holding period.
+    // Neither Madlan nor Yad2 show this — a major differentiator for serious investors.
+    if (price > 0 && projected > price && holdingYears > 0 && netReturn) {
+      const annualAppreciation = (projected - price) / holdingYears
+      const annualHoldingCost = netReturn.totalCosts > 0
+        ? ((netReturn.totalEntryCost - price) + netReturn.totalCosts) / holdingYears
+        : (netReturn.totalEntryCost - price) / holdingYears
+      // Total capital out = entry costs above price + annual holding
+      const totalCapitalOut = netReturn.totalEntryCost - price
+      // Year-by-year: find when cumulative net gain turns positive
+      let cumulativeGain = -totalCapitalOut
+      let paybackYear = null
+      for (let yr = 1; yr <= Math.ceil(holdingYears * 1.5); yr++) {
+        cumulativeGain += annualAppreciation - (yr <= holdingYears ? annualHoldingCost / holdingYears : 0)
+        if (cumulativeGain >= 0 && paybackYear === null) {
+          // Interpolate for sub-year precision
+          const prevGain = cumulativeGain - annualAppreciation + (yr <= holdingYears ? annualHoldingCost / holdingYears : 0)
+          const fraction = prevGain < 0 ? Math.abs(prevGain) / (cumulativeGain - prevGain) : 0
+          paybackYear = Math.round((yr - 1 + fraction) * 10) / 10
+          break
+        }
+      }
+      p._paybackYears = paybackYear // e.g., 2.3 (years) or null if never breaks even
+    } else {
+      p._paybackYears = null
+    }
+
+    // ── Buy Signal ──────────────────────────────────────────────────────
+    // Bloomberg-style composite signal: BUY / HOLD / WATCH based on multiple factors.
+    // Combines: deal discount, risk level, net ROI, market trend, and investment score.
+    // Provides a single actionable recommendation that synthesizes all our data.
+    // Professional investors love signals — like analyst ratings or traffic lights.
+    // No Israeli RE competitor offers algorithmic buy recommendations.
+    {
+      let signalScore = 0 // -10 to +10 scale
+
+      // Factor 1: Deal discount (below/above city average price)
+      const discount = p._dealDiscount ?? 0
+      if (discount >= 15) signalScore += 3
+      else if (discount >= 5) signalScore += 1.5
+      else if (discount <= -15) signalScore -= 2
+      else if (discount <= -5) signalScore -= 1
+
+      // Factor 2: Net ROI strength
+      const nRoi = p._netRoi ?? 0
+      if (nRoi >= 80) signalScore += 2.5
+      else if (nRoi >= 50) signalScore += 1.5
+      else if (nRoi >= 20) signalScore += 0.5
+      else if (nRoi < 0) signalScore -= 2
+
+      // Factor 3: Risk level
+      if (p._riskLevel === 'low') signalScore += 1.5
+      else if (p._riskLevel === 'medium') signalScore += 0
+      else if (p._riskLevel === 'high') signalScore -= 1.5
+      else if (p._riskLevel === 'very_high') signalScore -= 3
+
+      // Factor 4: Market trend (area momentum)
+      const trend = p._marketTrend
+      if (trend?.direction === 'up' && trend.changePct >= 3) signalScore += 1
+      else if (trend?.direction === 'down' && trend.changePct <= -3) signalScore -= 1
+
+      // Factor 5: Investment grade
+      if (p._investmentScore >= 8) signalScore += 1
+      else if (p._investmentScore >= 6) signalScore += 0.5
+      else if (p._investmentScore <= 3) signalScore -= 1
+
+      // Map score to signal
+      if (signalScore >= 4) {
+        p._buySignal = { signal: 'BUY', label: '🟢 קנייה', strength: Math.min(10, Math.round(signalScore)) }
+      } else if (signalScore >= 1) {
+        p._buySignal = { signal: 'HOLD', label: '🟡 שווה בדיקה', strength: Math.round(signalScore) }
+      } else {
+        p._buySignal = { signal: 'WATCH', label: '🔴 המתן', strength: Math.round(signalScore) }
+      }
+    }
   }
 
   // ── Investment Ranking ────────────────────────────────────────────────

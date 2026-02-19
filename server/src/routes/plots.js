@@ -110,6 +110,8 @@ function applySparseFields(plots, fieldsParam) {
     if (p._totalEntryCost != null) sparse._totalEntryCost = p._totalEntryCost
     if (p._netProfit != null) sparse._netProfit = p._netProfit
     if (p._totalCosts != null) sparse._totalCosts = p._totalCosts
+    if (p._paybackYears != null) sparse._paybackYears = p._paybackYears
+    if (p._buySignal != null) sparse._buySignal = p._buySignal
     return sparse
   })
 }

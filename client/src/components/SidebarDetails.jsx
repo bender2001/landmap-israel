@@ -1240,6 +1240,26 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   </span>
                 )
               })()}
+              {/* Buy Signal — Bloomberg-style composite recommendation badge.
+                  Synthesizes deal discount, net ROI, risk, momentum, and grade into
+                  a single actionable signal. No Israeli RE competitor offers this. */}
+              {plot._buySignal && (
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                    plot._buySignal.signal === 'BUY'
+                      ? 'bg-emerald-500/12 border border-emerald-500/30 text-emerald-400'
+                      : plot._buySignal.signal === 'HOLD'
+                        ? 'bg-amber-500/12 border border-amber-500/30 text-amber-400'
+                        : 'bg-slate-500/12 border border-slate-500/30 text-slate-400'
+                  }`}
+                  title={`אות השקעה: ${plot._buySignal.label} (ציון ${plot._buySignal.strength}/10)${plot._paybackYears ? ` · החזר השקעה: ~${plot._paybackYears} שנים` : ''}`}
+                >
+                  {plot._buySignal.label}
+                  {plot._paybackYears != null && plot._paybackYears > 0 && (
+                    <span className="text-[9px] opacity-70">· {plot._paybackYears}שנ׳</span>
+                  )}
+                </span>
+              )}
               {/* Investment Rank badge — "Rank #X of Y" among available plots.
                   Powerful social proof: investors instantly see if this is a top-ranked opportunity.
                   Like Bloomberg's "Top Pick" or Morningstar's star rating — unique to LandMap. */}
