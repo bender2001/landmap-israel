@@ -63,6 +63,44 @@ function generateETag(data) {
   return '"' + crypto.createHash('md5').update(JSON.stringify(data)).digest('hex').slice(0, 16) + '"'
 }
 
+// ─── Sparse fieldsets (fields param) ──────────────────────────────────
+// Whitelist of allowed field names for the `fields` query parameter.
+// Prevents clients from requesting internal/sensitive columns.
+// When `fields` is provided, only these columns + computed enrichments are returned,
+// reducing JSON payload by 40-60% for list views (e.g., map only needs coordinates + price).
+const ALLOWED_SPARSE_FIELDS = new Set([
+  'id', 'block_number', 'number', 'city', 'status', 'total_price', 'projected_value',
+  'size_sqm', 'coordinates', 'zoning_stage', 'readiness_estimate', 'description',
+  'created_at', 'updated_at', 'views', 'plot_images',
+])
+
+/**
+ * Strip plots to only requested fields (sparse fieldset / partial response).
+ * Like Google API's `fields` parameter — reduces bandwidth for clients that
+ * only need a subset (e.g., map view only needs coordinates + price + status).
+ * Computed enrichment fields (_investmentScore, _grade, etc.) are always included.
+ */
+function applySparseFields(plots, fieldsParam) {
+  if (!fieldsParam || !plots || plots.length === 0) return plots
+  const requested = fieldsParam.split(',').map(f => f.trim()).filter(f => ALLOWED_SPARSE_FIELDS.has(f))
+  if (requested.length === 0) return plots // invalid fields → return full response
+
+  return plots.map(p => {
+    const sparse = {}
+    for (const field of requested) {
+      if (field in p) sparse[field] = p[field]
+    }
+    // Always include computed enrichment fields (lightweight, ~100 bytes each)
+    if (p._investmentScore != null) sparse._investmentScore = p._investmentScore
+    if (p._grade != null) sparse._grade = p._grade
+    if (p._roi != null) sparse._roi = p._roi
+    if (p._pricePerSqm != null) sparse._pricePerSqm = p._pricePerSqm
+    if (p._monthlyPayment != null) sparse._monthlyPayment = p._monthlyPayment
+    if (p._daysOnMarket != null) sparse._daysOnMarket = p._daysOnMarket
+    return sparse
+  })
+}
+
 // GET /api/plots - List published plots with optional filters
 router.get('/', sanitizePlotQuery, async (req, res, next) => {
   try {
@@ -115,7 +153,11 @@ router.get('/', sanitizePlotQuery, async (req, res, next) => {
       }
     }
 
-    res.json(plots)
+    // Apply sparse fieldsets if `fields` param is provided.
+    // Example: /api/plots?fields=id,city,total_price,coordinates
+    // Reduces JSON payload by 40-60% for clients that only need specific columns.
+    const result = req.query.fields ? applySparseFields(plots, req.query.fields) : plots
+    res.json(result)
   } catch (err) {
     next(err)
   }

@@ -513,11 +513,15 @@ export default function FilterBar({
     ? sizeRangeOptions.find((o) => o.value === sizeRangeValue)?.label
     : null
 
-  // Market snapshot stats
+  // Market snapshot stats — enhanced with ROI and hot deals for investor-centric context.
+  // Madlan shows avg price; we go further with ROI, hot deals, and total portfolio value.
   const marketStats = useMemo(() => {
     if (!allPlots || allPlots.length === 0) return null
     const available = allPlots.filter(p => p.status === 'AVAILABLE')
     const totalSize = allPlots.reduce((s, p) => s + (p.size_sqm ?? p.sizeSqM ?? 0), 0)
+    const totalValue = allPlots.reduce((s, p) => s + (p.total_price ?? p.totalPrice ?? 0), 0)
+
+    // Avg price per dunam (market benchmark)
     const avgPricePerDunam = allPlots.length > 0
       ? Math.round(allPlots.reduce((s, p) => {
           const price = p.total_price ?? p.totalPrice ?? 0
@@ -525,7 +529,41 @@ export default function FilterBar({
           return s + (price / size * 1000)
         }, 0) / allPlots.length)
       : 0
-    return { available: available.length, totalDunam: (totalSize / 1000).toFixed(1), avgPricePerDunam }
+
+    // Avg ROI across all plots — key investor metric
+    let roiSum = 0, roiCount = 0
+    // Avg price/sqm for hot deal detection (>15% below avg = hot deal)
+    let psmSum = 0, psmCount = 0
+    for (const p of allPlots) {
+      const price = p.total_price ?? p.totalPrice ?? 0
+      const proj = p.projected_value ?? p.projectedValue ?? 0
+      const size = p.size_sqm ?? p.sizeSqM ?? 0
+      if (price > 0 && proj > 0) {
+        roiSum += ((proj - price) / price) * 100
+        roiCount++
+      }
+      if (price > 0 && size > 0) {
+        psmSum += price / size
+        psmCount++
+      }
+    }
+    const avgRoi = roiCount > 0 ? Math.round(roiSum / roiCount) : 0
+    const avgPsm = psmCount > 0 ? psmSum / psmCount : 0
+
+    // Hot deals: plots >15% below avg price/sqm — like Madlan's "הזדמנויות"
+    let hotDeals = 0
+    if (avgPsm > 0) {
+      for (const p of allPlots) {
+        const price = p.total_price ?? p.totalPrice ?? 0
+        const size = p.size_sqm ?? p.sizeSqM ?? 0
+        if (price > 0 && size > 0) {
+          const psm = price / size
+          if (psm < avgPsm * 0.85) hotDeals++
+        }
+      }
+    }
+
+    return { available: available.length, totalDunam: (totalSize / 1000).toFixed(1), avgPricePerDunam, avgRoi, hotDeals, totalValue }
   }, [allPlots])
 
   return (
@@ -537,23 +575,50 @@ export default function FilterBar({
           : `מציג ${plotCount} חלקות`
         }
       </div>
-      {/* Market snapshot — like Madlan's data-driven header */}
+      {/* Market snapshot — Bloomberg-style data header with investor-centric metrics.
+          Shows always (not just when filters active) for constant market awareness.
+          Enhanced beyond Madlan: includes avg ROI, hot deals count, and total portfolio value. */}
       {marketStats && !isExpanded && (
-        <div className="hidden md:flex items-center gap-4 mb-2 px-1 text-[10px] text-slate-500">
-          <span>🟢 {marketStats.available} זמינות</span>
+        <div className="hidden md:flex items-center gap-3 mb-2 px-1 text-[10px] text-slate-500">
+          <span className="flex items-center gap-1">🟢 <span className="text-slate-400 font-medium">{marketStats.available}</span> זמינות</span>
           <span className="w-px h-3 bg-white/10" />
-          <span>📐 {marketStats.totalDunam} דונם סה״כ</span>
+          <span className="flex items-center gap-1">💰 ממוצע <span className="text-gold/80 font-medium">₪{marketStats.avgPricePerDunam.toLocaleString()}</span>/דונם</span>
           <span className="w-px h-3 bg-white/10" />
-          <span>💰 ממוצע ₪{marketStats.avgPricePerDunam.toLocaleString()}/דונם</span>
+          <span className="flex items-center gap-1">📈 ROI ממוצע <span className={`font-medium ${marketStats.avgRoi >= 100 ? 'text-emerald-400/80' : 'text-slate-400'}`}>+{marketStats.avgRoi}%</span></span>
+          {marketStats.hotDeals > 0 && (
+            <>
+              <span className="w-px h-3 bg-white/10" />
+              <span className="flex items-center gap-1 text-orange-400/80 font-medium">🔥 {marketStats.hotDeals} עסקאות חמות</span>
+            </>
+          )}
           <span className="w-px h-3 bg-white/10" />
-          <span>🕐 {(() => {
-            // Show actual data freshness instead of static text.
-            // Data is refreshed every 5 minutes via React Query refetchInterval.
+          <span className="flex items-center gap-1">📐 {marketStats.totalDunam} דונם</span>
+          <span className="w-px h-3 bg-white/10" />
+          <span className="text-slate-600">🕐 {(() => {
             const now = new Date()
             const hour = now.getHours()
             const min = now.getMinutes()
-            return `עודכן ${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`
+            return `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`
           })()}</span>
+        </div>
+      )}
+
+      {/* Mobile market stats — condensed version for small screens.
+          Shows 3 key metrics: available count, avg ROI, and hot deals (if any).
+          Desktop gets the full version above; mobile needs brevity. */}
+      {marketStats && !isExpanded && (
+        <div className="flex md:hidden items-center justify-center gap-3 mb-1.5 px-1 text-[9px] text-slate-500">
+          <span>🟢 {marketStats.available} זמינות</span>
+          <span className="w-px h-2.5 bg-white/10" />
+          <span>📈 +{marketStats.avgRoi}% ROI</span>
+          {marketStats.hotDeals > 0 && (
+            <>
+              <span className="w-px h-2.5 bg-white/10" />
+              <span className="text-orange-400/80">🔥 {marketStats.hotDeals}</span>
+            </>
+          )}
+          <span className="w-px h-2.5 bg-white/10" />
+          <span>{plotCount} חלקות</span>
         </div>
       )}
 
@@ -850,45 +915,50 @@ export default function FilterBar({
           </div>
         )}
 
-        {/* Bottom row: Clear + count */}
-        {activeCount > 0 && (
-          <div className="filter-actions-row">
+        {/* Bottom row: Always visible — count + actions.
+            Previously hidden when no filters active; now always shows for constant context.
+            Clear button only renders when filters are active. */}
+        <div className="filter-actions-row">
+          {activeCount > 0 && (
             <button className="filter-clear-btn" onClick={() => { haptic.heavy(); onClearFilters() }}>
               <X className="w-3 h-3" />
-              נקה הכל
+              נקה הכל ({activeCount})
             </button>
-            <button
-              className="filter-clear-btn"
-              onClick={handleCopySearch}
-              style={{ background: linkCopied ? 'rgba(34,197,94,0.15)' : undefined, borderColor: linkCopied ? 'rgba(34,197,94,0.3)' : undefined }}
-            >
-              {linkCopied ? <Check className="w-3 h-3 text-green-400" /> : <Link2 className="w-3 h-3" />}
-              {linkCopied ? 'הועתק!' : 'שתף חיפוש'}
-            </button>
-            <a
-              href={`/api/export/csv?${new URLSearchParams(
-                Object.fromEntries(Object.entries({
-                  city: filters.city !== 'all' ? filters.city : undefined,
-                  priceMin: filters.priceMin || undefined,
-                  priceMax: filters.priceMax || undefined,
-                  sizeMin: filters.sizeMin || undefined,
-                  sizeMax: filters.sizeMax || undefined,
-                  status: statusFilter.length > 0 ? statusFilter.join(',') : undefined,
-                }).filter(([, v]) => v !== undefined))
-              ).toString()}`}
-              download
-              className="filter-clear-btn"
-              title="ייצוא לאקסל (CSV)"
-            >
-              <Download className="w-3 h-3" />
-              ייצוא CSV
-            </a>
-            <div className="filter-count">
-              <Eye className="w-3 h-3" />
-              {plotCount} חלקות
-            </div>
+          )}
+          <button
+            className="filter-clear-btn"
+            onClick={handleCopySearch}
+            style={{ background: linkCopied ? 'rgba(34,197,94,0.15)' : undefined, borderColor: linkCopied ? 'rgba(34,197,94,0.3)' : undefined }}
+          >
+            {linkCopied ? <Check className="w-3 h-3 text-green-400" /> : <Link2 className="w-3 h-3" />}
+            {linkCopied ? 'הועתק!' : 'שתף חיפוש'}
+          </button>
+          <a
+            href={`/api/export/csv?${new URLSearchParams(
+              Object.fromEntries(Object.entries({
+                city: filters.city !== 'all' ? filters.city : undefined,
+                priceMin: filters.priceMin || undefined,
+                priceMax: filters.priceMax || undefined,
+                sizeMin: filters.sizeMin || undefined,
+                sizeMax: filters.sizeMax || undefined,
+                status: statusFilter.length > 0 ? statusFilter.join(',') : undefined,
+              }).filter(([, v]) => v !== undefined))
+            ).toString()}`}
+            download
+            className="filter-clear-btn"
+            title="ייצוא לאקסל (CSV)"
+          >
+            <Download className="w-3 h-3" />
+            ייצוא CSV
+          </a>
+          <div className="filter-count" style={activeCount > 0 ? { color: '#C8942A', fontWeight: 600 } : undefined}>
+            <Eye className="w-3 h-3" />
+            {plotCount} {plotCount === 1 ? 'חלקה' : 'חלקות'}
+            {activeCount > 0 && allPlots.length !== plotCount && (
+              <span className="text-slate-600 font-normal"> מתוך {allPlots.length}</span>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   )
