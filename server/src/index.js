@@ -260,6 +260,9 @@ app.use('/api/health', healthRoutes)
 
 // ─── Server-Sent Events (before timeout — SSE connections are long-lived) ───
 // Must be registered before the API 404 catch-all to be reachable.
+// Supports Last-Event-ID reconnection (SSE spec §9.2) — when a client reconnects
+// after a network drop, the browser sends the last event ID it received. We replay
+// any missed events from the circular buffer so no updates are lost.
 app.get('/api/events', (req, res) => {
   res.set({
     'Content-Type': 'text/event-stream',
@@ -275,6 +278,16 @@ app.get('/api/events', (req, res) => {
     res.write('data: {"type":"rejected","reason":"connection_limit"}\n\n')
     res.end()
     return
+  }
+
+  // Set retry interval — controls how long the browser waits before auto-reconnecting.
+  // Without this, browsers default to 3000ms which hammers the server during outages.
+  res.write(`retry: ${getRetryMs()}\n\n`)
+
+  // Replay missed events if client is reconnecting with Last-Event-ID
+  const lastEventId = req.headers['last-event-id']
+  if (lastEventId) {
+    replayMissedEvents(res, lastEventId)
   }
 
   res.write('data: {"type":"connected"}\n\n')
@@ -344,28 +357,24 @@ app.use('/api/admin/analytics', adminAnalyticsRoutes)
 
 // Cache stats endpoint for monitoring — restricted to prevent infrastructure info leaks.
 // Requires a simple secret token in query or header to prevent public enumeration.
-app.get('/api/cache-stats', (req, res) => {
+app.get('/api/cache-stats', async (req, res) => {
   const secret = process.env.CACHE_STATS_SECRET || process.env.ADMIN_SECRET
   if (secret && req.query.token !== secret && req.headers['x-admin-token'] !== secret) {
     return res.status(403).json({ error: 'גישה נדחתה', errorCode: 'FORBIDDEN' })
   }
 
   try {
-    const { plotCache, statsCache, marketCache } = require('./services/cacheService.js')
+    // Use dynamic import — this is an ESM project, require() is not available.
+    // Previous code tried require() first which always threw ReferenceError,
+    // wasting time before falling back to import(). Clean path now.
+    const mod = await import('./services/cacheService.js')
     res.json({
-      plots: plotCache.getStats(),
-      stats: statsCache.getStats(),
-      market: marketCache.getStats(),
+      plots: mod.plotCache.getStats(),
+      stats: mod.statsCache.getStats(),
+      market: mod.marketCache.getStats(),
     })
   } catch {
-    // Dynamic import for ESM
-    import('./services/cacheService.js').then(mod => {
-      res.json({
-        plots: mod.plotCache.getStats(),
-        stats: mod.statsCache.getStats(),
-        market: mod.marketCache.getStats(),
-      })
-    }).catch(() => res.json({ error: 'cache not available' }))
+    res.json({ error: 'cache not available' })
   }
 })
 
@@ -510,6 +519,42 @@ if (process.env.NODE_ENV === 'production') {
       description: 'חשב תשואה, עלויות נלוות, מימון ורווח נקי מהשקעה בקרקע בישראל. סימולטור מימון ואנליזת רגישות.',
       cacheControl: 'public, max-age=3600, stale-while-revalidate=7200',
     },
+    {
+      path: '/contact',
+      title: 'צור קשר — LandMap Israel | השאירו פרטים ונחזור אליכם',
+      description: 'מעוניינים בהשקעה בקרקע? צרו קשר עם צוות LandMap. WhatsApp, טלגרם, או טופס יצירת קשר — נחזור אליכם בהקדם.',
+      cacheControl: 'public, max-age=3600, stale-while-revalidate=7200',
+    },
+    {
+      path: '/compare',
+      title: 'השוואת חלקות — LandMap Israel',
+      description: 'השווה בין חלקות קרקע להשקעה לפי מחיר, שטח, תשואה, ייעוד ובשלות. כלי החלטה חכם למשקיעים.',
+      cacheControl: 'public, max-age=300, stale-while-revalidate=600',
+    },
+    {
+      path: '/favorites',
+      title: 'חלקות שמורות — LandMap Israel',
+      description: 'החלקות שסימנת כמועדפות. עקוב אחרי שינויי מחירים ועדכוני תכנון של ההשקעות שמעניינות אותך.',
+      cacheControl: 'public, max-age=60, stale-while-revalidate=120',
+    },
+    {
+      path: '/pricing',
+      title: 'תוכניות ומחירים — LandMap Israel',
+      description: 'תוכניות מנוי ל-LandMap Israel — גישה לנתוני קרקעות, ניתוח השקעות AI, התראות מחיר ודוחות מפורטים.',
+      cacheControl: 'public, max-age=3600, stale-while-revalidate=7200',
+    },
+    {
+      path: '/terms',
+      title: 'תנאי שימוש — LandMap Israel',
+      description: 'תנאי השימוש באתר LandMap Israel — פלטפורמת השקעות קרקעות בישראל.',
+      cacheControl: 'public, max-age=86400, stale-while-revalidate=172800',
+    },
+    {
+      path: '/privacy',
+      title: 'מדיניות פרטיות — LandMap Israel',
+      description: 'מדיניות הפרטיות של LandMap Israel — כיצד אנו אוספים, משתמשים ומגנים על המידע שלך.',
+      cacheControl: 'public, max-age=86400, stale-while-revalidate=172800',
+    },
   ]
 
   for (const page of staticPages) {
@@ -528,6 +573,46 @@ if (process.env.NODE_ENV === 'production') {
       }
     })
   }
+
+  // City-specific area pages with dynamic OG meta — enables rich WhatsApp/Telegram previews
+  // when sharing /areas/חדרה or /areas/נתניה. Queries DB for live stats per city.
+  // Like Madlan's city landing pages that show up with proper thumbnails on social media.
+  app.get('/areas/:city', async (req, res, next) => {
+    try {
+      const city = decodeURIComponent(req.params.city)
+      const baseUrl = getBaseUrl(req)
+
+      // Quick DB query for city stats to enrich the OG description
+      const { supabaseAdmin: sb } = await import('./config/supabase.js')
+      const { count, data: plots } = await sb
+        .from('plots')
+        .select('total_price, size_sqm, projected_value', { count: 'exact' })
+        .eq('city', city)
+        .eq('is_published', true)
+        .limit(200)
+
+      let description = `קרקעות להשקעה ב${city} — מחירים, תשואות, שטחים ומידע תכנוני מעודכן.`
+      if (plots && plots.length > 0) {
+        const avgPrice = Math.round(plots.reduce((s, p) => s + (p.total_price || 0), 0) / plots.length / 1000)
+        const avgRoi = plots.reduce((s, p) => {
+          const price = p.total_price || 0
+          const proj = p.projected_value || 0
+          return s + (price > 0 ? ((proj - price) / price) * 100 : 0)
+        }, 0) / plots.length
+        description = `${count || plots.length} חלקות ב${city} · מחיר ממוצע ₪${avgPrice.toLocaleString()}K · תשואה ממוצעת +${Math.round(avgRoi)}% ROI`
+      }
+
+      await sendWithOgMeta({
+        req, res,
+        title: `קרקעות להשקעה ב${city} — סטטיסטיקות ומפה | LandMap Israel`,
+        description,
+        url: `${baseUrl}/areas/${encodeURIComponent(city)}`,
+        cacheControl: 'public, max-age=300, stale-while-revalidate=600',
+      })
+    } catch {
+      next()
+    }
+  })
 
   app.get('*', (req, res) => {
     sendFallback(res)
@@ -551,7 +636,7 @@ app.all('/api/*', (req, res) => {
 app.use(errorHandler)
 
 // SSE service imports (used by /api/events above and shutdown below)
-import { addClient, removeClient, closeAll as closeSSE, getClientCount, startKeepalive, stopKeepalive } from './services/sseService.js'
+import { addClient, removeClient, replayMissedEvents, getRetryMs, closeAll as closeSSE, getClientCount, startKeepalive, stopKeepalive } from './services/sseService.js'
 
 import { serverState } from './services/serverState.js'
 
