@@ -19,6 +19,7 @@ const ALLOWED_SORTS = new Set([
   'newest-first',
   'monthly-asc',
   'distance-asc',
+  'deal-desc',
 ])
 const MAX_SEARCH_LENGTH = 100
 
@@ -72,6 +73,22 @@ export function sanitizePlotQuery(req, res, next) {
   // Sort
   if (q.sort && !ALLOWED_SORTS.has(q.sort)) {
     delete q.sort
+  }
+
+  // Bounding box: validate format "south,west,north,east" (4 finite numbers)
+  if (q.bbox) {
+    const parts = q.bbox.split(',').map(Number)
+    if (parts.length !== 4 || !parts.every(n => isFinite(n))) {
+      delete q.bbox // Malformed → ignore (don't error, just return all plots)
+    } else {
+      // Validate geographic range: lat [-90,90], lng [-180,180]
+      const [south, west, north, east] = parts
+      if (south < -90 || south > 90 || north < -90 || north > 90 ||
+          west < -180 || west > 180 || east < -180 || east > 180 ||
+          south > north) {
+        delete q.bbox
+      }
+    }
   }
 
   // Search: truncate and strip control characters

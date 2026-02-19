@@ -1,6 +1,6 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react'
-import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart, ExternalLink, Calculator as CalcIcon, FileText, Download, File, FileImage, FileSpreadsheet } from 'lucide-react'
+import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart, ExternalLink, Calculator as CalcIcon, FileText, Download, File, FileImage, FileSpreadsheet, Map as MapIcon } from 'lucide-react'
 import { usePlot, useNearbyPlots, useSimilarPlots } from '../../hooks/usePlots.js'
 import { useMarketOverview } from '../../hooks/useMarketOverview.js'
 import { useLastVisitPrice } from '../../hooks/useLastVisitPrice.js'
@@ -468,8 +468,20 @@ function StickyPlotInfoBar({ plot, computed }) {
             </span>
           </div>
 
-          {/* Right: CTA */}
+          {/* Right: CTAs */}
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* View on Interactive Map — critical for SEO-landed users who arrived
+                from Google and want to see spatial context, nearby plots, and filters.
+                Like Madlan's "הצג במפה" on property pages — the #1 navigation path
+                from detail back to discovery. */}
+            <Link
+              to={`/?plot=${plot.id}&city=${encodeURIComponent(plot.city)}`}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gold/15 border border-gold/25 rounded-lg text-gold text-xs font-bold hover:bg-gold/25 transition-colors"
+              title="הצג במפה האינטראקטיבית"
+            >
+              <MapIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">במפה</span>
+            </Link>
             <a
               href={plotInquiryLink(plot)}
               target="_blank"
@@ -1088,6 +1100,19 @@ export default function PlotDetail() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              {/* View on Interactive Map — the primary navigation from detail → map discovery.
+                  SEO-landed users (from Google "גוש X חלקה Y") need this to explore spatial context:
+                  nearby plots, area comparison, and interactive filters. Like Madlan's "הצג על המפה".
+                  Opens the main MapView with ?plot= param to auto-center and select this plot. */}
+              <Link
+                to={`/?plot=${plot.id}&city=${encodeURIComponent(plot.city)}`}
+                className="h-10 flex items-center gap-2 px-4 rounded-xl bg-gold/10 border border-gold/25 text-gold text-sm font-bold hover:bg-gold/20 hover:border-gold/35 transition-all"
+                title="הצג על המפה האינטראקטיבית"
+              >
+                <MapIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">הצג במפה</span>
+                <span className="sm:hidden">🗺️</span>
+              </Link>
               <button
                 onClick={() => favorites.toggle(plot.id)}
                 className={`w-10 h-10 rounded-xl border transition-all flex items-center justify-center ${
