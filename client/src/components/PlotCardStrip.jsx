@@ -152,7 +152,7 @@ const PlotShareButtons = memo(function PlotShareButtons({ plot, blockNum, price,
   )
 })
 
-const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, isFavorite, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, onToggleFavorite, prefetchPlot, priceChange, pricePercentile, categoryBadges, distanceKm }) {
+const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, isFavorite, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, onToggleFavorite, prefetchPlot, priceChange, pricePercentile, categoryBadges, distanceKm, imagePriority = false }) {
   // Viewport-based prefetching — loads plot detail into React Query cache when the card
   // scrolls into (or near) the visible area. On mobile, users scroll and tap without
   // hovering, so this ensures data is ready before the click. Skips if already selected
@@ -243,6 +243,7 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
         blockNum={blockNum}
         color={color}
         isCompared={isCompared}
+        priority={imagePriority}
       />
 
       {/* Quick share — native share sheet (mobile) or WhatsApp/Telegram fallback (desktop) */}
@@ -756,7 +757,7 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
           }
         }}
       >
-        {plots.map((plot) => (
+        {plots.map((plot, index) => (
           <PlotCardItem
             key={plot.id}
             plot={plot}
@@ -773,6 +774,7 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
             pricePercentile={pricePercentiles.get(plot.id) ?? null}
             categoryBadges={bestInCategory.get(plot.id)?.badges ?? null}
             distanceKm={plotDistances.get(plot.id) ?? null}
+            imagePriority={index < 3}
           />
         ))}
       </div>

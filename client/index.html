@@ -47,6 +47,46 @@
     <link rel="dns-prefetch" href="https://c.tile.opentopomap.org" />
     <link rel="dns-prefetch" href="https://nominatim.openstreetmap.org" />
     <link rel="canonical" href="https://landmap.co.il/" />
+    <!-- Organization + WebSite structured data — enables Google Knowledge Panel and
+         sitelinks search box in SERP. Like Madlan/Yad2's rich brand presence in Google. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "LandMap Israel",
+        "alternateName": "לנדמאפ ישראל",
+        "url": "https://landmap.co.il",
+        "logo": "https://landmap.co.il/icons/icon-512.png",
+        "description": "פלטפורמת השקעות קרקעות בישראל — מפה אינטראקטיבית, נתוני תכנון, שמאות ו-AI יועץ",
+        "sameAs": [],
+        "contactPoint": {
+          "@type": "ContactPoint",
+          "contactType": "customer service",
+          "availableLanguage": ["Hebrew", "English"]
+        },
+        "areaServed": {
+          "@type": "Country",
+          "name": "Israel"
+        }
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "LandMap Israel",
+        "alternateName": "לנדמאפ ישראל",
+        "url": "https://landmap.co.il",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": "https://landmap.co.il/?q={search_term_string}"
+          },
+          "query-input": "required name=search_term_string"
+        }
+      }
+    </script>
     <!-- Font: use fetchpriority=high since Heebo is the primary font and blocks render -->
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" as="style" fetchpriority="high" />
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />

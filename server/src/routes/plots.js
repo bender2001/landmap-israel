@@ -104,15 +104,20 @@ function applySparseFields(plots, fieldsParam) {
 // GET /api/plots - List published plots with optional filters
 router.get('/', sanitizePlotQuery, async (req, res, next) => {
   try {
+    const t0 = process.hrtime.bigint()
+
     // Cache list for 30s — data doesn't change often
     res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60, stale-if-error=300')
     const cacheKey = `plots:${JSON.stringify(req.query)}`
     const plots = await plotCache.wrap(cacheKey, () => getPublishedPlots(req.query), 30_000)
 
+    const tQuery = process.hrtime.bigint()
+
     // Cache observability headers — helps the frontend detect stale data
     // and lets DevTools/monitoring show cache hit/miss status.
     const dataAge = plotCache.getAge(cacheKey)
-    if (dataAge !== null) {
+    const cacheHit = dataAge !== null
+    if (cacheHit) {
       res.set('X-Cache', 'HIT')
       res.set('X-Data-Age', `${Math.round(dataAge / 1000)}s`)
     } else {
@@ -123,6 +128,15 @@ router.get('/', sanitizePlotQuery, async (req, res, next) => {
     const etag = generateETag(plots)
     res.set('ETag', etag)
     if (req.headers['if-none-match'] === etag) {
+      // Decomposed Server-Timing even on 304 — helps profile conditional request overhead
+      const tEnd = process.hrtime.bigint()
+      const queryMs = Number(tQuery - t0) / 1e6
+      const totalMs = Number(tEnd - t0) / 1e6
+      res.set('Server-Timing', [
+        `${cacheHit ? 'cache' : 'db'};dur=${queryMs.toFixed(1)};desc="${cacheHit ? 'Cache Hit' : 'DB Query'}"`,
+        `etag;dur=${(totalMs - queryMs).toFixed(1)};desc="ETag Match"`,
+        `total;dur=${totalMs.toFixed(1)};desc="Total"`,
+      ].join(', '))
       return res.status(304).end()
     }
 
@@ -157,6 +171,20 @@ router.get('/', sanitizePlotQuery, async (req, res, next) => {
     // Example: /api/plots?fields=id,city,total_price,coordinates
     // Reduces JSON payload by 40-60% for clients that only need specific columns.
     const result = req.query.fields ? applySparseFields(plots, req.query.fields) : plots
+
+    // Decomposed Server-Timing — shows in Chrome/Edge DevTools "Timing" tab.
+    // Breaks down: cache/db lookup, post-processing (ETag, sparse fields, analytics).
+    // Like Cloudflare/Fastly timing headers — zero client code needed.
+    const tEnd = process.hrtime.bigint()
+    const queryMs = Number(tQuery - t0) / 1e6
+    const processMs = Number(tEnd - tQuery) / 1e6
+    const totalMs = Number(tEnd - t0) / 1e6
+    res.set('Server-Timing', [
+      `${cacheHit ? 'cache' : 'db'};dur=${queryMs.toFixed(1)};desc="${cacheHit ? 'Cache Hit' : 'DB Query'}"`,
+      `process;dur=${processMs.toFixed(1)};desc="ETag+Serialize"`,
+      `total;dur=${totalMs.toFixed(1)};desc="Total"`,
+    ].join(', '))
+
     res.json(result)
   } catch (err) {
     next(err)

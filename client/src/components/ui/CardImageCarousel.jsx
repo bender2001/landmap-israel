@@ -15,7 +15,7 @@ import { useDataSaver } from '../../hooks/useDataSaver'
  * - Gradient overlay at bottom for text readability
  * - Fallback gradient placeholder on image error
  */
-const CardImageCarousel = memo(function CardImageCarousel({ images, blockNum, color, isCompared, onImageCountClick }) {
+const CardImageCarousel = memo(function CardImageCarousel({ images, blockNum, color, isCompared, onImageCountClick, priority = false }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loadErrors, setLoadErrors] = useState(new Set())
   const touchRef = useRef({ startX: 0, startY: 0 })
@@ -109,8 +109,9 @@ const CardImageCarousel = memo(function CardImageCarousel({ images, blockNum, co
             src={img.url}
             alt={img.alt || `גוש ${blockNum}`}
             className="plot-card-mini-thumb-img"
-            loading="lazy"
+            loading={priority ? 'eager' : 'lazy'}
             decoding="async"
+            {...(priority ? { fetchPriority: 'high' } : {})}
             onError={() => handleImgError(0)}
           />
         )}
@@ -176,8 +177,9 @@ const CardImageCarousel = memo(function CardImageCarousel({ images, blockNum, co
           src={currentImg.url}
           alt={currentImg.alt || `גוש ${blockNum} — תמונה ${currentIndex + 1}`}
           className="plot-card-mini-thumb-img"
-          loading={currentIndex === 0 ? 'eager' : 'lazy'}
+          loading={priority || currentIndex === 0 ? 'eager' : 'lazy'}
           decoding="async"
+          {...(priority && currentIndex === 0 ? { fetchPriority: 'high' } : {})}
           onError={() => handleImgError(currentIndex)}
         />
       )}
