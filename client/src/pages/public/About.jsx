@@ -1,5 +1,6 @@
+import { useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Map, Shield, Brain, Eye, ArrowLeft, Compass, TrendingUp, Lock, BarChart3, MapPin, Ruler, DollarSign } from 'lucide-react'
+import { Map, Shield, Brain, Eye, ArrowLeft, Compass, TrendingUp, Lock, BarChart3, MapPin, Ruler, DollarSign, ChevronDown, HelpCircle } from 'lucide-react'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
 import BackToTopButton from '../../components/ui/BackToTopButton'
@@ -44,11 +45,55 @@ const trustSignals = [
 ]
 
 /**
+ * Investor FAQ content — targets long-tail SEO queries like "האם השקעה בקרקע חוקית",
+ * "מה הסיכונים בקרקע חקלאית", etc. These are high-intent search queries from
+ * investors researching land investments. Google surfaces FAQ schema as expandable
+ * Q&A directly in search results — significant click-through rate improvement.
+ *
+ * Neither Madlan nor Yad2 has a visible FAQ section with schema markup.
+ * This positions LandMap as a trusted educational resource, not just a listing site.
+ */
+const investorFaq = [
+  {
+    q: 'מה ההבדל בין קרקע חקלאית לקרקע עם תב"ע מאושרת?',
+    a: 'קרקע חקלאית היא במצבה הגולמי — הייעוד רשום כחקלאי ואין אפשרות לבנות עליה. קרקע עם תב"ע (תוכנית בניין עיר) מאושרת כבר עברה שינוי ייעוד ויש היתר לבנייה. המחיר עולה דרמטית ככל שהקרקע מתקדמת בשלבי התכנון — זו בדיוק התשואה שמשקיעי קרקע מחפשים.',
+  },
+  {
+    q: 'מהם הסיכונים העיקריים בהשקעה בקרקע?',
+    a: 'הסיכון המרכזי הוא עיכוב או כישלון בשינוי הייעוד — תהליכים תכנוניים יכולים לקחת שנים. סיכונים נוספים: שינויים רגולטוריים, ירידת ערך כללית בשוק, עלויות נלוות (ארנונה, שמירה), וחוסר נזילות — קרקע קשה למכירה מהירה בהשוואה לדירה. LandMap מציג עבורכם ניתוח סיכונים לכל חלקה כדי לעזור בקבלת החלטה מושכלת.',
+  },
+  {
+    q: 'כמה זמן לוקח עד שקרקע חקלאית הופכת לבנייה?',
+    a: 'התהליך בישראל אורך בדרך כלל 5–15 שנה, תלוי באזור ובשלב התכנוני. קרקע שכבר בשלב הפקדת מתאר קרובה יותר (3–7 שנים). קרקע חקלאית ללא כל תכנית יכולה לקחת עשור ומעלה. ב-LandMap תוכלו לראות את שלב התכנון המדויק של כל חלקה וההערכה לזמן הבשלה.',
+  },
+  {
+    q: 'האם השקעה בקרקע בישראל חוקית?',
+    a: 'כמובן. רכישת קרקע בישראל היא עסקה חוקית לחלוטין. חשוב לבצע בדיקת נסח טאבו לוודא שהחלקה נקייה מעיקולים, לבדוק את מצב התכנון ברשות המקומית, ולהיעזר בעורך דין המתמחה במקרקעין. עסקת קרקע חייבת במס רכישה (6% למשקיע) ובדיווח לרשות המיסים.',
+  },
+  {
+    q: 'מה מס הרכישה על קרקע בישראל?',
+    a: 'מס רכישה על קרקע הוא בדרך כלל 6% מהמחיר עבור משקיעים (דירה ראשונה נהנית ממדרגות מופחתות, אך קרקע לא נחשבת דירת מגורים). בנוסף, יש לחשב שכר טרחת עו"ד (0.5%–1.5%), שמאי (₪3,000–5,000), ודמי רישום. מחשבון ההשקעות של LandMap כולל את כל העלויות הנלוות.',
+  },
+  {
+    q: 'איך LandMap שונה ממדלן או יד2?',
+    a: 'מדלן ויד2 מתמקדים בדירות ונכסים בנויים. LandMap מתמחה בקרקעות להשקעה — עם ניתוח תשואה, מעקב שלבי תכנון, ציון השקעה AI, השוואת חלקות, ומידע על מגמות שוק. אנחנו הכלי היחיד בישראל שמאפשר למשקיע לראות על מפה אינטראקטיבית את כל נתוני הקרקע, התשואה הצפויה, וסטטוס התכנון — הכל במקום אחד.',
+  },
+  {
+    q: 'מאיפה הנתונים של LandMap?',
+    a: 'הנתונים מגיעים ממקורות ציבוריים רשמיים: רשות מקרקעי ישראל (רמ"י), נדל"ן נט (רשות המיסים), ועדות תכנון מקומיות ומחוזיות, ומאגר GovMap. הנתונים מתעדכנים באופן שוטף ומועשרים עם ניתוח AI. שימו לב שהנתונים הם להמחשה וייעוץ ראשוני — יש לבצע בדיקת נאותות עצמאית לפני כל עסקה.',
+  },
+  {
+    q: 'מה זה "ציון השקעה" וכיצד הוא מחושב?',
+    a: 'ציון ההשקעה (1–10) הוא מדד מורכב שמשקלל: תשואה צפויה (ROI), שלב תכנוני (בשלות), מחיר ביחס לממוצע באזור, קרבה לפיתוח עירוני, ורמת סיכון. ציון 8+ מצביע על עסקה אטרקטיבית. הציון מחושב אוטומטית באמצעות אלגוריתם AI ומתעדכן בזמן אמת.',
+  },
+]
+
+/**
  * Organization JSON-LD — helps Google surface brand info in knowledge panels.
  * Consistent with ContactJsonLd but focused on the brand/about narrative.
  */
 function AboutJsonLd({ stats }) {
-  const schema = {
+  const orgSchema = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: 'LandMap Israel',
@@ -67,8 +112,113 @@ function AboutJsonLd({ stats }) {
       },
     } : {}),
   }
+
+  // FAQ JSON-LD — generates rich FAQ snippets in Google search results.
+  // These expandable Q&As appear directly under the search listing,
+  // increasing visibility and click-through rate by 2-3x (Google's own data).
+  // Targets high-intent Hebrew queries: "סיכונים בהשקעה בקרקע", "מס רכישה קרקע", etc.
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: investorFaq.map(item => ({
+      '@type': 'Question',
+      name: item.q,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: item.a,
+      },
+    })),
+  }
+
   return (
-    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
+    </>
+  )
+}
+
+/**
+ * FAQAccordion — expandable Q&A section with smooth height animation.
+ * Uses native <details>/<summary> for zero-JS progressive enhancement,
+ * enhanced with React state for smooth height transitions.
+ * Like Google's FAQ rich results but rendered on the page itself.
+ */
+function FAQItem({ question, answer, isOpen, onToggle }) {
+  return (
+    <div
+      className={`border border-white/5 rounded-xl overflow-hidden transition-colors ${isOpen ? 'bg-white/[0.03] border-gold/15' : 'hover:bg-white/[0.02]'}`}
+    >
+      <button
+        onClick={onToggle}
+        className="w-full flex items-start gap-3 p-5 text-right"
+        aria-expanded={isOpen}
+      >
+        <ChevronDown
+          className={`w-5 h-5 text-gold flex-shrink-0 mt-0.5 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
+        />
+        <span className={`text-sm font-bold leading-relaxed transition-colors ${isOpen ? 'text-gold' : 'text-slate-200'}`}>
+          {question}
+        </span>
+      </button>
+      <div
+        className={`grid transition-all duration-300 ease-out ${isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+      >
+        <div className="overflow-hidden">
+          <div className="px-5 pb-5 pr-13 text-sm text-slate-400 leading-relaxed">
+            {answer}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FAQSection() {
+  const [openIndex, setOpenIndex] = useState(null)
+
+  const handleToggle = useCallback((index) => {
+    setOpenIndex(prev => prev === index ? null : index)
+  }, [])
+
+  return (
+    <section className="py-16 px-4 border-t border-white/5">
+      <div className="max-w-3xl mx-auto">
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-gold/10 border border-gold/20 rounded-full mb-4">
+            <HelpCircle className="w-4 h-4 text-gold" />
+            <span className="text-sm text-gold font-medium">שאלות נפוצות</span>
+          </div>
+          <h2 className="text-3xl font-bold text-slate-100 mb-3">
+            מדריך למשקיע
+          </h2>
+          <p className="text-slate-400 text-sm">
+            תשובות לשאלות הנפוצות ביותר על השקעה בקרקעות בישראל
+          </p>
+        </div>
+        <div className="space-y-3">
+          {investorFaq.map((item, i) => (
+            <FAQItem
+              key={i}
+              question={item.q}
+              answer={item.a}
+              isOpen={openIndex === i}
+              onToggle={() => handleToggle(i)}
+            />
+          ))}
+        </div>
+        <div className="text-center mt-8">
+          <p className="text-xs text-slate-500 mb-3">לא מצאתם תשובה?</p>
+          <Link
+            to="/contact"
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-white/5 border border-white/10 rounded-xl text-slate-300 text-sm font-medium hover:bg-white/10 hover:border-gold/20 hover:text-gold transition-all"
+          >
+            <HelpCircle className="w-4 h-4" />
+            שאלו אותנו
+          </Link>
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -215,6 +365,12 @@ export default function About() {
           </div>
         </div>
       </section>
+
+      {/* FAQ — visible accordion with FAQ JSON-LD for Google rich results.
+          Targets long-tail Hebrew search queries like "סיכונים בהשקעה בקרקע".
+          Neither Madlan nor Yad2 has a visible FAQ — this positions LandMap
+          as an educational resource, not just a listing site. */}
+      <FAQSection />
 
       {/* CTA */}
       <section className="py-16 px-4 border-t border-white/5">

@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { MapPin, TrendingUp, Ruler, DollarSign, ArrowLeft, BarChart3, Building2, Users, ChevronDown, ChevronUp, Activity, ArrowUpDown, Zap, Shield } from 'lucide-react'
+import { MapPin, TrendingUp, Ruler, DollarSign, ArrowLeft, BarChart3, Building2, Users, ChevronDown, ChevronUp, Activity, ArrowUpDown, Zap, Shield, Award, Target } from 'lucide-react'
 import { useMarketOverview } from '../../hooks/useMarketOverview.js'
 import { useMarketTrends } from '../../hooks/useMarketTrends.js'
 import { useMetaTags } from '../../hooks/useMetaTags.js'
@@ -33,8 +33,14 @@ function StatCard({ icon: Icon, label, value, subValue, color = 'gold' }) {
   )
 }
 
-function CityCard({ city, stats }) {
+function CityCard({ city, stats, trendData }) {
   const [expanded, setExpanded] = useState(false)
+
+  // Extract 12-month price trend from trends API data — shows direction & magnitude.
+  // Like Madlan's area trend arrows but with data quality transparency.
+  const trend = trendData?.cities?.[city]
+  const trendChange = trend?.change12m ?? null
+  const trendQuality = trend?.dataQuality ?? 'low'
 
   return (
     <div className="glass-panel overflow-hidden">
@@ -50,7 +56,26 @@ function CityCard({ city, stats }) {
             </div>
             <div>
               <h3 className="text-lg font-bold text-slate-100">{city}</h3>
-              <span className="text-xs text-slate-400">{stats.count} חלקות</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">{stats.count} חלקות</span>
+                {/* 12-month price trend badge — instant market direction signal per city.
+                    Shows ↑/↓/→ with % change and data quality indicator (●/○).
+                    Investors scan this to spot which areas are heating up vs cooling down. */}
+                {trendChange !== null && (
+                  <span
+                    className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                      trendChange > 2 ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
+                        : trendChange < -2 ? 'text-red-400 bg-red-500/10 border border-red-500/20'
+                        : 'text-slate-400 bg-white/5 border border-white/10'
+                    }`}
+                    title={`שינוי מחיר 12 חודשים: ${trendChange >= 0 ? '+' : ''}${trendChange}% | איכות נתונים: ${trendQuality === 'high' ? 'גבוהה' : trendQuality === 'medium' ? 'בינונית' : 'נמוכה'}`}
+                  >
+                    <span>{trendChange > 2 ? '📈' : trendChange < -2 ? '📉' : '➡️'}</span>
+                    <span>{trendChange >= 0 ? '+' : ''}{trendChange}%</span>
+                    <span className={`w-1 h-1 rounded-full ${trendQuality === 'high' ? 'bg-emerald-400' : trendQuality === 'medium' ? 'bg-amber-400' : 'bg-slate-500'}`} title={`איכות נתונים: ${trendQuality}`} />
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -157,6 +182,156 @@ function CityCard({ city, stats }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * BestCityInsights — "Best City For..." recommendation badges.
+ * Highlights which city wins in each investor-relevant category.
+ * Like Madlan's "המלצות" but data-driven and auto-computed from real metrics.
+ *
+ * Categories:
+ * - 💰 Best for Budget — lowest median price per dunam
+ * - 📈 Highest ROI — highest average ROI
+ * - 📐 Largest Plots — highest avg plot size
+ * - 🟢 Most Available — highest availability ratio
+ * - 🏗️ Most Advanced — highest % of advanced zoning stages
+ *
+ * Only shown when 2+ cities exist (comparison needs multiple options).
+ * Memoized to avoid recalculating on every render.
+ */
+function BestCityInsights({ cities }) {
+  const insights = useMemo(() => {
+    if (!cities || cities.length < 2) return []
+
+    const result = []
+
+    // Best for Budget — lowest avg price per dunam
+    const withPrice = cities.filter(c => c.avgPricePerDunam > 0)
+    if (withPrice.length >= 2) {
+      const cheapest = withPrice.reduce((a, b) => a.avgPricePerDunam < b.avgPricePerDunam ? a : b)
+      result.push({
+        emoji: '💰',
+        label: 'הכי משתלם',
+        city: cheapest.city,
+        detail: `${formatCurrency(cheapest.avgPricePerDunam)}/דונם`,
+        color: '#22C55E',
+        bg: 'bg-emerald-500/10 border-emerald-500/20',
+      })
+    }
+
+    // Highest ROI
+    const withRoi = cities.filter(c => c.avgRoi > 0)
+    if (withRoi.length >= 2) {
+      const bestRoi = withRoi.reduce((a, b) => a.avgRoi > b.avgRoi ? a : b)
+      result.push({
+        emoji: '📈',
+        label: 'תשואה מובילה',
+        city: bestRoi.city,
+        detail: `+${bestRoi.avgRoi}% ROI`,
+        color: '#F59E0B',
+        bg: 'bg-amber-500/10 border-amber-500/20',
+      })
+    }
+
+    // Largest average plots
+    const withArea = cities.filter(c => c.totalArea > 0 && c.count > 0)
+    if (withArea.length >= 2) {
+      const largestAvg = withArea.reduce((a, b) => (a.totalArea / a.count) > (b.totalArea / b.count) ? a : b)
+      const avgDunam = ((largestAvg.totalArea / largestAvg.count) / 1000).toFixed(1)
+      result.push({
+        emoji: '📐',
+        label: 'חלקות גדולות',
+        city: largestAvg.city,
+        detail: `ממוצע ${avgDunam} דונם`,
+        color: '#3B82F6',
+        bg: 'bg-blue-500/10 border-blue-500/20',
+      })
+    }
+
+    // Most available (highest availability %)
+    const withAvail = cities.filter(c => c.count > 0)
+    if (withAvail.length >= 2) {
+      const mostAvail = withAvail.reduce((a, b) =>
+        (a.available / a.count) > (b.available / b.count) ? a : b
+      )
+      const pct = Math.round((mostAvail.available / mostAvail.count) * 100)
+      result.push({
+        emoji: '🟢',
+        label: 'הכי זמינות',
+        city: mostAvail.city,
+        detail: `${pct}% זמינות`,
+        color: '#10B981',
+        bg: 'bg-teal-500/10 border-teal-500/20',
+      })
+    }
+
+    // Most advanced zoning — highest % of plots in advanced planning stages
+    const advancedStages = new Set(['DETAILED_PLAN_APPROVED', 'DEVELOPER_TENDER', 'BUILDING_PERMIT', 'MASTER_PLAN_APPROVED', 'DETAILED_PLAN_DEPOSIT'])
+    const withZoning = cities.filter(c => c.byZoning && c.count > 0)
+    if (withZoning.length >= 2) {
+      const mostAdvanced = withZoning.reduce((best, c) => {
+        const advCount = Object.entries(c.byZoning)
+          .filter(([k]) => advancedStages.has(k))
+          .reduce((s, [, v]) => s + v, 0)
+        const advPct = c.count > 0 ? advCount / c.count : 0
+        const bestAdvCount = Object.entries(best.byZoning)
+          .filter(([k]) => advancedStages.has(k))
+          .reduce((s, [, v]) => s + v, 0)
+        const bestAdvPct = best.count > 0 ? bestAdvCount / best.count : 0
+        return advPct > bestAdvPct ? c : best
+      })
+      const advCount = Object.entries(mostAdvanced.byZoning)
+        .filter(([k]) => advancedStages.has(k))
+        .reduce((s, [, v]) => s + v, 0)
+      const advPct = Math.round((advCount / mostAdvanced.count) * 100)
+      if (advPct > 0) {
+        result.push({
+          emoji: '🏗️',
+          label: 'תכנון מתקדם',
+          city: mostAdvanced.city,
+          detail: `${advPct}% בשלבים מתקדמים`,
+          color: '#A855F7',
+          bg: 'bg-purple-500/10 border-purple-500/20',
+        })
+      }
+    }
+
+    return result
+  }, [cities])
+
+  if (insights.length === 0) return null
+
+  return (
+    <div className="glass-panel p-5 mb-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Award className="w-4 h-4 text-gold" />
+        <h3 className="text-sm font-bold text-slate-100">העיר הטובה ביותר עבור...</h3>
+        <span className="text-[9px] text-slate-500 bg-white/5 px-2 py-1 rounded-lg mr-auto">
+          מבוסס על נתוני שוק בזמן אמת
+        </span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {insights.map((insight, i) => (
+          <Link
+            key={i}
+            to={`/areas/${encodeURIComponent(insight.city)}`}
+            className={`flex flex-col items-center gap-2 p-4 rounded-xl border ${insight.bg} hover:scale-105 transition-all group text-center`}
+          >
+            <span className="text-2xl">{insight.emoji}</span>
+            <div>
+              <div className="text-[10px] text-slate-400 font-medium">{insight.label}</div>
+              <div className="text-sm font-bold text-slate-100 group-hover:text-gold transition-colors mt-0.5">
+                {insight.city}
+              </div>
+              <div className="text-[10px] font-medium mt-0.5" style={{ color: insight.color }}>
+                {insight.detail}
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
     </div>
   )
 }
@@ -692,6 +867,12 @@ export default function Areas() {
               </div>
             )}
 
+            {/* Best City For... — quick recommendation badges for investor decision aid.
+                Highlights which city wins in each category (budget, ROI, size, availability, zoning).
+                Data-driven, auto-computed from real metrics — not editorial opinion.
+                Neither Madlan nor Yad2 surfaces this kind of comparative insight. */}
+            {cities.length > 1 && <BestCityInsights cities={cities} />}
+
             {/* Market Health Scores — composite investment score per city */}
             {cities.length > 0 && <MarketHealthScores cities={cities} />}
 
@@ -701,10 +882,12 @@ export default function Areas() {
             {/* City comparison table — sortable like Madlan's area comparison */}
             {cities.length > 1 && <SortableComparisonTable cities={cities} />}
 
-            {/* City cards */}
+            {/* City cards — now with 12-month price trend badges from the trends API.
+                Trend data is passed to each card so investors can instantly see
+                which areas are appreciating vs declining without expanding. */}
             <div className="space-y-4 mt-6">
               {cities.map((city) => (
-                <CityCard key={city.city} city={city.city} stats={city} />
+                <CityCard key={city.city} city={city.city} stats={city} trendData={trends} />
               ))}
             </div>
 
