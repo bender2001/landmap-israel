@@ -1,10 +1,10 @@
 import { useState, useMemo, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Heart, Map, MapPin, TrendingUp, Trash2, Clock, GitCompareArrows, Share2, Printer, Copy, Check, Download, ArrowUpDown, ArrowDown, ArrowUp, FileSpreadsheet } from 'lucide-react'
+import { Heart, Map, MapPin, TrendingUp, Trash2, Clock, GitCompareArrows, Share2, Printer, Copy, Check, Download, ArrowUpDown, ArrowDown, ArrowUp, FileSpreadsheet, Eye, Calculator as CalcIcon, ChevronDown, ChevronUp } from 'lucide-react'
 import { usePlotsBatch } from '../../hooks/usePlots'
 import { useFavorites } from '../../hooks/useFavorites'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
-import { formatCurrency, formatPriceShort, calcInvestmentScore, getScoreLabel, getInvestmentGrade, calcCAGR } from '../../utils/formatters'
+import { formatCurrency, formatPriceShort, calcInvestmentScore, getScoreLabel, getInvestmentGrade, calcCAGR, formatRelativeTime } from '../../utils/formatters'
 import { useMetaTags } from '../../hooks/useMetaTags'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
@@ -570,6 +570,19 @@ export default function Favorites() {
                           >
                             במפה
                           </Link>
+                          <span className="text-slate-700">|</span>
+                          {/* Quick calculator pre-fill — opens the investment calculator with this plot's
+                              price, size, and zoning stage pre-filled. Bridges the "browse → analyze" workflow
+                              without requiring investors to manually re-enter data. Like Madlan's inline
+                              mortgage calculator but for full investment analysis. */}
+                          <Link
+                            to={`/calculator?price=${price}&size=${sizeSqm || ''}&zoning=${plot.zoning_stage ?? plot.zoningStage ?? ''}`}
+                            className="text-xs text-purple-400 hover:underline font-medium flex items-center gap-0.5"
+                            title="חשב תשואה במחשבון"
+                          >
+                            <CalcIcon className="w-3 h-3" />
+                            חשב
+                          </Link>
                         </div>
                       </div>
                     </div>
@@ -578,11 +591,182 @@ export default function Favorites() {
               })}
             </div>
           )}
+
+          {/* Recently Viewed section — shows plots the user browsed but didn't save.
+              Like Madlan's "נצפו לאחרונה" or Amazon's "recently viewed" section.
+              Reads from localStorage (landmap_recently_viewed) and filters out already-favorited plots.
+              Helps users rediscover plots they viewed during browsing sessions. */}
+          <RecentlyViewedSection favorites={favorites} toggle={toggle} />
         </div>
       </div>
 
       <BackToTopButton />
       <PublicFooter />
+    </div>
+  )
+}
+
+/**
+ * RecentlyViewedSection — shows recently viewed plots that aren't in favorites.
+ * Uses landmap_recently_viewed (set by MapView when user clicks a plot) and
+ * landmap_view_counts (set by useViewTracker for view timestamps).
+ * Collapsible to avoid cluttering the favorites page for power users.
+ */
+function RecentlyViewedSection({ favorites, toggle }) {
+  const [isExpanded, setIsExpanded] = useState(true)
+
+  // Get recently viewed IDs from localStorage, excluding already-favorited plots
+  const recentIds = useMemo(() => {
+    try {
+      const ids = JSON.parse(localStorage.getItem('landmap_recently_viewed') || '[]')
+      const favSet = new Set(favorites)
+      return ids.filter(id => !favSet.has(id)).slice(0, 6)
+    } catch { return [] }
+  }, [favorites])
+
+  // Get view timestamps from landmap_view_counts for "last viewed X ago" labels
+  const viewTimestamps = useMemo(() => {
+    try {
+      const store = JSON.parse(localStorage.getItem('landmap_view_counts') || '{}')
+      const map = new Map()
+      for (const [id, entry] of Object.entries(store)) {
+        if (entry.lastViewed) map.set(id, entry.lastViewed)
+      }
+      return map
+    } catch { return new Map() }
+  }, [])
+
+  // Batch fetch the recently viewed plots
+  const { data: recentPlots = [], isLoading } = usePlotsBatch(recentIds)
+
+  // Sort by most recently viewed
+  const sortedPlots = useMemo(() => {
+    if (!recentPlots.length) return []
+    return [...recentPlots].sort((a, b) => {
+      const tsA = viewTimestamps.get(a.id) || 0
+      const tsB = viewTimestamps.get(b.id) || 0
+      return tsB - tsA
+    })
+  }, [recentPlots, viewTimestamps])
+
+  if (recentIds.length === 0) return null
+
+  return (
+    <div className="mt-10">
+      <button
+        onClick={() => setIsExpanded(prev => !prev)}
+        className="flex items-center gap-3 mb-5 w-full group"
+      >
+        <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+          <Eye className="w-5 h-5 text-blue-400" />
+        </div>
+        <div className="text-right flex-1">
+          <h2 className="text-lg font-bold text-slate-200 group-hover:text-slate-100 transition-colors">נצפו לאחרונה</h2>
+          <p className="text-[11px] text-slate-500">חלקות שצפית בהן אך לא שמרת</p>
+        </div>
+        {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+      </button>
+
+      {isExpanded && (
+        isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Spinner className="w-6 h-6 text-blue-400" />
+          </div>
+        ) : sortedPlots.length === 0 ? (
+          <div className="glass-panel p-6 text-center text-sm text-slate-500">
+            <Eye className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+            הנתונים נטענים...
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {sortedPlots.map((plot) => {
+              const price = plot.total_price ?? plot.totalPrice
+              const projValue = plot.projected_value ?? plot.projectedValue
+              const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
+              const blockNum = plot.block_number ?? plot.blockNumber
+              const sizeSqM = plot.size_sqm ?? plot.sizeSqM
+              const color = statusColors[plot.status]
+              const lastViewed = viewTimestamps.get(plot.id)
+              const viewedAgo = lastViewed ? formatRelativeTime(new Date(lastViewed).toISOString()) : null
+              const zoning = plot.zoning_stage ?? plot.zoningStage
+
+              return (
+                <div
+                  key={plot.id}
+                  className="glass-panel p-0 overflow-hidden group hover:border-blue-500/20 transition-all opacity-90 hover:opacity-100"
+                >
+                  <div className="h-0.5 bg-gradient-to-r from-blue-500/50 to-blue-400/30" />
+                  <div className="p-3.5">
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-200">
+                          גוש {blockNum} | חלקה {plot.number}
+                        </h3>
+                        <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-0.5">
+                          <MapPin className="w-2.5 h-2.5" />
+                          {plot.city}
+                          {viewedAgo && (
+                            <span className="text-blue-400/70 mr-1.5">
+                              · 👁 {viewedAgo}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Save to favorites */}
+                      <button
+                        onClick={() => toggle(plot.id)}
+                        className="w-7 h-7 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center hover:bg-gold/20 transition"
+                        title="שמור למועדפים"
+                      >
+                        <Heart className="w-3 h-3 text-gold" />
+                      </button>
+                    </div>
+
+                    {/* Price + ROI row */}
+                    <div className="flex items-end justify-between mb-2">
+                      <div>
+                        <div className="text-[10px] text-slate-500">מחיר</div>
+                        <div className="text-sm font-bold text-gold">{formatPriceShort(price)}</div>
+                      </div>
+                      <div className="text-left">
+                        <div className="flex items-center gap-1">
+                          <TrendingUp className="w-3 h-3 text-emerald-400" />
+                          <span className="text-xs font-bold text-emerald-400">+{roi}%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer with actions */}
+                    <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                      <span className="text-[10px] text-slate-500">
+                        {sizeSqM ? `${(sizeSqM / 1000).toFixed(1)} דונם` : ''}
+                        {zoning && <span className="mr-1.5">· {zoningLabels[zoning]?.split(' ')[0] || ''}</span>}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          to={`/plot/${plot.id}`}
+                          className="text-[10px] text-blue-400 hover:underline font-medium"
+                        >
+                          פרטים
+                        </Link>
+                        <Link
+                          to={`/calculator?price=${price}&size=${sizeSqM || ''}&zoning=${zoning || ''}`}
+                          className="text-[10px] text-gold hover:underline font-medium flex items-center gap-0.5"
+                          title="חשב תשואה במחשבון"
+                        >
+                          <CalcIcon className="w-2.5 h-2.5" />
+                          חשב
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      )}
     </div>
   )
 }

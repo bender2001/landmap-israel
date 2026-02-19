@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../config/supabase.js'
+import { supabaseRetry } from '../utils/retry.js'
 
 // ─── Area Market Trend Cache ──────────────────────────────────────────────
 // Caches per-city price trend direction based on price_snapshots.
@@ -370,12 +371,12 @@ export async function getPublishedPlots(filters = {}) {
   }
 
   if (countOnly) {
-    const { count, error } = await query
+    const { count, error } = await supabaseRetry(() => query, { label: 'getPlots:count', retries: 2 })
     if (error) throw error
     return count
   }
 
-  let { data, error } = await query
+  let { data, error } = await supabaseRetry(() => query, { label: 'getPlots', retries: 2 })
   if (error) throw error
 
   // ─── Fuzzy search fallback ──────────────────────────────────────────
@@ -575,16 +576,19 @@ export async function getPublishedPlots(filters = {}) {
 }
 
 export async function getPlotById(id) {
-  const { data, error } = await supabaseAdmin
-    .from('plots')
-    .select(`
-      *,
-      plot_documents(*),
-      plot_images(*)
-    `)
-    .eq('id', id)
-    .eq('is_published', true)
-    .single()
+  const { data, error } = await supabaseRetry(
+    () => supabaseAdmin
+      .from('plots')
+      .select(`
+        *,
+        plot_documents(*),
+        plot_images(*)
+      `)
+      .eq('id', id)
+      .eq('is_published', true)
+      .single(),
+    { label: `getPlotById:${id}`, retries: 2 }
+  )
 
   if (error) throw error
 
