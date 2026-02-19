@@ -30,9 +30,9 @@
     <meta name="twitter:title" content="LandMap Israel — מפת קרקעות להשקעה" />
     <meta name="twitter:description" content="מצא קרקעות להשקעה בישראל עם מפה אינטראקטיבית, נתונים פיננסיים ו-AI יועץ" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#C8942A" />
+    <meta name="theme-color" content="#FFFFFF" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="LandMap" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -116,19 +116,19 @@
     <!-- Preload market overview — used by the filter bar market stats (always visible above fold) -->
     <link rel="preload" href="/api/market/overview" as="fetch" crossorigin="anonymous" />
   </head>
-  <body class="m-0 p-0 overflow-hidden bg-navy font-heebo">
+  <body>
     <div id="root"></div>
     <noscript>
-      <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#050D1A;color:#F1F5F9;font-family:sans-serif;text-align:center;padding:2rem;">
+      <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#FFFFFF;color:#1F2937;font-family:sans-serif;text-align:center;padding:2rem;">
         <div>
-          <h1 style="font-size:2rem;margin-bottom:1rem;color:#C8942A;">🏗️ LandMap Israel</h1>
+          <h1 style="font-size:2rem;margin-bottom:1rem;color:#1A73E8;">🏗️ LandMap Israel</h1>
           <p style="font-size:1.1rem;margin-bottom:0.5rem;">מפת קרקעות להשקעה בישראל</p>
           <p style="color:#94A3B8;">יש להפעיל JavaScript כדי להשתמש באפליקציה.</p>
           <p style="color:#94A3B8;font-size:0.85rem;">Please enable JavaScript to use this application.</p>
         </div>
       </div>
     </noscript>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {

@@ -1,0 +1,1604 @@
+import { useState, useMemo, useCallback } from 'react'
+import type { CSSProperties } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import type { LucideIcon } from 'lucide-react'
+import {
+  Heart,
+  Map,
+  MapPin,
+  TrendingUp,
+  Trash2,
+  Clock,
+  GitCompareArrows,
+  Share2,
+  Printer,
+  ArrowUpDown,
+  ArrowDown,
+  ArrowUp,
+  FileSpreadsheet,
+  Eye,
+  Calculator as CalcIcon,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react'
+import { usePlotsBatch, useRecommendations } from '../../hooks/usePlots'
+import { useFavorites } from '../../hooks/useFavorites'
+import { statusColors, statusLabels, zoningLabels } from '../../utils/constants'
+import {
+  formatCurrency,
+  formatPriceShort,
+  calcInvestmentScore,
+  getInvestmentGrade,
+  calcCAGR,
+  formatRelativeTime,
+} from '../../utils/formatters'
+import { useMetaTags } from '../../hooks/useMetaTags'
+import PublicNav from '../../components/PublicNav'
+import PublicFooter from '../../components/PublicFooter'
+import BackToTopButton from '../../components/ui/BackToTopButton'
+import Breadcrumb from '../../components/ui/Breadcrumb'
+import Spinner from '../../components/ui/Spinner'
+import styled from 'styled-components'
+import { theme, media } from '../../styles/theme'
+
+type PlotRecord = Record<string, unknown> & {
+  id: string
+  city?: string
+  number?: string | number
+  total_price?: number
+  totalPrice?: number
+  projected_value?: number
+  projectedValue?: number
+  size_sqm?: number
+  sizeSqM?: number
+  block_number?: string | number
+  blockNumber?: string | number
+  zoning_stage?: string
+  zoningStage?: string
+  readiness_estimate?: string | number
+  readinessEstimate?: string | number
+  status?: string
+  _roi?: number
+  _distanceKm?: number
+  _recReasons?: string[]
+}
+
+type SortOption = {
+  value: string
+  label: string
+  icon: LucideIcon
+}
+
+const sortOptions: SortOption[] = [
+  { value: 'added', label: 'סדר הוספה', icon: ArrowUpDown },
+  { value: 'price-asc', label: 'מחיר ↑', icon: ArrowUp },
+  { value: 'price-desc', label: 'מחיר ↓', icon: ArrowDown },
+  { value: 'roi-desc', label: 'תשואה ↓', icon: ArrowDown },
+  { value: 'size-desc', label: 'שטח ↓', icon: ArrowDown },
+  { value: 'score-desc', label: 'ציון ↓', icon: ArrowDown },
+]
+
+type PortfolioAnalyticsProps = {
+  plots: PlotRecord[]
+}
+
+function PortfolioAnalytics({ plots }: PortfolioAnalyticsProps) {
+  const analytics = useMemo(() => {
+    if (!plots || plots.length < 2) return null
+
+    let totalValue = 0
+    let totalProjected = 0
+    const cityBreakdown: Record<string, number> = {}
+    const gradeBreakdown: Record<string, number> = { 'A+': 0, A: 0, 'B+': 0, B: 0, 'C+': 0, C: 0 }
+    const zoningBreakdown: Record<string, number> = {}
+    let cagrSum = 0
+    let cagrCount = 0
+
+    for (const plot of plots) {
+      const price = plot.total_price ?? plot.totalPrice ?? 0
+      const proj = plot.projected_value ?? plot.projectedValue ?? 0
+      const readiness = plot.readiness_estimate ?? plot.readinessEstimate ?? ''
+      const zoning = plot.zoning_stage ?? plot.zoningStage ?? 'UNKNOWN'
+      const roi = price > 0 ? Math.round(((proj - price) / price) * 100) : 0
+
+      totalValue += price
+      totalProjected += proj
+
+      const city = plot.city || 'לא ידוע'
+      cityBreakdown[city] = (cityBreakdown[city] || 0) + price
+
+      const score = calcInvestmentScore(plot)
+      const { grade } = getInvestmentGrade(score)
+      if (gradeBreakdown[grade] !== undefined) gradeBreakdown[grade] += 1
+
+      const zoningLabel = zoningLabels[zoning] || zoning
+      zoningBreakdown[zoningLabel] = (zoningBreakdown[zoningLabel] || 0) + 1
+
+      const cagrData = calcCAGR(roi, readiness)
+      if (cagrData) {
+        cagrSum += cagrData.cagr
+        cagrCount += 1
+      }
+    }
+
+    const totalProfit = totalProjected - totalValue
+    const avgRoi = totalValue > 0 ? Math.round(((totalProjected - totalValue) / totalValue) * 100) : 0
+    const avgCagr = cagrCount > 0 ? Math.round((cagrSum / cagrCount) * 10) / 10 : null
+
+    const cities = Object.entries(cityBreakdown).sort((a, b) => b[1] - a[1])
+    const topCityPct = totalValue > 0 ? Math.round((cities[0][1] / totalValue) * 100) : 0
+    const diversificationRisk = cities.length === 1 ? 'high' : topCityPct > 70 ? 'medium' : 'low'
+
+    return {
+      totalValue,
+      totalProjected,
+      totalProfit,
+      avgRoi,
+      avgCagr,
+      cityBreakdown: cities,
+      gradeBreakdown: Object.entries(gradeBreakdown).filter(([, value]) => value > 0),
+      zoningBreakdown: Object.entries(zoningBreakdown).sort((a, b) => b[1] - a[1]),
+      diversificationRisk,
+      topCityPct,
+      plotCount: plots.length,
+    }
+  }, [plots])
+
+  if (!analytics) return null
+
+  const gradeColors: Record<string, string> = {
+    'A+': '#22C55E',
+    A: '#4ADE80',
+    'B+': '#C8942A',
+    B: '#F59E0B',
+    'C+': '#F97316',
+    C: '#EF4444',
+  }
+
+  const riskConfig = {
+    low: { label: 'מפוזר', color: '#22C55E', emoji: '🟢' },
+    medium: { label: 'ריכוזי', color: '#F59E0B', emoji: '🟡' },
+    high: { label: 'מרוכז', color: '#EF4444', emoji: '🔴' },
+  } as const
+
+  const risk = riskConfig[analytics.diversificationRisk]
+
+  return (
+    <Panel $noPadding $borderColor="rgba(200, 148, 42, 0.1)">
+      <TopBar />
+      <PanelBody>
+        <PanelHeader>
+          <IconBadge $variant="gold">
+            <TrendingUp />
+          </IconBadge>
+          <div>
+            <SectionTitle>ניתוח תיק השקעות</SectionTitle>
+            <SectionSubtitle>{analytics.plotCount} חלקות · סיכום אגרגטי</SectionSubtitle>
+          </div>
+        </PanelHeader>
+
+        <KpiGrid>
+          <KpiCard $tone="blue">
+            <KpiLabel>שווי תיק</KpiLabel>
+            <KpiValue $tone="blue">{formatPriceShort(analytics.totalValue)}</KpiValue>
+          </KpiCard>
+          <KpiCard $tone="emerald">
+            <KpiLabel>רווח צפוי</KpiLabel>
+            <KpiValue $tone="emerald">+{formatPriceShort(analytics.totalProfit)}</KpiValue>
+          </KpiCard>
+          <KpiCard $tone="gold">
+            <KpiLabel>ROI ממוצע</KpiLabel>
+            <KpiValue $tone="gold">+{analytics.avgRoi}%</KpiValue>
+          </KpiCard>
+          <KpiCard $tone="purple">
+            <KpiLabel>CAGR ממוצע</KpiLabel>
+            <KpiValue $tone="purple">
+              {analytics.avgCagr ? `${analytics.avgCagr}%` : '—'}
+              <KpiSuffix>/שנה</KpiSuffix>
+            </KpiValue>
+          </KpiCard>
+        </KpiGrid>
+
+        <AnalyticsGrid>
+          <MiniPanel>
+            <MiniHeader>
+              <MiniTitle>
+                <MapPin /> פיזור גיאוגרפי
+              </MiniTitle>
+              <RiskBadge style={{ color: risk.color, background: `${risk.color}15`, border: `1px solid ${risk.color}25` }}>
+                {risk.emoji} {risk.label}
+              </RiskBadge>
+            </MiniHeader>
+            <MiniBody>
+              {analytics.cityBreakdown.map(([city, value]) => {
+                const pct = Math.round((value / analytics.totalValue) * 100)
+                return (
+                  <div key={city}>
+                    <MiniRow>
+                      <span>{city}</span>
+                      <span>{pct}% · {formatPriceShort(value)}</span>
+                    </MiniRow>
+                    <MiniBar>
+                      <MiniBarFill style={{ width: `${pct}%` }} />
+                    </MiniBar>
+                  </div>
+                )
+              })}
+            </MiniBody>
+          </MiniPanel>
+
+          <MiniPanel>
+            <MiniTitle>
+              <Heart /> דירוגי השקעה
+            </MiniTitle>
+            {analytics.gradeBreakdown.length > 0 ? (
+              <MiniBody>
+                {analytics.gradeBreakdown.map(([grade, count]) => {
+                  const pct = Math.round((count / analytics.plotCount) * 100)
+                  const color = gradeColors[grade] || theme.colors.slate[400]
+                  return (
+                    <div key={grade}>
+                      <MiniRow>
+                        <span style={{ color }}>{grade}</span>
+                        <span>{count} חלקות ({pct}%)</span>
+                      </MiniRow>
+                      <MiniBar>
+                        <MiniBarFill style={{ width: `${pct}%`, background: color }} />
+                      </MiniBar>
+                    </div>
+                  )
+                })}
+              </MiniBody>
+            ) : (
+              <EmptyMini>אין נתונים</EmptyMini>
+            )}
+          </MiniPanel>
+        </AnalyticsGrid>
+
+        {analytics.zoningBreakdown.length > 0 && (
+          <TagRow>
+            <TagLead>📋 שלבים:</TagLead>
+            {analytics.zoningBreakdown.map(([label, count]) => (
+              <TagItem key={label}>
+                {label} <strong>({count})</strong>
+              </TagItem>
+            ))}
+          </TagRow>
+        )}
+      </PanelBody>
+    </Panel>
+  )
+}
+
+type RecommendedForYouProps = {
+  favoriteIds: string[]
+  toggle: (id: string) => void
+}
+
+function RecommendedForYou({ favoriteIds, toggle }: RecommendedForYouProps) {
+  const { data: recommendations = [], isLoading } = useRecommendations(favoriteIds)
+  const [isExpanded, setIsExpanded] = useState(true)
+  const navigate = useNavigate()
+
+  if (favoriteIds.length < 2) return null
+  if (!isLoading && recommendations.length === 0) return null
+
+  return (
+    <Section>
+      <SectionToggle type="button" onClick={() => setIsExpanded((prev) => !prev)}>
+        <IconBadge $variant="purple">
+          <span>✨</span>
+        </IconBadge>
+        <div>
+          <SectionTitle>מומלץ עבורך</SectionTitle>
+          <SectionSubtitle>חלקות דומות למועדפים שלך שאולי פספסת</SectionSubtitle>
+        </div>
+        {isExpanded ? <ChevronUp /> : <ChevronDown />}
+      </SectionToggle>
+
+      {isExpanded && (
+        isLoading ? (
+          <CenteredBox>
+            <Spinner className="" />
+            <LoadingText>מנתח את המועדפים שלך...</LoadingText>
+          </CenteredBox>
+        ) : (
+          <CardGrid>
+            {recommendations.map((plot: PlotRecord) => {
+              const price = plot.total_price ?? plot.totalPrice ?? 0
+              const projValue = plot.projected_value ?? plot.projectedValue ?? 0
+              const roi = plot._roi ?? (price > 0 ? Math.round(((projValue - price) / price) * 100) : 0)
+              const blockNum = plot.block_number ?? plot.blockNumber
+              const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
+              const color = statusColors[plot.status as keyof typeof statusColors]
+              const readiness = plot.readiness_estimate ?? plot.readinessEstimate
+              const reasons = plot._recReasons || []
+
+              return (
+                <RecommendationCard
+                  key={plot.id}
+                  onClick={() => navigate(`/plot/${plot.id}`)}
+                  role="link"
+                  tabIndex={0}
+                  onKeyDown={(event) => { if (event.key === 'Enter') navigate(`/plot/${plot.id}`) }}
+                >
+                  <AccentBar $variant="purple" />
+                  <CardBody>
+                    {reasons.length > 0 && (
+                      <ReasonRow>
+                        {reasons.map((reason, index) => (
+                          <ReasonTag key={`${reason}-${index}`}>{reason}</ReasonTag>
+                        ))}
+                      </ReasonRow>
+                    )}
+
+                    <CardHeader>
+                      <div>
+                        <CardTitle>גוש {blockNum} | חלקה {plot.number}</CardTitle>
+                        <CardMeta>
+                          <MapPin />
+                          {plot.city}
+                          {plot._distanceKm != null && (
+                            <DistanceNote>· 📍 {plot._distanceKm < 1 ? `${Math.round(plot._distanceKm * 1000)}מ׳` : `${plot._distanceKm}ק״מ`}</DistanceNote>
+                          )}
+                        </CardMeta>
+                      </div>
+                      <IconAction
+                        type="button"
+                        onClick={(event) => { event.stopPropagation(); toggle(plot.id) }}
+                        aria-label="שמור למועדפים"
+                        title="שמור למועדפים"
+                      >
+                        <Heart />
+                      </IconAction>
+                    </CardHeader>
+
+                    <BadgeRow>
+                      <StatusBadge style={{ background: `${color}20`, color }}>
+                        <span style={{ background: color }} />
+                        {statusLabels[plot.status as keyof typeof statusLabels]}
+                      </StatusBadge>
+                      {readiness && (
+                        <ReadinessBadge>
+                          <Clock />
+                          {readiness}
+                        </ReadinessBadge>
+                      )}
+                    </BadgeRow>
+
+                    <PriceRow>
+                      <div>
+                        <LabelSmall>מחיר</LabelSmall>
+                        <PriceValue>{formatPriceShort(price)}</PriceValue>
+                        {sizeSqM > 0 && (
+                          <PriceNote>{formatPriceShort(Math.round(price / sizeSqM * 1000))}/דונם</PriceNote>
+                        )}
+                      </div>
+                      <div>
+                        <LabelSmall>תשואה צפויה</LabelSmall>
+                        <InlineRow>
+                          <TrendingUp />
+                          <RoiValue>+{roi}%</RoiValue>
+                        </InlineRow>
+                        {(() => {
+                          const cagrData = calcCAGR(roi, readiness)
+                          if (!cagrData) return null
+                          return <PriceNote>{cagrData.cagr}%/שנה CAGR</PriceNote>
+                        })()}
+                      </div>
+                    </PriceRow>
+
+                    <CardFooter>
+                      <SizeNote>{sizeSqM > 0 ? `${(sizeSqM / 1000).toFixed(1)} דונם` : ''}</SizeNote>
+                      <FooterLink to={`/plot/${plot.id}`} onClick={(event) => event.stopPropagation()}>
+                        פרטים מלאים →
+                      </FooterLink>
+                    </CardFooter>
+                  </CardBody>
+                </RecommendationCard>
+              )
+            })}
+          </CardGrid>
+        )
+      )}
+    </Section>
+  )
+}
+
+type RecentlyViewedProps = {
+  favorites: string[]
+  toggle: (id: string) => void
+}
+
+function RecentlyViewedSection({ favorites, toggle }: RecentlyViewedProps) {
+  const [isExpanded, setIsExpanded] = useState(true)
+
+  const recentIds = useMemo(() => {
+    try {
+      const ids = JSON.parse(localStorage.getItem('landmap_recently_viewed') || '[]') as string[]
+      const favSet = new Set(favorites)
+      return ids.filter((id) => !favSet.has(id)).slice(0, 6)
+    } catch {
+      return []
+    }
+  }, [favorites])
+
+  const viewTimestamps = useMemo(() => {
+    try {
+      const store = JSON.parse(localStorage.getItem('landmap_view_counts') || '{}') as Record<string, { lastViewed?: number }>
+      const map = new Map<string, number>()
+      for (const [id, entry] of Object.entries(store)) {
+        if (entry.lastViewed) map.set(id, entry.lastViewed)
+      }
+      return map
+    } catch {
+      return new Map<string, number>()
+    }
+  }, [])
+
+  const { data: recentPlots = [], isLoading } = usePlotsBatch(recentIds)
+
+  const sortedPlots = useMemo(() => {
+    if (!recentPlots.length) return []
+    return [...recentPlots].sort((a, b) => {
+      const tsA = viewTimestamps.get(a.id) || 0
+      const tsB = viewTimestamps.get(b.id) || 0
+      return tsB - tsA
+    })
+  }, [recentPlots, viewTimestamps])
+
+  if (recentIds.length === 0) return null
+
+  return (
+    <Section>
+      <SectionToggle type="button" onClick={() => setIsExpanded((prev) => !prev)}>
+        <IconBadge $variant="blue">
+          <Eye />
+        </IconBadge>
+        <div>
+          <SectionTitle>נצפו לאחרונה</SectionTitle>
+          <SectionSubtitle>חלקות שצפית בהן אך לא שמרת</SectionSubtitle>
+        </div>
+        {isExpanded ? <ChevronUp /> : <ChevronDown />}
+      </SectionToggle>
+
+      {isExpanded && (
+        isLoading ? (
+          <CenteredBox>
+            <Spinner className="" />
+          </CenteredBox>
+        ) : sortedPlots.length === 0 ? (
+          <Panel>
+            <EmptyMini>
+              <Eye />
+              הנתונים נטענים...
+            </EmptyMini>
+          </Panel>
+        ) : (
+          <CompactGrid>
+            {sortedPlots.map((plot: PlotRecord) => {
+              const price = plot.total_price ?? plot.totalPrice
+              const projValue = plot.projected_value ?? plot.projectedValue
+              const roi = price > 0 ? Math.round(((projValue || 0) - price) / price * 100) : 0
+              const blockNum = plot.block_number ?? plot.blockNumber
+              const sizeSqM = plot.size_sqm ?? plot.sizeSqM
+              const lastViewed = viewTimestamps.get(plot.id)
+              const viewedAgo = lastViewed ? formatRelativeTime(new Date(lastViewed).toISOString()) : null
+              const zoning = plot.zoning_stage ?? plot.zoningStage
+
+              return (
+                <CompactCard key={plot.id}>
+                  <AccentBar $variant="blue" $height="2px" />
+                  <CardBody $compact>
+                    <CardHeader>
+                      <div>
+                        <CardTitle $size="sm">גוש {blockNum} | חלקה {plot.number}</CardTitle>
+                        <CardMeta $size="sm">
+                          <MapPin />
+                          {plot.city}
+                          {viewedAgo && <DistanceNote>· 👁 {viewedAgo}</DistanceNote>}
+                        </CardMeta>
+                      </div>
+                      <IconAction type="button" onClick={() => toggle(plot.id)}>
+                        <Heart />
+                      </IconAction>
+                    </CardHeader>
+
+                    <PriceRow $compact>
+                      <div>
+                        <LabelSmall>מחיר</LabelSmall>
+                        <PriceValue $size="sm">{formatPriceShort(price)}</PriceValue>
+                      </div>
+                      <InlineRow>
+                        <TrendingUp />
+                        <RoiValue $size="sm">+{roi}%</RoiValue>
+                      </InlineRow>
+                    </PriceRow>
+
+                    <CardFooter $compact>
+                      <SizeNote>
+                        {sizeSqM ? `${(sizeSqM / 1000).toFixed(1)} דונם` : ''}
+                        {zoning && <span> · {zoningLabels[zoning]?.split(' ')[0] || ''}</span>}
+                      </SizeNote>
+                      <InlineLinks>
+                        <FooterLink to={`/plot/${plot.id}`} $variant="blue">פרטים</FooterLink>
+                        <FooterLink to={`/calculator?price=${price}&size=${sizeSqM || ''}&zoning=${zoning || ''}`} $variant="gold">
+                          <CalcIcon />
+                          חשב
+                        </FooterLink>
+                      </InlineLinks>
+                    </CardFooter>
+                  </CardBody>
+                </CompactCard>
+              )
+            })}
+          </CompactGrid>
+        )
+      )}
+    </Section>
+  )
+}
+
+export default function Favorites() {
+  useMetaTags({
+    title: 'חלקות מועדפות — LandMap Israel',
+    description: 'רשימת החלקות שסימנת כמועדפות. השווה, שתף והדפס את ההשקעות שמעניינות אותך.',
+    url: `${window.location.origin}/favorites`,
+  })
+
+  const { favorites, toggle } = useFavorites()
+  const { data: batchPlots = [], isLoading } = usePlotsBatch(favorites)
+  const navigate = useNavigate()
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [sortBy, setSortBy] = useState('added')
+
+  const favoritePlotsUnsorted = useMemo(() => {
+    if (!batchPlots.length) return []
+    const plotMap = new Map(batchPlots.map((plot) => [plot.id, plot]))
+    return favorites.map((id) => plotMap.get(id)).filter(Boolean) as PlotRecord[]
+  }, [batchPlots, favorites])
+
+  const favoritePlots = useMemo(() => {
+    if (sortBy === 'added') return favoritePlotsUnsorted
+    const sorted = [...favoritePlotsUnsorted]
+    const getPrice = (plot: PlotRecord) => plot.total_price ?? plot.totalPrice ?? 0
+    const getSize = (plot: PlotRecord) => plot.size_sqm ?? plot.sizeSqM ?? 0
+    const getRoi = (plot: PlotRecord) => {
+      const price = getPrice(plot)
+      const proj = plot.projected_value ?? plot.projectedValue ?? 0
+      return price > 0 ? ((proj - price) / price) * 100 : 0
+    }
+    switch (sortBy) {
+      case 'price-asc':
+        sorted.sort((a, b) => getPrice(a) - getPrice(b))
+        break
+      case 'price-desc':
+        sorted.sort((a, b) => getPrice(b) - getPrice(a))
+        break
+      case 'roi-desc':
+        sorted.sort((a, b) => getRoi(b) - getRoi(a))
+        break
+      case 'size-desc':
+        sorted.sort((a, b) => getSize(b) - getSize(a))
+        break
+      case 'score-desc':
+        sorted.sort((a, b) => calcInvestmentScore(b) - calcInvestmentScore(a))
+        break
+    }
+    return sorted
+  }, [favoritePlotsUnsorted, sortBy])
+
+  const handleCompare = useCallback(() => {
+    const ids = favoritePlots.slice(0, 3).map((plot) => plot.id).join(',')
+    if (ids) navigate(`/compare?plots=${ids}`)
+  }, [favoritePlots, navigate])
+
+  const handleShare = useCallback(() => {
+    const lines = ['❤️ חלקות מועדפות — LandMap Israel\n']
+    favoritePlots.forEach((plot, index) => {
+      const bn = plot.block_number ?? plot.blockNumber
+      const price = plot.total_price ?? plot.totalPrice
+      const proj = plot.projected_value ?? plot.projectedValue
+      const roi = price && proj ? Math.round((proj - price) / price * 100) : 0
+      lines.push(`${index + 1}. גוש ${bn} חלקה ${plot.number} (${plot.city})`)
+      lines.push(`   ${formatPriceShort(price || 0)} · +${roi}% ROI`)
+    })
+    lines.push(`\n🔗 ${window.location.origin}`)
+    window.open(`https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`, '_blank')
+  }, [favoritePlots])
+
+  const handlePrint = useCallback(() => {
+    const pw = window.open('', '_blank')
+    if (!pw) return
+    const rows = favoritePlots.map((plot) => {
+      const bn = plot.block_number ?? plot.blockNumber
+      const price = plot.total_price ?? plot.totalPrice ?? 0
+      const proj = plot.projected_value ?? plot.projectedValue ?? 0
+      const size = plot.size_sqm ?? plot.sizeSqM ?? 0
+      const roi = price > 0 ? Math.round((proj - price) / price * 100) : 0
+      const score = calcInvestmentScore(plot)
+      return {
+        bn,
+        number: plot.number,
+        city: plot.city,
+        price,
+        proj,
+        size,
+        roi,
+        score,
+        status: statusLabels[plot.status as keyof typeof statusLabels] || plot.status,
+      }
+    })
+    pw.document.write(`<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8">
+      <title>חלקות מועדפות — LandMap Israel</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a2e; padding: 40px; max-width: 800px; margin: 0 auto; line-height: 1.5; }
+        h1 { font-size: 22px; margin-bottom: 4px; }
+        .subtitle { color: #666; font-size: 13px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f0f0f0; padding: 8px 10px; text-align: right; font-size: 12px; border: 1px solid #ddd; }
+        td { padding: 8px 10px; text-align: right; font-size: 13px; border: 1px solid #eee; }
+        tr:nth-child(even) { background: #fafafa; }
+        .footer { margin-top: 30px; text-align: center; color: #aaa; font-size: 10px; border-top: 1px solid #eee; padding-top: 12px; }
+        @media print { body { padding: 20px; } }
+      </style></head><body>
+      <h1>❤️ חלקות מועדפות</h1>
+      <div class="subtitle">${rows.length} חלקות • ${new Date().toLocaleDateString('he-IL')}</div>
+      <table><thead><tr><th>#</th><th>חלקה</th><th>עיר</th><th>מחיר</th><th>שטח</th><th>תשואה</th><th>ציון</th></tr></thead>
+      <tbody>${rows.map((row, i) => `<tr>
+        <td>${i + 1}</td><td>גוש ${row.bn} / ${row.number}</td><td>${row.city}</td>
+        <td>${formatCurrency(row.price)}</td><td>${(row.size / 1000).toFixed(1)} דונם</td>
+        <td>+${row.roi}%</td><td>${row.score}/10</td>
+      </tr>`).join('')}</tbody></table>
+      <div class="footer">LandMap Israel — מפת קרקעות להשקעה • ${new Date().toLocaleDateString('he-IL')}</div>
+    </body></html>`)
+    pw.document.close()
+    setTimeout(() => pw.print(), 300)
+  }, [favoritePlots])
+
+  const handleExportCsv = useCallback(() => {
+    const BOM = '\uFEFF'
+    const headers = ['גוש', 'חלקה', 'עיר', 'מחיר (₪)', 'שווי צפוי (₪)', 'תשואה (%)', 'שטח (מ"ר)', 'מחיר/מ"ר (₪)', 'ציון השקעה', 'סטטוס', 'ייעוד', 'מוכנות']
+    const rows = favoritePlots.map((plot) => {
+      const price = plot.total_price ?? plot.totalPrice ?? 0
+      const proj = plot.projected_value ?? plot.projectedValue ?? 0
+      const size = plot.size_sqm ?? plot.sizeSqM ?? 0
+      const roi = price > 0 ? Math.round(((proj - price) / price) * 100) : 0
+      const ppsqm = size > 0 ? Math.round(price / size) : 0
+      return [
+        plot.block_number ?? plot.blockNumber,
+        plot.number,
+        plot.city,
+        price,
+        proj,
+        roi,
+        size,
+        ppsqm,
+        calcInvestmentScore(plot),
+        statusLabels[plot.status as keyof typeof statusLabels] || plot.status,
+        zoningLabels[plot.zoning_stage ?? plot.zoningStage] || '',
+        plot.readiness_estimate ?? plot.readinessEstimate ?? '',
+      ].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')
+    })
+    const csv = BOM + headers.join(',') + '\n' + rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `landmap-favorites-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }, [favoritePlots])
+
+  return (
+    <Page dir="rtl">
+      <PublicNav />
+      <Content>
+        <Container>
+          <Breadcrumb
+            items={[
+              { label: 'מפה', to: '/' },
+              { label: 'מועדפים' },
+            ]}
+            className=""
+          />
+          <HeaderRow>
+            <IconBadge $variant="danger">
+              <Heart />
+            </IconBadge>
+            <div>
+              <Title>מועדפים</Title>
+              <Subtitle>
+                {favoritePlots.length > 0
+                  ? `${favoritePlots.length} חלקות שמורות`
+                  : 'לא שמרת חלקות עדיין'}
+              </Subtitle>
+            </div>
+          </HeaderRow>
+
+          {!isLoading && favoritePlots.length > 0 && (
+            <Toolbar>
+              {favoritePlots.length >= 2 && (
+                <ActionButton $variant="gold-outline" onClick={handleCompare}>
+                  <GitCompareArrows />
+                  השווה {Math.min(favoritePlots.length, 3)} חלקות
+                </ActionButton>
+              )}
+              <ActionButton $variant="whatsapp" onClick={handleShare}>
+                <Share2 />
+                שתף ב-WhatsApp
+              </ActionButton>
+              <ActionButton $variant="ghost" onClick={handlePrint}>
+                <Printer />
+                הדפס
+              </ActionButton>
+              <ActionButton $variant="ghost" onClick={handleExportCsv}>
+                <FileSpreadsheet />
+                CSV
+              </ActionButton>
+              <SortWrap>
+                <SortSelect value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+                  {sortOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </SortSelect>
+                <SortIcon />
+              </SortWrap>
+              <StatsSummary>
+                <span>💰 סה״כ {formatPriceShort(favoritePlots.reduce((sum, plot) => sum + (plot.total_price ?? plot.totalPrice ?? 0), 0))}</span>
+                <Divider />
+                <span>
+                  📈 ממוצע +{favoritePlots.length > 0 ? Math.round(favoritePlots.reduce((sum, plot) => {
+                    const pr = plot.total_price ?? plot.totalPrice ?? 0
+                    const pj = plot.projected_value ?? plot.projectedValue ?? 0
+                    return sum + (pr > 0 ? ((pj - pr) / pr) * 100 : 0)
+                  }, 0) / favoritePlots.length) : 0}% ROI
+                </span>
+              </StatsSummary>
+            </Toolbar>
+          )}
+
+          {!isLoading && favoritePlots.length >= 2 && (
+            <PortfolioAnalytics plots={favoritePlots} />
+          )}
+
+          {isLoading ? (
+            <CenteredBox>
+              <Spinner className="" />
+            </CenteredBox>
+          ) : favoritePlots.length === 0 ? (
+            <Panel>
+              <EmptyState>
+                <Heart />
+                <EmptyTitle>אין חלקות מועדפות</EmptyTitle>
+                <EmptyText>לחצו על לב ליד חלקה כדי לשמור אותה כאן</EmptyText>
+                <PrimaryLink to="/">
+                  <Map />
+                  גלו חלקות במפה
+                </PrimaryLink>
+              </EmptyState>
+            </Panel>
+          ) : (
+            <CardGrid>
+              {favoritePlots.map((plot) => {
+                const price = plot.total_price ?? plot.totalPrice ?? 0
+                const projValue = plot.projected_value ?? plot.projectedValue ?? 0
+                const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
+                const blockNum = plot.block_number ?? plot.blockNumber
+                const sizeSqm = plot.size_sqm ?? plot.sizeSqM
+                const color = statusColors[plot.status as keyof typeof statusColors]
+                const readiness = plot.readiness_estimate ?? plot.readinessEstimate
+
+                return (
+                  <PlotCard key={plot.id}>
+                    <ColorBar style={{ background: color }} />
+                    <CardBody>
+                      <CardHeader>
+                        <div>
+                          <CardTitle>גוש {blockNum} | חלקה {plot.number}</CardTitle>
+                          <CardMeta>
+                            <MapPin />
+                            {plot.city}
+                          </CardMeta>
+                        </div>
+                        <IconAction type="button" onClick={() => toggle(plot.id)}>
+                          <Trash2 />
+                        </IconAction>
+                      </CardHeader>
+
+                      <BadgeRow>
+                        <StatusBadge style={{ background: `${color}20`, color }}>
+                          <span style={{ background: color }} />
+                          {statusLabels[plot.status as keyof typeof statusLabels]}
+                        </StatusBadge>
+                        <Pill>{zoningLabels[plot.zoning_stage ?? plot.zoningStage]}</Pill>
+                      </BadgeRow>
+
+                      <PriceRow>
+                        <div>
+                          <LabelSmall>מחיר</LabelSmall>
+                          <PriceValue>{formatCurrency(price)}</PriceValue>
+                        </div>
+                        <div>
+                          <LabelSmall>תשואה</LabelSmall>
+                          <InlineRow>
+                            <TrendingUp />
+                            <RoiValue>+{roi}%</RoiValue>
+                          </InlineRow>
+                        </div>
+                      </PriceRow>
+
+                      <CardFooter>
+                        <SizeNote>
+                          {sizeSqm?.toLocaleString()} מ"ר
+                          {readiness && (
+                            <span>
+                              <Clock />
+                              {readiness}
+                            </span>
+                          )}
+                        </SizeNote>
+                        <InlineLinks>
+                          <FooterLink to={`/plot/${plot.id}`} $variant="gold">פרטים מלאים</FooterLink>
+                          <Separator>|</Separator>
+                          <FooterLink to={`/?plot=${plot.id}`} $variant="blue">במפה</FooterLink>
+                          <Separator>|</Separator>
+                          <FooterLink
+                            to={`/calculator?price=${price}&size=${sizeSqm || ''}&zoning=${plot.zoning_stage ?? plot.zoningStage ?? ''}`}
+                            $variant="purple"
+                          >
+                            <CalcIcon />
+                            חשב
+                          </FooterLink>
+                        </InlineLinks>
+                      </CardFooter>
+                    </CardBody>
+                  </PlotCard>
+                )
+              })}
+            </CardGrid>
+          )}
+
+          {!isLoading && favorites.length >= 2 && (
+            <RecommendedForYou favoriteIds={favorites} toggle={toggle} />
+          )}
+
+          <RecentlyViewedSection favorites={favorites} toggle={toggle} />
+        </Container>
+      </Content>
+
+      <BackToTopButton />
+      <PublicFooter />
+    </Page>
+  )
+}
+
+const Page = styled.div`
+  min-height: 100vh;
+  background: ${theme.colors.navy};
+`
+
+const Content = styled.div`
+  padding: 112px 16px 64px;
+`
+
+const Container = styled.div`
+  max-width: 64rem;
+  margin: 0 auto;
+`
+
+const HeaderRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 32px;
+`
+
+const Title = styled.h1`
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: ${theme.colors.slate[100]};
+`
+
+const Subtitle = styled.p`
+  font-size: 0.875rem;
+  color: ${theme.colors.slate[400]};
+`
+
+const Toolbar = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+`
+
+const ActionButton = styled.button<{ $variant: 'gold-outline' | 'whatsapp' | 'ghost' }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: ${theme.radii.xl};
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: ${theme.transitions.fast};
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  ${({ $variant }) => {
+    switch ($variant) {
+      case 'gold-outline':
+        return `
+          background: rgba(200, 148, 42, 0.1);
+          border: 1px solid rgba(200, 148, 42, 0.2);
+          color: ${theme.colors.gold};
+          &:hover { background: rgba(200, 148, 42, 0.2); }
+        `
+      case 'whatsapp':
+        return `
+          background: rgba(37, 211, 102, 0.1);
+          border: 1px solid rgba(37, 211, 102, 0.2);
+          color: #25d366;
+          &:hover { background: rgba(37, 211, 102, 0.2); }
+        `
+      case 'ghost':
+      default:
+        return `
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: ${theme.colors.slate[300]};
+          &:hover { border-color: rgba(200, 148, 42, 0.3); color: ${theme.colors.gold}; }
+        `
+    }
+  }}
+`
+
+const SortWrap = styled.div`
+  position: relative;
+  margin-inline-start: 8px;
+`
+
+const SortSelect = styled.select`
+  appearance: none;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: ${theme.radii.xl};
+  color: ${theme.colors.slate[300]};
+  padding: 10px 36px 10px 12px;
+  cursor: pointer;
+  transition: ${theme.transitions.fast};
+
+  &:focus {
+    outline: none;
+    border-color: rgba(200, 148, 42, 0.4);
+  }
+`
+
+const SortIcon = styled(ArrowUpDown)`
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: ${theme.colors.slate[500]};
+  pointer-events: none;
+`
+
+const StatsSummary = styled.div`
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: ${theme.colors.slate[500]};
+`
+
+const Divider = styled.span`
+  width: 1px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.1);
+`
+
+const Panel = styled.div<{ $noPadding?: boolean; $borderColor?: string }>`
+  background: ${theme.glass.bg};
+  border: ${({ $borderColor }) => $borderColor || theme.glass.border};
+  backdrop-filter: ${theme.glass.blur};
+  border-radius: ${theme.radii.xl};
+  box-shadow: ${theme.shadows.glass};
+  overflow: hidden;
+  padding: ${({ $noPadding }) => ($noPadding ? '0' : '24px')};
+`
+
+const PanelBody = styled.div`
+  padding: 20px;
+`
+
+const TopBar = styled.div`
+  height: 4px;
+  background: ${theme.gradients.gold};
+`
+
+const PanelHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+`
+
+const SectionTitle = styled.h2`
+  font-size: 1rem;
+  font-weight: 700;
+  color: ${theme.colors.slate[100]};
+`
+
+const SectionSubtitle = styled.p`
+  font-size: 0.65rem;
+  color: ${theme.colors.slate[500]};
+`
+
+const KpiGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+  ${media.sm} {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+`
+
+const KpiCard = styled.div<{ $tone: 'blue' | 'emerald' | 'gold' | 'purple' }>`
+  border-radius: ${theme.radii.lg};
+  padding: 12px;
+  text-align: center;
+  ${({ $tone }) => {
+    const tones: Record<string, { bg: string; border: string }> = {
+      blue: { bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.15)' },
+      emerald: { bg: 'rgba(34, 197, 94, 0.08)', border: 'rgba(34, 197, 94, 0.15)' },
+      gold: { bg: 'rgba(200, 148, 42, 0.08)', border: 'rgba(200, 148, 42, 0.15)' },
+      purple: { bg: 'rgba(139, 92, 246, 0.08)', border: 'rgba(139, 92, 246, 0.15)' },
+    }
+    return `background: ${tones[$tone].bg}; border: 1px solid ${tones[$tone].border};`
+  }}
+`
+
+const KpiLabel = styled.div`
+  font-size: 0.65rem;
+  color: ${theme.colors.slate[500]};
+  margin-bottom: 4px;
+`
+
+const KpiValue = styled.div<{ $tone: 'blue' | 'emerald' | 'gold' | 'purple' }>`
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: ${({ $tone }) => {
+    switch ($tone) {
+      case 'blue':
+        return theme.colors.blue
+      case 'emerald':
+        return theme.colors.emerald
+      case 'gold':
+        return theme.colors.gold
+      default:
+        return theme.colors.purple
+    }
+  }};
+`
+
+const KpiSuffix = styled.span`
+  font-size: 0.55rem;
+  font-weight: 400;
+  color: ${theme.colors.slate[500]};
+  margin-inline-start: 2px;
+`
+
+const AnalyticsGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  ${media.sm} {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+`
+
+const MiniPanel = styled.div`
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: ${theme.radii.lg};
+  padding: 12px;
+`
+
+const MiniHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+`
+
+const MiniTitle = styled.span`
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: ${theme.colors.slate[300]};
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  svg {
+    width: 12px;
+    height: 12px;
+    color: ${theme.colors.gold};
+  }
+`
+
+const RiskBadge = styled.span`
+  font-size: 0.6rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+`
+
+const MiniBody = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`
+
+const MiniRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: ${theme.colors.slate[400]};
+`
+
+const MiniBar = styled.div`
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+`
+
+const MiniBarFill = styled.div`
+  height: 100%;
+  border-radius: 999px;
+  background: ${theme.gradients.gold};
+  transition: width 0.5s ease;
+`
+
+const EmptyMini = styled.div`
+  text-align: center;
+  font-size: 0.75rem;
+  color: ${theme.colors.slate[500]};
+  padding: 16px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+
+  svg {
+    width: 32px;
+    height: 32px;
+    color: ${theme.colors.slate[600]};
+  }
+`
+
+const TagRow = styled.div`
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+`
+
+const TagLead = styled.span`
+  font-size: 0.65rem;
+  color: ${theme.colors.slate[500]};
+  margin-inline-end: 4px;
+`
+
+const TagItem = styled.span`
+  font-size: 0.6rem;
+  color: ${theme.colors.slate[400]};
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 2px 8px;
+  border-radius: ${theme.radii.md};
+
+  strong {
+    color: ${theme.colors.slate[300]};
+  }
+`
+
+const Section = styled.div`
+  margin-top: 32px;
+`
+
+const SectionToggle = styled.button`
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  text-align: right;
+  color: ${theme.colors.slate[200]};
+
+  svg {
+    width: 16px;
+    height: 16px;
+    color: ${theme.colors.slate[500]};
+  }
+`
+
+const IconBadge = styled.div<{ $variant: 'gold' | 'purple' | 'blue' | 'danger' }>`
+  width: 40px;
+  height: 40px;
+  border-radius: ${theme.radii.lg};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  ${({ $variant }) => {
+    switch ($variant) {
+      case 'purple':
+        return `background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.2); color: ${theme.colors.purple};`
+      case 'blue':
+        return `background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2); color: ${theme.colors.blue};`
+      case 'danger':
+        return `background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); color: ${theme.colors.red};`
+      default:
+        return `background: rgba(200, 148, 42, 0.1); border-color: rgba(200, 148, 42, 0.2); color: ${theme.colors.gold};`
+    }
+  }}
+`
+
+const CardGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  ${media.sm} {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  ${media.lg} {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+`
+
+const CompactGrid = styled(CardGrid)`
+  gap: 12px;
+`
+
+const PlotCard = styled(Panel)`
+  padding: 0;
+  transition: ${theme.transitions.fast};
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: rgba(200, 148, 42, 0.3);
+  }
+`
+
+const RecommendationCard = styled(PlotCard)`
+  cursor: pointer;
+  &:hover {
+    border-color: rgba(139, 92, 246, 0.2);
+  }
+`
+
+const CompactCard = styled(PlotCard)`
+  opacity: 0.9;
+
+  &:hover {
+    opacity: 1;
+  }
+`
+
+const ColorBar = styled.div`
+  height: 4px;
+`
+
+const AccentBar = styled.div<{ $variant: 'purple' | 'blue'; $height?: string }>`
+  height: ${({ $height }) => $height || '4px'};
+  background: ${({ $variant }) =>
+    $variant === 'blue'
+      ? 'linear-gradient(90deg, rgba(59,130,246,0.5), rgba(96,165,250,0.3))'
+      : 'linear-gradient(90deg, rgba(139,92,246,0.6), rgba(129,140,248,0.3))'};
+`
+
+const CardBody = styled.div<{ $compact?: boolean }>`
+  padding: ${({ $compact }) => ($compact ? '14px' : '16px')};
+`
+
+const CardHeader = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+`
+
+const CardTitle = styled.h3<{ $size?: 'sm' }>`
+  font-size: ${({ $size }) => ($size === 'sm' ? '0.9rem' : '1rem')};
+  font-weight: 700;
+  color: ${theme.colors.slate[100]};
+`
+
+const CardMeta = styled.div<{ $size?: 'sm' }>`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: ${({ $size }) => ($size === 'sm' ? '0.7rem' : '0.75rem')};
+  color: ${theme.colors.slate[400]};
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+`
+
+const DistanceNote = styled.span`
+  color: rgba(139, 92, 246, 0.7);
+`
+
+const IconAction = styled.button`
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(200, 148, 42, 0.1);
+  border: 1px solid rgba(200, 148, 42, 0.2);
+  color: ${theme.colors.gold};
+  transition: ${theme.transitions.fast};
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover {
+    background: rgba(200, 148, 42, 0.2);
+  }
+`
+
+const BadgeRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+`
+
+const StatusBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 600;
+
+  span {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    display: inline-block;
+  }
+`
+
+const ReadinessBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  color: ${theme.colors.slate[500]};
+
+  svg {
+    width: 10px;
+    height: 10px;
+  }
+`
+
+const Pill = styled.span`
+  font-size: 0.65rem;
+  color: ${theme.colors.slate[500]};
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 8px;
+  border-radius: 999px;
+`
+
+const PriceRow = styled.div<{ $compact?: boolean }>`
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: ${({ $compact }) => ($compact ? '10px' : '12px')};
+  gap: 12px;
+`
+
+const LabelSmall = styled.div`
+  font-size: 0.65rem;
+  color: ${theme.colors.slate[500]};
+`
+
+const PriceValue = styled.div<{ $size?: 'sm' }>`
+  font-size: ${({ $size }) => ($size === 'sm' ? '0.9rem' : '1.1rem')};
+  font-weight: 700;
+  color: ${theme.colors.gold};
+`
+
+const PriceNote = styled.div`
+  font-size: 0.6rem;
+  color: ${theme.colors.slate[500]};
+`
+
+const InlineRow = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    color: ${theme.colors.emerald};
+  }
+`
+
+const RoiValue = styled.span<{ $size?: 'sm' }>`
+  font-size: ${({ $size }) => ($size === 'sm' ? '0.8rem' : '0.95rem')};
+  font-weight: 700;
+  color: ${theme.colors.emerald};
+`
+
+const CardFooter = styled.div<{ $compact?: boolean }>`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: ${({ $compact }) => ($compact ? '8px' : '12px')};
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.65rem;
+`
+
+const SizeNote = styled.span`
+  color: ${theme.colors.slate[500]};
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+`
+
+const InlineLinks = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+`
+
+const FooterLink = styled(Link)<{ $variant?: 'gold' | 'blue' | 'purple' }>`
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: ${({ $variant }) => {
+    switch ($variant) {
+      case 'blue':
+        return theme.colors.blue
+      case 'purple':
+        return theme.colors.purple
+      default:
+        return theme.colors.gold
+    }
+  }};
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  &:hover {
+    text-decoration: underline;
+  }
+`
+
+const Separator = styled.span`
+  color: ${theme.colors.slate[700]};
+`
+
+const ReasonRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+`
+
+const ReasonTag = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: rgba(196, 181, 253, 1);
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  border-radius: ${theme.radii.md};
+`
+
+const CenteredBox = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px 0;
+
+  svg {
+    width: 40px;
+    height: 40px;
+    color: ${theme.colors.gold};
+  }
+`
+
+const LoadingText = styled.span`
+  font-size: 0.7rem;
+  color: ${theme.colors.slate[500]};
+`
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: 48px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+
+  svg {
+    width: 64px;
+    height: 64px;
+    color: ${theme.colors.slate[600]};
+  }
+`
+
+const EmptyTitle = styled.h2`
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: ${theme.colors.slate[300]};
+`
+
+const EmptyText = styled.p`
+  color: ${theme.colors.slate[500]};
+`
+
+const PrimaryLink = styled(Link)`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: ${theme.radii.xl};
+  background: ${theme.gradients.gold};
+  color: ${theme.colors.navy};
+  font-weight: 700;
+  transition: ${theme.transitions.fast};
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  &:hover {
+    box-shadow: 0 14px 26px rgba(200, 148, 42, 0.3);
+  }
+`

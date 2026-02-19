@@ -1,0 +1,172 @@
+export const theme = {
+  colors: {
+    primary: '#1A73E8',
+    primaryLight: '#E8F0FE',
+    primaryDark: '#1557B0',
+    text: '#1F2937',
+    textSecondary: '#6B7280',
+    textTertiary: '#9CA3AF',
+    bg: '#FFFFFF',
+    bgSecondary: '#F9FAFB',
+    bgTertiary: '#F3F4F6',
+    border: '#E5E7EB',
+    borderLight: '#F3F4F6',
+
+    // Brand
+    navy: '#0A1628',
+    gold: '#C8942A',
+    goldBright: '#E5B94E',
+
+    // Slate scale
+    slate: {
+      50: '#F8FAFC',
+      100: '#F1F5F9',
+      200: '#E2E8F0',
+      300: '#CBD5E1',
+      400: '#94A3B8',
+      500: '#64748B',
+      600: '#475569',
+      700: '#334155',
+      800: '#1E293B',
+      900: '#0F172A',
+    },
+
+    // Semantic scales
+    emerald: {
+      50: '#ECFDF5',
+      100: '#D1FAE5',
+      200: '#A7F3D0',
+      400: '#34D399',
+      500: '#10B981',
+      600: '#059669',
+      700: '#047857',
+    },
+    amber: {
+      50: '#FFFBEB',
+      100: '#FEF3C7',
+      200: '#FDE68A',
+      400: '#FBBF24',
+      500: '#F59E0B',
+      600: '#D97706',
+      700: '#B45309',
+    },
+    orange: {
+      50: '#FFF7ED',
+      100: '#FFEDD5',
+      400: '#FB923C',
+      500: '#F97316',
+      600: '#EA580C',
+    },
+    red: {
+      50: '#FEF2F2',
+      100: '#FEE2E2',
+      200: '#FECACA',
+      400: '#F87171',
+      500: '#EF4444',
+      600: '#DC2626',
+      700: '#B91C1C',
+    },
+    blue: {
+      50: '#EFF6FF',
+      100: '#DBEAFE',
+      400: '#60A5FA',
+      500: '#3B82F6',
+      600: '#2563EB',
+      700: '#1D4ED8',
+    },
+    purple: {
+      50: '#FAF5FF',
+      100: '#F3E8FF',
+      400: '#A78BFA',
+      500: '#8B5CF6',
+      600: '#7C3AED',
+      700: '#6D28D9',
+    },
+
+    // Status
+    status: {
+      available: '#16A34A',
+      sold: '#DC2626',
+      reserved: '#D97706',
+      planning: '#7C3AED',
+    },
+    success: '#16A34A',
+    warning: '#D97706',
+    danger: '#DC2626',
+    info: '#2563EB',
+    white: '#FFFFFF',
+    black: '#111827',
+  },
+  fonts: {
+    primary: "'Heebo', sans-serif",
+    mono: "'Courier New', monospace",
+  },
+  space: {
+    xs: '4px',
+    sm: '8px',
+    md: '16px',
+    lg: '24px',
+    xl: '32px',
+    xxl: '48px',
+  },
+  radii: {
+    sm: '6px',
+    md: '8px',
+    lg: '12px',
+    xl: '16px',
+    xxl: '20px',
+    full: '9999px',
+  },
+  glass: {
+    bg: 'rgba(10, 22, 40, 0.6)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    blur: 'blur(12px)',
+  },
+  shadows: {
+    sm: '0 1px 2px rgba(0,0,0,0.05)',
+    md: '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)',
+    lg: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)',
+    xl: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)',
+    card: '0 1px 3px rgba(0,0,0,0.08)',
+    elevated: '0 4px 12px rgba(0,0,0,0.12)',
+    popup: '0 10px 40px rgba(0,0,0,0.15)',
+    glass: '0 4px 30px rgba(0, 0, 0, 0.1)',
+  },
+  gradients: {
+    primary: 'linear-gradient(135deg, #1A73E8, #4A90D9)',
+    subtle: 'linear-gradient(180deg, #FFFFFF, #F9FAFB)',
+    gold: 'linear-gradient(135deg, #C8942A, #E5B94E)',
+  },
+  breakpoints: {
+    sm: '640px',
+    md: '768px',
+    lg: '1024px',
+    xl: '1280px',
+  },
+  transitions: {
+    fast: '0.15s ease',
+    normal: '0.2s ease',
+    smooth: '0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    spring: '0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+  },
+  zIndex: {
+    map: 1,
+    mapControls: 1000,
+    filterBar: 30,
+    sidebar: 50,
+    modal: 70,
+    toast: 80,
+    tooltip: 100,
+  },
+} as const
+
+export type Theme = typeof theme
+
+export const media = {
+  sm: `@media (min-width: ${theme.breakpoints.sm})`,
+  md: `@media (min-width: ${theme.breakpoints.md})`,
+  lg: `@media (min-width: ${theme.breakpoints.lg})`,
+  xl: `@media (min-width: ${theme.breakpoints.xl})`,
+  mobile: `@media (max-width: 639px)`,
+  tablet: `@media (max-width: 767px)`,
+} as const
