@@ -183,6 +183,14 @@ const MAP_LAYERS = [
     showLabels: false,
   },
   {
+    id: 'israel',
+    label: 'מפת ישראל',
+    emoji: '🇮🇱',
+    tiles: 'https://israelhiking.osm.org.il/Hebrew/Tiles/{z}/{x}/{y}.png',
+    attribution: '&copy; Israel Hiking Map, OpenStreetMap contributors',
+    showLabels: false,
+  },
+  {
     id: 'topo',
     label: 'טופוגרפי',
     emoji: '⛰️',

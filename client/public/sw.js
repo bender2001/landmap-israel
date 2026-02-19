@@ -12,6 +12,7 @@ const TILE_HOSTS = [
   'tile.openstreetmap.org',     // OSM
   'basemaps.cartocdn.com',      // CartoDB Dark/Light
   'server.arcgisonline.com',    // Esri Satellite/Topo
+  'israelhiking.osm.org.il',   // Israel Hiking Map (Hebrew labels)
   'mt0.google.com',             // Google Maps tiles (if used)
   'mt1.google.com',
   'tiles.stadiamaps.com',       // Stadia

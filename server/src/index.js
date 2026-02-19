@@ -57,6 +57,7 @@ app.use(helmet({
         "https://*.tile.openstreetmap.org",
         "https://*.tile.opentopomap.org",
         "https://*.basemaps.cartocdn.com",
+        "https://israelhiking.osm.org.il",
         "https://unpkg.com",
         // Street View / satellite imagery providers
         "https://*.google.com",
@@ -70,6 +71,7 @@ app.use(helmet({
         "https://*.tile.openstreetmap.org",
         "https://*.tile.opentopomap.org",
         "https://*.basemaps.cartocdn.com",
+        "https://israelhiking.osm.org.il",
         // Geocoding
         "https://nominatim.openstreetmap.org",
         // Google Fonts CSS
@@ -179,6 +181,11 @@ app.use('/api', (req, res, next) => {
   // NEL (Network Error Logging) hint — helps clients report network failures
   // back to the server for infrastructure monitoring. Supported by Chrome/Edge.
   res.set('NEL', '{"report_to":"default","max_age":86400,"include_subdomains":true}')
+  // X-Robots-Tag: prevent search engines from indexing raw API JSON responses.
+  // Without this, crawlers that ignore robots.txt Disallow: /api/ could index JSON
+  // payloads, polluting SERPs with raw data instead of the rich HTML plot pages.
+  // Defense-in-depth alongside robots.txt. Google recommends both for API endpoints.
+  res.set('X-Robots-Tag', 'noindex, nofollow')
   next()
 })
 
