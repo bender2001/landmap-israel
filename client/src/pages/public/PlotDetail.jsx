@@ -1,6 +1,6 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react'
-import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart, ExternalLink, Calculator as CalcIcon, FileText, Download, File, FileImage, FileSpreadsheet, Map as MapIcon, Flag } from 'lucide-react'
+import { ArrowRight, ArrowUp, MapPin, TrendingUp, Clock, Waves, TreePine, Hospital, CheckCircle2, DollarSign, Hourglass, Heart, Share2, MessageCircle, Printer, Copy, Check, GitCompareArrows, BarChart, ExternalLink, Calculator as CalcIcon, FileText, Download, File, FileImage, FileSpreadsheet, Map as MapIcon, Flag, Navigation } from 'lucide-react'
 import { usePlot, useNearbyPlots, useSimilarPlots } from '../../hooks/usePlots.js'
 import { useMarketOverview } from '../../hooks/useMarketOverview.js'
 import { useLastVisitPrice } from '../../hooks/useLastVisitPrice.js'
@@ -12,10 +12,10 @@ import PublicNav from '../../components/PublicNav.jsx'
 import PublicFooter from '../../components/PublicFooter.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../../utils/constants.js'
-import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcInvestmentVerdict, calcDaysOnMarket, calcInvestmentTimeline } from '../../utils/formatters.js'
+import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcInvestmentVerdict, calcDaysOnMarket, calcInvestmentTimeline, calcCommuteTimes, plotCenter } from '../../utils/formatters.js'
 import MiniMap from '../../components/ui/MiniMap.jsx'
 import Breadcrumb from '../../components/ui/Breadcrumb.jsx'
-import { plotInquiryLink, plotReportIssueLink } from '../../utils/config.js'
+import { plotInquiryLink, plotReportIssueLink, plotTelegramLink } from '../../utils/config.js'
 import ZoningProgressBar from '../../components/ui/ZoningProgressBar.jsx'
 import WidgetErrorBoundary from '../../components/ui/WidgetErrorBoundary.jsx'
 
@@ -2026,6 +2026,49 @@ export default function PlotDetail() {
                   </div>
                 )}
               </div>
+
+              {/* Commute Times — estimated driving time to major Israeli cities.
+                  Investors need to know how connected the land is to employment hubs (Tel Aviv,
+                  Jerusalem, Haifa). Madlan shows this prominently on property pages.
+                  Already computed by the sidebar — now also on the full-page detail for SEO-landed users. */}
+              {(() => {
+                const center = plotCenter(plot.coordinates)
+                if (!center) return null
+                const commutes = calcCommuteTimes(center.lat, center.lng)
+                if (!commutes || commutes.length === 0) return null
+                return (
+                  <div className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-500/15 flex items-center justify-center">
+                        <Navigation className="w-3.5 h-3.5 text-indigo-400" />
+                      </div>
+                      <h2 className="text-sm font-bold text-slate-200">זמני נסיעה משוערים</h2>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {commutes.slice(0, 6).map(c => (
+                        <a
+                          key={c.city}
+                          href={c.googleMapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2.5 bg-white/[0.02] border border-white/5 rounded-xl px-3 py-2.5 hover:border-indigo-500/20 hover:bg-indigo-500/5 transition-all group"
+                        >
+                          <span className="text-lg flex-shrink-0">{c.emoji}</span>
+                          <div className="min-w-0">
+                            <div className="text-xs font-medium text-slate-300 group-hover:text-slate-200 truncate">{c.city}</div>
+                            <div className="text-[10px] text-slate-500">
+                              ~{c.drivingMinutes} דק׳ · {c.distanceKm} ק״מ
+                            </div>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                    <p className="text-[9px] text-slate-600 mt-2">
+                      * הערכה על בסיס מרחק אווירי × 1.35. זמני נסיעה בפועל תלויים בתנועה ובנתיב.
+                    </p>
+                  </div>
+                )
+              })()}
             </div>
 
             {/* Right: Zoning pipeline + costs */}
@@ -2244,6 +2287,19 @@ export default function PlotDetail() {
                 aria-label="צור קשר ב-WhatsApp"
               >
                 <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              </a>
+              {/* Telegram inquiry — deep-link to bot with plot context.
+                  Telegram is popular among Israeli tech investors. Complements WhatsApp. */}
+              <a
+                href={plotTelegramLink(plot)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden sm:flex w-14 items-center justify-center bg-[#229ED9] rounded-2xl hover:bg-[#1A8BC7] transition-all shadow-lg shadow-[#229ED9]/20"
+                aria-label="צור קשר בטלגרם"
+              >
+                <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                </svg>
               </a>
               <button
                 onClick={() => toggleCompare(id)}

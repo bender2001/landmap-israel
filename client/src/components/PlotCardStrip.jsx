@@ -614,6 +614,18 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
               )
             })()}
             <MarketPositionDot percentile={pricePercentile} />
+            {/* Data completeness micro-indicator — shows a colored dot for data quality.
+                Investors can quickly spot which plots have the most complete/reliable data.
+                🟢 ≥70% = comprehensive, 🟡 40-69% = partial, 🔴 <40% = sparse.
+                Only shown when below 70% — good data doesn't need a warning. */}
+            {plot._dataCompleteness != null && plot._dataCompleteness < 70 && (
+              <span
+                className="text-[8px] text-slate-600"
+                title={`שלמות נתונים: ${plot._dataCompleteness}% — ${plot._dataCompleteness < 40 ? 'נתונים חלקיים' : 'נתונים סבירים'}`}
+              >
+                {plot._dataCompleteness < 40 ? '🔴' : '🟡'} נתונים {plot._dataCompleteness}%
+              </span>
+            )}
           </div>
           <div className="plot-card-mini-tags">
             <span className="plot-card-mini-roi" title={plot._netRoi != null ? `ברוטו +${roi}% · נטו +${plot._netRoi}% (אחרי מס, היטל השבחה, עלויות)` : `תשואה ברוטו`}>+{roi}%</span>
@@ -811,6 +823,32 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
     const avgRoi = Math.round(roiSum / plots.length)
     const totalProfit = totalProjected - totalValue
 
+    // Net portfolio return — THE number professional investors actually use.
+    // Shows the REAL aggregate return after all Israeli costs (purchase tax, attorney,
+    // holding, betterment levy, capital gains, agent). The gross "potential profit" above
+    // is misleading — a ₪2M gross profit might be only ₪800K net. Neither Madlan nor
+    // Yad2 surfaces net portfolio returns; they only show listing prices.
+    let totalNetProfit = 0
+    let netProfitCount = 0
+    for (const p of plots) {
+      if (p._netProfit != null) {
+        totalNetProfit += p._netProfit
+        netProfitCount++
+      }
+    }
+
+    // Average data completeness — shows overall data quality of the visible portfolio.
+    // Helps investors gauge how reliable the aggregate numbers are.
+    let totalCompleteness = 0
+    let completenessCount = 0
+    for (const p of plots) {
+      if (p._dataCompleteness != null) {
+        totalCompleteness += p._dataCompleteness
+        completenessCount++
+      }
+    }
+    const avgCompleteness = completenessCount > 0 ? Math.round(totalCompleteness / completenessCount) : null
+
     // Market temperature — a composite signal of market activity:
     // - High availability ratio (>80%) + fresh listings + high ROI = 🔥 Hot
     // - Moderate = 🟡 Warm
@@ -828,7 +866,7 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
       marketTemp = { emoji: '❄️', label: 'שקט', color: 'text-blue-400', bg: 'bg-blue-400/10 border-blue-400/20' }
     }
 
-    return { available: available.length, totalValue, totalProjected, totalProfit, avgRoi, totalArea, marketTemp, freshCount }
+    return { available: available.length, totalValue, totalProjected, totalProfit, avgRoi, totalArea, marketTemp, freshCount, totalNetProfit: netProfitCount > 0 ? totalNetProfit : null, avgCompleteness }
   }, [plots])
 
   // Recently viewed tracking is now handled by the shared useRecentlyViewed store.
@@ -907,6 +945,35 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
               <div className="plot-strip-stat" title={`שווי נוכחי: ₪${stats.totalValue.toLocaleString()} → צפי: ₪${stats.totalProjected.toLocaleString()}`}>
                 <span className="text-emerald-400">💎</span>
                 <span>רווח פוטנציאלי ₪{formatPriceShort(stats.totalProfit)}</span>
+              </div>
+            </>
+          )}
+          {/* Net Portfolio Return — the REAL aggregate profit after all Israeli costs.
+              Like Bloomberg's portfolio P&L — shows what investors actually take home.
+              Neither Madlan nor Yad2 surfaces net returns at the portfolio level. */}
+          {stats.totalNetProfit != null && (
+            <>
+              <div className="plot-strip-stat-divider" />
+              <div className="plot-strip-stat" title={`רווח נטו: ₪${stats.totalNetProfit.toLocaleString()} (אחרי מס רכישה, היטל השבחה, מס שבח, עלויות אחזקה, שכ״ט)`}>
+                <span className={stats.totalNetProfit > 0 ? 'text-emerald-400' : 'text-red-400'}>💵</span>
+                <span className={stats.totalNetProfit > 0 ? 'text-emerald-400' : 'text-red-400'}>
+                  נטו {formatPriceShort(Math.abs(stats.totalNetProfit))}
+                </span>
+              </div>
+            </>
+          )}
+          {/* Data Quality indicator — average data completeness across visible plots.
+              Helps investors gauge how reliable the aggregate numbers are.
+              Higher completeness = more trustworthy data = more confident decisions. */}
+          {stats.avgCompleteness != null && (
+            <>
+              <div className="plot-strip-stat-divider" />
+              <div
+                className="plot-strip-stat"
+                title={`איכות נתונים ממוצעת: ${stats.avgCompleteness}% — חלקות עם נתונים מלאים יותר נותנות תמונה מהימנה יותר`}
+              >
+                <span>{stats.avgCompleteness >= 70 ? '🟢' : stats.avgCompleteness >= 40 ? '🟡' : '🔴'}</span>
+                <span className="text-slate-400">נתונים {stats.avgCompleteness}%</span>
               </div>
             </>
           )}

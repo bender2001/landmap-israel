@@ -189,7 +189,7 @@ export default function MapView() {
     // pre-computed _pricePerSqm, _monthlyPayment, _daysOnMarket fields, enabling
     // these sorts without redundant client-side computation.
     // Pass sorts to server — 'default' means no sort param, server applies smart discovery relevance.
-    if (['price-asc', 'price-desc', 'size-asc', 'size-desc', 'updated-desc', 'score-desc', 'roi-desc', 'roi-asc', 'cagr-desc', 'newest-first', 'ppsqm-asc', 'ppsqm-desc', 'monthly-asc', 'deal-desc', 'net-roi-desc', 'relevance'].includes(sortBy)) {
+    if (['price-asc', 'price-desc', 'size-asc', 'size-desc', 'updated-desc', 'score-desc', 'roi-desc', 'roi-asc', 'cagr-desc', 'newest-first', 'ppsqm-asc', 'ppsqm-desc', 'monthly-asc', 'deal-desc', 'net-roi-desc', 'relevance', 'completeness-desc'].includes(sortBy)) {
       f.sort = sortBy
     }
     return f
@@ -404,6 +404,31 @@ export default function MapView() {
         const aNet = a._netRoi ?? (a._roi ?? 0)
         const bNet = b._netRoi ?? (b._roi ?? 0)
         return bNet - aNet || tieBreak(a, b)
+      }); break
+      // "Favorites first" — puts favorited plots at the top, then sorts by investment score.
+      // Like Spotify's "Liked Songs" sort — brings the user's saved items to the front.
+      // Uses client-side favorites (localStorage-backed) since favorites aren't server-side.
+      // Non-favorites are sorted by investment score so the best opportunities surface next.
+      case 'favorites-first': {
+        const favSet = favorites?.ids ? new Set(favorites.ids) : new Set()
+        sorted.sort((a, b) => {
+          const aFav = favSet.has(a.id) ? 1 : 0
+          const bFav = favSet.has(b.id) ? 1 : 0
+          if (aFav !== bFav) return bFav - aFav // favorites first
+          // Within same group, sort by investment score
+          const aScore = a._investmentScore ?? 0
+          const bScore = b._investmentScore ?? 0
+          return bScore - aScore || tieBreak(a, b)
+        })
+        break
+      }
+      // "Data completeness" — prioritizes plots with the most complete data.
+      // Investors can filter by data quality to find the most trustworthy listings.
+      // Uses server-computed _dataCompleteness (0-100) from enrichPlotsWithScores().
+      case 'completeness-desc': sorted.sort((a, b) => {
+        const aComp = a._dataCompleteness ?? 0
+        const bComp = b._dataCompleteness ?? 0
+        return bComp - aComp || tieBreak(a, b)
       }); break
       // "Best deal first" — ranks plots by how far below the area average price/sqm they are.
       // A plot 20% below average scores higher than one 5% below. Investors love this:

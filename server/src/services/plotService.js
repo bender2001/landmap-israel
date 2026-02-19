@@ -484,6 +484,39 @@ async function enrichPlotsWithScores(plots) {
       p._paybackYears = null
     }
 
+    // ── Data Completeness Score ─────────────────────────────────────────
+    // Scores 0-100 based on how many key fields are populated for this plot.
+    // Investors need to know which plots have the most reliable, complete data
+    // before committing capital. Like a "data quality" rating — plots with
+    // images, documents, area context, nearby dev info, and committee data
+    // are more trustworthy than bare-bones listings with just price and size.
+    // Neither Madlan nor Yad2 surfaces data quality — another differentiator.
+    {
+      let completeness = 0
+      const checks = [
+        [!!p.coordinates && Array.isArray(p.coordinates) && p.coordinates.length >= 3, 15], // polygon shape
+        [price > 0, 10],                                                       // has price
+        [projected > 0, 5],                                                    // has projected value
+        [size > 0, 5],                                                         // has size
+        [!!p.zoning_stage && p.zoning_stage !== 'AGRICULTURAL', 5],            // zoning beyond default
+        [!!p.readiness_estimate, 5],                                           // has readiness
+        [!!p.description && p.description.length > 20, 8],                     // meaningful description
+        [!!p.area_context, 8],                                                 // area context info
+        [!!p.nearby_development, 7],                                           // nearby development info
+        [!!p.distance_to_sea || !!p.distance_to_park || !!p.distance_to_hospital, 5], // proximity data
+        [!!p.density_units_per_dunam, 5],                                      // density info
+        [!!p.tax_authority_value, 5],                                          // official valuation
+        [!!p.standard_22 || !!p.standard22, 3],                                // standard22 info
+        [!!p.plot_images && p.plot_images.length > 0, 8],                      // has images
+        [!!p.plot_images && p.plot_images.length >= 3, 3],                     // multiple images (bonus)
+        [!!p.committee_status, 3],                                             // committee data
+      ]
+      for (const [cond, weight] of checks) {
+        if (cond) completeness += weight
+      }
+      p._dataCompleteness = Math.min(100, completeness) // 0-100
+    }
+
     // ── Buy Signal ──────────────────────────────────────────────────────
     // Bloomberg-style composite signal: BUY / HOLD / WATCH based on multiple factors.
     // Combines: deal discount, risk level, net ROI, market trend, and investment score.
@@ -915,6 +948,11 @@ async function _getPublishedPlotsImpl(filters = {}) {
         return aDiscount - bDiscount || tieBreak(a, b)
       })
     }
+  } else if (filters.sort === 'completeness-desc' && data) {
+    // Data completeness sort: prioritize plots with the most complete data.
+    // Uses pre-computed _dataCompleteness (0-100) from enrichPlotsWithScores().
+    // Helps investors find the most trustworthy listings first.
+    data.sort((a, b) => (b._dataCompleteness || 0) - (a._dataCompleteness || 0) || tieBreak(a, b))
   } else if (filters.sort === 'relevance' && data) {
     // Explicit relevance sort — same algorithm as the smart default but user-requested.
     const now = Date.now()

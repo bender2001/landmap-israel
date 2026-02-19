@@ -58,6 +58,17 @@ export function plotReportIssueLink(plot) {
 }
 
 /**
+ * Build a Telegram bot deep link for a specific plot inquiry.
+ * Opens the LandMap bot with a pre-filled /start parameter containing plot identification.
+ * The bot can parse the start param to show the plot details immediately.
+ * Complements WhatsApp inquiry — Telegram is popular among Israeli tech investors.
+ */
+export function plotTelegramLink(plot) {
+  const blockNum = plot.block_number ?? plot.blockNumber
+  return `https://t.me/LandMapIsraelBot?start=plot_${plot.id}_gush${blockNum}_parcel${plot.number}`
+}
+
+/**
  * Native Web Share API — uses the system share sheet on supported platforms (mobile).
  * Like Madlan/Yad2/Airbnb: one button → opens native share with WhatsApp, Telegram,
  * Messages, etc. Falls back gracefully when not supported.

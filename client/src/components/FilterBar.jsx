@@ -117,6 +117,8 @@ const sortOptions = [
   { label: '🔥 עסקה הכי טובה', value: 'deal-desc', icon: ArrowDown },
   { label: '🕐 חדשות ראשונות', value: 'newest-first', icon: ArrowDown },
   { label: 'הכי קרוב אליי 📍', value: 'distance-asc', icon: Navigation },
+  { label: '❤️ מועדפים ראשונים', value: 'favorites-first', icon: ArrowDown },
+  { label: '📊 שלמות נתונים', value: 'completeness-desc', icon: ArrowDown },
   { label: 'מחיר: נמוך לגבוה', value: 'price-asc', icon: ArrowUp },
   { label: 'מחיר: גבוה לנמוך', value: 'price-desc', icon: ArrowDown },
   { label: 'מחיר/מ״ר: נמוך לגבוה', value: 'ppsqm-asc', icon: ArrowUp },
