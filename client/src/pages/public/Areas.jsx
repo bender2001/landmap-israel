@@ -8,6 +8,7 @@ import PublicNav from '../../components/PublicNav.jsx'
 import PublicFooter from '../../components/PublicFooter.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import BackToTopButton from '../../components/ui/BackToTopButton.jsx'
+import Breadcrumb from '../../components/ui/Breadcrumb.jsx'
 import { formatCurrency, formatDunam } from '../../utils/formatters.js'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants.js'
 
@@ -641,6 +642,13 @@ export default function Areas() {
       <AreasJsonLd overview={overview} cities={cities} />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <Breadcrumb
+          items={[
+            { label: 'מפה', to: '/' },
+            { label: 'סקירת אזורים' },
+          ]}
+          className="mb-6"
+        />
         {/* Hero */}
         <div className="text-center mb-10">
           <h1 className="text-3xl sm:text-4xl font-black text-slate-100 mb-3">

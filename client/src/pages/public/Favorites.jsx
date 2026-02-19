@@ -9,6 +9,7 @@ import { useMetaTags } from '../../hooks/useMetaTags'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
 import BackToTopButton from '../../components/ui/BackToTopButton'
+import Breadcrumb from '../../components/ui/Breadcrumb'
 
 const sortOptions = [
   { value: 'added', label: 'סדר הוספה', icon: ArrowUpDown },
@@ -367,6 +368,13 @@ export default function Favorites() {
 
       <div className="pt-28 pb-16 px-4">
         <div className="max-w-5xl mx-auto">
+          <Breadcrumb
+            items={[
+              { label: 'מפה', to: '/' },
+              { label: 'מועדפים' },
+            ]}
+            className="mb-4"
+          />
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
               <Heart className="w-6 h-6 text-red-400" />

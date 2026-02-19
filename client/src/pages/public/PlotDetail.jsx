@@ -13,6 +13,7 @@ import Spinner from '../../components/ui/Spinner.jsx'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../../utils/constants.js'
 import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcInvestmentVerdict, calcDaysOnMarket, calcInvestmentTimeline } from '../../utils/formatters.js'
 import MiniMap from '../../components/ui/MiniMap.jsx'
+import Breadcrumb from '../../components/ui/Breadcrumb.jsx'
 import { plotInquiryLink } from '../../utils/config.js'
 import ZoningProgressBar from '../../components/ui/ZoningProgressBar.jsx'
 import WidgetErrorBoundary from '../../components/ui/WidgetErrorBoundary.jsx'
@@ -971,7 +972,6 @@ export default function PlotDetail() {
       <StickyPlotInfoBar plot={plot} computed={computed} />
       <SectionNav />
       <JsonLdSchema plot={plot} />
-      <BreadcrumbSchema plot={plot} />
       <PlotFaqSchema plot={plot} />
 
       {/* Background grid */}
@@ -986,28 +986,15 @@ export default function PlotDetail() {
       <div className="relative z-10 pt-20 pb-28">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
 
-          {/* Breadcrumb — semantic <ol> for SEO & a11y, history.back() to preserve filter state */}
-          <nav aria-label="ניווט" className="mb-6">
-            <ol className="flex items-center gap-2 text-xs text-slate-500 list-none p-0 m-0">
-              <li className="flex items-center gap-2">
-                <button
-                  onClick={() => window.history.length > 2 ? navigate(-1) : navigate('/')}
-                  className="hover:text-gold transition-colors flex items-center gap-1"
-                >
-                  <ArrowRight className="w-3 h-3" />
-                  מפת קרקעות
-                </button>
-                <span aria-hidden="true">/</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Link to={`/?city=${plot.city}`} className="hover:text-gold transition-colors">{plot.city}</Link>
-                <span aria-hidden="true">/</span>
-              </li>
-              <li aria-current="page">
-                <span className="text-slate-300">גוש {blockNumber} חלקה {plot.number}</span>
-              </li>
-            </ol>
-          </nav>
+          {/* Breadcrumb — reusable component with JSON-LD structured data for Google rich results */}
+          <Breadcrumb
+            items={[
+              { label: 'מפה', to: '/' },
+              { label: plot.city, to: `/?city=${encodeURIComponent(plot.city)}` },
+              { label: `גוש ${blockNumber} חלקה ${plot.number}` },
+            ]}
+            className="mb-6"
+          />
 
           {/* Hero header */}
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-8">

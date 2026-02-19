@@ -9,6 +9,7 @@ import PublicNav from '../../components/PublicNav.jsx'
 import PublicFooter from '../../components/PublicFooter.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import BackToTopButton from '../../components/ui/BackToTopButton.jsx'
+import Breadcrumb from '../../components/ui/Breadcrumb.jsx'
 import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, getScoreLabel, calcCAGR } from '../../utils/formatters.js'
 import { statusColors, statusLabels, zoningLabels } from '../../utils/constants.js'
 
@@ -629,22 +630,14 @@ export default function AreaCity() {
       />
 
       <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pt-20 pb-16">
-        {/* Breadcrumb */}
-        <nav aria-label="ניווט" className="mb-6">
-          <ol className="flex items-center gap-2 text-xs text-slate-500 list-none p-0 m-0">
-            <li className="flex items-center gap-2">
-              <Link to="/" className="hover:text-gold transition-colors">מפת קרקעות</Link>
-              <span aria-hidden="true">/</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <Link to="/areas" className="hover:text-gold transition-colors">סקירת אזורים</Link>
-              <span aria-hidden="true">/</span>
-            </li>
-            <li aria-current="page">
-              <span className="text-slate-300">{decodedCity}</span>
-            </li>
-          </ol>
-        </nav>
+        <Breadcrumb
+          items={[
+            { label: 'מפה', to: '/' },
+            { label: 'סקירת אזורים', to: '/areas' },
+            { label: decodedCity },
+          ]}
+          className="mb-6"
+        />
 
         {/* Hero */}
         <div className="mb-8">

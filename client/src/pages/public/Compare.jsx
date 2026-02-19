@@ -9,6 +9,7 @@ import { useMetaTags } from '../../hooks/useMetaTags'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
 import BackToTopButton from '../../components/ui/BackToTopButton'
+import Breadcrumb from '../../components/ui/Breadcrumb'
 import Spinner from '../../components/ui/Spinner'
 
 /**
@@ -481,6 +482,13 @@ export default function Compare() {
 
       <div className="pt-28 pb-16 px-4">
         <div className="max-w-5xl mx-auto">
+          <Breadcrumb
+            items={[
+              { label: 'מפה', to: '/' },
+              { label: 'השוואת חלקות' },
+            ]}
+            className="mb-4"
+          />
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 rounded-2xl bg-gold/10 border border-gold/20 flex items-center justify-center">
               <BarChart3 className="w-6 h-6 text-gold" />

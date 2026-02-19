@@ -4262,3 +4262,389 @@ select:focus-visible {
   outline: 2px solid rgba(200, 148, 42, 0.7);
   outline-offset: 1px;
 }
+
+/* ═══════════════════════════════════════════
+   PRINT STYLES — Professional Investment Reports
+   ═══════════════════════════════════════════
+   When investors press Ctrl+P on any page, the output should look like a
+   professional property report — clean, readable, and branded.
+   Madlan/Yad2 have clean print views; LandMap needs the same.
+   
+   Key principles:
+   - White background, dark text (saves ink, readable)
+   - Hide all interactive/navigation UI
+   - Expand collapsed sections so all data is visible
+   - Proper page break handling
+   - Show URLs for links (useful when printed)
+   - Branded header/footer
+   ═══════════════════════════════════════════ */
+@media print {
+  /* ── Reset to printable colors ── */
+  *,
+  *::before,
+  *::after {
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html, body {
+    background: white !important;
+    color: #1a1a2e !important;
+    font-size: 11pt !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: auto !important;
+  }
+
+  #root {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* ── Hide interactive/nav elements ── */
+  /* Navigation, floating buttons, map controls, chat, bottom bars */
+  nav.fixed,
+  .nav-mobile-menu,
+  .nav-hamburger,
+  .nav-desktop-links + div, /* backdrop */
+  .leaflet-control-zoom,
+  .leaflet-control-layers,
+  .leaflet-control-attribution,
+  [class*="MobileBottomNav"],
+  [class*="MobilePlotActionBar"],
+  [class*="ConnectionStatus"],
+  [class*="OfflineBanner"],
+  [class*="MarketTicker"],
+  [class*="MarketPulse"],
+  [class*="MarketVelocity"],
+  [class*="WelcomeBack"],
+  [class*="FilterSuggestions"],
+  [class*="CompareBar"],
+  [class*="FirstVisitHints"],
+  [class*="FeaturedDeals"],
+  [class*="PriceMovers"],
+  [class*="AIChat"],
+  [class*="AlertSubscription"],
+  [class*="RecentlyViewed"],
+  [class*="CookieConsent"],
+  [class*="InstallPrompt"],
+  [class*="DealAlerts"],
+  [class*="DataFreshness"],
+  [class*="KeyboardShortcuts"],
+  [class*="LeadModal"],
+  [class*="WhatsNew"],
+  [class*="BackToTop"],
+  [aria-label="WhatsApp"],
+  [aria-label="צור קשר ב-WhatsApp"],
+  [aria-label="צור קשר בטלגרם"],
+  [aria-label="צור קשר לפרטים"],
+  [aria-label="הצג קיצורי מקלדת"],
+  [data-print-hide],
+  button[aria-label="סגור"],
+  .skip-to-content,
+  .fixed.bottom-0, /* bottom bars */
+  .sm\\:hidden, /* mobile-only elements */
+  .animate-bounce-in, /* notification popups */
+  [role="dialog"], /* modals */
+  .sr-only /* screen reader text */ {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* ── Layout adjustments ── */
+  .fixed {
+    position: static !important;
+  }
+
+  /* Main content should flow naturally */
+  .min-h-screen,
+  .h-screen {
+    min-height: auto !important;
+    height: auto !important;
+  }
+
+  .overflow-hidden,
+  .overflow-x-auto,
+  .overflow-y-auto {
+    overflow: visible !important;
+  }
+
+  /* Remove dark backgrounds */
+  .bg-navy,
+  .bg-navy-light,
+  [class*="bg-navy"] {
+    background: white !important;
+  }
+
+  /* Glass panels → light cards with borders */
+  .glass-panel {
+    background: #fafbfc !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* ── Typography for print ── */
+  .text-slate-100,
+  .text-slate-200,
+  .text-slate-300,
+  .text-white,
+  .brand-text {
+    color: #1a1a2e !important;
+    -webkit-text-fill-color: #1a1a2e !important;
+    background: none !important;
+  }
+
+  .text-slate-400,
+  .text-slate-500 {
+    color: #64748b !important;
+  }
+
+  .text-slate-600 {
+    color: #94a3b8 !important;
+  }
+
+  .text-gold,
+  [class*="text-gold"] {
+    color: #92700E !important;
+    -webkit-text-fill-color: #92700E !important;
+    background: none !important;
+  }
+
+  .text-emerald-400,
+  [class*="text-emerald"] {
+    color: #059669 !important;
+  }
+
+  .text-blue-400,
+  [class*="text-blue"] {
+    color: #2563EB !important;
+  }
+
+  .text-red-400,
+  [class*="text-red"] {
+    color: #DC2626 !important;
+  }
+
+  .text-orange-400,
+  [class*="text-orange"] {
+    color: #D97706 !important;
+  }
+
+  .text-purple-400,
+  [class*="text-purple"] {
+    color: #7C3AED !important;
+  }
+
+  /* Gradient text → solid for readability */
+  .bg-gradient-to-r.bg-clip-text {
+    -webkit-text-fill-color: #92700E !important;
+    background: none !important;
+  }
+
+  /* ── Cards and containers ── */
+  .border-white\/5,
+  .border-white\/10,
+  [class*="border-white"] {
+    border-color: #e2e8f0 !important;
+  }
+
+  .bg-white\/5,
+  .bg-white\/\[0\.02\],
+  .bg-white\/\[0\.03\],
+  [class*="bg-white/"] {
+    background: #f8fafc !important;
+  }
+
+  /* Gold-tinted backgrounds → light yellow */
+  .bg-gold\/10,
+  .bg-gold\/15,
+  [class*="bg-gold/"] {
+    background: #FFFBEB !important;
+  }
+
+  /* Status color backgrounds → lighter versions for print */
+  [class*="bg-emerald-500/"] {
+    background: #ECFDF5 !important;
+  }
+
+  [class*="bg-blue-500/"] {
+    background: #EFF6FF !important;
+  }
+
+  [class*="bg-red-500/"] {
+    background: #FEF2F2 !important;
+  }
+
+  /* ── Shadows & effects → none ── */
+  .shadow-lg,
+  .shadow-xl,
+  .shadow-2xl,
+  [class*="shadow-"] {
+    box-shadow: none !important;
+  }
+
+  .backdrop-blur-md,
+  .backdrop-blur-xl,
+  [class*="backdrop-blur"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* ── Expand collapsed sections ── */
+  /* CollapsibleSection children should be visible when printing */
+  [style*="max-height: 0px"] {
+    max-height: none !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+  }
+
+  /* ── Map → show but constrain height ── */
+  .leaflet-container {
+    height: 250px !important;
+    max-height: 250px !important;
+    page-break-inside: avoid !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+  }
+
+  /* MiniMap: reasonable print size */
+  [class*="MiniMap"] .leaflet-container {
+    height: 200px !important;
+  }
+
+  /* ── Page breaks ── */
+  .glass-panel,
+  .plot-similar-grid > * {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  h1, h2, h3 {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* Section anchors: avoid orphan headers */
+  [id^="section-"] {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* ── Scrollable areas → show all ── */
+  .scrollbar-none,
+  .scrollbar-hide,
+  [class*="scrollbar-"] {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* PlotCardStrip: show as grid instead of horizontal scroll */
+  .plot-card-strip {
+    overflow: visible !important;
+    flex-wrap: wrap !important;
+  }
+
+  .plot-card-mini {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* ── Links: show URLs after text ── */
+  a[href^="http"]:not([aria-label])::after {
+    content: " (" attr(href) ")";
+    font-size: 8pt;
+    color: #94a3b8;
+    word-break: break-all;
+  }
+
+  /* Don't show URLs for navigation links */
+  nav a::after,
+  .breadcrumb-nav a::after {
+    content: none !important;
+  }
+
+  /* ── Animations → off ── */
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* ── Branded footer on print ── */
+  @page {
+    margin: 1.5cm 2cm;
+    size: A4;
+  }
+
+  /* ── Comparison table: ensure borders print ── */
+  table {
+    border-collapse: collapse !important;
+  }
+
+  table th,
+  table td {
+    border: 1px solid #e2e8f0 !important;
+    padding: 6px 10px !important;
+  }
+
+  table th {
+    background: #f1f5f9 !important;
+    font-weight: 600 !important;
+  }
+
+  /* ── Radar/chart SVGs: ensure visibility ── */
+  svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  svg text {
+    fill: #334155 !important;
+  }
+
+  svg polyline,
+  svg line,
+  svg rect {
+    stroke: #64748b !important;
+  }
+
+  /* ── PublicNav: hide completely, PublicFooter: show compact ── */
+  nav[class*="fixed"] {
+    display: none !important;
+  }
+
+  /* ── Reading progress bar + sticky info bar: hide ── */
+  [class*="ReadingProgress"],
+  [class*="StickyPlotInfo"],
+  [class*="SectionNav"] {
+    display: none !important;
+  }
+
+  /* ── Page title for print context ── */
+  body::before {
+    content: "LandMap Israel — מפת קרקעות להשקעה";
+    display: block;
+    text-align: center;
+    font-size: 9pt;
+    color: #94a3b8;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 8px;
+    margin-bottom: 16px;
+  }
+
+  /* ── Filter bar: show current filters as text, not interactive ── */
+  .filter-bar-container {
+    border: 1px solid #e2e8f0 !important;
+    background: #f8fafc !important;
+    page-break-inside: avoid !important;
+  }
+
+  .filter-bar-container input,
+  .filter-bar-container select {
+    border: 1px solid #cbd5e1 !important;
+    background: white !important;
+    color: #1e293b !important;
+  }
+}
