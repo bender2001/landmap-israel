@@ -324,6 +324,10 @@ function SimilarPlots({ currentPlot, allPlots, onSelectPlot }) {
             {showDistance && p.distance_km != null && (
               <span className="text-blue-400">· {p.distance_km < 1 ? `${Math.round(p.distance_km * 1000)}מ׳` : `${p.distance_km} ק״מ`}</span>
             )}
+            {/* Show distance from similar plots endpoint (geographic proximity factor) */}
+            {!showDistance && p._distanceKm != null && (
+              <span className="text-blue-400/70">· {p._distanceKm < 1 ? `${Math.round(p._distanceKm * 1000)}מ׳` : `${p._distanceKm} ק״מ`}</span>
+            )}
           </div>
           {showReasons && p._matchReasons && p._matchReasons.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">

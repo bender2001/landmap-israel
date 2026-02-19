@@ -25,17 +25,61 @@ export default function SearchAutocomplete({ value, onChange, plots = [], onSele
     if (!value || value.length < 1) return []
     const q = value.toLowerCase()
     const results = []
-    for (let i = 0; i < plots.length; i++) {
-      if (results.length >= MAX_SUGGESTIONS) break // early termination — skip remaining plots
-      const p = plots[i]
-      const bn = (p.block_number ?? p.blockNumber ?? '').toString()
-      const num = (p.number ?? '').toString()
-      const city = (p.city ?? '').toLowerCase()
-      const desc = (p.description ?? '').toLowerCase()
-      if (bn.includes(q) || num.includes(q) || city.includes(q) || desc.includes(q)) {
-        results.push(p)
+
+    // Detect structured gush/parcel patterns for precise matching:
+    //   "7842/15" → exact block + parcel match
+    //   "גוש 7842" → exact block match
+    //   "חלקה 15" → exact parcel match
+    // This gives investors instant results when searching by the land registry numbers
+    // they already know — much faster than generic text matching.
+    const slashMatch = q.match(/^(\d{3,6})\s*\/\s*(\d{1,5})$/)
+    const gushMatch = q.match(/גוש\s*(\d{3,6})/)
+    const parcelMatch = q.match(/(?:חלקה|חל['׳])\s*(\d{1,5})/)
+
+    if (slashMatch || (gushMatch && parcelMatch)) {
+      // Structured search: match block_number and/or number exactly
+      const targetBlock = slashMatch ? slashMatch[1] : (gushMatch ? gushMatch[1] : null)
+      const targetParcel = slashMatch ? slashMatch[2] : (parcelMatch ? parcelMatch[1] : null)
+      for (let i = 0; i < plots.length; i++) {
+        if (results.length >= MAX_SUGGESTIONS) break
+        const p = plots[i]
+        const bn = (p.block_number ?? p.blockNumber ?? '').toString()
+        const num = (p.number ?? '').toString()
+        const blockMatch = !targetBlock || bn === targetBlock
+        const parcelMatchOk = !targetParcel || num === targetParcel
+        if (blockMatch && parcelMatchOk) results.push(p)
+      }
+    } else if (gushMatch) {
+      // Block number only
+      const targetBlock = gushMatch[1]
+      for (let i = 0; i < plots.length; i++) {
+        if (results.length >= MAX_SUGGESTIONS) break
+        const bn = (plots[i].block_number ?? plots[i].blockNumber ?? '').toString()
+        if (bn === targetBlock) results.push(plots[i])
+      }
+    } else if (parcelMatch) {
+      // Parcel number only
+      const targetParcel = parcelMatch[1]
+      for (let i = 0; i < plots.length; i++) {
+        if (results.length >= MAX_SUGGESTIONS) break
+        const num = (plots[i].number ?? '').toString()
+        if (num === targetParcel) results.push(plots[i])
+      }
+    } else {
+      // Generic text search (existing behavior)
+      for (let i = 0; i < plots.length; i++) {
+        if (results.length >= MAX_SUGGESTIONS) break
+        const p = plots[i]
+        const bn = (p.block_number ?? p.blockNumber ?? '').toString()
+        const num = (p.number ?? '').toString()
+        const city = (p.city ?? '').toLowerCase()
+        const desc = (p.description ?? '').toLowerCase()
+        if (bn.includes(q) || num.includes(q) || city.includes(q) || desc.includes(q)) {
+          results.push(p)
+        }
       }
     }
+
     return results
   }, [value, plots])
 

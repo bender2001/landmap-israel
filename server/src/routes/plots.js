@@ -497,9 +497,11 @@ router.get('/:id/nearby-pois', sanitizePlotId, computeHeavyLimiter, requestAbort
   }
 })
 
-// GET /api/plots/:id/similar - Find plots with similar investment characteristics
-// Unlike /nearby (geography), this matches by zoning stage, price range, size, and ROI.
-// Ideal for "חלקות דומות" — investors want similar *opportunities*, not just nearby land.
+// GET /api/plots/:id/similar - Find plots with similar investment characteristics.
+// Unlike /nearby (geography only), this matches by zoning stage, price range, size, ROI,
+// AND geographic proximity. Investors want similar *opportunities* — and nearby similar
+// plots are more relevant for comparison than distant ones with the same price.
+// Like Madlan's "נכסים דומים" but with multi-factor scoring.
 router.get('/:id/similar', sanitizePlotId, computeHeavyLimiter, requestAbortSignal, async (req, res, next) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 4, 10)
@@ -521,6 +523,9 @@ router.get('/:id/similar', sanitizePlotId, computeHeavyLimiter, requestAbortSign
     const zoning = plot.zoning_stage || 'AGRICULTURAL'
     const projValue = plot.projected_value || 0
     const plotRoi = price > 0 ? ((projValue - price) / price) * 100 : 0
+
+    // Compute centroid of the source plot for geographic proximity scoring
+    const plotCentroid = calcCentroid(plot.coordinates)
 
     // Zoning pipeline order for proximity matching
     const ZONING_ORDER = [
@@ -562,17 +567,36 @@ router.get('/:id/similar', sanitizePlotId, computeHeavyLimiter, requestAbortSign
         // Same city bonus (1 pt) — investors often focus on specific areas
         const cityBonus = p.city === plot.city ? 1 : 0
 
-        const totalScore = priceScore + sizeScore + zoningScore + roiScore + cityBonus
+        // Geographic proximity bonus (0-2 pts) — nearby similar plots are more useful
+        // for comparison than distant ones. Uses haversine distance with a decay curve:
+        //   <3km → 2pts, <10km → 1pt, <20km → 0.5pt, >20km → 0pts
+        // This nudges the algorithm to prefer nearby matches when similarity is equal,
+        // giving investors the most actionable comparisons for their area of interest.
+        let geoScore = 0
+        let distanceKm = null
+        if (plotCentroid) {
+          const pCentroid = calcCentroid(p.coordinates)
+          if (pCentroid) {
+            distanceKm = haversineKm(plotCentroid.lat, plotCentroid.lng, pCentroid.lat, pCentroid.lng)
+            if (distanceKm <= 3) geoScore = 2
+            else if (distanceKm <= 10) geoScore = 1
+            else if (distanceKm <= 20) geoScore = 0.5
+          }
+        }
+
+        const totalScore = priceScore + sizeScore + zoningScore + roiScore + cityBonus + geoScore
 
         return {
           ...p,
           _similarityScore: Math.round(totalScore * 100) / 100,
+          _distanceKm: distanceKm !== null ? Math.round(distanceKm * 10) / 10 : null,
           _matchReasons: [
             zoningDist <= 1 && 'שלב תכנוני דומה',
             priceDiff < 0.3 && 'טווח מחיר דומה',
             sizeDiff < 0.4 && 'שטח דומה',
             roiDiff < 0.3 && 'תשואה דומה',
             p.city === plot.city && 'אותה עיר',
+            distanceKm !== null && distanceKm <= 5 && 'קרוב גיאוגרפית',
           ].filter(Boolean),
         }
       })

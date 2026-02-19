@@ -312,17 +312,71 @@ export async function getPublishedPlots(filters = {}) {
     }
   }
 
-  // Server-side text search — searches block_number, number, city, description
+  // Server-side text search — searches block_number, number, city, description.
+  // Enhanced: detects structured gush/parcel patterns that investors commonly use:
+  //   "7842/15" → block=7842, parcel=15
+  //   "גוש 7842 חלקה 15" → block=7842, parcel=15
+  //   "גוש 7842" → block=7842
+  //   "חלקה 15" → parcel=15
+  // Falls back to generic ilike search for free-text queries.
   if (filters.q && filters.q.trim()) {
-    // Sanitize: escape special PostgREST/SQL chars to prevent injection
-    const q = filters.q.trim()
-      .replace(/[%_\\]/g, c => `\\${c}`)  // escape SQL wildcards
-      .replace(/[,()]/g, '')               // strip PostgREST operators
-      .slice(0, 100)                       // limit length
-    if (q.length > 0) {
-      query = query.or(
-        `block_number.ilike.%${q}%,number.ilike.%${q}%,city.ilike.%${q}%,description.ilike.%${q}%`
-      )
+    const rawQ = filters.q.trim().slice(0, 100)
+    let searchApplied = false
+
+    // Pattern 1: "7842/15" or "7842 / 15" — slash-separated gush/parcel
+    const slashMatch = rawQ.match(/^(\d{3,6})\s*\/\s*(\d{1,5})$/)
+    if (slashMatch) {
+      query = query.eq('block_number', slashMatch[1]).eq('number', slashMatch[2])
+      searchApplied = true
+    }
+
+    // Pattern 2: "גוש 7842 חלקה 15" — Hebrew gush + parcel
+    if (!searchApplied) {
+      const hebrewFullMatch = rawQ.match(/גוש\s*(\d{3,6})\s*(?:חלקה|חל['׳])\s*(\d{1,5})/)
+      if (hebrewFullMatch) {
+        query = query.eq('block_number', hebrewFullMatch[1]).eq('number', hebrewFullMatch[2])
+        searchApplied = true
+      }
+    }
+
+    // Pattern 3: "גוש 7842" — Hebrew gush only
+    if (!searchApplied) {
+      const gushOnlyMatch = rawQ.match(/גוש\s*(\d{3,6})$/)
+      if (gushOnlyMatch) {
+        query = query.eq('block_number', gushOnlyMatch[1])
+        searchApplied = true
+      }
+    }
+
+    // Pattern 4: "חלקה 15" — Hebrew parcel only
+    if (!searchApplied) {
+      const parcelOnlyMatch = rawQ.match(/(?:חלקה|חל['׳])\s*(\d{1,5})$/)
+      if (parcelOnlyMatch) {
+        query = query.eq('number', parcelOnlyMatch[1])
+        searchApplied = true
+      }
+    }
+
+    // Pattern 5: "block 7842 parcel 15" — English gush/parcel (for API users)
+    if (!searchApplied) {
+      const engMatch = rawQ.match(/block\s*(\d{3,6})\s*(?:parcel|plot)\s*(\d{1,5})/i)
+      if (engMatch) {
+        query = query.eq('block_number', engMatch[1]).eq('number', engMatch[2])
+        searchApplied = true
+      }
+    }
+
+    // Fallback: generic ilike search across all text fields
+    if (!searchApplied) {
+      // Sanitize: escape special PostgREST/SQL chars to prevent injection
+      const q = rawQ
+        .replace(/[%_\\]/g, c => `\\${c}`)  // escape SQL wildcards
+        .replace(/[,()]/g, '')               // strip PostgREST operators
+      if (q.length > 0) {
+        query = query.or(
+          `block_number.ilike.%${q}%,number.ilike.%${q}%,city.ilike.%${q}%,description.ilike.%${q}%`
+        )
+      }
     }
   }
 
@@ -670,8 +724,8 @@ export async function deletePlot(id) {
  */
 export async function getPlotsByIds(ids) {
   if (!ids || ids.length === 0) return []
-  // Limit to 10 to prevent abuse
-  const safeIds = ids.slice(0, 10)
+  // Limit to 30 to match route validation (routes/plots.js allows up to 30)
+  const safeIds = ids.slice(0, 30)
 
   const { data, error } = await supabaseAdmin
     .from('plots')
