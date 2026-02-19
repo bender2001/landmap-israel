@@ -8,6 +8,7 @@ import { useFavorites } from '../../hooks/useFavorites.js'
 import { useViewTracker } from '../../hooks/useViewTracker.js'
 import { useLocalStorage } from '../../hooks/useLocalStorage.js'
 import PublicNav from '../../components/PublicNav.jsx'
+import PublicFooter from '../../components/PublicFooter.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../../utils/constants.js'
 import { formatCurrency, formatDunam, formatPriceShort, calcInvestmentScore, getScoreLabel, formatRelativeTime, getFreshnessColor, calcCAGR, calcInvestmentVerdict, calcDaysOnMarket, calcInvestmentTimeline } from '../../utils/formatters.js'
@@ -364,7 +365,11 @@ function SectionNav() {
   return (
     <div
       className="fixed top-[4.25rem] left-0 right-0 z-[54] transition-all duration-300"
-      style={{ opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(-8px)' }}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(-8px)',
+        willChange: 'transform, opacity', // GPU compositing — prevents repaint jank during scroll-driven visibility
+      }}
     >
       <div className="bg-navy/85 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
@@ -426,6 +431,7 @@ function StickyPlotInfoBar({ plot, computed }) {
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(-100%)',
         pointerEvents: visible ? 'auto' : 'none',
+        willChange: 'transform, opacity', // GPU compositing hint — avoids jank on scroll-driven show/hide
       }}
       dir="rtl"
     >
@@ -525,41 +531,50 @@ function MortgageCalcSection({ totalPrice }) {
   const totalInterest = totalPayment - loanAmount
 
   return (
-    <div className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+    <div className="bg-navy-light/40 border border-white/5 rounded-2xl p-5" role="group" aria-labelledby="mortgage-calc-heading">
       <div className="flex items-center gap-2 mb-4">
         <DollarSign className="w-4 h-4 text-gold" />
-        <h2 className="text-base font-bold text-slate-100">מחשבון מימון</h2>
+        <h2 id="mortgage-calc-heading" className="text-base font-bold text-slate-100">מחשבון מימון</h2>
       </div>
       <div className="space-y-4">
         <div>
           <div className="flex justify-between text-xs text-slate-400 mb-1">
-            <span>הון עצמי</span>
+            <label htmlFor="mortgage-equity">הון עצמי</label>
             <span className="text-gold font-medium">{equity}% ({formatCurrency(Math.round(totalPrice * equity / 100))})</span>
           </div>
-          <input type="range" min="20" max="100" step="5" value={equity}
+          <input type="range" id="mortgage-equity" min="20" max="100" step="5" value={equity}
             onChange={(e) => setEquity(Number(e.target.value))}
+            aria-label="אחוז הון עצמי"
+            aria-valuemin={20} aria-valuemax={100} aria-valuenow={equity}
+            aria-valuetext={`${equity}% הון עצמי, ${formatCurrency(Math.round(totalPrice * equity / 100))}`}
             className="w-full h-1.5 rounded-full appearance-none bg-white/10 accent-gold cursor-pointer" />
         </div>
         <div>
           <div className="flex justify-between text-xs text-slate-400 mb-1">
-            <span>תקופה</span>
+            <label htmlFor="mortgage-years">תקופה</label>
             <span className="text-slate-300 font-medium">{years} שנים</span>
           </div>
-          <input type="range" min="5" max="30" step="1" value={years}
+          <input type="range" id="mortgage-years" min="5" max="30" step="1" value={years}
             onChange={(e) => setYears(Number(e.target.value))}
+            aria-label="תקופת הלוואה בשנים"
+            aria-valuemin={5} aria-valuemax={30} aria-valuenow={years}
+            aria-valuetext={`${years} שנים`}
             className="w-full h-1.5 rounded-full appearance-none bg-white/10 accent-gold cursor-pointer" />
         </div>
         <div>
           <div className="flex justify-between text-xs text-slate-400 mb-1">
-            <span>ריבית</span>
+            <label htmlFor="mortgage-rate">ריבית</label>
             <span className="text-slate-300 font-medium">{rate}%</span>
           </div>
-          <input type="range" min="2" max="8" step="0.25" value={rate}
+          <input type="range" id="mortgage-rate" min="2" max="8" step="0.25" value={rate}
             onChange={(e) => setRate(Number(e.target.value))}
+            aria-label="אחוז ריבית שנתי"
+            aria-valuemin={2} aria-valuemax={8} aria-valuenow={rate}
+            aria-valuetext={`ריבית ${rate} אחוז`}
             className="w-full h-1.5 rounded-full appearance-none bg-white/10 accent-gold cursor-pointer" />
         </div>
         {equity < 100 && (
-          <div className="grid grid-cols-3 gap-3 pt-3 border-t border-white/5">
+          <div className="grid grid-cols-3 gap-3 pt-3 border-t border-white/5" role="status" aria-live="polite" aria-atomic="true">
             <div className="text-center">
               <div className="text-xs text-slate-500">החזר חודשי</div>
               <div className="text-sm font-bold text-gold">{formatCurrency(monthlyPayment)}</div>
@@ -2006,6 +2021,13 @@ export default function PlotDetail() {
           </div>
         </div>
       </div>
+
+      {/* Public footer — legal links, contact info, brand.
+          Previously missing on PlotDetail, the longest page on the site.
+          Every Madlan/Yad2 property page has a footer with Terms/Privacy links.
+          Critical for legal compliance and UX completeness — users who scroll
+          the entire page need clear navigation back to important pages. */}
+      <PublicFooter />
 
       {/* Floating navigation: Back-to-Map + Scroll-to-top.
           Back-to-Map preserves the map viewport position via URL hash (#map=zoom/lat/lng).
