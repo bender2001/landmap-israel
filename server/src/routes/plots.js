@@ -231,8 +231,8 @@ router.get('/batch', async (req, res, next) => {
     if (ids.length === 0) {
       return res.status(400).json({ error: 'רשימת IDs ריקה', errorCode: 'EMPTY_IDS' })
     }
-    if (ids.length > 10) {
-      return res.status(400).json({ error: 'עד 10 חלקות בבקשה אחת', errorCode: 'TOO_MANY_IDS' })
+    if (ids.length > 30) {
+      return res.status(400).json({ error: 'עד 30 חלקות בבקשה אחת', errorCode: 'TOO_MANY_IDS' })
     }
     // Validate UUID format to prevent injection
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

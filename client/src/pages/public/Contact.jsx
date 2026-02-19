@@ -267,60 +267,77 @@ export default function Contact() {
 
                     {/* Name */}
                     <div>
-                      <label className="text-xs text-slate-400 mb-1.5 block">שם מלא</label>
+                      <label htmlFor="contact-name" className="text-xs text-slate-400 mb-1.5 block">שם מלא</label>
                       <div className="relative">
                         <User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         <input
+                          id="contact-name"
                           type="text"
+                          autoComplete="name"
+                          aria-required="true"
+                          aria-invalid={!!errors.name}
+                          aria-describedby={errors.name ? 'contact-name-error' : undefined}
                           placeholder="הכנס שם מלא"
                           value={formData.name}
                           onChange={(e) => handleChange('name', e.target.value)}
                           className="w-full pr-10 pl-4 py-3 bg-navy-light/60 border border-white/10 rounded-xl text-slate-200 placeholder-slate-500 focus:border-gold/50 focus:outline-none transition"
                         />
                       </div>
-                      {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
+                      {errors.name && <p id="contact-name-error" role="alert" className="text-red-400 text-xs mt-1">{errors.name}</p>}
                     </div>
 
                     {/* Phone */}
                     <div>
-                      <label className="text-xs text-slate-400 mb-1.5 block">טלפון</label>
+                      <label htmlFor="contact-phone" className="text-xs text-slate-400 mb-1.5 block">טלפון</label>
                       <div className="relative">
                         <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         <input
+                          id="contact-phone"
                           type="tel"
                           dir="ltr"
+                          autoComplete="tel"
+                          aria-required="true"
+                          aria-invalid={!!errors.phone}
+                          aria-describedby={errors.phone ? 'contact-phone-error' : undefined}
                           placeholder="050-0000000"
                           value={formData.phone}
                           onChange={(e) => handleChange('phone', e.target.value)}
                           className="w-full pr-10 pl-4 py-3 bg-navy-light/60 border border-white/10 rounded-xl text-slate-200 text-right placeholder-slate-500 focus:border-gold/50 focus:outline-none transition"
                         />
                       </div>
-                      {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone}</p>}
+                      {errors.phone && <p id="contact-phone-error" role="alert" className="text-red-400 text-xs mt-1">{errors.phone}</p>}
                     </div>
 
                     {/* Email */}
                     <div>
-                      <label className="text-xs text-slate-400 mb-1.5 block">אימייל</label>
+                      <label htmlFor="contact-email" className="text-xs text-slate-400 mb-1.5 block">אימייל</label>
                       <div className="relative">
                         <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         <input
+                          id="contact-email"
                           type="email"
                           dir="ltr"
+                          autoComplete="email"
+                          aria-required="true"
+                          aria-invalid={!!errors.email}
+                          aria-describedby={errors.email ? 'contact-email-error' : undefined}
                           placeholder="email@example.com"
                           value={formData.email}
                           onChange={(e) => handleChange('email', e.target.value)}
                           className="w-full pr-10 pl-4 py-3 bg-navy-light/60 border border-white/10 rounded-xl text-slate-200 text-right placeholder-slate-500 focus:border-gold/50 focus:outline-none transition"
                         />
                       </div>
-                      {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
+                      {errors.email && <p id="contact-email-error" role="alert" className="text-red-400 text-xs mt-1">{errors.email}</p>}
                     </div>
 
                     {/* Message */}
                     <div>
-                      <label className="text-xs text-slate-400 mb-1.5 block">הודעה (אופציונלי)</label>
+                      <label htmlFor="contact-message" className="text-xs text-slate-400 mb-1.5 block">הודעה (אופציונלי)</label>
                       <div className="relative">
                         <MessageSquare className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
                         <textarea
+                          id="contact-message"
+                          autoComplete="off"
                           placeholder="ספרו לנו על הצרכים שלכם..."
                           rows={4}
                           value={formData.message}

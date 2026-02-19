@@ -188,27 +188,37 @@ export default function LeadModal({ isOpen, onClose, plot }) {
 
               {/* Name */}
               <div className="mb-4">
-                <label className="text-xs text-slate-400 mb-1.5 block">שם מלא</label>
+                <label htmlFor="lead-name" className="text-xs text-slate-400 mb-1.5 block">שם מלא</label>
                 <div className="relative flex items-center">
                   <User className="absolute right-3 w-4 h-4 text-slate-400 pointer-events-none" />
                   <input
+                    id="lead-name"
                     type="text"
+                    autoComplete="name"
+                    aria-required="true"
+                    aria-invalid={!!errors.name}
+                    aria-describedby={errors.name ? 'lead-name-error' : undefined}
                     placeholder="הכנס שם מלא"
                     value={formData.name}
                     onChange={(e) => handleChange('name', e.target.value)}
                     className="w-full pr-10 pl-4 py-3 bg-navy-light/60 border border-white/10 rounded-xl text-slate-200 placeholder-slate-500 focus:border-gold/50 focus:outline-none transition"
                   />
                 </div>
-                {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
+                {errors.name && <p id="lead-name-error" role="alert" className="text-red-400 text-xs mt-1">{errors.name}</p>}
               </div>
 
               {/* Phone */}
               <div className="mb-4">
-                <label className="text-xs text-slate-400 mb-1.5 block">טלפון</label>
+                <label htmlFor="lead-phone" className="text-xs text-slate-400 mb-1.5 block">טלפון</label>
                 <div className="relative flex items-center">
                   <Phone className="absolute right-3 w-4 h-4 text-slate-400 pointer-events-none" />
                   <input
+                    id="lead-phone"
                     type="tel"
+                    autoComplete="tel"
+                    aria-required="true"
+                    aria-invalid={!!errors.phone}
+                    aria-describedby={errors.phone ? 'lead-phone-error' : undefined}
                     placeholder="050-0000000"
                     dir="ltr"
                     value={formData.phone}
@@ -216,16 +226,21 @@ export default function LeadModal({ isOpen, onClose, plot }) {
                     className="w-full pr-10 pl-4 py-3 bg-navy-light/60 border border-white/10 rounded-xl text-slate-200 text-right placeholder-slate-500 focus:border-gold/50 focus:outline-none transition"
                   />
                 </div>
-                {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone}</p>}
+                {errors.phone && <p id="lead-phone-error" role="alert" className="text-red-400 text-xs mt-1">{errors.phone}</p>}
               </div>
 
               {/* Email */}
               <div className="mb-4">
-                <label className="text-xs text-slate-400 mb-1.5 block">אימייל</label>
+                <label htmlFor="lead-email" className="text-xs text-slate-400 mb-1.5 block">אימייל</label>
                 <div className="relative flex items-center">
                   <Mail className="absolute right-3 w-4 h-4 text-slate-400 pointer-events-none" />
                   <input
+                    id="lead-email"
                     type="email"
+                    autoComplete="email"
+                    aria-required="true"
+                    aria-invalid={!!errors.email}
+                    aria-describedby={errors.email ? 'lead-email-error' : undefined}
                     placeholder="email@example.com"
                     dir="ltr"
                     value={formData.email}
@@ -233,7 +248,7 @@ export default function LeadModal({ isOpen, onClose, plot }) {
                     className="w-full pr-10 pl-4 py-3 bg-navy-light/60 border border-white/10 rounded-xl text-slate-200 text-right placeholder-slate-500 focus:border-gold/50 focus:outline-none transition"
                   />
                 </div>
-                {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
+                {errors.email && <p id="lead-email-error" role="alert" className="text-red-400 text-xs mt-1">{errors.email}</p>}
               </div>
 
               {/* Submit */}
