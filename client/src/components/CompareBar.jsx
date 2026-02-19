@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart3, X, ArrowLeft, Share2, Check, ChevronUp, ChevronDown, TrendingUp, Ruler, Clock, DollarSign, Award } from 'lucide-react'
 import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
 import { formatPriceShort, calcInvestmentScore, getInvestmentGrade, calcCAGR, calcMonthlyPayment, formatMonthlyPayment } from '../utils/formatters'
+import { showToast } from './ui/ToastContainer'
 
 /**
  * Inline quick comparison grid — shows key investment metrics side-by-side
@@ -243,8 +244,11 @@ export default function CompareBar({ compareIds, plots, onRemove, onClear }) {
                 const url = `${window.location.origin}/compare?plots=${compareIds.join(',')}`
                 navigator.clipboard.writeText(url).then(() => {
                   setLinkCopied(true)
+                  showToast('🔗 קישור ההשוואה הועתק — שלח למשקיע אחר', 'success')
                   setTimeout(() => setLinkCopied(false), 2000)
-                }).catch(() => {})
+                }).catch(() => {
+                  showToast('לא הצלחנו להעתיק את הקישור', 'error')
+                })
               }}
               className="flex items-center gap-1 text-xs text-slate-400 hover:text-gold transition px-2 py-1 rounded-lg hover:bg-white/5"
               title="העתק קישור להשוואה"

@@ -144,6 +144,20 @@ export function ToastProvider({ children }) {
     }, (options.duration || (type === 'error' ? 6000 : 4000)) + 500) // +500ms buffer for exit animation
   }, [])
 
+  // Global toast event bridge — allows any component (including those outside the
+  // React context tree) to trigger toasts via custom events. Pattern:
+  //   window.dispatchEvent(new CustomEvent('landmap:toast', { detail: { message, type, options } }))
+  // Used by FilterBar, CompareBar, and SidebarDetails for clipboard copy feedback.
+  // Like Google's global notification bus — decoupled from the component hierarchy.
+  useEffect(() => {
+    const handler = (e) => {
+      const { message, type, options } = e.detail || {}
+      if (message) addToast(message, type, options)
+    }
+    window.addEventListener('landmap:toast', handler)
+    return () => window.removeEventListener('landmap:toast', handler)
+  }, [addToast])
+
   const removeToast = useCallback((id) => {
     setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
@@ -169,4 +183,23 @@ export function useToast() {
   const ctx = useContext(ToastContext)
   if (!ctx) throw new Error('useToast must be used within ToastProvider')
   return ctx
+}
+
+/**
+ * Global toast utility — fires a toast from anywhere without React context.
+ * Uses a CustomEvent bridge to the ToastProvider listener.
+ * 
+ * Usage:
+ *   import { showToast } from './ui/ToastContainer'
+ *   showToast('הקישור הועתק!', 'success')
+ *   showToast('שגיאה', 'error', { duration: 6000 })
+ * 
+ * Prefer useToast() inside React components for type-safe access.
+ * Use showToast() for utility functions, event handlers outside React, or
+ * components that don't want to add a useToast() dependency.
+ */
+export function showToast(message, type = 'success', options = {}) {
+  window.dispatchEvent(new CustomEvent('landmap:toast', {
+    detail: { message, type, options },
+  }))
 }

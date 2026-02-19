@@ -4,6 +4,7 @@ import { statusColors, statusLabels, zoningLabels } from '../utils/constants'
 import SearchAutocomplete from './SearchAutocomplete'
 import SavedSearches from './SavedSearches'
 import { useHapticFeedback } from '../hooks/useHapticFeedback'
+import { showToast } from './ui/ToastContainer'
 
 /**
  * AnimatedCount — smooth counting animation when the number changes.
@@ -412,8 +413,11 @@ export default function FilterBar({
     navigator.clipboard.writeText(window.location.href).then(() => {
       haptic.success()
       setLinkCopied(true)
+      showToast('🔗 הקישור הועתק — שתף אותו עם משקיעים אחרים', 'success')
       setTimeout(() => setLinkCopied(false), 2000)
-    }).catch(() => {})
+    }).catch(() => {
+      showToast('לא הצלחנו להעתיק את הקישור', 'error')
+    })
   }
 
   // Dynamic city options with plot counts — auto-discovers new cities from data (like Madlan)

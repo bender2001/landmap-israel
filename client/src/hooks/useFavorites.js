@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react'
+import { showToast } from '../components/ui/ToastContainer'
 
 /**
  * Cross-component synchronized favorites using useSyncExternalStore.
@@ -76,10 +77,19 @@ export function useFavorites() {
 
   const toggle = useCallback((plotId) => {
     const prev = getSnapshot()
-    const next = prev.includes(plotId)
+    const wasInFavorites = prev.includes(plotId)
+    const next = wasInFavorites
       ? prev.filter((id) => id !== plotId)
       : [...prev, plotId]
     setFavorites(next)
+    // Toast feedback — like Madlan's "נשמר במועדפים" / "הוסר מהמועדפים" confirmation.
+    // Users need immediate visual confirmation that their action registered,
+    // especially on mobile where the heart icon might be small and hard to see.
+    showToast(
+      wasInFavorites ? '💔 הוסר מהמועדפים' : '❤️ נוסף למועדפים',
+      wasInFavorites ? 'info' : 'success',
+      { duration: 2000 }
+    )
   }, [])
 
   const isFavorite = useCallback(

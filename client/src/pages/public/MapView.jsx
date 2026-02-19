@@ -20,6 +20,7 @@ import { usePriceTracker } from '../../hooks/usePriceTracker.js'
 import { useSavedSearches } from '../../hooks/useSavedSearches.js'
 import { Phone } from 'lucide-react'
 import { whatsappLink, CONTACT, plotOgImageUrl, trackContactConversion } from '../../utils/config.js'
+import { showToast } from '../../components/ui/ToastContainer.jsx'
 import { useRealtimeUpdates } from '../../hooks/useRealtimeUpdates.js'
 import IdleRender from '../../components/ui/IdleRender.jsx'
 import OfflineBanner from '../../components/ui/OfflineBanner.jsx'
@@ -218,9 +219,19 @@ export default function MapView() {
   // Compare state (localStorage-backed via useLocalStorage, cross-tab sync)
   const [compareIds, setCompareIds] = useLocalStorage('landmap_compare', [])
   const toggleCompare = useCallback((plotId) => {
-    setCompareIds((prev) =>
-      prev.includes(plotId) ? prev.filter((id) => id !== plotId) : prev.length < 3 ? [...prev, plotId] : prev
-    )
+    setCompareIds((prev) => {
+      const wasInCompare = prev.includes(plotId)
+      if (wasInCompare) {
+        showToast('📊 הוסר מההשוואה', 'info', { duration: 2000 })
+        return prev.filter((id) => id !== plotId)
+      }
+      if (prev.length >= 3) {
+        showToast('⚠️ ניתן להשוות עד 3 חלקות', 'warning', { duration: 3000 })
+        return prev
+      }
+      showToast('📊 נוסף להשוואה — בחר חלקות נוספות', 'success', { duration: 2000 })
+      return [...prev, plotId]
+    })
   }, [])
   const removeFromCompare = useCallback((plotId) => {
     setCompareIds((prev) => prev.filter((id) => id !== plotId))
