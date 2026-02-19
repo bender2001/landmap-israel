@@ -7,6 +7,12 @@ import { marketCache } from '../services/cacheService.js'
 import { auth } from '../middleware/auth.js'
 import { adminOnly } from '../middleware/adminOnly.js'
 
+// ─── Auto-snapshot tracking ────────────────────────────────────────────
+// Ensures a daily price snapshot is taken automatically on the first request
+// that hits trends/overview each day, without relying on manual admin triggers.
+// Investors need real historical data — synthetic trends are misleading.
+let lastAutoSnapshotDate = null
+
 // ─── Dedicated rate limiter for data-heavy endpoints ───────────────────
 // Price history and city history endpoints return large datasets and hit the DB.
 // Without a tighter limiter, a scraper could enumerate all plots and download
@@ -40,6 +46,16 @@ const router = Router()
 router.get('/overview', async (req, res, next) => {
   try {
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
+
+    // Auto-trigger daily snapshot (non-blocking, same as /trends)
+    const today = new Date().toISOString().slice(0, 10)
+    if (lastAutoSnapshotDate !== today) {
+      lastAutoSnapshotDate = today
+      takeDailySnapshot().catch(err => {
+        console.warn('[market/overview] auto-snapshot failed:', err.message)
+        lastAutoSnapshotDate = null
+      })
+    }
 
     // Wrap in marketCache — this is an expensive aggregation query that doesn't change often.
     // Without caching, every Areas page load / market widget triggers a full Supabase scan.
@@ -221,84 +237,165 @@ router.get('/compare', async (req, res, next) => {
 
 /**
  * GET /api/market/trends
- * Monthly price trend data per city (based on plot created_at / updated_at timestamps).
- * Provides data for sparklines and trend charts on the frontend.
- * If not enough real history, generates synthetic trend points from current data.
+ * Monthly price trend data per city — uses REAL price_snapshots when available.
+ * Falls back to synthetic projection only for months with no snapshot data.
+ * Auto-triggers a daily snapshot to continuously build historical data.
+ *
+ * This is a critical data integrity improvement: investors make decisions based on
+ * price trends. Showing synthetic data is misleading — Madlan/Yad2 use real transaction
+ * data. We now use real snapshots, clearly marking any synthetic fill-ins.
  */
 router.get('/trends', async (req, res, next) => {
   try {
     res.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=1200')
 
-    const { data: plots, error } = await supabaseAdmin
-      .from('plots')
-      .select('city, total_price, size_sqm, created_at, updated_at')
-      .eq('is_published', true)
-
-    if (error) throw error
-    if (!plots || plots.length === 0) {
-      return res.json({ months: [], cities: {} })
-    }
-
-    // Generate 12 months of trend data
-    const now = new Date()
-    const months = []
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      months.push({
-        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-        label: d.toLocaleDateString('he-IL', { month: 'short', year: '2-digit' }),
+    // Auto-trigger daily snapshot (non-blocking, fire-and-forget)
+    // This ensures price history accumulates passively without admin intervention.
+    const today = new Date().toISOString().slice(0, 10)
+    if (lastAutoSnapshotDate !== today) {
+      lastAutoSnapshotDate = today
+      takeDailySnapshot().catch(err => {
+        console.warn('[market/trends] auto-snapshot failed:', err.message)
+        lastAutoSnapshotDate = null // retry next request
       })
     }
 
-    // Group plots by city and compute current avg price/sqm
-    const cityData = {}
-    for (const p of plots) {
-      const city = p.city || 'אחר'
-      const size = p.size_sqm || 1
-      const priceSqm = size > 0 ? p.total_price / size : 0
-      if (priceSqm <= 0) continue
-      if (!cityData[city]) cityData[city] = { prices: [], count: 0 }
-      cityData[city].prices.push(priceSqm)
-      cityData[city].count += 1
-    }
+    const trends = await marketCache.wrap('market-trends-v2', async () => {
+      // 1. Get current published plots for baseline data
+      const { data: plots, error } = await supabaseAdmin
+        .from('plots')
+        .select('id, city, total_price, size_sqm, created_at, updated_at')
+        .eq('is_published', true)
 
-    // Build trend: slight synthetic variation around the average for visual insight
-    // In production this would use actual historical snapshots
-    const cities = {}
-    for (const [city, data] of Object.entries(cityData)) {
-      const avg = data.prices.reduce((s, v) => s + v, 0) / data.prices.length
-      const trend = months.map((m, i) => {
-        // Simulate gentle upward trend (~0.3-0.8% monthly growth, with noise)
-        const monthsAgo = 11 - i
-        const growthFactor = 1 - (monthsAgo * 0.005) // ~0.5% per month back
-        const noise = 1 + (Math.sin(i * 2.1 + city.charCodeAt(0)) * 0.02) // ±2% noise
-        return {
-          month: m.key,
-          label: m.label,
-          avgPriceSqm: Math.round(avg * growthFactor * noise),
-        }
-      })
-
-      const first = trend[0].avgPriceSqm
-      const last = trend[trend.length - 1].avgPriceSqm
-      const changePercent = first > 0 ? Math.round(((last - first) / first) * 100) : 0
-
-      cities[city] = {
-        count: data.count,
-        currentAvg: Math.round(avg),
-        trend,
-        change12m: changePercent,
+      if (error) throw error
+      if (!plots || plots.length === 0) {
+        return { months: [], cities: {}, dataSource: 'empty' }
       }
-    }
 
-    const trends = {
-      months: months.map(m => m.key),
-      monthLabels: months.map(m => m.label),
-      cities,
-    }
+      // 2. Generate 12 months of date keys
+      const now = new Date()
+      const months = []
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        months.push({
+          key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+          label: d.toLocaleDateString('he-IL', { month: 'short', year: '2-digit' }),
+        })
+      }
 
-    // ETag support — trends data is ~3-8KB and used by sparklines, trend charts, and
-    // area comparison widgets. Rarely changes intraday, so 304 saves significant bandwidth.
+      // 3. Try to load real snapshot data (last 365 days)
+      const sinceDate = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().slice(0, 10)
+      let snapshots = []
+      let hasRealData = false
+      try {
+        const { data: snaps, error: snapError } = await supabaseAdmin
+          .from('price_snapshots')
+          .select('plot_id, total_price, price_per_sqm, snapshot_date')
+          .gte('snapshot_date', sinceDate)
+          .order('snapshot_date', { ascending: true })
+
+        if (!snapError && snaps && snaps.length > 0) {
+          snapshots = snaps
+          hasRealData = true
+        }
+      } catch {
+        // Table may not exist yet — continue with synthetic fallback
+      }
+
+      // 4. Build city map from current plots
+      const plotCityMap = new Map()
+      for (const p of plots) {
+        plotCityMap.set(p.id, p.city || 'אחר')
+      }
+
+      // 5. Aggregate snapshot data by city + month
+      const realDataByCity = {}
+      if (hasRealData) {
+        for (const snap of snapshots) {
+          const city = plotCityMap.get(snap.plot_id)
+          if (!city) continue
+          const monthKey = snap.snapshot_date.slice(0, 7) // "YYYY-MM"
+          if (!realDataByCity[city]) realDataByCity[city] = {}
+          if (!realDataByCity[city][monthKey]) {
+            realDataByCity[city][monthKey] = { totalPsm: 0, count: 0 }
+          }
+          const psm = snap.price_per_sqm || (snap.total_price > 0 ? snap.total_price / 1 : 0)
+          if (psm > 0) {
+            realDataByCity[city][monthKey].totalPsm += psm
+            realDataByCity[city][monthKey].count += 1
+          }
+        }
+      }
+
+      // 6. Build per-city trends using real data with synthetic fill for gaps
+      const cityData = {}
+      for (const p of plots) {
+        const city = p.city || 'אחר'
+        const size = p.size_sqm || 1
+        const priceSqm = size > 0 ? p.total_price / size : 0
+        if (priceSqm <= 0) continue
+        if (!cityData[city]) cityData[city] = { prices: [], count: 0 }
+        cityData[city].prices.push(priceSqm)
+        cityData[city].count += 1
+      }
+
+      const cities = {}
+      for (const [city, data] of Object.entries(cityData)) {
+        const currentAvg = data.prices.reduce((s, v) => s + v, 0) / data.prices.length
+        const citySnapData = realDataByCity[city] || {}
+
+        // Count how many months have real data
+        const realMonthCount = months.filter(m => citySnapData[m.key]?.count > 0).length
+
+        const trend = months.map((m, i) => {
+          const real = citySnapData[m.key]
+          if (real && real.count > 0) {
+            // Use REAL average from snapshots
+            return {
+              month: m.key,
+              label: m.label,
+              avgPriceSqm: Math.round(real.totalPsm / real.count),
+              samples: real.count,
+              source: 'snapshot',
+            }
+          }
+          // Synthetic fallback — gentle backward projection from current average
+          // Clearly marked as 'estimated' so the frontend can distinguish
+          const monthsAgo = 11 - i
+          const growthFactor = 1 - (monthsAgo * 0.005)
+          const noise = 1 + (Math.sin(i * 2.1 + city.charCodeAt(0)) * 0.015)
+          return {
+            month: m.key,
+            label: m.label,
+            avgPriceSqm: Math.round(currentAvg * growthFactor * noise),
+            samples: 0,
+            source: 'estimated',
+          }
+        })
+
+        const first = trend[0].avgPriceSqm
+        const last = trend[trend.length - 1].avgPriceSqm
+        const changePercent = first > 0 ? Math.round(((last - first) / first) * 100) : 0
+
+        cities[city] = {
+          count: data.count,
+          currentAvg: Math.round(currentAvg),
+          trend,
+          change12m: changePercent,
+          realMonths: realMonthCount,
+          dataQuality: realMonthCount >= 6 ? 'high' : realMonthCount >= 2 ? 'medium' : 'low',
+        }
+      }
+
+      return {
+        months: months.map(m => m.key),
+        monthLabels: months.map(m => m.label),
+        cities,
+        dataSource: hasRealData ? 'snapshots' : 'synthetic',
+        snapshotCount: snapshots.length,
+      }
+    }, 600_000) // 10 min TTL
+
     const etag = generateETag(trends)
     res.set('ETag', etag)
     if (req.headers['if-none-match'] === etag) {
@@ -430,6 +527,170 @@ router.get('/price-changes', async (req, res, next) => {
     }
 
     res.json(changes)
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
+ * GET /api/market/momentum
+ * Price momentum analysis — week-over-week and month-over-month price velocity per city.
+ * This is a key differentiator vs Madlan/Yad2: serious investors want to see the *rate*
+ * of price change, not just the current level. Is the market accelerating or decelerating?
+ *
+ * Returns per-city:
+ *   - wow: week-over-week % change in avg price/sqm
+ *   - mom: month-over-month % change
+ *   - trend: 'accelerating' | 'steady' | 'decelerating' | 'insufficient_data'
+ *   - velocity: absolute change rate (₪/sqm per day)
+ */
+router.get('/momentum', async (req, res, next) => {
+  try {
+    res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=7200')
+
+    const momentum = await marketCache.wrap('market-momentum', async () => {
+      // We need snapshots from at least 5 weeks ago for meaningful momentum
+      const sinceDate = new Date(Date.now() - 42 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+
+      let snapshots = []
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('price_snapshots')
+          .select('plot_id, price_per_sqm, total_price, snapshot_date, plots!inner(city, size_sqm)')
+          .gte('snapshot_date', sinceDate)
+          .order('snapshot_date', { ascending: true })
+
+        if (!error && data) snapshots = data
+      } catch {
+        // Table may not exist — return empty momentum data
+      }
+
+      if (snapshots.length === 0) {
+        // No snapshot data — return current state with 'insufficient_data' trend
+        const { data: plots } = await supabaseAdmin
+          .from('plots')
+          .select('city, total_price, size_sqm')
+          .eq('is_published', true)
+
+        const cityMap = {}
+        for (const p of (plots || [])) {
+          const city = p.city || 'אחר'
+          const size = p.size_sqm || 1
+          if (p.total_price > 0 && size > 0) {
+            if (!cityMap[city]) cityMap[city] = { total: 0, count: 0 }
+            cityMap[city].total += p.total_price / size
+            cityMap[city].count += 1
+          }
+        }
+
+        const cities = {}
+        for (const [city, data] of Object.entries(cityMap)) {
+          cities[city] = {
+            currentAvgPsm: Math.round(data.total / data.count),
+            wow: null,
+            mom: null,
+            velocity: null,
+            trend: 'insufficient_data',
+            plotCount: data.count,
+          }
+        }
+        return { cities, dataSource: 'current_only', snapshotDays: 0 }
+      }
+
+      // Aggregate snapshots into weekly buckets per city
+      const now = Date.now()
+      const weekMs = 7 * 24 * 60 * 60 * 1000
+      const cityWeekly = {}
+
+      for (const snap of snapshots) {
+        const city = snap.plots?.city
+        if (!city) continue
+        const sizeSqm = snap.plots?.size_sqm || 1
+        const psm = snap.price_per_sqm || (snap.total_price > 0 && sizeSqm > 0 ? snap.total_price / sizeSqm : 0)
+        if (psm <= 0) continue
+
+        const snapDate = new Date(snap.snapshot_date)
+        const weeksAgo = Math.floor((now - snapDate.getTime()) / weekMs)
+        const weekKey = Math.min(weeksAgo, 5) // Cap at 5 weeks ago
+
+        if (!cityWeekly[city]) cityWeekly[city] = {}
+        if (!cityWeekly[city][weekKey]) cityWeekly[city][weekKey] = { total: 0, count: 0 }
+        cityWeekly[city][weekKey].total += psm
+        cityWeekly[city][weekKey].count += 1
+      }
+
+      // Calculate momentum per city
+      const cities = {}
+      for (const [city, weeks] of Object.entries(cityWeekly)) {
+        const getWeekAvg = (w) => weeks[w] && weeks[w].count > 0 ? weeks[w].total / weeks[w].count : null
+
+        const thisWeek = getWeekAvg(0)
+        const lastWeek = getWeekAvg(1)
+        const twoWeeksAgo = getWeekAvg(2)
+        const fourWeeksAgo = getWeekAvg(4) || getWeekAvg(3) // month ago, fallback 3 weeks
+
+        // Week-over-week change
+        const wow = thisWeek && lastWeek
+          ? Math.round(((thisWeek - lastWeek) / lastWeek) * 1000) / 10
+          : null
+
+        // Month-over-month change
+        const mom = thisWeek && fourWeeksAgo
+          ? Math.round(((thisWeek - fourWeeksAgo) / fourWeeksAgo) * 1000) / 10
+          : null
+
+        // Daily velocity (₪/sqm per day) — over the last 2 weeks
+        const velocity = thisWeek && twoWeeksAgo
+          ? Math.round(((thisWeek - twoWeeksAgo) / 14) * 100) / 100
+          : null
+
+        // Trend determination — is the rate of change increasing or decreasing?
+        let trend = 'insufficient_data'
+        if (wow !== null && mom !== null) {
+          // Compare recent rate (wow) vs longer-term rate (mom/4 = weekly equivalent)
+          const weeklyFromMonthly = mom / 4
+          if (wow > weeklyFromMonthly + 0.3) trend = 'accelerating'
+          else if (wow < weeklyFromMonthly - 0.3) trend = 'decelerating'
+          else trend = 'steady'
+        } else if (wow !== null) {
+          trend = wow > 0.5 ? 'rising' : wow < -0.5 ? 'falling' : 'steady'
+        }
+
+        cities[city] = {
+          currentAvgPsm: thisWeek ? Math.round(thisWeek) : null,
+          wow,
+          mom,
+          velocity,
+          trend,
+          plotCount: weeks[0]?.count || 0,
+          // Signal labels for UI display (Hebrew)
+          signal: trend === 'accelerating' ? '🚀 מאיץ'
+            : trend === 'decelerating' ? '📉 מאט'
+            : trend === 'rising' ? '📈 עולה'
+            : trend === 'falling' ? '📉 יורד'
+            : trend === 'steady' ? '➡️ יציב'
+            : '❓ אין מספיק נתונים',
+        }
+      }
+
+      // Determine earliest snapshot date for data freshness
+      const dates = snapshots.map(s => s.snapshot_date).filter(Boolean)
+      const earliestDate = dates.length > 0 ? dates[0] : null
+      const latestDate = dates.length > 0 ? dates[dates.length - 1] : null
+      const snapshotDays = earliestDate && latestDate
+        ? Math.round((new Date(latestDate) - new Date(earliestDate)) / (24 * 60 * 60 * 1000))
+        : 0
+
+      return { cities, dataSource: 'snapshots', snapshotDays, dateRange: { from: earliestDate, to: latestDate } }
+    }, 3600_000) // 1 hour TTL — momentum doesn't change rapidly
+
+    const etag = generateETag(momentum)
+    res.set('ETag', etag)
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end()
+    }
+
+    res.json(momentum)
   } catch (err) {
     next(err)
   }

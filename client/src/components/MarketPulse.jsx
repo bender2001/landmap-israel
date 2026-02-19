@@ -1,6 +1,7 @@
 import { useState, useMemo, memo, useCallback } from 'react'
-import { Activity, ChevronDown, ChevronUp, TrendingUp, Clock, Zap, Target } from 'lucide-react'
+import { Activity, ChevronDown, ChevronUp, TrendingUp, Clock, Zap, Target, Gauge } from 'lucide-react'
 import { formatPriceShort, calcInvestmentScore } from '../utils/formatters'
+import { useMarketMomentum } from '../hooks/useMarketMomentum'
 
 /**
  * MarketPulse — floating widget showing real-time market activity metrics.
@@ -16,6 +17,7 @@ import { formatPriceShort, calcInvestmentScore } from '../utils/formatters'
  */
 const MarketPulse = memo(function MarketPulse({ plots }) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const { momentum: momentumMap, dataSource: momentumSource } = useMarketMomentum()
 
   const metrics = useMemo(() => {
     if (!plots || plots.length === 0) return null
@@ -191,6 +193,37 @@ const MarketPulse = memo(function MarketPulse({ plots }) {
                 </div>
               </div>
             </div>
+
+            {/* City momentum indicators — week-over-week price velocity.
+                Shows investors whether the market is accelerating or slowing down.
+                This is data Madlan/Yad2 don't show — key competitive advantage. */}
+            {momentumMap.size > 0 && (
+              <div className="space-y-1">
+                <div className="flex items-center gap-1 mb-1">
+                  <Gauge className="w-2.5 h-2.5 text-slate-500" />
+                  <span className="text-[8px] text-slate-500 font-medium">מומנטום מחירים</span>
+                </div>
+                {Array.from(momentumMap.entries()).slice(0, 3).map(([city, m]) => {
+                  if (!m.signal) return null
+                  const wowColor = m.wow > 0 ? 'text-emerald-400' : m.wow < 0 ? 'text-red-400' : 'text-slate-400'
+                  return (
+                    <div key={city} className="flex items-center justify-between bg-white/[0.02] rounded-md px-2 py-1">
+                      <span className="text-[9px] text-slate-300 font-medium">{city}</span>
+                      <div className="flex items-center gap-1.5">
+                        {m.wow != null && (
+                          <span className={`text-[9px] font-bold ${wowColor}`} title="שינוי שבועי">
+                            {m.wow > 0 ? '+' : ''}{m.wow}%
+                          </span>
+                        )}
+                        <span className="text-[8px]" title={`מגמה: ${m.signal}`}>
+                          {m.signal?.split(' ')[0]}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             {/* Hot deals indicator */}
             {metrics.hotDeals > 0 && (
