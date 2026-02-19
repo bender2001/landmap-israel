@@ -448,6 +448,27 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
           return <ZoningProgressBar currentStage={zoningStage} variant="compact" className="mt-0.5" />
         })()}
 
+        {/* Risk level badge — server-computed investment risk indicator.
+            Like credit rating agencies' risk grades — gives instant risk context.
+            Neither Madlan nor Yad2 surface risk assessment; this is a pro-investor feature.
+            Uses server-side _riskLevel to avoid expensive client computation. */}
+        {plot._riskLevel && plot._riskLevel !== 'low' && (
+          <div
+            className="flex items-center gap-1 mt-0.5 text-[8px] font-medium"
+            title={plot._riskFactors?.length > 0 ? `גורמי סיכון: ${plot._riskFactors.join(', ')}` : `סיכון: ${plot._riskScore}/100`}
+          >
+            {plot._riskLevel === 'medium' && (
+              <span className="text-amber-400/80">⚠️ סיכון בינוני</span>
+            )}
+            {plot._riskLevel === 'high' && (
+              <span className="text-orange-400/80">🔶 סיכון גבוה</span>
+            )}
+            {plot._riskLevel === 'very_high' && (
+              <span className="text-red-400/80">🔴 סיכון גבוה מאוד</span>
+            )}
+          </div>
+        )}
+
         {/* Demand velocity indicator — views/day urgency signal */}
         {demandVelocity && demandVelocity.tier !== 'low' && (
           <div

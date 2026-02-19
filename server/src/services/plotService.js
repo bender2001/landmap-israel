@@ -128,8 +128,71 @@ function computeGrade(score) {
 }
 
 /**
+ * Compute investment risk level for a plot. Server-side equivalent of the client's
+ * calcRiskLevel(). Factors: zoning stage, time horizon, price deviation, ROI realism.
+ * Returns { score: 0-100, level: 'low'|'medium'|'high'|'very_high', factors: string[] }
+ * Running server-side eliminates expensive per-card computation on the client
+ * (calcRiskLevel requires allPlots for comparison — O(n²) if done per card).
+ */
+function computeRiskLevel(plot, cityAvgPsm) {
+  const price = plot.total_price || 0
+  const projected = plot.projected_value || 0
+  const sizeSqM = plot.size_sqm || 0
+  const zoning = plot.zoning_stage || 'AGRICULTURAL'
+  const readiness = plot.readiness_estimate || ''
+  const roi = price > 0 ? ((projected - price) / price) * 100 : 0
+
+  let riskScore = 0
+  const factors = []
+
+  // 1. Zoning risk (0-30): early stages = high regulatory risk
+  const zoningRisk = {
+    AGRICULTURAL: 30, MASTER_PLAN_DEPOSIT: 25, MASTER_PLAN_APPROVED: 18,
+    DETAILED_PLAN_PREP: 15, DETAILED_PLAN_DEPOSIT: 10, DETAILED_PLAN_APPROVED: 5,
+    DEVELOPER_TENDER: 3, BUILDING_PERMIT: 1,
+  }[zoning] ?? 20
+  riskScore += zoningRisk
+  if (zoningRisk >= 25) factors.push('שלב תכנוני מוקדם')
+  else if (zoningRisk >= 15) factors.push('תכנון בתהליך')
+
+  // 2. Time horizon risk (0-25): longer wait = more uncertainty
+  let timeRisk = 15
+  if (readiness.includes('1-3')) timeRisk = 8
+  else if (readiness.includes('3-5')) timeRisk = 15
+  else if (readiness.includes('5+') || readiness.includes('5-')) timeRisk = 25
+  riskScore += timeRisk
+  if (timeRisk >= 20) factors.push('טווח השקעה ארוך')
+
+  // 3. Price deviation risk (0-20): far from city average = suspicious
+  if (cityAvgPsm > 0 && sizeSqM > 0 && price > 0) {
+    const plotPsm = price / sizeSqM
+    const deviation = ((plotPsm - cityAvgPsm) / cityAvgPsm) * 100
+    if (deviation > 20) { riskScore += 20; factors.push('מחיר גבוה מהממוצע') }
+    else if (deviation > 10) { riskScore += 10 }
+    else if (deviation < -20) { riskScore += 5; factors.push('מחיר נמוך — יש לבדוק') }
+  }
+
+  // 4. ROI realism risk (0-15): extremely high ROI is suspicious
+  if (roi > 300) { riskScore += 15; factors.push('תשואה גבוהה מאוד') }
+  else if (roi > 200) { riskScore += 8 }
+  else if (roi < 30 && price > 0) { riskScore += 5 }
+
+  // 5. Liquidity risk (0-10): larger plots harder to sell
+  const dunam = sizeSqM / 1000
+  if (dunam > 5) { riskScore += 10; factors.push('שטח גדול — נזילות נמוכה') }
+  else if (dunam > 3) riskScore += 5
+
+  riskScore = Math.min(100, riskScore)
+
+  const level = riskScore <= 25 ? 'low' : riskScore <= 45 ? 'medium'
+    : riskScore <= 65 ? 'high' : 'very_high'
+
+  return { score: riskScore, level, factors: factors.slice(0, 3) }
+}
+
+/**
  * Enrich an array of plots with computed investment metrics.
- * Adds _investmentScore, _grade, and _roi fields to each plot.
+ * Adds _investmentScore, _grade, _roi, _riskLevel, and more fields to each plot.
  */
 async function enrichPlotsWithScores(plots) {
   if (!plots || plots.length === 0) return plots
@@ -137,6 +200,23 @@ async function enrichPlotsWithScores(plots) {
 
   // Fetch area trends (cached, non-blocking on cache hit)
   const trends = await refreshAreaMarketTrends()
+
+  // Pre-compute city average price/sqm for risk deviation calculation.
+  // Single pass over all plots — O(n) instead of O(n²) per card.
+  const cityPsmAccum = {} // city → { totalPsm, count }
+  for (const p of plots) {
+    const price = p.total_price || 0
+    const size = p.size_sqm || 0
+    if (price > 0 && size > 0 && p.city) {
+      if (!cityPsmAccum[p.city]) cityPsmAccum[p.city] = { totalPsm: 0, count: 0 }
+      cityPsmAccum[p.city].totalPsm += price / size
+      cityPsmAccum[p.city].count += 1
+    }
+  }
+  const cityAvgPsm = {}
+  for (const [city, acc] of Object.entries(cityPsmAccum)) {
+    cityAvgPsm[city] = acc.count > 0 ? acc.totalPsm / acc.count : 0
+  }
 
   for (const p of plots) {
     const price = p.total_price || 0
@@ -177,6 +257,14 @@ async function enrichPlotsWithScores(plots) {
     if (cityTrend) {
       p._marketTrend = cityTrend // { direction: 'up'|'down'|'stable', changePct: number }
     }
+
+    // Risk level — server-side computation of investment risk factors.
+    // Eliminates client-side calcRiskLevel(plot, allPlots) which was O(n) per card.
+    // Now pre-computed once for all plots in a single enrichment pass.
+    const risk = computeRiskLevel(p, cityAvgPsm[p.city] || 0)
+    p._riskLevel = risk.level     // 'low'|'medium'|'high'|'very_high'
+    p._riskScore = risk.score     // 0-100
+    p._riskFactors = risk.factors // top 3 risk factors (Hebrew strings)
   }
   return plots
 }

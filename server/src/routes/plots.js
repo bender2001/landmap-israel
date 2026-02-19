@@ -97,6 +97,9 @@ function applySparseFields(plots, fieldsParam) {
     if (p._pricePerSqm != null) sparse._pricePerSqm = p._pricePerSqm
     if (p._monthlyPayment != null) sparse._monthlyPayment = p._monthlyPayment
     if (p._daysOnMarket != null) sparse._daysOnMarket = p._daysOnMarket
+    if (p._riskLevel != null) sparse._riskLevel = p._riskLevel
+    if (p._riskScore != null) sparse._riskScore = p._riskScore
+    if (p._riskFactors != null) sparse._riskFactors = p._riskFactors
     return sparse
   })
 }

@@ -4113,3 +4113,67 @@ body {
     -webkit-backdrop-filter: none !important;
   }
 }
+
+/* ═══════════════════════════════════════════
+   FOCUS-VISIBLE — WCAG 2.4.7 Focus Visible
+   Gold ring for keyboard navigation (only when keyboard-focused, not mouse-clicked).
+   Like Google's "blue ring on Tab" but branded gold for LandMap.
+   Ensures investors can navigate the entire app via keyboard (Tab, Enter, Space).
+   Neither Madlan nor Yad2 have proper focus-visible styles — competitive edge.
+   ═══════════════════════════════════════════ */
+:focus-visible {
+  outline: 2px solid rgba(200, 148, 42, 0.7);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Cards get a subtle glow instead of hard outline */
+.plot-card-mini:focus-visible {
+  outline: none;
+  border-color: rgba(200, 148, 42, 0.6);
+  box-shadow:
+    0 0 0 3px rgba(200, 148, 42, 0.25),
+    0 14px 40px -6px rgba(0, 0, 0, 0.55);
+}
+
+/* Buttons and links: slightly thicker ring for visibility against dark backgrounds */
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid rgba(200, 148, 42, 0.8);
+  outline-offset: 2px;
+}
+
+/* Input fields: inner glow */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: rgba(200, 148, 42, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(200, 148, 42, 0.15), inset 0 0 0 1px rgba(200, 148, 42, 0.2);
+}
+
+/* Filter pills: match active state style */
+.filter-pill-trigger:focus-visible {
+  outline: none;
+  border-color: rgba(200, 148, 42, 0.5);
+  box-shadow: 0 0 0 3px rgba(200, 148, 42, 0.2);
+}
+
+/* Map controls: visible ring on dark background */
+.leaflet-control-zoom a:focus-visible {
+  outline: 2px solid rgba(200, 148, 42, 0.8) !important;
+  outline-offset: -2px !important;
+}
+
+/* Sidebar close button */
+.sidebar-details button:focus-visible,
+.sidebar-panel button:focus-visible {
+  outline: 2px solid rgba(200, 148, 42, 0.7);
+  outline-offset: 1px;
+}
+
+/* Quick preset buttons */
+.filter-bar-container button:focus-visible {
+  outline: 2px solid rgba(200, 148, 42, 0.7);
+  outline-offset: 1px;
+}
