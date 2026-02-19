@@ -38,6 +38,7 @@ const DataDisclaimer = lazy(() => import('../../components/DataDisclaimer.jsx'))
 
 // Eagerly imported — tiny component, used in the header area above the fold
 import DataCompletenessBar from '../../components/ui/DataCompletenessBar.jsx'
+import { useThemeColor, themeColors } from '../../hooks/useThemeColor.js'
 
 // ─── Eager preloading of below-fold chunks ────────────────────────────
 // Unlike SidebarDetails (which may not open at all), PlotDetail always renders
@@ -676,6 +677,10 @@ export default function PlotDetail() {
 
   // Market overview for below-market indicator (like Madlan's "מחיר נמוך ממדלן")
   const { data: marketData } = useMarketOverview()
+
+  // Dynamic browser chrome color — darkest navy for full immersion on detail page.
+  // Makes the address bar blend with the dark background for a native app feel.
+  useThemeColor(themeColors.detail)
 
   // Nearby plots for investment verdict area benchmark — populated by SimilarPlotsSection
   const [nearbyPlots, setNearbyPlots] = useState([])

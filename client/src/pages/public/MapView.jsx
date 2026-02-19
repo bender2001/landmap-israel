@@ -33,6 +33,7 @@ import { useLocalStorage } from '../../hooks/useLocalStorage.js'
 import { usePriceChanges } from '../../hooks/usePriceChanges.js'
 import { usePersonalNotes } from '../../hooks/usePersonalNotes.js'
 import { useRecentlyViewed } from '../../hooks/useRecentlyViewed.js'
+import { useThemeColor, themeColors } from '../../hooks/useThemeColor.js'
 
 // Lazy-load non-critical widgets — they're not needed for first paint.
 // This reduces the MapView initial JS from ~126KB to ~95KB, cutting Time to Interactive.
@@ -632,6 +633,11 @@ export default function MapView() {
 
   // Real-time updates via SSE — auto-refresh when admin changes plots
   const { isConnected: sseConnected } = useRealtimeUpdates()
+
+  // Dynamic browser chrome color — makes mobile browser toolbar match app context.
+  // Shifts to darker navy when sidebar is open (focused mode), like native apps.
+  // Neither Madlan nor Yad2 does this — makes LandMap feel more polished on mobile.
+  useThemeColor(selectedPlot ? themeColors.focused : themeColors.default)
 
   // JSON-LD structured data for SEO (like Madlan/Yad2)
   useStructuredData(selectedPlot, filteredPlots)

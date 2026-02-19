@@ -152,6 +152,20 @@ router.get('/', sanitizePlotQuery, async (req, res, next) => {
 
     // Cache list for 30s — data doesn't change often
     res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60, stale-if-error=300')
+
+    // HTTP Link preload hints — tell the browser to start fetching related endpoints
+    // before the JS parses the response and discovers them. Saves one round-trip (~50-150ms)
+    // for cascading requests that MapView always makes after plots load:
+    // - /api/market/overview → ViewportSummary, FilterBar market stats
+    // - /api/plots/stats → MarketStatsWidget, FeaturedDeals
+    // - /api/plots/featured → FeaturedDeals widget
+    // Like Next.js's automatic prefetch or Cloudflare's Early Hints — but at the API level.
+    // Browser support: Chrome 103+ (Early Hints), all browsers (Link header for preload).
+    res.set('Link', [
+      '</api/market/overview>; rel=preload; as=fetch; crossorigin',
+      '</api/plots/stats>; rel=preload; as=fetch; crossorigin',
+      '</api/plots/featured>; rel=preload; as=fetch; crossorigin',
+    ].join(', '))
     const cacheKey = `plots:${JSON.stringify(req.query)}`
     const plots = await plotCache.wrap(cacheKey, () => getPublishedPlots(req.query), 30_000)
 
@@ -956,6 +970,18 @@ router.get('/:id', sanitizePlotId, async (req, res, next) => {
     res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120')
     const plot = await getPlotById(req.params.id)
     if (!plot) return res.status(404).json({ error: 'Plot not found' })
+
+    // HTTP Link preload hints for PlotDetail cascading requests.
+    // When the frontend fetches a single plot, it always follows up with
+    // nearby plots, similar plots, and market overview. Hinting these in the
+    // Link header lets the browser start fetching before the JS discovers them.
+    // Saves 50-150ms on PlotDetail page load (one round-trip per hint).
+    const plotId = req.params.id
+    res.set('Link', [
+      `</api/plots/${plotId}/nearby?limit=5>; rel=preload; as=fetch; crossorigin`,
+      `</api/plots/${plotId}/similar?limit=4>; rel=preload; as=fetch; crossorigin`,
+      '</api/market/overview>; rel=preload; as=fetch; crossorigin',
+    ].join(', '))
 
     // ETag for conditional requests — avoid resending unchanged data
     const etag = generateETag(plot)
