@@ -174,6 +174,54 @@ function FAQItem({ question, answer }) {
   )
 }
 
+/**
+ * PricingFaqJsonLd — FAQ structured data for Google rich snippets.
+ * Google displays these as expandable FAQ cards directly in search results,
+ * dramatically increasing click-through rate for queries like "landmap pricing"
+ * or "landmap israel מחירים". Madlan and Yad2 use this pattern extensively.
+ */
+function PricingFaqJsonLd() {
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: FAQ.map(item => ({
+      '@type': 'Question',
+      name: item.q,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: item.a,
+      },
+    })),
+  }
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
+/**
+ * PricingBreadcrumbJsonLd — breadcrumb schema for SEO.
+ * Helps Google show "LandMap > מחירים" in search results.
+ */
+function PricingBreadcrumbJsonLd() {
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'LandMap Israel', item: window.location.origin },
+      { '@type': 'ListItem', position: 2, name: 'תוכניות מנוי' },
+    ],
+  }
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
 export default function Pricing() {
   const [email, setEmail] = useState('')
   const [registering, setRegistering] = useState(false)
@@ -207,6 +255,8 @@ export default function Pricing() {
   return (
     <div className="min-h-screen bg-navy" dir="rtl">
       <PublicNav />
+      <PricingFaqJsonLd />
+      <PricingBreadcrumbJsonLd />
 
       {/* Hero */}
       <div className="pt-28 pb-12 px-4 text-center">

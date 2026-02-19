@@ -198,6 +198,159 @@ function PlotRow({ plot }) {
   )
 }
 
+/**
+ * PriceDistributionChart — SVG histogram showing how plot prices are distributed.
+ * Like Madlan's price distribution for neighborhoods — gives investors instant visual
+ * context about where most plots are priced and whether there are bargain outliers.
+ * Pure SVG, no chart library dependency.
+ */
+function PriceDistributionChart({ plots }) {
+  const chartData = useMemo(() => {
+    if (!plots || plots.length < 3) return null
+    const prices = plots
+      .map(p => p.total_price ?? p.totalPrice ?? 0)
+      .filter(p => p > 0)
+      .sort((a, b) => a - b)
+    if (prices.length < 3) return null
+
+    // Create 8 bins from min to max
+    const min = prices[0]
+    const max = prices[prices.length - 1]
+    const range = max - min
+    if (range <= 0) return null
+
+    const binCount = Math.min(8, Math.max(4, Math.ceil(Math.sqrt(prices.length))))
+    const binWidth = range / binCount
+    const bins = Array.from({ length: binCount }, (_, i) => ({
+      min: min + i * binWidth,
+      max: min + (i + 1) * binWidth,
+      count: 0,
+    }))
+
+    for (const price of prices) {
+      const idx = Math.min(binCount - 1, Math.floor((price - min) / binWidth))
+      bins[idx].count++
+    }
+
+    const maxCount = Math.max(...bins.map(b => b.count))
+    const median = prices[Math.floor(prices.length / 2)]
+
+    return { bins, maxCount, min, max, median, total: prices.length }
+  }, [plots])
+
+  if (!chartData) return null
+
+  const { bins, maxCount, min, max, median, total } = chartData
+  const W = 400
+  const H = 140
+  const padX = 10
+  const padY = 10
+  const barGap = 4
+  const chartW = W - padX * 2
+  const chartH = H - padY * 2 - 20 // 20px for labels
+  const barW = (chartW - barGap * (bins.length - 1)) / bins.length
+
+  // Median line position
+  const range = max - min
+  const medianX = range > 0 ? padX + ((median - min) / range) * chartW : W / 2
+
+  return (
+    <div className="glass-panel p-5 mb-8">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-gold" />
+          התפלגות מחירים
+        </h2>
+        <span className="text-[9px] text-slate-500 bg-white/5 px-2 py-1 rounded-lg">
+          {total} חלקות · חציון: ₪{Math.round(median).toLocaleString()}
+        </span>
+      </div>
+
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full h-auto"
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label={`התפלגות מחירי חלקות — חציון ₪${Math.round(median).toLocaleString()}`}
+      >
+        {/* Bars */}
+        {bins.map((bin, i) => {
+          const barH = maxCount > 0 ? (bin.count / maxCount) * chartH : 0
+          const x = padX + i * (barW + barGap)
+          const y = padY + chartH - barH
+          const isMedianBin = median >= bin.min && median < bin.max
+          return (
+            <g key={i}>
+              <rect
+                x={x}
+                y={y}
+                width={barW}
+                height={Math.max(2, barH)}
+                rx={3}
+                fill={isMedianBin ? 'rgba(200,148,42,0.6)' : 'rgba(200,148,42,0.25)'}
+                stroke={isMedianBin ? 'rgba(200,148,42,0.8)' : 'rgba(200,148,42,0.15)'}
+                strokeWidth={1}
+              />
+              {/* Count label on bars with data */}
+              {bin.count > 0 && (
+                <text
+                  x={x + barW / 2}
+                  y={y - 4}
+                  fill="rgba(148,163,184,0.7)"
+                  fontSize="9"
+                  textAnchor="middle"
+                  fontFamily="sans-serif"
+                >
+                  {bin.count}
+                </text>
+              )}
+              {/* Price range label */}
+              {i % 2 === 0 && (
+                <text
+                  x={x + barW / 2}
+                  y={H - 4}
+                  fill="rgba(148,163,184,0.4)"
+                  fontSize="8"
+                  textAnchor="middle"
+                  fontFamily="sans-serif"
+                >
+                  ₪{bin.min >= 1000000 ? `${(bin.min / 1000000).toFixed(1)}M` : `${Math.round(bin.min / 1000)}K`}
+                </text>
+              )}
+            </g>
+          )
+        })}
+
+        {/* Median line */}
+        <line
+          x1={medianX}
+          y1={padY}
+          x2={medianX}
+          y2={padY + chartH}
+          stroke="rgba(200,148,42,0.5)"
+          strokeWidth="1"
+          strokeDasharray="4 3"
+        />
+        <text
+          x={medianX}
+          y={padY - 2}
+          fill="rgba(200,148,42,0.8)"
+          fontSize="8"
+          textAnchor="middle"
+          fontFamily="sans-serif"
+          fontWeight="bold"
+        >
+          חציון
+        </text>
+      </svg>
+
+      <p className="text-[9px] text-slate-600 mt-1 text-center">
+        💡 העמודה הבולטת מסמנת את הטווח שבו נמצא המחיר החציוני
+      </p>
+    </div>
+  )
+}
+
 export default function AreaCity() {
   const { city } = useParams()
   const decodedCity = decodeURIComponent(city || '')
@@ -420,6 +573,9 @@ export default function AreaCity() {
             </div>
           </div>
         )}
+
+        {/* Price distribution histogram — like Madlan's area price distribution */}
+        <PriceDistributionChart plots={plots} />
 
         {/* CTA: View on map */}
         <div className="glass-panel p-6 mb-8 border-gold/10 bg-gradient-to-r from-gold/5 to-transparent">
