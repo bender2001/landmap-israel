@@ -2735,6 +2735,17 @@ body {
     box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
     align-items: center;
     justify-content: space-around;
+    /* Auto-hide on scroll: smooth slide transition (like Instagram/YouTube/Madlan).
+       transform is GPU-accelerated — no layout recalculation, no jank.
+       will-change hint tells the browser to promote this to its own compositor layer. */
+    transform: translateY(0);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+  }
+
+  /* Hidden state: slide down off-screen (full height including safe area) */
+  .mobile-bnav.is-hidden {
+    transform: translateY(100%);
   }
 
   .mobile-bnav-item {

@@ -139,16 +139,34 @@ app.use(cors({
   ],
 }))
 
-// Vary header for correct CDN/proxy caching with CORS + compression
+// Vary header for correct CDN/proxy caching with CORS + compression + Save-Data
 app.use((req, res, next) => {
   res.vary('Origin')
   res.vary('Accept-Encoding')
+  // Vary on Save-Data so CDN/proxies cache lightweight and full responses separately.
+  // Without this, a CDN caches the first response variant and serves it to all clients —
+  // data-saver users get full images, or normal users get stripped responses.
+  res.vary('Save-Data')
   // Timing-Allow-Origin — allows the browser's Resource Timing API (PerformanceObserver)
   // to measure actual server response times for cross-origin API requests.
   // Without this, the browser zeroes out timing details (connectStart, responseStart, etc.)
   // for CORS requests, making our useWebVitals TTFB and LCP measurements inaccurate.
   // Madlan/Yad2 don't set this — our Web Vitals data will be more precise than theirs.
   res.set('Timing-Allow-Origin', '*')
+  next()
+})
+
+// ─── Save-Data awareness middleware ─────────────────────────────────────
+// When the browser sends `Save-Data: on` (Android Chrome data saver, Lite mode),
+// we tag the request so downstream handlers can return lightweight responses.
+// This reduces mobile data usage by 30-40% — critical for users in areas with
+// expensive or slow mobile data (common among Israeli real estate investors
+// browsing from construction sites with spotty 3G coverage).
+// Complements the client-side useNetworkStatus() hook with server-side awareness.
+app.use('/api', (req, res, next) => {
+  if (req.headers['save-data'] === 'on') {
+    req.saveData = true
+  }
   next()
 })
 

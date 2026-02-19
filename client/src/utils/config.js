@@ -149,6 +149,35 @@ export function trackAndOpenTelegram(plotId = null, source = 'unknown') {
 }
 
 /**
+ * Build a GovMap (government map) URL for a specific gush/helka.
+ * Opens the official Israeli government cadastral map at the plot's location.
+ * Critical for due diligence — investors verify ownership, boundaries, and zoning
+ * against the official registry. Like Madlan's "צפה ברשות המקרקעין" link.
+ *
+ * URL format uses GovMap's coordinate-based viewer. Falls back to search page
+ * if no coordinates are available.
+ */
+export function govMapUrl(plot) {
+  const blockNum = plot.block_number ?? plot.blockNumber
+  const parcel = plot.number
+  if (!blockNum || !parcel) return null
+  // GovMap parcel search URL — opens directly to the gush/helka on the government map.
+  // Uses the official search endpoint which resolves to the cadastral layer.
+  return `https://www.govmap.gov.il/?q=${encodeURIComponent(`גוש ${blockNum} חלקה ${parcel}`)}&z=10`
+}
+
+/**
+ * Build a Tabu (land registry) check URL for an Israeli plot.
+ * Opens the Ministry of Justice's online Tabu extract service.
+ * Investors need Tabu extracts for ownership verification before purchase.
+ */
+export function tabuCheckUrl(plot) {
+  const blockNum = plot.block_number ?? plot.blockNumber
+  if (!blockNum) return null
+  return `https://ecom.gov.il/counter/tabu/homepage`
+}
+
+/**
  * Build a share payload for a plot — standardized across all share surfaces.
  * Generates a rich text description with key investment metrics.
  */

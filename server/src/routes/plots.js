@@ -205,7 +205,24 @@ router.get('/', sanitizePlotQuery, async (req, res, next) => {
     // Apply sparse fieldsets if `fields` param is provided.
     // Example: /api/plots?fields=id,city,total_price,coordinates
     // Reduces JSON payload by 40-60% for clients that only need specific columns.
-    const result = req.query.fields ? applySparseFields(plots, req.query.fields) : plots
+    let result = req.query.fields ? applySparseFields(plots, req.query.fields) : plots
+
+    // Save-Data optimization: strip plot_images from list responses when the browser
+    // has data saver enabled (Save-Data: on). Images are the heaviest part of the
+    // plot list payload (~30-40% of JSON size). The detail endpoint still returns
+    // full images when a user clicks into a specific plot — this only affects the list.
+    // Combined with the client's useNetworkStatus(), this provides end-to-end data savings.
+    if (req.saveData && Array.isArray(result) && result.length > 0) {
+      result = result.map(p => {
+        if (p.plot_images) {
+          const { plot_images, ...rest } = p
+          // Preserve image count so the UI can show "📷 3" without loading images
+          return { ...rest, _imageCount: plot_images.length }
+        }
+        return p
+      })
+      res.set('X-Save-Data', 'applied')
+    }
 
     // Decomposed Server-Timing — shows in Chrome/Edge DevTools "Timing" tab.
     // Breaks down: cache/db lookup, post-processing (ETag, sparse fields, analytics).

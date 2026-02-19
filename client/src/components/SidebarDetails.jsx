@@ -13,7 +13,7 @@ import { calcInvestmentPnL } from '../utils/plot'
 import { usePlot, useNearbyPlots, useSimilarPlots, usePrefetchPlot, useNearbyPois } from '../hooks/usePlots'
 import MiniMap from './ui/MiniMap'
 import ZoningProgressBar from './ui/ZoningProgressBar'
-import { plotInquiryLink } from '../utils/config'
+import { plotInquiryLink, govMapUrl, tabuCheckUrl } from '../utils/config'
 
 // ─── Lazy-loaded sub-components ──────────────────────────────────────────
 // These are inside collapsed (defaultOpen=false) sections or below the fold.
@@ -1325,6 +1325,48 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
 
         {/* Prev/Next navigation — like Madlan */}
         <PlotNavigation currentPlot={plot} allPlots={allPlots} onSelectPlot={onSelectPlot} />
+
+        {/* Official sources quick-links — GovMap + Tabu.
+            Critical for investor due diligence: verify plot boundaries, ownership, and zoning
+            against official government registries. Like Madlan's "צפה ברשות המקרקעין" link.
+            Shows compact icon buttons that open in new tabs. */}
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5 flex-shrink-0" dir="rtl">
+          <span className="text-[10px] text-slate-500 font-medium">🏛️ מקורות רשמיים:</span>
+          {govMapUrl(plot) && (
+            <a
+              href={govMapUrl(plot)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-slate-400 bg-white/5 border border-white/10 rounded-lg hover:bg-gold/10 hover:text-gold hover:border-gold/20 transition-all"
+              title={`פתח גוש ${blockNumber} חלקה ${plot.number} ב-GovMap (מפת ממשלת ישראל)`}
+            >
+              <ExternalLink className="w-2.5 h-2.5" />
+              GovMap
+            </a>
+          )}
+          {tabuCheckUrl(plot) && (
+            <a
+              href={tabuCheckUrl(plot)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-slate-400 bg-white/5 border border-white/10 rounded-lg hover:bg-gold/10 hover:text-gold hover:border-gold/20 transition-all"
+              title="בדיקת נסח טאבו — רשות המקרקעין"
+            >
+              <FileText className="w-2.5 h-2.5" />
+              נסח טאבו
+            </a>
+          )}
+          <a
+            href={`https://www.nadlan.gov.il/?search=${encodeURIComponent(plot.city)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-slate-400 bg-white/5 border border-white/10 rounded-lg hover:bg-gold/10 hover:text-gold hover:border-gold/20 transition-all"
+            title="עסקאות נדל״ן באזור — אתר הממשלה"
+          >
+            <BarChart className="w-2.5 h-2.5" />
+            נדל״ן ממשלתי
+          </a>
+        </div>
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden relative" ref={scrollRef} onScroll={handleScroll}>

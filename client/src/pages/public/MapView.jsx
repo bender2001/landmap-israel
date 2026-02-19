@@ -719,7 +719,7 @@ export default function MapView() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen bg-navy overflow-hidden relative" dir="rtl">
+      <div className="h-screen w-screen bg-navy overflow-hidden relative" dir="rtl" role="main" aria-busy="true" aria-label="טוען מפת קרקעות">
         {/* Skeleton map area — mimics the real map with animated placeholder */}
         <div className="absolute inset-0 bg-gradient-to-b from-navy via-navy-light/20 to-navy">
           {/* Fake map grid lines */}
@@ -780,7 +780,7 @@ export default function MapView() {
 
   if (plotsError && plots.length === 0) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-navy" dir="rtl">
+      <div className="h-screen w-screen flex items-center justify-center bg-navy" dir="rtl" role="alert">
         <div className="flex flex-col items-center gap-4 max-w-sm text-center px-6">
           <div className="w-16 h-16 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center">
             <span className="text-2xl">⚠️</span>
@@ -799,7 +799,10 @@ export default function MapView() {
   }
 
   return (
-    <div className={`relative h-screen w-screen overflow-hidden bg-navy ${selectedPlot ? 'sidebar-open' : ''}`}>
+    <div
+      className={`relative h-screen w-screen overflow-hidden bg-navy ${selectedPlot ? 'sidebar-open' : ''}`}
+      aria-busy={isLoading || isPlaceholderData}
+    >
       {/* Filter transition indicator */}
       {(isFilterStale || isPlaceholderData) && (
         <div className="fixed top-0 left-0 right-0 z-[100] h-0.5">

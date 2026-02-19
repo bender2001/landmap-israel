@@ -642,7 +642,7 @@ function GeoSearch() {
  * when only one is hovered/selected. Each polygon only re-renders when
  * its own props change (hover state, color mode, favorites, compare).
  */
-const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelectPlot, onHover, onHoverEnd, prefetchPlot, favorites, compareIds, onToggleCompare, areaAvgPsm }) {
+const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, isSelected, onSelectPlot, onHover, onHoverEnd, prefetchPlot, favorites, compareIds, onToggleCompare, areaAvgPsm }) {
   const price = plot.total_price ?? plot.totalPrice
   const projValue = plot.projected_value ?? plot.projectedValue
   const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
@@ -658,15 +658,27 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
   const handleMouseOver = useCallback(() => { onHover(plot.id); prefetchPlot(plot.id) }, [onHover, prefetchPlot, plot.id])
   const handleMouseOut = useCallback(() => onHoverEnd(), [onHoverEnd])
 
+  // Visual hierarchy: selected > hovered > default. Like Madlan's property highlight:
+  // selected polygon gets a bright gold ring + higher fill opacity to stand out
+  // from all other polygons while the sidebar is open.
+  const polygonColor = isSelected ? '#C8942A' : isHovered ? '#FFFFFF' : color
+  const polygonFillOpacity = plot.status === 'SOLD'
+    ? (isSelected ? 0.45 : isHovered ? 0.35 : 0.2)
+    : (isSelected ? 0.65 : isHovered ? 0.6 : 0.45)
+  const polygonWeight = isSelected ? 5 : isHovered ? 4 : 2.5
+  const polygonDash = plot.status === 'SOLD' ? '4 6'
+    : (isSelected || isHovered) ? '' : '6 4'
+
   return (
+    <>
     <Polygon
       positions={plot.coordinates}
       pathOptions={{
-        color: isHovered ? '#FFFFFF' : color,
-        fillColor: color,
-        fillOpacity: plot.status === 'SOLD' ? (isHovered ? 0.35 : 0.2) : (isHovered ? 0.6 : 0.45),
-        weight: isHovered ? 4 : 2.5,
-        dashArray: plot.status === 'SOLD' ? '4 6' : (isHovered ? '' : '6 4'),
+        color: polygonColor,
+        fillColor: isSelected ? '#C8942A' : color,
+        fillOpacity: polygonFillOpacity,
+        weight: polygonWeight,
+        dashArray: polygonDash,
       }}
       eventHandlers={{
         click: handleClick,
@@ -885,6 +897,26 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, onSelect
         </div>
       </Popup>
     </Polygon>
+    {/* Selected plot outer glow ring — a wider, semi-transparent gold polygon
+        rendered behind the main polygon. Creates a "halo" effect that makes the
+        selected plot instantly identifiable on the map from any zoom level.
+        Like Madlan's selected property highlight — users can pan around and
+        always spot which plot has the sidebar open. */}
+    {isSelected && (
+      <Polygon
+        positions={plot.coordinates}
+        pathOptions={{
+          color: '#C8942A',
+          fillColor: 'transparent',
+          fillOpacity: 0,
+          weight: 10,
+          opacity: 0.3,
+          dashArray: '',
+          interactive: false,
+        }}
+      />
+    )}
+    </>
   )
 })
 
@@ -1115,7 +1147,7 @@ function MapViewportCounter({ plots, totalCount }) {
  * when there are many plots (50+), as Leaflet doesn't need to manage off-screen SVG paths.
  * Re-evaluates on map move/zoom events with debounced updates.
  */
-function ViewportCulledPolygons({ plots, plotColors, hoveredId, onSelectPlot, onHover, onHoverEnd, prefetchPlot, favorites, compareIds, onToggleCompare, areaAvgPsm }) {
+function ViewportCulledPolygons({ plots, plotColors, hoveredId, selectedPlotId, onSelectPlot, onHover, onHoverEnd, prefetchPlot, favorites, compareIds, onToggleCompare, areaAvgPsm }) {
   const map = useMap()
   const [visiblePlotIds, setVisiblePlotIds] = useState(new Set())
   const boundsRef = useRef(null)
@@ -1155,8 +1187,11 @@ function ViewportCulledPolygons({ plots, plotColors, hoveredId, onSelectPlot, on
       }
     }
 
-    // Also always include hovered plot to prevent flickering
+    // Also always include hovered and selected plots to prevent flickering/disappearing.
+    // The selected plot must stay rendered even if the user pans away from it —
+    // its gold glow ring helps users find it again when panning back.
     if (hoveredId) visible.add(hoveredId)
+    if (selectedPlotId) visible.add(selectedPlotId)
 
     setVisiblePlotIds(prev => {
       // Only update state if the set actually changed (avoid re-renders)
@@ -1164,7 +1199,7 @@ function ViewportCulledPolygons({ plots, plotColors, hoveredId, onSelectPlot, on
       return visible
     })
     boundsRef.current = bounds
-  }, [map, plotBounds, hoveredId])
+  }, [map, plotBounds, hoveredId, selectedPlotId])
 
   useEffect(() => {
     updateVisibility()
@@ -1187,6 +1222,7 @@ function ViewportCulledPolygons({ plots, plotColors, hoveredId, onSelectPlot, on
       plot={plot}
       color={plotColors[plot.id] || statusColors[plot.status]}
       isHovered={hoveredId === plot.id}
+      isSelected={selectedPlotId === plot.id}
       onSelectPlot={onSelectPlot}
       onHover={onHover}
       onHoverEnd={onHoverEnd}
@@ -1747,6 +1783,7 @@ export default function MapArea({ plots, pois = [], selectedPlot, onSelectPlot, 
           plots={plots}
           plotColors={plotColors}
           hoveredId={hoveredId}
+          selectedPlotId={selectedPlot?.id}
           onSelectPlot={onSelectPlot}
           onHover={handleHover}
           onHoverEnd={handleHoverEnd}

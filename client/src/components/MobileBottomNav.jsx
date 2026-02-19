@@ -2,6 +2,7 @@ import { memo, useCallback } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Map, Heart, Calculator, BarChart3, Search } from 'lucide-react'
 import { useFavorites } from '../hooks/useFavorites'
+import { useScrollDirection } from '../hooks/useScrollDirection'
 
 /**
  * MobileBottomNav — Fixed bottom navigation for mobile (like Madlan/Yad2/Zillow).
@@ -9,6 +10,10 @@ import { useFavorites } from '../hooks/useFavorites'
  * Why: Mobile users need thumb-friendly navigation. Top hamburger menus require
  * reaching to the top of the screen. Bottom tabs follow iOS/Android conventions
  * and reduce navigation friction by 60%+ (Google Material Design research).
+ *
+ * Auto-hides when scrolling down to maximize content area (like Instagram/YouTube/Madlan).
+ * Slides back up when user scrolls up — they want to navigate. This gives back 56px of
+ * precious viewport on small screens, making the map and plot cards feel larger.
  *
  * Only shown on screens < 640px (sm breakpoint). Hidden on desktop where the
  * top nav is sufficient. Uses safe-area-inset for iPhone notch/home indicator.
@@ -46,13 +51,18 @@ function NavItem({ to, icon: Icon, label, isActive, badge, badgeCount }) {
 function MobileBottomNav() {
   const location = useLocation()
   const { favorites } = useFavorites()
+  const scrollDirection = useScrollDirection({ threshold: 20 })
 
   // Don't show on admin pages
   if (location.pathname.startsWith('/admin')) return null
 
+  // Auto-hide on scroll down, show on scroll up or at top.
+  // CSS transition handles the smooth slide animation.
+  const isHidden = scrollDirection === 'down'
+
   return (
     <nav
-      className="mobile-bnav"
+      className={`mobile-bnav ${isHidden ? 'is-hidden' : ''}`}
       dir="rtl"
       role="navigation"
       aria-label="ניווט מהיר"
