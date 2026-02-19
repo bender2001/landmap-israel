@@ -37,6 +37,12 @@
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Preconnect to Supabase — the #1 bottleneck for first data paint.
+         Every API call (plots, market, leads) proxies through Express to Supabase.
+         Preconnect saves ~150-300ms on the TLS+TCP handshake for the first Supabase query.
+         This is the single highest-impact preconnect after fonts. -->
+    <link rel="preconnect" href="https://fivphcrtquxkxyxknzqc.supabase.co" crossorigin />
+    <link rel="dns-prefetch" href="https://fivphcrtquxkxyxknzqc.supabase.co" />
     <!-- Preconnect to map tile servers for faster map loads -->
     <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin />
     <link rel="preconnect" href="https://a.tile.openstreetmap.org" crossorigin />

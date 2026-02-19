@@ -12,6 +12,7 @@ import { whatsappShareLink, useNativeShare, buildPlotShareData } from '../utils/
 import { useDragScroll } from '../hooks/useDragScroll'
 import { useViewportPrefetch } from '../hooks/useViewportPrefetch'
 import { useImpressionTracker } from '../hooks/useImpressionTracker'
+import SmartInsights from './SmartInsights'
 
 /**
  * Compute price-per-sqm percentile for each plot relative to all plots.
@@ -887,6 +888,12 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
           )}
         </div>
       )}
+
+      {/* Smart Investment Insights — Bloomberg-style contextual intelligence bar.
+          Surfaces non-obvious patterns from the filtered dataset: yield spreads,
+          city comparisons, undervalued opportunities, best grades. Rotates every 6s.
+          Key differentiator: Madlan/Yad2 show raw data, we show actionable intelligence. */}
+      <SmartInsights plots={plots} />
 
       {/* Scroll position indicator — shows "X/Y" and progress bar (like Madlan's results counter) */}
       {plots.length > 3 && (
