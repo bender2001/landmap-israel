@@ -22,6 +22,15 @@ class AnalyticsService {
     this.conversionsByChannel = {} // { channel: count }
     this.conversionsByPlot = {}   // { plotId: count }
 
+    // Impression tracking — counts how many times each plot was *seen* (not just clicked).
+    // Impression data is the denominator for CTR (Click-Through Rate) calculation:
+    //   CTR = clicks / impressions
+    // YouTube, TikTok, and Instagram all use impressions for feed algorithms.
+    // With this + plotClicks, we can surface plots with high impressions but low clicks
+    // (possible UX issues) or high CTR (strong demand signals).
+    this.impressions = {}         // { plotId: count }
+    this.impressionEvents = 0     // total impression events received
+
     // Core Web Vitals — tracks LCP, INP, CLS, TTFB, FID from real users.
     // Stored in-memory with rolling window. Provides p75 aggregates
     // (the same percentile Google uses for CWV ranking decisions).
@@ -107,6 +116,38 @@ class AnalyticsService {
   trackPlotClick(plotId) {
     if (!plotId) return
     this.plotClicks[plotId] = (this.plotClicks[plotId] || 0) + 1
+  }
+
+  /**
+   * Record plot impressions (plots seen in the card strip / viewport).
+   * Accepts a batch of { plotId } entries from the client's IntersectionObserver.
+   * @param {{ plotId: string }[]} batch - Array of impression entries
+   */
+  trackImpressions(batch) {
+    if (!Array.isArray(batch)) return
+    for (const entry of batch) {
+      if (!entry?.plotId || typeof entry.plotId !== 'string') continue
+      const id = entry.plotId.slice(0, 50) // sanitize
+      this.impressions[id] = (this.impressions[id] || 0) + 1
+      this.impressionEvents++
+    }
+  }
+
+  /**
+   * Get Click-Through Rate (CTR) for each plot — clicks / impressions.
+   * High CTR = strong demand signal → candidates for "Featured Deals".
+   * Low CTR with high impressions = possible pricing or presentation issue.
+   * @param {number} limit - Max results
+   */
+  getPlotCTR(limit = 20) {
+    const results = []
+    for (const [plotId, impressionCount] of Object.entries(this.impressions)) {
+      if (impressionCount < 3) continue // Skip noise (< 3 impressions)
+      const clicks = this.plotClicks[plotId] || 0
+      const ctr = Math.round((clicks / impressionCount) * 10000) / 100 // percentage with 2 decimals
+      results.push({ plotId, impressions: impressionCount, clicks, ctr })
+    }
+    return results.sort((a, b) => b.ctr - a.ctr).slice(0, limit)
   }
 
   trackSession() {
@@ -230,6 +271,11 @@ class AnalyticsService {
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count),
       topPlots: this.getTopPlots(10),
+      impressions: {
+        totalEvents: this.impressionEvents,
+        uniquePlots: Object.keys(this.impressions).length,
+        topCTR: this.getPlotCTR(10),
+      },
       vitals: this.getVitalsSummary(),
       conversions: this.getConversionSummary(),
     }

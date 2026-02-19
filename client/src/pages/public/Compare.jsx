@@ -400,6 +400,182 @@ function WinnerSummary({ plots }) {
   )
 }
 
+/**
+ * RiskReturnScatter — the foundational investment analysis chart.
+ * Plots each compared plot on a 2D risk/return scatter:
+ *   X-axis: Risk (higher = riskier) — based on zoning stage, days on market, price volatility
+ *   Y-axis: Return (higher = better) — ROI percentage
+ *
+ * The ideal investment sits in the TOP-LEFT quadrant (high return, low risk).
+ * This is how institutional investors evaluate real assets — a chart like this
+ * positions LandMap as a professional-grade tool, far beyond Madlan/Yad2's
+ * simple table comparisons.
+ *
+ * Risk scoring (0-10):
+ *   - Early zoning stages are riskier (AGRICULTURAL = 9, BUILDING_PERMIT = 1)
+ *   - Longer holding periods add risk (time value of money)
+ *   - Uses server-computed _riskScore when available
+ */
+function RiskReturnScatter({ plots }) {
+  if (!plots || plots.length < 2) return null
+
+  const ZONING_RISK = {
+    AGRICULTURAL: 9,
+    MASTER_PLAN_DEPOSIT: 7.5,
+    MASTER_PLAN_APPROVED: 6,
+    DETAILED_PLAN_PREP: 5,
+    DETAILED_PLAN_DEPOSIT: 4,
+    DETAILED_PLAN_APPROVED: 3,
+    DEVELOPER_TENDER: 2,
+    BUILDING_PERMIT: 1,
+  }
+
+  const READINESS_RISK = {
+    '1-3': 2,
+    '3-5': 4,
+    '5-7': 6,
+    '5+': 7,
+    '7-10': 8,
+    '10+': 9,
+  }
+
+  const dataPoints = plots.map((p, i) => {
+    const price = p.total_price ?? p.totalPrice ?? 0
+    const proj = p.projected_value ?? p.projectedValue ?? 0
+    const roi = price > 0 ? Math.round(((proj - price) / price) * 100) : 0
+    const zoning = p.zoning_stage ?? p.zoningStage ?? 'AGRICULTURAL'
+    const readiness = p.readiness_estimate ?? p.readinessEstimate ?? '5+'
+
+    // Composite risk score (0-10): weighted average of zoning risk + time risk
+    const zoningRisk = ZONING_RISK[zoning] ?? 5
+    const timeRisk = READINESS_RISK[readiness] ?? 5
+    // Prefer server-computed risk score if available
+    const risk = p._riskScore ?? Math.round((zoningRisk * 0.6 + timeRisk * 0.4) * 10) / 10
+
+    return { plot: p, roi, risk, color: PLOT_COLORS[i], index: i }
+  })
+
+  // Chart dimensions
+  const W = 320, H = 220
+  const pad = { top: 25, right: 25, bottom: 35, left: 45 }
+  const chartW = W - pad.left - pad.right
+  const chartH = H - pad.top - pad.bottom
+
+  // Scales
+  const minRoi = Math.min(0, ...dataPoints.map(d => d.roi))
+  const maxRoi = Math.max(100, ...dataPoints.map(d => d.roi)) * 1.1
+  const maxRisk = 10
+
+  const scaleX = (risk) => pad.left + (risk / maxRisk) * chartW
+  const scaleY = (roi) => pad.top + chartH - ((roi - minRoi) / (maxRoi - minRoi)) * chartH
+
+  // Quadrant boundaries (risk=5, roi=median)
+  const medianRoi = dataPoints.length > 0
+    ? [...dataPoints].sort((a, b) => a.roi - b.roi)[Math.floor(dataPoints.length / 2)].roi
+    : 100
+  const quadX = scaleX(5)
+  const quadY = scaleY(medianRoi)
+
+  return (
+    <div className="glass-panel p-6 mb-6">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/20 flex items-center justify-center">
+          <TrendingUp className="w-4.5 h-4.5 text-purple-400" />
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-slate-100">סיכון מול תשואה</h3>
+          <p className="text-[10px] text-slate-500">הפינה השמאלית-עליונה = ההשקעה האידיאלית (תשואה גבוהה, סיכון נמוך)</p>
+        </div>
+      </div>
+
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[400px] mx-auto" dir="ltr">
+        {/* Background quadrants */}
+        {/* Top-left: Best (high return, low risk) */}
+        <rect x={pad.left} y={pad.top} width={quadX - pad.left} height={quadY - pad.top} fill="rgba(34,197,94,0.04)" />
+        {/* Top-right: High return, high risk */}
+        <rect x={quadX} y={pad.top} width={pad.left + chartW - quadX} height={quadY - pad.top} fill="rgba(245,158,11,0.04)" />
+        {/* Bottom-left: Low return, low risk */}
+        <rect x={pad.left} y={quadY} width={quadX - pad.left} height={pad.top + chartH - quadY} fill="rgba(148,163,184,0.04)" />
+        {/* Bottom-right: Worst (low return, high risk) */}
+        <rect x={quadX} y={quadY} width={pad.left + chartW - quadX} height={pad.top + chartH - quadY} fill="rgba(239,68,68,0.04)" />
+
+        {/* Quadrant dividers */}
+        <line x1={quadX} y1={pad.top} x2={quadX} y2={pad.top + chartH} stroke="rgba(255,255,255,0.06)" strokeWidth="1" strokeDasharray="4 4" />
+        <line x1={pad.left} y1={quadY} x2={pad.left + chartW} y2={quadY} stroke="rgba(255,255,255,0.06)" strokeWidth="1" strokeDasharray="4 4" />
+
+        {/* Quadrant labels */}
+        <text x={pad.left + 4} y={pad.top + 12} className="text-[7px] fill-emerald-400/50">⭐ אידיאלי</text>
+        <text x={pad.left + chartW - 4} y={pad.top + chartH - 4} textAnchor="end" className="text-[7px] fill-red-400/50">⚠️ מסוכן</text>
+
+        {/* Axes */}
+        <line x1={pad.left} y1={pad.top + chartH} x2={pad.left + chartW} y2={pad.top + chartH} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+        <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + chartH} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+
+        {/* X-axis ticks */}
+        {[0, 2.5, 5, 7.5, 10].map(v => (
+          <g key={`x-${v}`}>
+            <line x1={scaleX(v)} y1={pad.top + chartH} x2={scaleX(v)} y2={pad.top + chartH + 4} stroke="rgba(255,255,255,0.1)" />
+            <text x={scaleX(v)} y={pad.top + chartH + 14} textAnchor="middle" className="text-[8px] fill-slate-500">{v}</text>
+          </g>
+        ))}
+
+        {/* Y-axis ticks */}
+        {[0, 50, 100, 150, 200, 250].filter(v => v >= minRoi && v <= maxRoi).map(v => (
+          <g key={`y-${v}`}>
+            <line x1={pad.left - 4} y1={scaleY(v)} x2={pad.left} y2={scaleY(v)} stroke="rgba(255,255,255,0.1)" />
+            <text x={pad.left - 8} y={scaleY(v) + 3} textAnchor="end" className="text-[8px] fill-slate-500">{v}%</text>
+            {/* Grid line */}
+            <line x1={pad.left} y1={scaleY(v)} x2={pad.left + chartW} y2={scaleY(v)} stroke="rgba(255,255,255,0.03)" />
+          </g>
+        ))}
+
+        {/* Axis labels */}
+        <text x={pad.left + chartW / 2} y={H - 2} textAnchor="middle" className="text-[9px] fill-slate-400">סיכון →</text>
+        <text x={8} y={pad.top + chartH / 2} textAnchor="middle" className="text-[9px] fill-slate-400" transform={`rotate(-90, 8, ${pad.top + chartH / 2})`}>תשואה % →</text>
+
+        {/* Data points with labels */}
+        {dataPoints.map(({ plot, roi, risk, color, index }) => {
+          const cx = scaleX(risk)
+          const cy = scaleY(roi)
+          const bn = plot.block_number ?? plot.blockNumber
+          return (
+            <g key={plot.id}>
+              {/* Glow effect */}
+              <circle cx={cx} cy={cy} r="12" fill={`${color}15`} />
+              {/* Main dot */}
+              <circle cx={cx} cy={cy} r="6" fill={color} stroke="#1a1a2e" strokeWidth="2" />
+              {/* Label */}
+              <text
+                x={cx}
+                y={cy - 10}
+                textAnchor="middle"
+                className="text-[8px] font-bold"
+                fill={color}
+              >
+                {bn}/{plot.number}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 mt-2">
+        {dataPoints.map(({ plot, roi, risk, color }) => {
+          const bn = plot.block_number ?? plot.blockNumber
+          return (
+            <div key={plot.id} className="flex items-center gap-1.5 text-[10px] text-slate-400">
+              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: color }} />
+              <span>{bn}/{plot.number}</span>
+              <span className="text-slate-600">({roi}% / {risk})</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function CompareCell({ value, highlight = false, className = '' }) {
   return (
     <td className={`py-3 px-4 text-sm ${highlight ? 'text-gold font-bold' : 'text-slate-300'} ${className}`}>
@@ -580,6 +756,12 @@ export default function Compare() {
             {plots.length >= 2 && (
               <>
                 <CompareRadar plots={plots} />
+
+                {/* Risk vs Return Scatter — the fundamental institutional investment chart.
+                    Shows each plot on a 2D risk/return plane. Top-left = ideal (high return, low risk).
+                    This is how hedge funds and PE firms evaluate assets — positioning LandMap
+                    as a professional-grade platform that goes far beyond Madlan/Yad2's basic tables. */}
+                <RiskReturnScatter plots={plots} />
 
                 <div className="glass-panel p-6 mb-6">
                   <h3 className="text-base font-bold text-slate-100 mb-4 flex items-center gap-2">

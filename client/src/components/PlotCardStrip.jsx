@@ -11,6 +11,7 @@ import { useAreaAverages } from '../hooks/useAreaAverages'
 import { whatsappShareLink, useNativeShare, buildPlotShareData } from '../utils/config'
 import { useDragScroll } from '../hooks/useDragScroll'
 import { useViewportPrefetch } from '../hooks/useViewportPrefetch'
+import { useImpressionTracker } from '../hooks/useImpressionTracker'
 
 /**
  * Compute price-per-sqm percentile for each plot relative to all plots.
@@ -193,7 +194,7 @@ const QuickCopyButton = memo(function QuickCopyButton({ plot }) {
   )
 })
 
-const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, isFavorite, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, onToggleFavorite, prefetchPlot, priceChange, pricePercentile, categoryBadges, distanceKm, imagePriority = false }) {
+const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, isFavorite, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, onToggleFavorite, prefetchPlot, priceChange, pricePercentile, categoryBadges, distanceKm, imagePriority = false, observeImpression }) {
   // Viewport-based prefetching — loads plot detail into React Query cache when the card
   // scrolls into (or near) the visible area. On mobile, users scroll and tap without
   // hovering, so this ensures data is ready before the click. Skips if already selected
@@ -226,7 +227,13 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
 
   return (
     <div
-      ref={viewportRef}
+      ref={(el) => {
+        // Combine viewport prefetch ref and impression tracking ref on the same element.
+        // Both use IntersectionObserver internally but with different thresholds/callbacks.
+        if (typeof viewportRef === 'function') viewportRef(el)
+        else if (viewportRef) viewportRef.current = el
+        if (observeImpression && el) observeImpression(el, plot.id)
+      }}
       data-plot-id={plot.id}
       role="option"
       aria-selected={isSelected}
@@ -586,6 +593,15 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
 
 export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare, isLoading = false, onClearFilters, getPriceChange, favorites, userLocation }) {
   const prefetchPlot = usePrefetchPlot()
+  // Impression tracking — tracks which plots the user actually SEES in the card strip.
+  // Feeds into analytics CTR calculation: impressions vs clicks per plot.
+  // High impressions + low clicks = possible pricing/presentation issue.
+  // High CTR = strong demand signal for the "featured deals" algorithm.
+  const { observeRef: observeImpression } = useImpressionTracker({
+    threshold: 0.5,       // Card must be 50% visible to count
+    cooldownMs: 60_000,   // Don't re-count same plot within 1 minute
+    batchFlushMs: 8_000,  // Flush batch every 8 seconds
+  })
   const areaAverages = useAreaAverages(plots)
   const pricePercentiles = usePricePercentiles(plots)
   // "Best in category" badges — highlight top deals in filtered results (like Madlan's deal indicators)
@@ -928,6 +944,7 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
             categoryBadges={bestInCategory.get(plot.id)?.badges ?? null}
             distanceKm={plotDistances.get(plot.id) ?? null}
             imagePriority={index < 3}
+            observeImpression={observeImpression}
           />
         ))}
       </div>

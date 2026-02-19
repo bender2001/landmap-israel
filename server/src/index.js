@@ -318,6 +318,19 @@ app.get('/api/events', (req, res) => {
 // without admin auth and feeds into the analytics service for p75 monitoring.
 app.use('/api/vitals', vitalsRoutes)
 
+// ─── Impression tracking (lightweight fire-and-forget beacon) ───
+// Tracks which plots users actually SEE in the card strip / viewport.
+// Combined with click data (plotClicks), this gives us CTR per plot —
+// the key metric for ranking algorithms (like YouTube's impression-to-click ratio).
+// Accepts batched POST beacons from the client's IntersectionObserver.
+app.post('/api/analytics/impressions', (req, res) => {
+  const { impressions } = req.body || {}
+  if (Array.isArray(impressions) && impressions.length <= 100) {
+    analytics.trackImpressions(impressions)
+  }
+  res.status(204).end()
+})
+
 // ─── Contact conversion tracking (lightweight fire-and-forget beacon) ───
 // Tracks WhatsApp/Telegram/Phone/Lead clicks for marketing ROI measurement.
 // Like Madlan's internal funnel metrics — critical for business intelligence.
