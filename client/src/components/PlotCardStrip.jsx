@@ -4,7 +4,7 @@ import PriceSparkline from './ui/PriceSparkline'
 import ZoningProgressBar from './ui/ZoningProgressBar'
 import CardImageCarousel from './ui/CardImageCarousel'
 import { statusColors, statusLabels } from '../utils/constants'
-import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, getInvestmentGrade, formatRelativeTime, getFreshnessColor, calcCAGR, calcMonthlyPayment, formatMonthlyPayment, calcDemandVelocity, calcBestInCategory, calcBuildableValue } from '../utils/formatters'
+import { formatPriceShort, formatCurrency, calcInvestmentScore, getScoreLabel, getInvestmentGrade, formatRelativeTime, getFreshnessColor, calcCAGR, calcMonthlyPayment, formatMonthlyPayment, calcDemandVelocity, calcBestInCategory, calcBuildableValue, plotCenter, haversineKm, formatDistanceKm } from '../utils/formatters'
 import { calcTransactionCosts } from '../utils/plot'
 import { usePrefetchPlot } from '../hooks/usePlots'
 import { useAreaAverages } from '../hooks/useAreaAverages'
@@ -152,7 +152,7 @@ const PlotShareButtons = memo(function PlotShareButtons({ plot, blockNum, price,
   )
 })
 
-const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, isFavorite, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, onToggleFavorite, prefetchPlot, priceChange, pricePercentile, categoryBadges }) {
+const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, isFavorite, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, onToggleFavorite, prefetchPlot, priceChange, pricePercentile, categoryBadges, distanceKm }) {
   // Viewport-based prefetching — loads plot detail into React Query cache when the card
   // scrolls into (or near) the visible area. On mobile, users scroll and tap without
   // hovering, so this ensures data is ready before the click. Skips if already selected
@@ -287,6 +287,15 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
         <div className="plot-card-mini-city">
           <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
           <span>{plot.city}</span>
+          {/* Distance from user — shown when geolocation is active (like Madlan/Yad2's proximity indicator) */}
+          {distanceKm != null && (
+            <span
+              className="text-[8px] text-blue-400/80 font-medium whitespace-nowrap"
+              title={`${distanceKm.toFixed(1)} ק״מ ממיקומך`}
+            >
+              📍 {formatDistanceKm(distanceKm)}
+            </span>
+          )}
           {(() => {
             // Prefer server-computed score when available (reduces client CPU)
             const score = plot._investmentScore ?? calcInvestmentScore(plot)
@@ -458,12 +467,26 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
   )
 })
 
-export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare, isLoading = false, onClearFilters, getPriceChange, favorites }) {
+export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare, isLoading = false, onClearFilters, getPriceChange, favorites, userLocation }) {
   const prefetchPlot = usePrefetchPlot()
   const areaAverages = useAreaAverages(plots)
   const pricePercentiles = usePricePercentiles(plots)
   // "Best in category" badges — highlight top deals in filtered results (like Madlan's deal indicators)
   const bestInCategory = useMemo(() => calcBestInCategory(plots), [plots])
+
+  // Precompute distances from user — only when geolocation is active.
+  // Returns Map<plotId, distanceKm>. Memoized to avoid haversine math on every render.
+  const plotDistances = useMemo(() => {
+    if (!userLocation) return new Map()
+    const result = new Map()
+    for (const p of plots) {
+      const center = plotCenter(p.coordinates)
+      if (center) {
+        result.set(p.id, haversineKm(userLocation.lat, userLocation.lng, center.lat, center.lng))
+      }
+    }
+    return result
+  }, [plots, userLocation])
   const scrollRef = useRef(null)
 
   // Desktop drag-to-scroll — like Madlan/Airbnb card strips where you grab and drag.
@@ -749,6 +772,7 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
             priceChange={getPriceChange ? getPriceChange(plot.id) : null}
             pricePercentile={pricePercentiles.get(plot.id) ?? null}
             categoryBadges={bestInCategory.get(plot.id)?.badges ?? null}
+            distanceKm={plotDistances.get(plot.id) ?? null}
           />
         ))}
       </div>

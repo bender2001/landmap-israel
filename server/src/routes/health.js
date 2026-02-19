@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { supabaseAdmin } from '../config/supabase.js'
 import { plotCache, statsCache, marketCache } from '../services/cacheService.js'
 import { getClientCount } from '../services/sseService.js'
+import { responseTracker } from '../services/responseTimeTracker.js'
 
 const router = Router()
 
@@ -75,7 +76,11 @@ router.get('/', async (req, res) => {
     market: getCacheStats(marketCache),
   }
 
-  // 4. Uptime
+  // 4. API response time percentiles (P50/P75/P95/P99)
+  // Like Google's latency SLOs — tracks whether API meets its performance budget.
+  checks.latency = responseTracker.getStats()
+
+  // 5. Uptime
   const uptimeSec = Math.round((Date.now() - startedAt) / 1000)
 
   const statusCode = overallStatus === 'error' ? 503 : 200

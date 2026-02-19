@@ -549,6 +549,61 @@ router.post('/:id/view', sanitizePlotId, async (req, res) => {
   }
 })
 
+// GET /api/plots/by-gush/:block/:parcel — SEO-friendly plot lookup by gush/helka numbers.
+// Enables human-readable URLs like /plot/by-gush/10043/15 for search engines and sharing.
+// Google indexes these better than UUID-based URLs, and investors naturally search
+// "גוש 10043 חלקה 15" — this route resolves that to the actual plot.
+// Returns 301 redirect to the canonical UUID-based URL for deduplication.
+router.get('/by-gush/:block/:parcel', async (req, res, next) => {
+  try {
+    const { block, parcel } = req.params
+    // Validate inputs — must be numeric
+    if (!/^\d+$/.test(block) || !/^\d+$/.test(parcel)) {
+      return res.status(400).json({
+        error: 'מספר גוש/חלקה לא תקין',
+        errorCode: 'INVALID_GUSH_HELKA',
+      })
+    }
+
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
+
+    const cacheKey = `gush:${block}:${parcel}`
+    const plot = await plotCache.wrap(cacheKey, async () => {
+      const { data, error } = await supabaseAdmin
+        .from('plots')
+        .select('id, block_number, number, city')
+        .eq('block_number', parseInt(block, 10))
+        .eq('number', parcel)
+        .eq('is_published', true)
+        .limit(1)
+        .single()
+
+      if (error && error.code !== 'PGRST116') throw error // PGRST116 = no rows
+      return data || null
+    }, 300_000)
+
+    if (!plot) {
+      return res.status(404).json({
+        error: `לא נמצאה חלקה: גוש ${block} חלקה ${parcel}`,
+        errorCode: 'PLOT_NOT_FOUND',
+        suggestion: 'נסה לחפש במפה הראשית',
+      })
+    }
+
+    // Return the plot info with its canonical ID (for API consumers)
+    // The frontend can use this to redirect to /plot/:id
+    res.json({
+      id: plot.id,
+      block_number: plot.block_number,
+      number: plot.number,
+      city: plot.city,
+      url: `/plot/${plot.id}`,
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
 // GET /api/plots/:id - Single plot with documents & images
 router.get('/:id', sanitizePlotId, async (req, res, next) => {
   try {

@@ -34,6 +34,7 @@ import vitalsRoutes from './routes/vitals.js'
 import { errorHandler, requestId } from './middleware/errorHandler.js'
 import { requestTimeout } from './middleware/timeout.js'
 import { supabaseAdmin } from './config/supabase.js'
+import { responseTracker } from './services/responseTimeTracker.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -160,7 +161,11 @@ app.use((req, res, next) => {
       res.set('Server-Timing', `total;dur=${ms.toFixed(1)};desc="Server"`)
     }
     // Skip logging for health checks and SSE — they're too noisy
-    if (req.originalUrl === '/api/health' || req.originalUrl === '/api/events') return
+    if (req.originalUrl === '/api/health' || req.originalUrl === '/api/health/ping' || req.originalUrl === '/api/events') return
+    // Track response time percentiles for API routes (P50/P75/P95/P99)
+    if (req.originalUrl.startsWith('/api/')) {
+      responseTracker.record(req.method, req.originalUrl, ms)
+    }
     // Log slow requests at warn level (>2s), others at info
     const level = ms > 2000 ? 'warn' : 'info'
     const cacheHit = res.getHeader('X-Cache')
@@ -344,6 +349,46 @@ if (process.env.NODE_ENV === 'production') {
       }
     },
   }))
+
+  // SEO-friendly gush/helka URL — resolves block+parcel to canonical plot page.
+  // Handles social bots (WhatsApp, Telegram, Facebook) and search engine crawlers
+  // that access /plot/by-gush/10043/15 directly.
+  app.get('/plot/by-gush/:block/:parcel', async (req, res) => {
+    try {
+      const { block, parcel } = req.params
+      const { supabaseAdmin: sb } = await import('./config/supabase.js')
+      const { data: plot } = await sb
+        .from('plots')
+        .select('id, block_number, number, city, total_price, projected_value, size_sqm, description')
+        .eq('block_number', parseInt(block, 10))
+        .eq('number', parcel)
+        .eq('is_published', true)
+        .limit(1)
+        .single()
+
+      if (plot) {
+        const baseUrl = getBaseUrl(req)
+        const price = plot.total_price ?? 0
+        const sizeSqM = plot.size_sqm ?? 0
+        const projValue = plot.projected_value ?? 0
+        const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
+        const dunam = (sizeSqM / 1000).toFixed(1)
+        const priceK = Math.round(price / 1000)
+
+        await sendWithOgMeta({
+          req, res,
+          title: `גוש ${block} חלקה ${parcel} - ${plot.city} | LandMap Israel`,
+          description: `קרקע להשקעה ב${plot.city} · ₪${priceK.toLocaleString()}K · ${dunam} דונם · תשואה +${roi}%`.slice(0, 200),
+          url: `${baseUrl}/plot/${plot.id}`,
+          cacheControl: 'public, max-age=300, stale-while-revalidate=600',
+        })
+      } else {
+        sendFallback(res)
+      }
+    } catch {
+      sendFallback(res)
+    }
+  })
 
   // OG meta injection for /plot/:id — enables rich social previews (WhatsApp, Telegram, Facebook)
   app.get('/plot/:id', async (req, res) => {

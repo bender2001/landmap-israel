@@ -7,6 +7,13 @@ import RouteProgressBar from './components/ui/RouteProgressBar'
 import MobileBottomNav from './components/MobileBottomNav'
 import { useWebVitals } from './hooks/useWebVitals'
 
+/**
+ * GushRedirect — resolves SEO-friendly /plot/by-gush/BLOCK/PARCEL to the canonical /plot/:id URL.
+ * Enables human-readable URLs that Google and investors can understand ("גוש 10043 חלקה 15").
+ * Makes a quick API call to resolve block+parcel → UUID, then redirects.
+ */
+const GushRedirect = lazy(() => import('./pages/public/GushRedirect'))
+
 // Lazy-load overlay components — they're all conditional (first visit, consent, PWA)
 // and don't need to be in the initial bundle (saves ~8-12KB from index.js).
 const IntroOverlay = lazy(() => import('./components/IntroOverlay'))
@@ -88,6 +95,7 @@ export default function App() {
             <Routes>
               {/* Public */}
               <Route path="/" element={<MapView />} />
+              <Route path="/plot/by-gush/:block/:parcel" element={<GushRedirect />} />
               <Route path="/plot/:id" element={<PlotDetail />} />
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />

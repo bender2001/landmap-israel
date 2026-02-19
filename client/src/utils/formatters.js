@@ -983,6 +983,21 @@ export function haversineKm(lat1, lng1, lat2, lng2) {
 }
 
 /**
+ * Format a distance in km for display — compact, human-readable.
+ * < 1 km → "850 מ׳" (meters)
+ * 1-10 km → "2.5 ק״מ" (one decimal)
+ * 10+ km → "15 ק״מ" (rounded)
+ * Like Madlan/Yad2's distance badges on listing cards.
+ */
+export function formatDistanceKm(km) {
+  if (!isFinite(km) || km < 0) return null
+  if (km < 0.1) return 'כאן'
+  if (km < 1) return `${Math.round(km * 1000)} מ׳`
+  if (km < 10) return `${km.toFixed(1)} ק״מ`
+  return `${Math.round(km)} ק״מ`
+}
+
+/**
  * Estimate driving time to major Israeli cities from a given coordinate.
  * Uses haversine straight-line distance with a road-factor multiplier
  * (Israeli roads add ~30-40% distance vs straight line due to terrain & route).
