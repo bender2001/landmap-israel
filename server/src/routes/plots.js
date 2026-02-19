@@ -180,6 +180,11 @@ router.get('/', sanitizePlotQuery, async (req, res, next) => {
     // Add total count header for pagination-ready responses
     res.set('X-Total-Count', String(plots.length))
 
+    // Indicate fuzzy search results — lets the UI show "did you mean?" hints
+    if (plots._fuzzy) {
+      res.set('X-Search-Fuzzy', 'true')
+    }
+
     // Last-Modified from most recent updated_at — enables If-Modified-Since
     // conditional requests from CDNs, proxies, and browsers. ETag handles
     // content-level dedup; Last-Modified covers time-based cache validation.

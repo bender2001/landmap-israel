@@ -1249,6 +1249,21 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   </span>
                 )
               })()}
+              {/* Area market trend — 30-day price direction from server-computed snapshots.
+                  Lets investors instantly see if the area is appreciating or depreciating.
+                  Like Madlan's area trend arrows on individual listings. */}
+              {plot._marketTrend && plot._marketTrend.direction !== 'stable' && (
+                <span
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                    plot._marketTrend.direction === 'up'
+                      ? 'bg-emerald-500/10 border border-emerald-500/25 text-emerald-400'
+                      : 'bg-red-500/10 border border-red-500/25 text-red-400'
+                  }`}
+                  title={`מגמת אזור ${plot.city}: ${plot._marketTrend.direction === 'up' ? 'עלייה' : 'ירידה'} של ${Math.abs(plot._marketTrend.changePct)}% ב-30 יום אחרונים`}
+                >
+                  {plot._marketTrend.direction === 'up' ? '📈' : '📉'} {plot.city} {plot._marketTrend.changePct > 0 ? '+' : ''}{plot._marketTrend.changePct}%
+                </span>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">

@@ -311,6 +311,20 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
               </span>
             )
           })()}
+          {/* Area market trend — shows if the city is trending up/down based on 30-day price snapshots.
+              Like Madlan's area arrows — gives instant market context without opening area details. */}
+          {plot._marketTrend && plot._marketTrend.direction !== 'stable' && (
+            <span
+              className={`text-[7px] font-bold ${
+                plot._marketTrend.direction === 'up'
+                  ? 'text-emerald-400/80'
+                  : 'text-red-400/80'
+              }`}
+              title={`מגמת אזור ${plot.city}: ${plot._marketTrend.direction === 'up' ? 'עלייה' : 'ירידה'} ${Math.abs(plot._marketTrend.changePct)}% ב-30 יום`}
+            >
+              {plot._marketTrend.direction === 'up' ? '📈' : '📉'} {plot._marketTrend.changePct > 0 ? '+' : ''}{plot._marketTrend.changePct}%
+            </span>
+          )}
           {viewCount > 0 ? (
             <span className="text-[8px] text-indigo-400/60 mr-auto" title={`${viewCount} צפיות`}>
               👁 {viewCount}

@@ -1,5 +1,82 @@
 import { supabaseAdmin } from '../config/supabase.js'
 
+// ─── Area Market Trend Cache ──────────────────────────────────────────────
+// Caches per-city price trend direction based on price_snapshots.
+// Refreshed every 10 minutes. Shows investors whether the area is appreciating,
+// depreciating, or stable — like Madlan's area trend arrows.
+let areaMarketTrends = new Map() // city → { direction: 'up'|'down'|'stable', changePct: number }
+let areaMarketTrendsUpdatedAt = 0
+const AREA_TREND_TTL = 10 * 60 * 1000 // 10 min
+
+async function refreshAreaMarketTrends() {
+  const now = Date.now()
+  if (now - areaMarketTrendsUpdatedAt < AREA_TREND_TTL && areaMarketTrends.size > 0) {
+    return areaMarketTrends
+  }
+  try {
+    // Get snapshots from last 30 days, grouped by city
+    const thirtyDaysAgo = new Date(now - 30 * 86400000).toISOString().slice(0, 10)
+    const { data, error } = await supabaseAdmin
+      .from('price_snapshots')
+      .select('total_price, price_per_sqm, snapshot_date, plots!inner(city)')
+      .gte('snapshot_date', thirtyDaysAgo)
+      .order('snapshot_date', { ascending: true })
+
+    if (error) {
+      // Table may not exist — degrade gracefully
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        areaMarketTrendsUpdatedAt = now
+        return areaMarketTrends
+      }
+      throw error
+    }
+
+    if (!data || data.length === 0) {
+      areaMarketTrendsUpdatedAt = now
+      return areaMarketTrends
+    }
+
+    // Split into first-half and second-half of the 30-day window
+    const midDate = new Date(now - 15 * 86400000).toISOString().slice(0, 10)
+    const cityFirst = {} // city → { totalPsm, count }
+    const citySecond = {}
+
+    for (const row of data) {
+      const city = row.plots?.city
+      if (!city || !row.price_per_sqm) continue
+      const bucket = row.snapshot_date < midDate ? cityFirst : citySecond
+      if (!bucket[city]) bucket[city] = { totalPsm: 0, count: 0 }
+      bucket[city].totalPsm += row.price_per_sqm
+      bucket[city].count += 1
+    }
+
+    // Compute trend per city
+    const trends = new Map()
+    const allCities = new Set([...Object.keys(cityFirst), ...Object.keys(citySecond)])
+    for (const city of allCities) {
+      const first = cityFirst[city]
+      const second = citySecond[city]
+      if (!first || !second || first.count === 0 || second.count === 0) {
+        trends.set(city, { direction: 'stable', changePct: 0 })
+        continue
+      }
+      const avgFirst = first.totalPsm / first.count
+      const avgSecond = second.totalPsm / second.count
+      const changePct = Math.round(((avgSecond - avgFirst) / avgFirst) * 100)
+      const direction = changePct > 2 ? 'up' : changePct < -2 ? 'down' : 'stable'
+      trends.set(city, { direction, changePct })
+    }
+
+    areaMarketTrends = trends
+    areaMarketTrendsUpdatedAt = now
+    return trends
+  } catch (err) {
+    console.warn('[plotService] area trend refresh failed:', err.message)
+    areaMarketTrendsUpdatedAt = now // Don't retry immediately on error
+    return areaMarketTrends
+  }
+}
+
 /**
  * Compute an investment score (1-10) for a plot — server-side equivalent
  * of the client's calcInvestmentScore(). Running this server-side:
@@ -54,9 +131,13 @@ function computeGrade(score) {
  * Enrich an array of plots with computed investment metrics.
  * Adds _investmentScore, _grade, and _roi fields to each plot.
  */
-function enrichPlotsWithScores(plots) {
+async function enrichPlotsWithScores(plots) {
   if (!plots || plots.length === 0) return plots
   const now = Date.now()
+
+  // Fetch area trends (cached, non-blocking on cache hit)
+  const trends = await refreshAreaMarketTrends()
+
   for (const p of plots) {
     const price = p.total_price || 0
     const projected = p.projected_value || 0
@@ -88,6 +169,13 @@ function enrichPlotsWithScores(plots) {
       )
     } else {
       p._monthlyPayment = null
+    }
+
+    // Area market trend — shows if the city's price/sqm is trending up, down, or stable
+    // over the last 30 days. Like Madlan's area trend indicators. Enables "hot market" badges.
+    const cityTrend = trends.get(p.city)
+    if (cityTrend) {
+      p._marketTrend = cityTrend // { direction: 'up'|'down'|'stable', changePct: number }
     }
   }
   return plots
@@ -182,8 +270,91 @@ export async function getPublishedPlots(filters = {}) {
     return count
   }
 
-  const { data, error } = await query
+  let { data, error } = await query
   if (error) throw error
+
+  // ─── Fuzzy search fallback ──────────────────────────────────────────
+  // When exact ilike search returns 0 results and user has a search query,
+  // retry without the text filter and apply Levenshtein fuzzy matching client-side.
+  // This handles Hebrew typos (e.g., "חדירה" instead of "חדרה") that ilike misses.
+  // Like Google's "Did you mean?" — investors shouldn't get 0 results for a typo.
+  if (data && data.length === 0 && filters.q && filters.q.trim().length >= 2) {
+    const fuzzyQuery = filters.q.trim().toLowerCase()
+    // Re-fetch without the text filter
+    const filtersWithoutQ = { ...filters }
+    delete filtersWithoutQ.q
+    let allQuery = supabaseAdmin
+      .from('plots')
+      .select('*, plot_images(id, url, alt)')
+      .eq('is_published', true)
+
+    if (filtersWithoutQ.city && filtersWithoutQ.city !== 'all') allQuery = allQuery.eq('city', filtersWithoutQ.city)
+    if (filtersWithoutQ.priceMin) allQuery = allQuery.gte('total_price', Number(filtersWithoutQ.priceMin))
+    if (filtersWithoutQ.priceMax) allQuery = allQuery.lte('total_price', Number(filtersWithoutQ.priceMax))
+    if (filtersWithoutQ.status) allQuery = allQuery.in('status', filtersWithoutQ.status.split(','))
+
+    const { data: allData } = await allQuery.order('created_at', { ascending: false })
+    if (allData && allData.length > 0) {
+      // Simple Levenshtein for short Hebrew strings
+      const lev = (a, b) => {
+        const m = a.length, n = b.length
+        if (m === 0) return n
+        if (n === 0) return m
+        const dp = Array.from({ length: m + 1 }, (_, i) => i)
+        for (let j = 1; j <= n; j++) {
+          let prev = dp[0]
+          dp[0] = j
+          for (let i = 1; i <= m; i++) {
+            const tmp = dp[i]
+            dp[i] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[i], dp[i - 1])
+            prev = tmp
+          }
+        }
+        return dp[m]
+      }
+
+      // Score each plot by best fuzzy match across searchable fields
+      const MAX_DISTANCE = Math.max(1, Math.floor(fuzzyQuery.length * 0.4)) // Allow ~40% edits
+      const fuzzyResults = allData
+        .map(p => {
+          const fields = [
+            (p.block_number || '').toString(),
+            (p.number || '').toString(),
+            (p.city || '').toLowerCase(),
+            (p.description || '').toLowerCase().slice(0, 200),
+          ]
+          let bestDist = Infinity
+          for (const field of fields) {
+            if (!field) continue
+            // Check substring windows of the field
+            if (field.includes(fuzzyQuery)) { bestDist = 0; break }
+            // Sliding window match for partial fuzzy
+            for (let start = 0; start <= field.length - fuzzyQuery.length; start++) {
+              const window = field.slice(start, start + fuzzyQuery.length)
+              const d = lev(fuzzyQuery, window)
+              if (d < bestDist) bestDist = d
+              if (d === 0) break
+            }
+            // Also check against full field (for short field names like city)
+            if (field.length <= fuzzyQuery.length + 3) {
+              const d = lev(fuzzyQuery, field)
+              if (d < bestDist) bestDist = d
+            }
+          }
+          return { plot: p, distance: bestDist }
+        })
+        .filter(r => r.distance <= MAX_DISTANCE)
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 20)
+        .map(r => r.plot)
+
+      if (fuzzyResults.length > 0) {
+        // Mark results as fuzzy matches so the UI can optionally show "did you mean?"
+        fuzzyResults._fuzzy = true
+        data = fuzzyResults
+      }
+    }
+  }
 
   // Optimize coordinate precision — 6 decimal places ≈ 11cm accuracy.
   // Full Supabase precision (15+ decimals) adds ~30% unnecessary bytes to the JSON
@@ -205,8 +376,8 @@ export async function getPublishedPlots(filters = {}) {
     }
   }
 
-  // Enrich with server-computed investment metrics
-  enrichPlotsWithScores(data)
+  // Enrich with server-computed investment metrics (async — fetches area trends)
+  await enrichPlotsWithScores(data)
 
   // Post-fetch sorts for computed fields that can't be done in SQL.
   // These use the enriched _fields computed by enrichPlotsWithScores().
@@ -301,7 +472,7 @@ export async function getPlotById(id) {
   // and _daysOnMarket. This caused inconsistency between list and detail views:
   // the sidebar would recalculate metrics client-side that the card strip got for free.
   if (data) {
-    enrichPlotsWithScores([data])
+    await enrichPlotsWithScores([data])
   }
 
   return data
@@ -389,7 +560,7 @@ export async function getPlotsByIds(ids) {
   // causing the Compare page to show plots without _investmentScore, _grade,
   // _roi, _pricePerSqm, _monthlyPayment, and _daysOnMarket. This forced
   // redundant client-side recalculation and inconsistent score display.
-  enrichPlotsWithScores(data)
+  await enrichPlotsWithScores(data)
 
   return data || []
 }
