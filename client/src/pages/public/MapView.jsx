@@ -19,7 +19,7 @@ import { useViewTracker } from '../../hooks/useViewTracker.js'
 import { usePriceTracker } from '../../hooks/usePriceTracker.js'
 import { useSavedSearches } from '../../hooks/useSavedSearches.js'
 import { Phone } from 'lucide-react'
-import { whatsappLink, CONTACT, plotOgImageUrl } from '../../utils/config.js'
+import { whatsappLink, CONTACT, plotOgImageUrl, trackContactConversion } from '../../utils/config.js'
 import { useRealtimeUpdates } from '../../hooks/useRealtimeUpdates.js'
 import IdleRender from '../../components/ui/IdleRender.jsx'
 import OfflineBanner from '../../components/ui/OfflineBanner.jsx'
@@ -263,8 +263,23 @@ export default function MapView() {
     return f
   }, [filters, statusFilter, sortBy, debouncedSearch])
 
-  const { data: plots = [], isLoading, error: plotsError, refetch: refetchPlots, isPlaceholderData, dataUpdatedAt, isMockData } = useAllPlots(apiFilters)
+  const { data: plots = [], isLoading, error: plotsError, refetch: refetchPlots, isPlaceholderData, dataUpdatedAt, isMockData, isStaleData } = useAllPlots(apiFilters)
   const { data: pois = [] } = usePois()
+
+  // ─── API Connection Recovery Notification ──────────────────────────
+  // When the server was down (user saw mock data) and the API recovers,
+  // show a positive green notification. Like Google Docs' "Back online" toast.
+  // Listens for the custom event dispatched by usePlots on mock→api transition.
+  const [showApiRecovered, setShowApiRecovered] = useState(false)
+  useEffect(() => {
+    const handler = (e) => {
+      setShowApiRecovered(true)
+      const timer = setTimeout(() => setShowApiRecovered(false), 5000)
+      return () => clearTimeout(timer)
+    }
+    window.addEventListener('landmap:connection-recovered', handler)
+    return () => window.removeEventListener('landmap:connection-recovered', handler)
+  }, [])
 
   // Auto-refresh data when user returns to tab after being away 2+ minutes.
   // Real estate listings change frequently — price updates, new plots, status changes.
@@ -781,6 +796,38 @@ export default function MapView() {
           </div>
         </div>
       )}
+      {/* API connection recovered — shows briefly when server comes back after being down.
+          Distinct from OfflineBanner (network) — this handles API-level recovery (mock → live data).
+          Like Google Docs' "Changes saved" or Notion's "Synced" indicator. */}
+      {showApiRecovered && (
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[100] animate-bounce-in" dir="rtl">
+          <div className="flex items-center gap-2.5 px-4 py-2.5 bg-emerald-500/15 backdrop-blur-md border border-emerald-500/25 rounded-2xl shadow-lg">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+            <span className="text-xs font-medium text-emerald-300">
+              השרת חזר לפעולה — הנתונים מעודכנים ✓
+            </span>
+          </div>
+        </div>
+      )}
+      {/* Stale data indicator — shows when server returned 5xx but cached ETag data was served.
+          Like Google Maps' "Data may be outdated" subtle warning. Transparent about data freshness
+          without showing a scary error screen that would drive investors away. */}
+      {isStaleData && !isMockData && (
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[100] animate-bounce-in" dir="rtl">
+          <div className="flex items-center gap-2.5 px-4 py-2.5 bg-amber-500/10 backdrop-blur-md border border-amber-500/20 rounded-2xl shadow-lg">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
+            <span className="text-xs font-medium text-amber-300">
+              הנתונים עשויים להיות לא מעודכנים — השרת אינו מגיב כרגע
+            </span>
+            <button
+              onClick={() => refetchPlots()}
+              className="text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-lg hover:bg-amber-400/20 transition-colors flex-shrink-0"
+            >
+              נסה שוב
+            </button>
+          </div>
+        </div>
+      )}
       {/* Bounds filter badge — shows when "Search this area" is active */}
       {boundsFilter && (
         <div className="fixed top-14 sm:top-16 left-1/2 -translate-x-1/2 z-[50]" dir="rtl">
@@ -1054,7 +1101,9 @@ export default function MapView() {
         <span className="group-hover:text-slate-300 transition-colors">קיצורים</span>
       </button>
 
-      {/* Floating contact CTA — desktop: full buttons, mobile: single expandable FAB */}
+      {/* Floating contact CTA — desktop: full buttons, mobile: single expandable FAB.
+          All buttons fire conversion tracking events via trackContactConversion()
+          for marketing ROI measurement — like Madlan's internal funnel metrics. */}
       {/* Desktop version */}
       <div className="fixed bottom-[16rem] left-4 z-[30] hidden sm:flex flex-col gap-2 animate-bounce-in">
         <a
@@ -1064,6 +1113,7 @@ export default function MapView() {
           }
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => trackContactConversion('whatsapp', selectedPlot?.id, { source: 'map_fab_desktop' })}
           className="w-12 h-12 flex items-center justify-center bg-[#25D366] rounded-2xl shadow-lg shadow-[#25D366]/30 hover:shadow-xl hover:scale-110 transition-all"
           aria-label="צור קשר ב-WhatsApp"
         >
@@ -1078,6 +1128,7 @@ export default function MapView() {
           }
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => trackContactConversion('telegram', selectedPlot?.id, { source: 'map_fab_desktop' })}
           className="w-12 h-12 flex items-center justify-center bg-[#229ED9] rounded-2xl shadow-lg shadow-[#229ED9]/30 hover:shadow-xl hover:scale-110 transition-all"
           aria-label="צור קשר בטלגרם"
         >
@@ -1086,7 +1137,7 @@ export default function MapView() {
           </svg>
         </a>
         <button
-          onClick={() => setIsLeadModalOpen(true)}
+          onClick={() => { trackContactConversion('phone', selectedPlot?.id, { source: 'map_fab_desktop' }); setIsLeadModalOpen(true) }}
           className="w-12 h-12 flex items-center justify-center bg-gradient-to-r from-gold via-gold-bright to-gold text-navy rounded-2xl shadow-lg shadow-gold/30 hover:shadow-xl hover:scale-110 transition-all"
           aria-label="צור קשר לפרטים"
         >
@@ -1102,6 +1153,7 @@ export default function MapView() {
           }
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => trackContactConversion('whatsapp', selectedPlot?.id, { source: 'map_fab_mobile' })}
           className="w-11 h-11 flex items-center justify-center bg-[#25D366] rounded-xl shadow-lg shadow-[#25D366]/30 transition-all"
           aria-label="צור קשר ב-WhatsApp"
         >

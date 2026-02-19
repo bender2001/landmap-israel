@@ -103,6 +103,22 @@ async function request(path, options = {}) {
         error.requestId = body.requestId || res.headers.get('x-request-id') || null
         error.errorCode = body.errorCode || null
 
+        // Stale-if-error: on 5xx server errors, return cached ETag data instead of throwing.
+        // This is the client-side implementation of the stale-if-error Cache-Control directive.
+        // When the server is down (500/502/503/504), users see slightly stale data instead of
+        // an error screen — like Google Maps' seamless offline mode. Critical for investor trust.
+        if (res.status >= 500 && cachedEtag) {
+          clearTimeout_()
+          const staleData = cachedEtag.data
+          // Tag the response so UI can show a subtle "data may be outdated" indicator
+          if (Array.isArray(staleData)) {
+            staleData._stale = true
+            staleData._staleReason = 'server_error'
+            staleData._staleStatus = res.status
+          }
+          return staleData
+        }
+
         // Retry on transient server errors (GET only)
         if (RETRY_STATUS_CODES.has(res.status) && (!options.method || options.method === 'GET') && attempt < MAX_RETRIES) {
           // For 429 (rate limit): use server-sent Retry-After instead of blind exponential backoff.

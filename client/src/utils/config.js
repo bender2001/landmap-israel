@@ -75,6 +75,79 @@ export function useNativeShare() {
   return { isSupported, share }
 }
 
+// ─── Contact Conversion Tracking ────────────────────────────────────────
+// Tracks WhatsApp/Telegram/Phone/Lead clicks as analytics events.
+// Critical for measuring marketing ROI — which channels and plots drive inquiries.
+// Like Madlan/Yad2's internal conversion funnel tracking.
+// Events are sent to the server in the background (fire-and-forget).
+
+const CONVERSION_EVENTS = []
+const MAX_QUEUED = 50
+
+/**
+ * Track a contact conversion event (WhatsApp click, Telegram click, Phone click, Lead form).
+ * @param {'whatsapp'|'telegram'|'phone'|'lead_form'|'share'} channel - Contact channel
+ * @param {string|null} plotId - Plot ID if the click was plot-specific
+ * @param {object} meta - Additional metadata (e.g., { source: 'sidebar' })
+ */
+export function trackContactConversion(channel, plotId = null, meta = {}) {
+  const event = {
+    channel,
+    plotId,
+    ...meta,
+    ts: Date.now(),
+    url: window.location.pathname,
+    referrer: document.referrer || null,
+  }
+
+  CONVERSION_EVENTS.push(event)
+
+  // Flush to server in the background (non-blocking)
+  try {
+    const body = JSON.stringify(event)
+    // Use sendBeacon for reliability — survives page navigations (link clicks open new tabs).
+    // Falls back to fetch for older browsers. Like Google Analytics' beacon transport.
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/analytics/conversion', body)
+    } else {
+      fetch('/api/analytics/conversion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+      }).catch(() => {})
+    }
+  } catch {
+    // Silently ignore — conversion tracking failure is never user-facing
+  }
+
+  // Trim old events from memory
+  if (CONVERSION_EVENTS.length > MAX_QUEUED) {
+    CONVERSION_EVENTS.splice(0, CONVERSION_EVENTS.length - MAX_QUEUED)
+  }
+}
+
+/**
+ * Build a tracked WhatsApp deep link. Wraps whatsappLink() and fires a conversion event.
+ * Use this in onClick handlers instead of raw <a href> for trackable WhatsApp CTAs.
+ */
+export function trackAndOpenWhatsApp(message, plotId = null, source = 'unknown') {
+  trackContactConversion('whatsapp', plotId, { source })
+  const url = whatsappLink(message)
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+/**
+ * Build a tracked Telegram deep link.
+ */
+export function trackAndOpenTelegram(plotId = null, source = 'unknown') {
+  trackContactConversion('telegram', plotId, { source })
+  const url = plotId
+    ? `https://t.me/LandMapIsraelBot?start=plot_${plotId}`
+    : 'https://t.me/LandMapIsraelBot'
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 /**
  * Build a share payload for a plot — standardized across all share surfaces.
  * Generates a rich text description with key investment metrics.

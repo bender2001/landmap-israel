@@ -15,6 +15,12 @@ class AnalyticsService {
     this.plotClicks = {}         // { plotId: count }
     this.sessionCount = 0
     this.startedAt = Date.now()
+    // Contact conversion tracking — measures which channels drive inquiries.
+    // Critical for marketing ROI: WhatsApp vs Telegram vs Phone vs Lead form.
+    // Like Madlan's internal funnel metrics that drive business decisions.
+    this.conversions = []        // Recent conversion events
+    this.conversionsByChannel = {} // { channel: count }
+    this.conversionsByPlot = {}   // { plotId: count }
 
     // Core Web Vitals — tracks LCP, INP, CLS, TTFB, FID from real users.
     // Stored in-memory with rolling window. Provides p75 aggregates
@@ -107,6 +113,66 @@ class AnalyticsService {
     this.sessionCount++
   }
 
+  /**
+   * Record a contact conversion event (WhatsApp/Telegram/Phone/Lead click).
+   * @param {{ channel: string, plotId?: string, source?: string, ts?: number }} event
+   */
+  trackConversion(event) {
+    if (!event?.channel) return
+    const entry = {
+      channel: event.channel,
+      plotId: event.plotId || null,
+      source: event.source || 'unknown',
+      url: event.url || null,
+      ts: event.ts || Date.now(),
+    }
+    this.conversions.push(entry)
+    this.conversionsByChannel[entry.channel] = (this.conversionsByChannel[entry.channel] || 0) + 1
+    if (entry.plotId) {
+      this.conversionsByPlot[entry.plotId] = (this.conversionsByPlot[entry.plotId] || 0) + 1
+    }
+    // Rolling window — keep bounded (max 500 events)
+    if (this.conversions.length > 500) {
+      this.conversions = this.conversions.slice(-500)
+    }
+  }
+
+  /** Get conversion summary — channel breakdown, top plots, funnel metrics */
+  getConversionSummary() {
+    const now = Date.now()
+    const last24h = this.conversions.filter(c => now - c.ts < 86400000)
+    const last7d = this.conversions.filter(c => now - c.ts < 7 * 86400000)
+
+    // Channel breakdown for last 24h
+    const channelLast24h = {}
+    for (const c of last24h) {
+      channelLast24h[c.channel] = (channelLast24h[c.channel] || 0) + 1
+    }
+
+    // Top plots by conversions
+    const plotCounts = {}
+    for (const c of last7d) {
+      if (c.plotId) plotCounts[c.plotId] = (plotCounts[c.plotId] || 0) + 1
+    }
+    const topPlots = Object.entries(plotCounts)
+      .map(([plotId, count]) => ({ plotId, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+
+    return {
+      total: this.conversions.length,
+      last24h: last24h.length,
+      last7d: last7d.length,
+      byChannel: this.conversionsByChannel,
+      channelLast24h,
+      topPlots,
+      // Conversion rate estimate: conversions / sessions
+      conversionRate: this.sessionCount > 0
+        ? Math.round((this.conversions.length / this.sessionCount) * 10000) / 100
+        : 0,
+    }
+  }
+
   /** Get top N search terms by frequency */
   getTopSearches(limit = 20) {
     const counts = {}
@@ -165,6 +231,7 @@ class AnalyticsService {
         .sort((a, b) => b.count - a.count),
       topPlots: this.getTopPlots(10),
       vitals: this.getVitalsSummary(),
+      conversions: this.getConversionSummary(),
     }
   }
 }

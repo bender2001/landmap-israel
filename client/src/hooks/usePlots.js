@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import { getPlots, getPlot, getNearbyPlots, getSimilarPlots, getPopularPlots, getFeaturedPlots, getPlotsBatch, getNearbyPois } from '../api/plots.js'
 import { plots as mockPlots } from '../data/mockData.js'
 import { useIsSlowConnection } from './useNetworkStatus.js'
@@ -91,12 +91,31 @@ export function useAllPlots(filters) {
   })
   // Detect if data came from mock fallback (API was unreachable)
   const isMockData = query.data?._source === 'mock'
+  // Detect stale-if-error data (server returned 5xx but we had cached ETag data)
+  const isStaleData = query.data?._stale === true
+
+  // ─── Connection recovery detection ──────────────────────────────────
+  // Track previous data source to detect mock → live transitions.
+  // When the API recovers after being down, we dispatch a custom event
+  // that the UI can listen for to show a "connection restored" notification.
+  // Like Google Docs' seamless "Back online" indicator.
+  const prevSourceRef = useRef(null)
+  const currentSource = query.data?._source
+  if (prevSourceRef.current === 'mock' && currentSource === 'api') {
+    // API recovered! Dispatch event so UI can show a positive notification.
+    // Using CustomEvent for decoupling — any component can listen without prop drilling.
+    window.dispatchEvent(new CustomEvent('landmap:connection-recovered', {
+      detail: { plotCount: query.data?.length || 0, timestamp: Date.now() },
+    }))
+  }
+  prevSourceRef.current = currentSource
 
   return {
     ...query,
     isPlaceholderData: query.isPlaceholderData,
     dataUpdatedAt: query.dataUpdatedAt,
     isMockData,
+    isStaleData,
   }
 }
 

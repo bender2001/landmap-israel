@@ -35,6 +35,7 @@ import { errorHandler, requestId } from './middleware/errorHandler.js'
 import { requestTimeout } from './middleware/timeout.js'
 import { supabaseAdmin } from './config/supabase.js'
 import { responseTracker } from './services/responseTimeTracker.js'
+import { analytics } from './services/analyticsService.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -285,6 +286,26 @@ app.get('/api/events', (req, res) => {
 // silently dropping all Web Vitals data. This dedicated endpoint accepts POST beacons
 // without admin auth and feeds into the analytics service for p75 monitoring.
 app.use('/api/vitals', vitalsRoutes)
+
+// ─── Contact conversion tracking (lightweight fire-and-forget beacon) ───
+// Tracks WhatsApp/Telegram/Phone/Lead clicks for marketing ROI measurement.
+// Like Madlan's internal funnel metrics — critical for business intelligence.
+// Accepts POST beacons from sendBeacon() or fetch({ keepalive: true }).
+app.post('/api/analytics/conversion', (req, res) => {
+  const { channel, plotId, source, url, ts } = req.body || {}
+  const VALID_CHANNELS = ['whatsapp', 'telegram', 'phone', 'lead_form', 'share']
+  if (!channel || !VALID_CHANNELS.includes(channel)) {
+    return res.status(204).end()
+  }
+  analytics.trackConversion({
+    channel,
+    plotId: typeof plotId === 'string' ? plotId.slice(0, 50) : null,
+    source: typeof source === 'string' ? source.slice(0, 30) : 'unknown',
+    url: typeof url === 'string' ? url.slice(0, 200) : '/',
+    ts: typeof ts === 'number' ? ts : Date.now(),
+  })
+  res.status(204).end()
+})
 
 // Request timeout — prevent hanging connections (15s for normal, 30s for chat/AI)
 app.use('/api/chat', requestTimeout(30000))
