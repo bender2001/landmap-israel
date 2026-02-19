@@ -32,6 +32,7 @@ import { useRefreshOnReturn } from '../../hooks/usePageVisibility.js'
 import { useLocalStorage } from '../../hooks/useLocalStorage.js'
 import { usePriceChanges } from '../../hooks/usePriceChanges.js'
 import { usePersonalNotes } from '../../hooks/usePersonalNotes.js'
+import { useRecentlyViewed } from '../../hooks/useRecentlyViewed.js'
 
 // Lazy-load non-critical widgets — they're not needed for first paint.
 // This reduces the MapView initial JS from ~126KB to ~95KB, cutting Time to Interactive.
@@ -117,6 +118,7 @@ export default function MapView() {
   const { recordPrices, getPriceChange } = usePriceTracker()
   const { searches: savedSearches, save: saveSearch, remove: removeSearch } = useSavedSearches()
   const personalNotes = usePersonalNotes()
+  const { recordView: recordRecentView } = useRecentlyViewed()
 
   // User geolocation — used for "sort by distance" (like Madlan's proximity sort).
   // Requested lazily when user selects distance sort, persisted in state for the session.
@@ -563,11 +565,14 @@ export default function MapView() {
     setSelectedPlot(plot)
     if (plot?.id) {
       trackView(plot.id)
+      // Record in shared recently-viewed store — syncs across PlotCardStrip,
+      // Favorites page, and RecentlyViewed widget without localStorage re-parsing.
+      recordRecentView(plot.id)
       // Preload PlotDetail route chunk in the background — so clicking "View Full Page"
       // in the sidebar is instant. Only triggers the import once (browser caches the module).
       plotDetailPreload()
     }
-  }, [trackView])
+  }, [trackView, recordRecentView])
 
   const handleCloseSidebar = useCallback(() => {
     setSelectedPlot(null)

@@ -13,6 +13,7 @@ import { useDragScroll } from '../hooks/useDragScroll'
 import { useViewportPrefetch } from '../hooks/useViewportPrefetch'
 import { useImpressionTracker } from '../hooks/useImpressionTracker'
 import SmartInsights from './SmartInsights'
+import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
 
 /**
  * Compute price-per-sqm percentile for each plot relative to all plots.
@@ -663,6 +664,12 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
 
 export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compareIds = [], onToggleCompare, isLoading = false, onClearFilters, getPriceChange, favorites, userLocation }) {
   const prefetchPlot = usePrefetchPlot()
+  // Shared recently-viewed store — O(1) lookups via Set, no localStorage re-parsing
+  // in the render cycle. Previously, a useMemo with [selectedPlot?.id] dependency
+  // re-parsed JSON and created a new Set on every plot selection, causing all 12+
+  // PlotCardItem children to re-render. Now uses useSyncExternalStore — only
+  // re-renders when the actual viewed set changes (new plot added).
+  const { wasViewed: isRecentlyViewed } = useRecentlyViewed()
   // Impression tracking — tracks which plots the user actually SEES in the card strip.
   // Feeds into analytics CTR calculation: impressions vs clicks per plot.
   // High impressions + low clicks = possible pricing/presentation issue.
@@ -824,22 +831,10 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
     return { available: available.length, totalValue, totalProjected, totalProfit, avgRoi, totalArea, marketTemp, freshCount }
   }, [plots])
 
-  // Track recently viewed plots
-  useEffect(() => {
-    if (!selectedPlot) return
-    try {
-      const key = 'landmap_recently_viewed'
-      const recent = JSON.parse(localStorage.getItem(key) || '[]')
-      const updated = [selectedPlot.id, ...recent.filter(id => id !== selectedPlot.id)].slice(0, 20)
-      localStorage.setItem(key, JSON.stringify(updated))
-    } catch {}
-  }, [selectedPlot?.id])
-
-  const recentlyViewed = useMemo(() => {
-    try {
-      return new Set(JSON.parse(localStorage.getItem('landmap_recently_viewed') || '[]'))
-    } catch { return new Set() }
-  }, [selectedPlot?.id])
+  // Recently viewed tracking is now handled by the shared useRecentlyViewed store.
+  // MapView calls recordRecentView(plot.id) in handleSelectPlot, and all consumers
+  // (PlotCardStrip, RecentlyViewed widget, Favorites page) share the same snapshot.
+  // No more localStorage JSON.parse in the render cycle.
 
   if (isLoading) return (
     <div className="plot-strip-wrapper" dir="rtl">
@@ -1009,7 +1004,7 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
             isSelected={selectedPlot?.id === plot.id}
             isCompared={compareIds.includes(plot.id)}
             isFavorite={favorites?.isFavorite(plot.id) ?? false}
-            wasViewed={recentlyViewed.has(plot.id)}
+            wasViewed={isRecentlyViewed(plot.id)}
             areaAvgPsm={areaAverages[plot.city]}
             onSelectPlot={onSelectPlot}
             onToggleCompare={onToggleCompare}

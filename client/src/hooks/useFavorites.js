@@ -1,4 +1,4 @@
-import { useCallback, useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import { showToast } from '../components/ui/ToastContainer'
 
 /**
@@ -17,6 +17,13 @@ import { showToast } from '../components/ui/ToastContainer'
  *
  * Performance: Only components reading favorites re-render. The subscriber
  * callback uses Object.is identity checks — no unnecessary re-renders.
+ *
+ * PERF v2: isFavorite now uses a derived Set for O(1) lookups instead of
+ * Array.includes() which was O(n). In PlotCardStrip, isFavorite is called for
+ * every card (12+ times per render cycle). With a typical 10-item favorites list,
+ * this reduces comparison work from 120 ops (12×10 linear scans) to 12 ops
+ * (12 × O(1) Set.has). The Set is derived via useMemo — only recomputed when
+ * the favorites array reference changes (which only happens on toggle).
  */
 
 const STORAGE_KEY = 'landmap_favorites'
@@ -75,6 +82,12 @@ if (typeof window !== 'undefined') {
 export function useFavorites() {
   const favorites = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
+  // Derived Set for O(1) lookups — only recomputed when favorites array changes.
+  // Previously, isFavorite used Array.includes() which is O(n) per call.
+  // With 12+ plots rendered in PlotCardStrip, each checking isFavorite,
+  // this was 12 × O(n) = O(12n) per render. Now it's 12 × O(1) = O(12).
+  const favoriteSet = useMemo(() => new Set(favorites), [favorites])
+
   const toggle = useCallback((plotId) => {
     const prev = getSnapshot()
     const wasInFavorites = prev.includes(plotId)
@@ -93,8 +106,8 @@ export function useFavorites() {
   }, [])
 
   const isFavorite = useCallback(
-    (plotId) => favorites.includes(plotId),
-    [favorites],
+    (plotId) => favoriteSet.has(plotId),
+    [favoriteSet],
   )
 
   return { favorites, toggle, isFavorite }
