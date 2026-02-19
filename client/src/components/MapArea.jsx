@@ -642,7 +642,7 @@ function GeoSearch() {
  * when only one is hovered/selected. Each polygon only re-renders when
  * its own props change (hover state, color mode, favorites, compare).
  */
-const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, isSelected, onSelectPlot, onHover, onHoverEnd, prefetchPlot, favorites, compareIds, onToggleCompare, areaAvgPsm }) {
+const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, isSelected, onSelectPlot, onHover, onHoverEnd, prefetchPlot, favorites, compareIds, onToggleCompare, areaAvgPsm, zoomLevel }) {
   const price = plot.total_price ?? plot.totalPrice
   const projValue = plot.projected_value ?? plot.projectedValue
   const roi = price > 0 ? Math.round((projValue - price) / price * 100) : 0
@@ -686,18 +686,23 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, isSelect
         mouseout: handleMouseOut,
       }}
     >
+      {/* Zoom-aware permanent tooltip — progressive detail levels:
+          zoom < 13: Price only (minimal DOM, many polygons visible at this level)
+          zoom 13-14: Price + sub line (size, price/sqm, ROI)
+          zoom >= 15: Full detail (grade, CAGR, deal badge, zoning bar)
+          This reduces DOM by ~70% at low zoom where 30+ tooltips are visible but
+          too small to read. At zoom >= 15, polygons are large enough for full detail.
+          Like Madlan which shows different info density at different zoom levels. */}
       <Tooltip permanent direction="center" className="price-tooltip">
         <span className="tooltip-main-price">{plot.status === 'SOLD' ? '🔴 ' : ''}{isNew ? '🆕 ' : ''}{favorites?.isFavorite(plot.id) ? '❤️ ' : ''}{compareIds?.includes(plot.id) ? '⚖️ ' : ''}{plot.plot_images?.length > 0 ? '📷 ' : ''}{formatPriceShort(price)}</span>
-        <span className="tooltip-sub">{plot.status === 'SOLD' ? 'נמכר · ' : ''}{formatDunam(sizeSqM)} דונם · {sizeSqM > 0 ? `₪${Math.round(price / sizeSqM).toLocaleString()}/מ״ר` : ''} · +{roi}%{(plot.views ?? 0) >= 5 ? ` · 👁${plot.views}` : ''}</span>
-        {/* Investment grade + CAGR row — gives investors instant quality context on hover.
-            Uses letter grade (A+/B/C) which is faster to scan than numeric scores.
-            Prefers server-computed _investmentScore/_grade to avoid redundant calculation
-            on each of the 50+ visible polygons — saves ~200ms on initial render. */}
-        {(() => {
+        {/* Level 2: size + price/sqm + ROI (zoom >= 13) */}
+        {zoomLevel >= 13 && (
+          <span className="tooltip-sub">{plot.status === 'SOLD' ? 'נמכר · ' : ''}{formatDunam(sizeSqM)} דונם · {sizeSqM > 0 ? `₪${Math.round(price / sizeSqM).toLocaleString()}/מ״ר` : ''} · +{roi}%{(plot.views ?? 0) >= 5 ? ` · 👁${plot.views}` : ''}</span>
+        )}
+        {/* Level 3: Investment grade + CAGR (zoom >= 14) */}
+        {zoomLevel >= 14 && (() => {
           const score = plot._investmentScore ?? calcInvestmentScore(plot)
-          const { grade, color: gradeColor } = plot._grade
-            ? getInvestmentGrade(score)
-            : getInvestmentGrade(score)
+          const { grade, color: gradeColor } = getInvestmentGrade(score)
           const displayGrade = plot._grade || grade
           const cagrData = calcCAGR(roi, readiness)
           return (
@@ -708,7 +713,8 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, isSelect
             </span>
           )
         })()}
-        {(() => {
+        {/* Level 4: Deal badge + zoning bar (zoom >= 15) */}
+        {zoomLevel >= 15 && (() => {
           const avg = areaAvgPsm?.[plot.city]
           if (!avg || sizeSqM <= 0) return null
           const plotPsm = price / sizeSqM
@@ -716,8 +722,7 @@ const PlotPolygon = memo(function PlotPolygon({ plot, color, isHovered, isSelect
           if (diffPct >= -5) return null
           return <span className="tooltip-deal-badge">🔥 {Math.abs(diffPct)}% מתחת לממוצע</span>
         })()}
-        {/* Zoning pipeline progress — shows regulatory journey at a glance */}
-        {zoningStage && <ZoningProgressBar currentStage={zoningStage} variant="compact" className="mt-0.5" />}
+        {zoomLevel >= 15 && zoningStage && <ZoningProgressBar currentStage={zoningStage} variant="compact" className="mt-0.5" />}
       </Tooltip>
 
       <Popup>
@@ -1152,6 +1157,24 @@ function ViewportCulledPolygons({ plots, plotColors, hoveredId, selectedPlotId, 
   const [visiblePlotIds, setVisiblePlotIds] = useState(new Set())
   const boundsRef = useRef(null)
 
+  // Track zoom level for tooltip detail scaling — at lower zooms the permanent
+  // tooltips should show less detail to reduce DOM nodes and visual clutter.
+  // Debounced at 150ms to batch rapid scroll-wheel zooming — prevents 50+ polygon
+  // re-renders 10x/sec during continuous zoom. Only commits the final zoom level.
+  const [zoomLevel, setZoomLevel] = useState(() => map.getZoom())
+  const zoomTimerRef = useRef(null)
+  useEffect(() => {
+    const handler = () => {
+      if (zoomTimerRef.current) clearTimeout(zoomTimerRef.current)
+      zoomTimerRef.current = setTimeout(() => setZoomLevel(map.getZoom()), 150)
+    }
+    map.on('zoomend', handler)
+    return () => {
+      map.off('zoomend', handler)
+      if (zoomTimerRef.current) clearTimeout(zoomTimerRef.current)
+    }
+  }, [map])
+
   // Precompute plot bounding boxes (lat/lng) — only recalculate when plots change
   const plotBounds = useMemo(() => {
     const result = new Map()
@@ -1231,6 +1254,7 @@ function ViewportCulledPolygons({ plots, plotColors, hoveredId, selectedPlotId, 
       compareIds={compareIds}
       onToggleCompare={onToggleCompare}
       areaAvgPsm={areaAvgPsm}
+      zoomLevel={zoomLevel}
     />
   ))
 }

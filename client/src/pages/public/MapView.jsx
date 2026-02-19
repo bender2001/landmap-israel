@@ -172,6 +172,12 @@ export default function MapView() {
   // Auto-search on map move — stored in localStorage for persistence (like Madlan/Airbnb)
   const [autoSearchOnMove, setAutoSearchOnMove] = useLocalStorage('landmap_auto_search', false)
 
+  // Keyboard navigation counter — shows "3 / 12" when navigating with ←→ arrows.
+  // Gives spatial context during keyboard navigation (a11y + UX win).
+  // Auto-hides after 2 seconds of inactivity, like volume overlays in media apps.
+  const [navIndicator, setNavIndicator] = useState(null) // { index, total }
+  const navIndicatorTimer = useRef(null)
+
   // Capture the initial ?plot= param before any effect can clear it
   const initialPlotRef = useRef(searchParams.get('plot'))
 
@@ -614,6 +620,11 @@ export default function MapView() {
           nextIdx = currentIdx > 0 ? currentIdx - 1 : filteredPlots.length - 1
         }
         setSelectedPlot(filteredPlots[nextIdx])
+
+        // Show navigation counter overlay (e.g. "3 / 12")
+        setNavIndicator({ index: nextIdx + 1, total: filteredPlots.length })
+        if (navIndicatorTimer.current) clearTimeout(navIndicatorTimer.current)
+        navIndicatorTimer.current = setTimeout(() => setNavIndicator(null), 2000)
       }
     }
     window.addEventListener('keydown', handler)
@@ -958,6 +969,29 @@ export default function MapView() {
           </WidgetErrorBoundary>
         </Suspense>
       </IdleRender>
+      {/* Keyboard navigation counter — shows "3 / 12" when navigating between plots
+          with ←→ arrow keys. Gives spatial awareness during keyboard navigation.
+          Auto-hides after 2s. Like media player volume overlays — transient, non-blocking.
+          Unique to LandMap — Madlan/Yad2 have no keyboard navigation support. */}
+      {navIndicator && (
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[200] pointer-events-none animate-fade-in" dir="rtl">
+          <div className="flex items-center gap-3 px-5 py-3 bg-navy/90 backdrop-blur-lg border border-gold/20 rounded-2xl shadow-2xl shadow-black/40">
+            <span className="text-2xl font-black text-gold tabular-nums">{navIndicator.index}</span>
+            <span className="text-sm text-slate-500 font-medium">/</span>
+            <span className="text-2xl font-black text-slate-400 tabular-nums">{navIndicator.total}</span>
+            <div className="flex flex-col mr-3 gap-0.5">
+              <span className="text-[10px] text-slate-500">חלקות</span>
+              <div className="w-16 h-1 rounded-full bg-white/5 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gold/50 transition-all duration-300"
+                  style={{ width: `${(navIndicator.index / navIndicator.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <MapErrorBoundary>
         <MapArea
           plots={filteredPlots}
