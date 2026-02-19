@@ -360,6 +360,10 @@ function SectionNav() {
     if (!el) return
     const y = el.getBoundingClientRect().top + window.scrollY - 100 // offset for sticky nav
     window.scrollTo({ top: y, behavior: 'smooth' })
+    // Update URL hash for deep-link shareability — enables "share this section" by copying the URL.
+    // Uses replaceState to avoid polluting browser history with every section click.
+    const shortHash = id.replace('section-', '')
+    window.history.replaceState(null, '', `#${shortHash}`)
   }, [])
 
   if (!visible) return null
@@ -639,9 +643,28 @@ export default function PlotDetail() {
   const [nearbyPlots, setNearbyPlots] = useState([])
   const handleNearbyLoaded = useCallback((plots) => setNearbyPlots(plots), [])
 
-  // Scroll to top on mount / route change — prevents stale scroll position from MapView
+  // Scroll to top on mount / route change — prevents stale scroll position from MapView.
+  // If a hash fragment is present (e.g., /plot/123#costs → section-costs), auto-scroll
+  // to that section after a short delay for the DOM to render. Like Madlan's deep-link
+  // support for property page sections — enables sharing "look at the costs" links.
   useEffect(() => {
-    window.scrollTo(0, 0)
+    const hash = window.location.hash.replace('#', '')
+    if (hash) {
+      // Map short hash names to full section IDs for convenience:
+      // /plot/123#costs → section-costs, /plot/123#financial → section-financial
+      const sectionId = hash.startsWith('section-') ? hash : `section-${hash}`
+      // Delay to let React render sections (lazy-loaded via Suspense)
+      const timer = setTimeout(() => {
+        const el = document.getElementById(sectionId)
+        if (el) {
+          const y = el.getBoundingClientRect().top + window.scrollY - 100
+          window.scrollTo({ top: y, behavior: 'smooth' })
+        }
+      }, 600)
+      return () => clearTimeout(timer)
+    } else {
+      window.scrollTo(0, 0)
+    }
     // Start preloading lazy widget chunks during idle time — they'll be needed shortly
     preloadPlotDetailChunks()
   }, [id])
@@ -680,6 +703,51 @@ export default function PlotDetail() {
       setTimeout(() => setLinkCopied(false), 2000)
     }).catch(() => {})
   }, [])
+
+  /**
+   * Copy a rich investment summary card to clipboard — formatted for WhatsApp/email sharing.
+   * Investors frequently share plot details with partners, attorneys, and accountants.
+   * A structured text card with emoji formatting is more impactful than a plain URL.
+   * Like sharing a Bloomberg terminal snapshot — all key metrics in one copy-paste.
+   */
+  const handleCopyInvestmentCard = useCallback(() => {
+    if (!plot || !computed) return
+    const { totalPrice, projectedValue, sizeSqM, blockNumber, roi, readiness, zoningStage } = computed
+    const score = calcInvestmentScore(plot)
+    const { label: scoreLabel } = getScoreLabel(score)
+    const cagrData = calcCAGR(roi, readiness)
+    const dunam = (sizeSqM / 1000).toFixed(1)
+    const priceSqm = sizeSqM > 0 ? Math.round(totalPrice / sizeSqM) : 0
+
+    const card = [
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+      `🏗️ *גוש ${blockNumber} | חלקה ${plot.number}*`,
+      `📍 ${plot.city}`,
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `💰 מחיר: ${formatCurrency(totalPrice)}`,
+      `📐 שטח: ${dunam} דונם (${sizeSqM.toLocaleString()} מ״ר)`,
+      `💵 מחיר/מ״ר: ${formatCurrency(priceSqm)}`,
+      ``,
+      `📈 תשואה צפויה: *+${roi}%*`,
+      `🎯 שווי צפוי: ${formatCurrency(projectedValue)}`,
+      cagrData ? `📊 CAGR: ${cagrData.cagr}%/שנה (${cagrData.years} שנים)` : null,
+      ``,
+      `🏷️ סטטוס: ${statusLabels[plot.status] || plot.status}`,
+      `📋 ייעוד: ${zoningLabels[zoningStage] || zoningStage}`,
+      readiness ? `⏳ מוכנות: ${readiness}` : null,
+      `⭐ ציון השקעה: ${score}/10 (${scoreLabel})`,
+      ``,
+      `🔗 ${window.location.href}`,
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+      `LandMap Israel 🗺️`,
+    ].filter(Boolean).join('\n')
+
+    navigator.clipboard.writeText(card).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2500)
+    }).catch(() => {})
+  }, [plot, computed])
 
   /**
    * Print investment report — generates a clean, professional PDF-ready document.
@@ -2045,6 +2113,17 @@ export default function PlotDetail() {
                   ? <Check className="w-5 h-5 text-green-400" />
                   : <Copy className="w-5 h-5 text-slate-400" />
                 }
+              </button>
+              {/* Copy Investment Card — rich formatted summary for WhatsApp/email sharing.
+                  Investors frequently share plot info with partners/attorneys/accountants.
+                  A structured card with key metrics is more useful than a bare URL. */}
+              <button
+                onClick={handleCopyInvestmentCard}
+                className="hidden sm:flex w-14 items-center justify-center bg-white/5 border border-white/10 rounded-2xl hover:bg-gold/10 hover:border-gold/20 transition-all"
+                aria-label="העתק כרטיס השקעה"
+                title="העתק כרטיס השקעה (מפורט) לשיתוף"
+              >
+                <FileText className="w-5 h-5 text-slate-400" />
               </button>
               <button
                 onClick={() => navigate(`/?plot=${id}`)}

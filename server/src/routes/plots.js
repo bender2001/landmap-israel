@@ -404,12 +404,19 @@ router.get('/popular', computeHeavyLimiter, requestAbortSignal, async (req, res,
       if (error) throw error
       if (!data || data.length === 0) return []
 
-      // Enrich with computed metrics
+      // Enrich with computed metrics + view velocity (views per day since listing).
+      // View velocity is a better "hotness" signal than raw views:
+      // a plot with 100 views over 6 months is less "hot" than one with 20 views in 2 days.
+      // Like YouTube/Reddit's "trending" algorithm — recency-weighted popularity.
       return data.map(p => {
         const price = p.total_price || 0
         const proj = p.projected_value || 0
         const roi = price > 0 ? Math.round(((proj - price) / price) * 100) : 0
-        return { ...p, _roi: roi }
+        const daysOld = p.created_at
+          ? Math.max(1, Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000))
+          : 30
+        const viewsPerDay = (p.views || 0) / daysOld
+        return { ...p, _roi: roi, _viewVelocity: Math.round(viewsPerDay * 100) / 100, _daysOld: daysOld }
       })
     }, 300_000)
 
