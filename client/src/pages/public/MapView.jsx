@@ -23,6 +23,8 @@ import { whatsappLink, CONTACT, plotOgImageUrl, trackContactConversion } from '.
 import { useRealtimeUpdates } from '../../hooks/useRealtimeUpdates.js'
 import IdleRender from '../../components/ui/IdleRender.jsx'
 import OfflineBanner from '../../components/ui/OfflineBanner.jsx'
+import ViewportSummary from '../../components/ViewportSummary.jsx'
+import ActiveFilterChips from '../../components/ActiveFilterChips.jsx'
 import { useRefreshOnReturn } from '../../hooks/usePageVisibility.js'
 import { useLocalStorage } from '../../hooks/useLocalStorage.js'
 import { usePriceChanges } from '../../hooks/usePriceChanges.js'
@@ -1027,6 +1029,26 @@ export default function MapView() {
         onSaveSearch={saveSearch}
         onLoadSearch={handleLoadSearch}
         onRemoveSearch={removeSearch}
+      />
+
+      {/* Viewport Summary — Bloomberg-style aggregate stats for the filtered set.
+          Shows total value, avg price/sqm, avg ROI in a compact expandable widget.
+          Positioned top-left of map, collapses to one line by default. */}
+      <ViewportSummary plots={filteredPlots} />
+
+      {/* Active Filter Chips — removable badges showing all active filters.
+          Like Madlan/Airbnb/Zillow: instant visibility of what's filtered + one-click removal.
+          Only renders when at least one filter is active. */}
+      <ActiveFilterChips
+        filters={filters}
+        statusFilter={statusFilter}
+        sortBy={sortBy}
+        boundsFilter={boundsFilter}
+        onFilterChange={handleFilterChange}
+        onToggleStatus={handleToggleStatus}
+        onSortChange={setSortBy}
+        onClearBounds={handleClearBounds}
+        onClearFilters={handleClearFilters}
       />
 
       {selectedPlot && (
