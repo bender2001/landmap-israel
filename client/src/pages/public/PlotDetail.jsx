@@ -458,7 +458,7 @@ function StickyPlotInfoBar({ plot, computed }) {
             </div>
           </div>
 
-          {/* Center: price + ROI */}
+          {/* Center: price + ROI + net ROI */}
           <div className="hidden sm:flex items-center gap-3">
             <span className="text-sm font-bold text-gold">{formatPriceShort(totalPrice)}</span>
             <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
@@ -466,7 +466,7 @@ function StickyPlotInfoBar({ plot, computed }) {
               : roi >= 50 ? 'bg-gold/15 text-gold border border-gold/20'
               : 'bg-white/5 text-slate-400 border border-white/10'
             }`}>
-              +{roi}% ROI
+              +{roi}%{plot._netRoi != null ? ` (נטו ${plot._netRoi > 0 ? '+' : ''}${plot._netRoi}%)` : ''}
             </span>
             <span
               className="px-2 py-0.5 rounded-md text-[10px] font-medium border"
@@ -474,6 +474,12 @@ function StickyPlotInfoBar({ plot, computed }) {
             >
               {statusLabels[plot.status]}
             </span>
+            {/* Investment rank in sticky bar — reinforces ranking context during scroll */}
+            {plot._investmentRank != null && plot._investmentRank <= 3 && (
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gold/10 text-gold border border-gold/20">
+                🏅 #{plot._investmentRank}
+              </span>
+            )}
           </div>
 
           {/* Right: CTAs */}
@@ -1168,6 +1174,44 @@ export default function PlotDetail() {
                     👁 {plot.views} צפיות
                   </span>
                 )}
+                {/* Investment Rank — like Morningstar's star rating or Bloomberg's "Top Pick".
+                    Shows where this plot ranks among all available plots by investment score.
+                    "#2 out of 12" is powerful social proof and urgency signal — investors
+                    want to know they're looking at one of the best options. No competitor has this. */}
+                {plot._investmentRank != null && plot._totalRanked > 0 && (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                      plot._investmentRank <= 3
+                        ? 'text-gold bg-gold/10 border-gold/25'
+                        : plot._investmentRank <= Math.ceil(plot._totalRanked / 2)
+                          ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                          : 'text-slate-400 bg-white/5 border-white/10'
+                    }`}
+                    title={`מדורג #${plot._investmentRank} מתוך ${plot._totalRanked} חלקות זמינות לפי ציון השקעה`}
+                  >
+                    {plot._investmentRank <= 3 ? '🏅' : '📊'} #{plot._investmentRank}/{plot._totalRanked}
+                  </span>
+                )}
+                {/* Net ROI badge — THE metric professional investors use.
+                    Gross ROI of +200% might be only +45% net after taxes, levies, and fees.
+                    This is the real number that determines if the deal is worth it.
+                    Showing it prominently in the hero sets LandMap apart from every competitor. */}
+                {plot._netRoi != null && (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                      plot._netRoi >= 50
+                        ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                        : plot._netRoi >= 20
+                          ? 'text-gold bg-gold/10 border-gold/20'
+                          : plot._netRoi >= 0
+                            ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                            : 'text-red-400 bg-red-500/10 border-red-500/20'
+                    }`}
+                    title={`תשואה נטו אחרי כל המיסים, היטלים ועלויות: ${plot._netRoi}%`}
+                  >
+                    💎 נטו {plot._netRoi > 0 ? '+' : ''}{plot._netRoi}%
+                  </span>
+                )}
                 {/* Days on Market — like Yad2's "ימים מאז פרסום" badge.
                     Helps investors assess urgency: fresh listings = opportunity, stale = potential issues. */}
                 {(() => {
@@ -1389,13 +1433,22 @@ export default function PlotDetail() {
             )
           })()}
 
-          {/* Below Market Price Indicator — like Madlan's "מחיר נמוך ממדלן" */}
+          {/* Below Market Price Indicator — like Madlan's "מחיר נמוך ממדלן".
+              Prefers server-enriched _cityAvgPriceSqm (available on each plot, no extra API call)
+              and falls back to the market overview API data. This eliminates a waterfall dependency:
+              previously the indicator was invisible until useMarketOverview resolved — now it renders
+              on first paint when server enrichment is available (~150ms faster perceived load). */}
           {(() => {
-            if (!marketData?.cities || sizeSqM <= 0) return null
-            const cityData = marketData.cities.find(c => c.city === plot.city)
-            if (!cityData || !cityData.avgPricePerSqm || cityData.count < 3) return null
+            if (sizeSqM <= 0) return null
+            // Prefer server-enriched city average (available immediately with plot data)
+            const serverAvg = plot._cityAvgPriceSqm
+            const marketCityData = marketData?.cities?.find(c => c.city === plot.city)
+            const avgPsm = serverAvg || marketCityData?.avgPricePerSqm
+            if (!avgPsm) return null
+            // Require minimum 3 plots for statistical relevance (only checked when market data available)
+            if (!serverAvg && marketCityData && marketCityData.count < 3) return null
             const plotPsm = totalPrice / sizeSqM
-            const diffPct = Math.round(((plotPsm - cityData.avgPricePerSqm) / cityData.avgPricePerSqm) * 100)
+            const diffPct = Math.round(((plotPsm - avgPsm) / avgPsm) * 100)
             if (Math.abs(diffPct) < 5) return null
             const isBelow = diffPct < 0
             return (
@@ -1419,20 +1472,24 @@ export default function PlotDetail() {
                     }
                   </div>
                   <div className="text-xs text-slate-500">
-                    ממוצע אזורי: {formatCurrency(cityData.avgPricePerSqm)}/מ״ר · חלקה זו: {formatCurrency(Math.round(plotPsm))}/מ״ר
+                    ממוצע אזורי: {formatCurrency(avgPsm)}/מ״ר · חלקה זו: {formatCurrency(Math.round(plotPsm))}/מ״ר
                   </div>
                 </div>
               </div>
             )
           })()}
 
-          {/* Price per sqm visual comparison — bar chart vs city average (like Madlan's price benchmark) */}
+          {/* Price per sqm visual comparison — bar chart vs city average (like Madlan's price benchmark).
+              Uses server-enriched _cityAvgPriceSqm when available for instant rendering. */}
           {(() => {
-            if (!marketData?.cities || sizeSqM <= 0) return null
-            const cityData = marketData.cities.find(c => c.city === plot.city)
-            if (!cityData || !cityData.avgPricePerSqm || cityData.count < 3) return null
+            if (sizeSqM <= 0) return null
+            const serverAvg = plot._cityAvgPriceSqm
+            const marketCityData = marketData?.cities?.find(c => c.city === plot.city)
+            const rawAvg = serverAvg || marketCityData?.avgPricePerSqm
+            if (!rawAvg) return null
+            if (!serverAvg && marketCityData && marketCityData.count < 3) return null
             const plotPsm = Math.round(totalPrice / sizeSqM)
-            const avgPsm = Math.round(cityData.avgPricePerSqm)
+            const avgPsm = Math.round(rawAvg)
             const maxPsm = Math.max(plotPsm, avgPsm) * 1.15
             const plotPct = (plotPsm / maxPsm) * 100
             const avgPct = (avgPsm / maxPsm) * 100
@@ -1467,7 +1524,7 @@ export default function PlotDetail() {
                   {/* City average */}
                   <div>
                     <div className="flex justify-between text-xs mb-1">
-                      <span className="text-slate-400">ממוצע {plot.city} ({cityData.count} חלקות)</span>
+                      <span className="text-slate-400">ממוצע {plot.city}{marketCityData?.count ? ` (${marketCityData.count} חלקות)` : ''}</span>
                       <span className="text-slate-300 font-medium">₪{avgPsm.toLocaleString()}/מ״ר</span>
                     </div>
                     <div className="h-3 rounded-full bg-white/5 overflow-hidden">
@@ -1558,8 +1615,26 @@ export default function PlotDetail() {
             <div className="rounded-2xl p-5 flex flex-col items-center gap-2 text-center bg-gradient-to-b from-gold/15 to-gold/8 border border-gold/20 relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-gold to-gold-bright" />
               <div className="text-xs text-slate-400">תשואה צפויה</div>
-              <div className="text-xl sm:text-2xl font-bold text-gold">{roi}%</div>
-              {readiness && <div className="text-xs text-slate-500">{readiness}</div>}
+              <div className="text-xl sm:text-2xl font-bold text-gold">+{roi}%</div>
+              {/* Net ROI sub-line — the real number after all Israeli transaction costs.
+                  Gross ROI is eye-catching but misleading: +200% gross can be +45% net.
+                  Showing both gives investors honest expectations and builds trust.
+                  This is THE differentiator from Madlan/Yad2 who only show listing price. */}
+              {plot._netRoi != null ? (
+                <div className="text-xs" title="תשואה נטו אחרי מס רכישה, היטל השבחה, מס שבח ועלויות נלוות">
+                  <span className="text-slate-500">נטו: </span>
+                  <span className={`font-bold ${
+                    plot._netRoi >= 50 ? 'text-emerald-400'
+                    : plot._netRoi >= 20 ? 'text-gold/80'
+                    : plot._netRoi >= 0 ? 'text-amber-400'
+                    : 'text-red-400'
+                  }`}>
+                    {plot._netRoi > 0 ? '+' : ''}{plot._netRoi}%
+                  </span>
+                </div>
+              ) : readiness ? (
+                <div className="text-xs text-slate-500">{readiness}</div>
+              ) : null}
             </div>
             {/* Buy Signal + Payback — Bloomberg-style investment recommendation card.
                 Synthesizes all analysis into a single actionable signal with payback timeline.

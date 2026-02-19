@@ -112,6 +112,7 @@ function applySparseFields(plots, fieldsParam) {
     if (p._totalCosts != null) sparse._totalCosts = p._totalCosts
     if (p._paybackYears != null) sparse._paybackYears = p._paybackYears
     if (p._buySignal != null) sparse._buySignal = p._buySignal
+    if (p._cityAvgPriceSqm != null) sparse._cityAvgPriceSqm = p._cityAvgPriceSqm
     return sparse
   })
 }

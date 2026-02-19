@@ -361,8 +361,13 @@ async function enrichPlotsWithScores(plots) {
       const plotPsm = price / size
       const discountPct = Math.round(((cityAvgPsm[p.city] - plotPsm) / cityAvgPsm[p.city]) * 100)
       p._dealDiscount = discountPct // positive = below avg, negative = above avg
+      // Expose the city average price/sqm so the client can reference it directly
+      // for "vs city average" comparisons without needing a separate API call.
+      // Eliminates the need for useMarketOverview on PlotDetail just to show the benchmark.
+      p._cityAvgPriceSqm = Math.round(cityAvgPsm[p.city])
     } else {
       p._dealDiscount = null
+      p._cityAvgPriceSqm = null
     }
 
     // Net investment return — THE metric professional investors use.
