@@ -266,7 +266,7 @@ function SimilarPlotsSection({ plotId, onNearbyLoaded }) {
             חלקות דומות
             <span className="text-xs text-slate-500 font-normal">מחיר, שלב תכנוני ותשואה</span>
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 plot-similar-grid">
             {similar.map(p => <PlotCard key={p.id} p={p} />)}
           </div>
         </div>
@@ -279,7 +279,7 @@ function SimilarPlotsSection({ plotId, onNearbyLoaded }) {
             <span className="w-7 h-7 rounded-lg bg-blue-500/15 flex items-center justify-center text-sm">📍</span>
             חלקות בסביבה
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 plot-similar-grid">
             {nearbyFiltered.map(p => <PlotCard key={p.id} p={p} />)}
           </div>
         </div>
@@ -1420,7 +1420,7 @@ export default function PlotDetail() {
 
           {/* Forward-looking investment projection — year-by-year S-curve growth.
               Differentiator: Madlan/Yad2 show history, we show the investor's future. */}
-          <div id="section-projection" className="mb-8 bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+          <div id="section-projection" className="mb-8 bg-navy-light/40 border border-white/5 rounded-2xl p-5 plot-detail-section">
             <WidgetErrorBoundary name="תחזית השקעה">
               <Suspense fallback={<SectionSkeleton height="h-56" />}>
                 <InvestmentProjection
@@ -1441,7 +1441,7 @@ export default function PlotDetail() {
             const timeline = calcInvestmentTimeline(plot)
             if (!timeline || timeline.stages.length === 0) return null
             return (
-              <div id="section-timeline" className="mb-8 bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+              <div id="section-timeline" className="mb-8 bg-navy-light/40 border border-white/5 rounded-2xl p-5 plot-detail-section">
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center">
@@ -1651,7 +1651,7 @@ export default function PlotDetail() {
                 const docs = plot.plot_documents?.length ? plot.plot_documents : plot.documents?.length ? plot.documents : null
                 if (!docs) return null
                 return (
-                  <div id="section-documents" className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+                  <div id="section-documents" className="bg-navy-light/40 border border-white/5 rounded-2xl p-5 plot-detail-section">
                     <div className="flex items-center gap-2 mb-3">
                       <div className="w-7 h-7 rounded-lg bg-gold/15 flex items-center justify-center">
                         <FileText className="w-3.5 h-3.5 text-gold" />
@@ -1733,7 +1733,7 @@ export default function PlotDetail() {
             {/* Right: Zoning pipeline + costs */}
             <div className="space-y-4">
               {/* Zoning pipeline */}
-              <div id="section-planning" className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+              <div id="section-planning" className="bg-navy-light/40 border border-white/5 rounded-2xl p-5 plot-detail-section">
                 <h2 className="text-base font-bold text-slate-100 mb-3">צינור תכנוני</h2>
                 {readiness && (
                   <div className="flex items-center gap-2 mb-4 bg-gold/5 border border-gold/20 rounded-xl px-4 py-2.5">
@@ -1771,7 +1771,7 @@ export default function PlotDetail() {
                 const trueRoi = txn.totalWithPurchase > 0 ? Math.round((netAfterAll / txn.totalWithPurchase) * 100) : 0
 
                 return (
-                  <div id="section-costs" className="bg-navy-light/40 border border-white/5 rounded-2xl p-5">
+                  <div id="section-costs" className="bg-navy-light/40 border border-white/5 rounded-2xl p-5 plot-detail-section">
                     <div className="flex items-center gap-2 mb-4">
                       <DollarSign className="w-4 h-4 text-gold" />
                       <h2 className="text-base font-bold text-slate-100">ניתוח עלויות מלא</h2>

@@ -351,6 +351,160 @@ function PriceDistributionChart({ plots }) {
   )
 }
 
+/**
+ * RoiDistributionChart — SVG histogram showing how plot ROIs are distributed.
+ * Complements PriceDistributionChart: price shows what you pay, ROI shows what you get.
+ * Investors can instantly see if most plots in a city offer moderate returns (clustered
+ * around 100-150%) or if there's a wide spread (some 50%, some 300%).
+ * Neither Madlan nor Yad2 visualize ROI distribution — unique differentiator.
+ */
+function RoiDistributionChart({ plots }) {
+  const chartData = useMemo(() => {
+    if (!plots || plots.length < 3) return null
+    const rois = plots
+      .map(p => {
+        const price = p.total_price ?? p.totalPrice ?? 0
+        const proj = p.projected_value ?? p.projectedValue ?? 0
+        return price > 0 ? Math.round(((proj - price) / price) * 100) : null
+      })
+      .filter(r => r !== null && r >= 0)
+      .sort((a, b) => a - b)
+    if (rois.length < 3) return null
+
+    const min = rois[0]
+    const max = rois[rois.length - 1]
+    const range = max - min
+    if (range <= 0) return null
+
+    const binCount = Math.min(8, Math.max(4, Math.ceil(Math.sqrt(rois.length))))
+    const binWidth = range / binCount
+    const bins = Array.from({ length: binCount }, (_, i) => ({
+      min: min + i * binWidth,
+      max: min + (i + 1) * binWidth,
+      count: 0,
+    }))
+
+    for (const roi of rois) {
+      const idx = Math.min(binCount - 1, Math.floor((roi - min) / binWidth))
+      bins[idx].count++
+    }
+
+    const maxCount = Math.max(...bins.map(b => b.count))
+    const median = rois[Math.floor(rois.length / 2)]
+    const avg = Math.round(rois.reduce((s, v) => s + v, 0) / rois.length)
+
+    return { bins, maxCount, min, max, median, avg, total: rois.length }
+  }, [plots])
+
+  if (!chartData) return null
+
+  const { bins, maxCount, min, max, median, avg, total } = chartData
+  const W = 400
+  const H = 140
+  const padX = 10
+  const padY = 10
+  const barGap = 4
+  const chartW = W - padX * 2
+  const chartH = H - padY * 2 - 20
+  const barW = (chartW - barGap * (bins.length - 1)) / bins.length
+
+  const range = max - min
+  const medianX = range > 0 ? padX + ((median - min) / range) * chartW : W / 2
+
+  return (
+    <div className="glass-panel glass-panel-cv p-5 mb-8">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-emerald-400" />
+          התפלגות תשואות
+        </h2>
+        <span className="text-[9px] text-slate-500 bg-white/5 px-2 py-1 rounded-lg">
+          {total} חלקות · חציון: +{median}% · ממוצע: +{avg}%
+        </span>
+      </div>
+
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full h-auto"
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label={`התפלגות תשואות — חציון +${median}%, ממוצע +${avg}%`}
+      >
+        {bins.map((bin, i) => {
+          const barH = maxCount > 0 ? (bin.count / maxCount) * chartH : 0
+          const x = padX + i * (barW + barGap)
+          const y = padY + chartH - barH
+          const isMedianBin = median >= bin.min && median < bin.max
+          return (
+            <g key={i}>
+              <rect
+                x={x}
+                y={y}
+                width={barW}
+                height={Math.max(2, barH)}
+                rx={3}
+                fill={isMedianBin ? 'rgba(34,197,94,0.6)' : 'rgba(34,197,94,0.25)'}
+                stroke={isMedianBin ? 'rgba(34,197,94,0.8)' : 'rgba(34,197,94,0.15)'}
+                strokeWidth={1}
+              />
+              {bin.count > 0 && (
+                <text
+                  x={x + barW / 2}
+                  y={y - 4}
+                  fill="rgba(148,163,184,0.7)"
+                  fontSize="9"
+                  textAnchor="middle"
+                  fontFamily="sans-serif"
+                >
+                  {bin.count}
+                </text>
+              )}
+              {i % 2 === 0 && (
+                <text
+                  x={x + barW / 2}
+                  y={H - 4}
+                  fill="rgba(148,163,184,0.4)"
+                  fontSize="8"
+                  textAnchor="middle"
+                  fontFamily="sans-serif"
+                >
+                  +{Math.round(bin.min)}%
+                </text>
+              )}
+            </g>
+          )
+        })}
+
+        {/* Median line */}
+        <line
+          x1={medianX}
+          y1={padY}
+          x2={medianX}
+          y2={padY + chartH}
+          stroke="rgba(34,197,94,0.5)"
+          strokeWidth="1"
+          strokeDasharray="4 3"
+        />
+        <text
+          x={medianX}
+          y={padY - 2}
+          fill="rgba(34,197,94,0.8)"
+          fontSize="8"
+          textAnchor="middle"
+          fontFamily="sans-serif"
+          fontWeight="bold"
+        >
+          חציון
+        </text>
+      </svg>
+
+      <p className="text-[9px] text-slate-600 mt-1 text-center">
+        💡 תשואה חציונית +{median}% — רוב החלקות מציעות תשואה בטווח +{Math.round(chartData.bins[1]?.min || min)}% עד +{Math.round(chartData.bins[chartData.bins.length - 2]?.max || max)}%
+      </p>
+    </div>
+  )
+}
+
 export default function AreaCity() {
   const { city } = useParams()
   const decodedCity = decodeURIComponent(city || '')
@@ -577,6 +731,11 @@ export default function AreaCity() {
         {/* Price distribution histogram — like Madlan's area price distribution */}
         <PriceDistributionChart plots={plots} />
 
+        {/* ROI distribution histogram — shows how returns are spread across plots.
+            Complements price distribution: price is what you pay, ROI is what you earn.
+            Unique to LandMap — neither Madlan nor Yad2 visualize return distribution. */}
+        <RoiDistributionChart plots={plots} />
+
         {/* CTA: View on map */}
         <div className="glass-panel p-6 mb-8 border-gold/10 bg-gradient-to-r from-gold/5 to-transparent">
           <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -609,7 +768,7 @@ export default function AreaCity() {
               </h2>
               <span className="text-xs text-slate-500">ממוינות לפי ציון השקעה</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 area-city-plot-grid">
               {sortedPlots.slice(0, 9).map(p => (
                 <PlotRow key={p.id} plot={p} />
               ))}
