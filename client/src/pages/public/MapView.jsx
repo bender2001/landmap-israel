@@ -43,6 +43,7 @@ const PriceMovers = lazy(() => import('../../components/PriceMovers.jsx'))
 const MobilePlotActionBar = lazy(() => import('../../components/ui/MobilePlotActionBar.jsx'))
 const MarketPulse = lazy(() => import('../../components/MarketPulse.jsx'))
 const MarketVelocity = lazy(() => import('../../components/MarketVelocity.jsx'))
+const WelcomeBack = lazy(() => import('../../components/WelcomeBack.jsx'))
 
 // Preload PlotDetail chunk — imported but not rendered here.
 // When a user selects a plot (opens sidebar), we trigger this import to preload
@@ -897,6 +898,15 @@ export default function MapView() {
         <Suspense fallback={null}>
           <WidgetErrorBoundary name="MarketVelocity" silent>
             <MarketVelocity plots={filteredPlots} />
+          </WidgetErrorBoundary>
+        </Suspense>
+      </IdleRender>
+      {/* Welcome back notification — shows new plots since last visit (engagement/FOMO).
+          Like Airbnb's "New since your last search". Deferred for perf. */}
+      <IdleRender>
+        <Suspense fallback={null}>
+          <WidgetErrorBoundary name="WelcomeBack" silent>
+            <WelcomeBack plots={filteredPlots} />
           </WidgetErrorBoundary>
         </Suspense>
       </IdleRender>

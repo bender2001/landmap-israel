@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback, useMemo, memo } from 'react'
-import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows, Share2, Heart } from 'lucide-react'
+import { MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart3, Ruler, GitCompareArrows, Share2, Heart, Clipboard, Check } from 'lucide-react'
 import PriceSparkline from './ui/PriceSparkline'
 import ZoningProgressBar from './ui/ZoningProgressBar'
 import CardImageCarousel from './ui/CardImageCarousel'
@@ -152,6 +152,47 @@ const PlotShareButtons = memo(function PlotShareButtons({ plot, blockNum, price,
   )
 })
 
+/**
+ * QuickCopyButton — one-click clipboard copy of plot essentials.
+ * Copies: "גוש X חלקה Y · City · ₪Price · +ROI%"
+ * 
+ * Investors constantly need to paste plot info into WhatsApp, email, or notes.
+ * The full share flow (WhatsApp/Telegram) is overkill for a quick text paste.
+ * This button gives instant clipboard access — a pattern Google Maps uses
+ * for addresses and coordinates. No Israeli RE competitor has this.
+ */
+const QuickCopyButton = memo(function QuickCopyButton({ plot }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback((e) => {
+    e.stopPropagation()
+    const blockNum = plot.block_number ?? plot.blockNumber
+    const price = plot.total_price ?? plot.totalPrice ?? 0
+    const proj = plot.projected_value ?? plot.projectedValue ?? 0
+    const roi = price > 0 ? Math.round(((proj - price) / price) * 100) : 0
+    const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
+    const dunam = sizeSqM > 0 ? (sizeSqM / 1000).toFixed(1) : '?'
+
+    const text = `גוש ${blockNum} חלקה ${plot.number} · ${plot.city} · ${formatPriceShort(price)} · ${dunam} דונם · +${roi}% ROI`
+
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }).catch(() => {})
+  }, [plot])
+
+  return (
+    <button
+      onClick={handleCopy}
+      className={`plot-card-copy-btn ${copied ? 'is-copied' : ''}`}
+      title={copied ? 'הועתק!' : 'העתק פרטי חלקה'}
+      aria-label={copied ? 'הועתק ללוח' : 'העתק פרטי חלקה ללוח'}
+    >
+      {copied ? <Check className="w-3 h-3" /> : <Clipboard className="w-3 h-3" />}
+    </button>
+  )
+})
+
 const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, isFavorite, wasViewed, areaAvgPsm, onSelectPlot, onToggleCompare, onToggleFavorite, prefetchPlot, priceChange, pricePercentile, categoryBadges, distanceKm, imagePriority = false }) {
   // Viewport-based prefetching — loads plot detail into React Query cache when the card
   // scrolls into (or near) the visible area. On mobile, users scroll and tap without
@@ -248,6 +289,11 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
 
       {/* Quick share — native share sheet (mobile) or WhatsApp/Telegram fallback (desktop) */}
       <PlotShareButtons plot={plot} blockNum={blockNum} price={price} roi={roi} />
+
+      {/* Quick copy — one-click clipboard copy of plot essentials.
+          Investors need to paste plot info into WhatsApp/email/notes constantly.
+          Like Google Maps' "copy address" — instant and practical. */}
+      <QuickCopyButton plot={plot} />
 
       {/* Favorite toggle — like Madlan/Yad2's heart on every listing card.
           Allows one-click save without opening the sidebar. */}
@@ -594,10 +640,13 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
   const stats = useMemo(() => {
     if (!plots || plots.length === 0) return null
     const available = plots.filter(p => p.status === 'AVAILABLE')
+    const sold = plots.filter(p => p.status === 'SOLD')
     let totalValue = 0
     let totalProjected = 0
     let roiSum = 0
     let totalArea = 0
+    let freshCount = 0 // plots added in last 7 days
+    const now = Date.now()
 
     for (const p of plots) {
       const price = p.total_price ?? p.totalPrice ?? 0
@@ -606,12 +655,31 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
       totalProjected += proj
       totalArea += p.size_sqm ?? p.sizeSqM ?? 0
       if (price > 0) roiSum += ((proj - price) / price) * 100
+      const created = p.created_at ?? p.createdAt
+      if (created && (now - new Date(created).getTime()) < 7 * 86400000) freshCount++
     }
 
     const avgRoi = Math.round(roiSum / plots.length)
     const totalProfit = totalProjected - totalValue
 
-    return { available: available.length, totalValue, totalProjected, totalProfit, avgRoi, totalArea }
+    // Market temperature — a composite signal of market activity:
+    // - High availability ratio (>80%) + fresh listings + high ROI = 🔥 Hot
+    // - Moderate = 🟡 Warm
+    // - Low activity / mostly sold = ❄️ Cold
+    // No Israeli competitor surfaces this as a single indicator.
+    const availRatio = plots.length > 0 ? available.length / plots.length : 0
+    const freshRatio = plots.length > 0 ? freshCount / plots.length : 0
+    const heatScore = (availRatio * 40) + (freshRatio * 30) + (Math.min(avgRoi, 200) / 200 * 30)
+    let marketTemp
+    if (heatScore >= 55) {
+      marketTemp = { emoji: '🔥', label: 'חם', color: 'text-orange-400', bg: 'bg-orange-400/10 border-orange-400/20' }
+    } else if (heatScore >= 30) {
+      marketTemp = { emoji: '🟡', label: 'פעיל', color: 'text-amber-400', bg: 'bg-amber-400/10 border-amber-400/20' }
+    } else {
+      marketTemp = { emoji: '❄️', label: 'שקט', color: 'text-blue-400', bg: 'bg-blue-400/10 border-blue-400/20' }
+    }
+
+    return { available: available.length, totalValue, totalProjected, totalProfit, avgRoi, totalArea, marketTemp, freshCount }
   }, [plots])
 
   // Track recently viewed plots
@@ -702,6 +770,21 @@ export default function PlotCardStrip({ plots, selectedPlot, onSelectPlot, compa
               <div className="plot-strip-stat" title={`שווי נוכחי: ₪${stats.totalValue.toLocaleString()} → צפי: ₪${stats.totalProjected.toLocaleString()}`}>
                 <span className="text-emerald-400">💎</span>
                 <span>רווח פוטנציאלי ₪{formatPriceShort(stats.totalProfit)}</span>
+              </div>
+            </>
+          )}
+          {/* Market Temperature — composite market activity indicator.
+              Unique to LandMap: neither Madlan nor Yad2 surface a single "market heat" metric.
+              Combines availability ratio, listing freshness, and ROI levels. */}
+          {stats.marketTemp && (
+            <>
+              <div className="plot-strip-stat-divider" />
+              <div
+                className={`plot-strip-stat px-2 py-0.5 rounded-md border ${stats.marketTemp.bg}`}
+                title={`שוק ${stats.marketTemp.label} — ${stats.available} זמינות, ${stats.freshCount} חדשות השבוע, ממוצע +${stats.avgRoi}% ROI`}
+              >
+                <span>{stats.marketTemp.emoji}</span>
+                <span className={`font-bold ${stats.marketTemp.color}`}>{stats.marketTemp.label}</span>
               </div>
             </>
           )}
