@@ -743,4 +743,120 @@ router.get('/city-history/:city', historyLimiter, async (req, res, next) => {
   }
 })
 
+/**
+ * GET /api/market/velocity
+ * Market velocity indicators — key metrics for professional investors:
+ * - Average days on market (time to sell)
+ * - Absorption rate (% sold per month)
+ * - View velocity (demand signal)
+ * - New listing momentum (supply signal)
+ * - Per-city velocity breakdown
+ *
+ * Neither Madlan nor Yad2 surface these metrics prominently.
+ * Differentiator: positions LandMap as a data-driven platform for serious investors.
+ * Cached 5 min — metrics don't change rapidly but should stay fresh.
+ */
+router.get('/velocity', async (req, res, next) => {
+  try {
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
+
+    const velocity = await marketCache.wrap('market-velocity', async () => {
+      const { data: plots, error } = await supabaseAdmin
+        .from('plots')
+        .select('id, city, status, total_price, size_sqm, views, created_at, updated_at')
+        .eq('is_published', true)
+
+      if (error) throw error
+      if (!plots || plots.length === 0) return { total: 0, velocity: null }
+
+      const now = Date.now()
+      let totalDaysOnMarket = 0
+      let daysOnMarketCount = 0
+      let totalViews = 0
+      let available = 0
+      let sold = 0
+      let newLast7 = 0
+      let newLast30 = 0
+      const byCity = {}
+
+      for (const p of plots) {
+        const createdTs = p.created_at ? new Date(p.created_at).getTime() : 0
+        const days = createdTs > 0 ? Math.floor((now - createdTs) / 86400000) : null
+        const city = p.city || 'אחר'
+
+        if (!byCity[city]) {
+          byCity[city] = { available: 0, sold: 0, totalDays: 0, daysCount: 0, views: 0, newLast7: 0 }
+        }
+        const c = byCity[city]
+
+        if (p.status === 'AVAILABLE') {
+          available++
+          c.available++
+          if (days !== null && days >= 0) {
+            totalDaysOnMarket += days
+            daysOnMarketCount++
+            c.totalDays += days
+            c.daysCount++
+          }
+        } else if (p.status === 'SOLD') {
+          sold++
+          c.sold++
+        }
+
+        totalViews += p.views || 0
+        c.views += p.views || 0
+
+        if (createdTs > 0) {
+          const daysSince = (now - createdTs) / 86400000
+          if (daysSince <= 7) { newLast7++; c.newLast7++ }
+          if (daysSince <= 30) newLast30++
+        }
+      }
+
+      const total = plots.length
+      const avgDaysOnMarket = daysOnMarketCount > 0 ? Math.round(totalDaysOnMarket / daysOnMarketCount) : null
+      const absorptionRate = total > 0 ? Math.round((sold / total) * 100) : 0
+      const avgViewsPerPlot = total > 0 ? Math.round(totalViews / total) : 0
+
+      // Weekly momentum (7-day vs 30-day annualized pace)
+      const weeklyPace = newLast7
+      const monthlyAvgPace = Math.round(newLast30 / 4.3)
+      const momentum = weeklyPace > monthlyAvgPace ? 'accelerating' : weeklyPace < monthlyAvgPace ? 'decelerating' : 'stable'
+
+      // Per-city velocity
+      const cities = Object.entries(byCity).map(([city, c]) => ({
+        city,
+        avgDaysOnMarket: c.daysCount > 0 ? Math.round(c.totalDays / c.daysCount) : null,
+        absorptionRate: (c.available + c.sold) > 0 ? Math.round((c.sold / (c.available + c.sold)) * 100) : 0,
+        avgViews: (c.available + c.sold) > 0 ? Math.round(c.views / (c.available + c.sold)) : 0,
+        newLast7: c.newLast7,
+      })).sort((a, b) => (a.avgDaysOnMarket ?? 999) - (b.avgDaysOnMarket ?? 999))
+
+      return {
+        total,
+        available,
+        sold,
+        avgDaysOnMarket,
+        absorptionRate,
+        avgViewsPerPlot,
+        newLast7,
+        newLast30,
+        momentum,
+        cities,
+        generatedAt: new Date().toISOString(),
+      }
+    }, 300_000) // 5 min cache
+
+    const etag = generateETag(velocity)
+    res.set('ETag', etag)
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end()
+    }
+
+    res.json(velocity)
+  } catch (err) {
+    next(err)
+  }
+})
+
 export default router

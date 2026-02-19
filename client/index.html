@@ -79,5 +79,30 @@
         })
       }
     </script>
+    <!-- Speculation Rules API (Chrome 109+) — pre-renders likely navigation targets.
+         When a user hovers over a link to these routes, Chrome starts pre-rendering the page
+         in a hidden tab. Clicking then navigates instantly (0ms perceived latency).
+         Browsers that don't support speculation rules silently ignore this script tag.
+         Like Next.js prefetch but at the browser level — works with any SPA/MPA. -->
+    <script type="speculationrules">
+      {
+        "prerender": [
+          {
+            "where": {
+              "href_matches": ["/areas", "/calculator", "/compare", "/favorites", "/about", "/contact", "/pricing"]
+            },
+            "eagerness": "moderate"
+          }
+        ],
+        "prefetch": [
+          {
+            "where": {
+              "href_matches": "/plot/*"
+            },
+            "eagerness": "moderate"
+          }
+        ]
+      }
+    </script>
   </body>
 </html>

@@ -42,6 +42,7 @@ const MarketTicker = lazy(() => import('../../components/MarketTicker.jsx'))
 const PriceMovers = lazy(() => import('../../components/PriceMovers.jsx'))
 const MobilePlotActionBar = lazy(() => import('../../components/ui/MobilePlotActionBar.jsx'))
 const MarketPulse = lazy(() => import('../../components/MarketPulse.jsx'))
+const MarketVelocity = lazy(() => import('../../components/MarketVelocity.jsx'))
 
 // Preload PlotDetail chunk — imported but not rendered here.
 // When a user selects a plot (opens sidebar), we trigger this import to preload
@@ -886,6 +887,16 @@ export default function MapView() {
         <Suspense fallback={null}>
           <WidgetErrorBoundary name="MarketPulse" silent>
             <MarketPulse plots={filteredPlots} />
+          </WidgetErrorBoundary>
+        </Suspense>
+      </IdleRender>
+      {/* Market Velocity — real-time market speed indicators for professional investors.
+          Shows avg days on market, absorption rate, view velocity, listing momentum.
+          Unique to LandMap — neither Madlan nor Yad2 surface these metrics. */}
+      <IdleRender>
+        <Suspense fallback={null}>
+          <WidgetErrorBoundary name="MarketVelocity" silent>
+            <MarketVelocity plots={filteredPlots} />
           </WidgetErrorBoundary>
         </Suspense>
       </IdleRender>
