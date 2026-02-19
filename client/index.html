@@ -102,8 +102,12 @@
     <!-- Preload critical API data — start fetching plots before React mounts.
          By the time the app hydrates and React Query fires useAllPlots(), the browser
          already has the response in its HTTP cache. Saves 200-500ms on initial load.
-         Uses "as=fetch" + crossorigin to match the fetch() request signature. -->
-    <link rel="preload" href="/api/plots" as="fetch" crossorigin="anonymous" />
+         Uses "as=fetch" + crossorigin to match the fetch() request signature.
+         fetchpriority=high tells the browser to prioritize this over other preloads
+         (fonts, CSS) since plot data is the critical path for first meaningful paint. -->
+    <link rel="preload" href="/api/plots" as="fetch" crossorigin="anonymous" fetchpriority="high" />
+    <!-- Preload market overview — used by the filter bar market stats (always visible above fold) -->
+    <link rel="preload" href="/api/market/overview" as="fetch" crossorigin="anonymous" />
   </head>
   <body class="m-0 p-0 overflow-hidden bg-navy font-heebo">
     <div id="root"></div>

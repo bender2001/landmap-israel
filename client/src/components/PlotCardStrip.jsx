@@ -552,6 +552,17 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
           <div className="plot-card-mini-tags">
             <span className="plot-card-mini-roi">+{roi}%</span>
             {(() => {
+              // Prefer server-computed _cagr when available (avoids recalculating per card)
+              const serverCagr = plot._cagr
+              const serverYears = plot._holdingYears
+              if (serverCagr != null && serverCagr > 0) {
+                return (
+                  <span className="plot-card-mini-cagr" title={`תשואה שנתית על בסיס ${serverYears || '?'} שנים`}>
+                    {serverCagr}%/שנה
+                  </span>
+                )
+              }
+              // Fallback to client-side calculation (mock data, offline, etc.)
               const cagrData = calcCAGR(roi, readiness)
               if (!cagrData) return null
               return (

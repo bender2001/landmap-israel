@@ -100,6 +100,10 @@ function applySparseFields(plots, fieldsParam) {
     if (p._riskLevel != null) sparse._riskLevel = p._riskLevel
     if (p._riskScore != null) sparse._riskScore = p._riskScore
     if (p._riskFactors != null) sparse._riskFactors = p._riskFactors
+    if (p._cagr != null) sparse._cagr = p._cagr
+    if (p._holdingYears != null) sparse._holdingYears = p._holdingYears
+    if (p._marketTrend != null) sparse._marketTrend = p._marketTrend
+    if (p._dealDiscount != null) sparse._dealDiscount = p._dealDiscount
     return sparse
   })
 }

@@ -252,6 +252,27 @@ async function enrichPlotsWithScores(plots) {
       p._monthlyPayment = null
     }
 
+    // CAGR (Compound Annual Growth Rate) — pre-computed annualized return that
+    // accounts for holding period. More meaningful than raw ROI for investor comparison:
+    // 200% ROI over 10 years (CAGR 11.6%) is worse than 100% ROI over 3 years (CAGR 26%).
+    // Previously only computed client-side in calcCAGR() — now server-enriched so:
+    // 1. PlotCardStrip/tooltips can display it without recalculating
+    // 2. cagr-desc sort uses this pre-computed value (faster, consistent)
+    // 3. Available to OG generators, webhooks, and export endpoints
+    const readiness = p.readiness_estimate || ''
+    let holdingYears = 5
+    if (readiness.includes('1-3')) holdingYears = 2
+    else if (readiness.includes('3-5')) holdingYears = 4
+    else if (readiness.includes('5+') || readiness.includes('5-')) holdingYears = 7
+
+    if (price > 0 && projected > price && holdingYears > 0) {
+      p._cagr = Math.round((Math.pow(projected / price, 1 / holdingYears) - 1) * 1000) / 10 // e.g. 26.3
+      p._holdingYears = holdingYears
+    } else {
+      p._cagr = 0
+      p._holdingYears = holdingYears
+    }
+
     // Area market trend — shows if the city's price/sqm is trending up, down, or stable
     // over the last 30 days. Like Madlan's area trend indicators. Enables "hot market" badges.
     const cityTrend = trends.get(p.city)
@@ -582,23 +603,9 @@ export async function getPublishedPlots(filters = {}) {
       return bTs - aTs || tieBreak(a, b)
     })
   } else if (filters.sort === 'cagr-desc' && data) {
-    // CAGR sort: annualized return considering holding period.
-    // More meaningful than raw ROI — a 200% ROI over 10 years (CAGR 11.6%)
-    // is worse than 100% ROI over 3 years (CAGR 26%). Investors prefer CAGR.
-    data.sort((a, b) => {
-      const getCagr = (p) => {
-        const price = p.total_price || 0
-        const proj = p.projected_value || 0
-        if (price <= 0 || proj <= price) return 0
-        const readiness = p.readiness_estimate || ''
-        let years = 5
-        if (readiness.includes('1-3')) years = 2
-        else if (readiness.includes('3-5')) years = 4
-        else if (readiness.includes('5+')) years = 7
-        return (Math.pow(proj / price, 1 / years) - 1) * 100
-      }
-      return getCagr(b) - getCagr(a) || tieBreak(a, b)
-    })
+    // CAGR sort: uses pre-computed _cagr from enrichPlotsWithScores().
+    // No need to recalculate here — enrichment already stored it.
+    data.sort((a, b) => (b._cagr || 0) - (a._cagr || 0) || tieBreak(a, b))
   } else if (filters.sort === 'deal-desc' && data) {
     // "Best deal first" — sort by how far below the area average price/sqm each plot is.
     // Compute average price/sqm across all results, then rank by discount.

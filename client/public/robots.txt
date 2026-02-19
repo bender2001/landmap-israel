@@ -1,6 +1,42 @@
+# LandMap Israel — robots.txt
+# https://landmap.co.il/robots.txt
+
 User-agent: *
 Allow: /
+Allow: /plot/
+Allow: /areas/
+Allow: /about
+Allow: /contact
+Allow: /calculator
+Allow: /compare
+Allow: /pricing
+Allow: /terms
+Allow: /privacy
 Disallow: /admin/
 Disallow: /api/
+Disallow: /plot/by-gush/
 
-Sitemap: /sitemap.xml
+# Crawl budget optimization — prevent search engines from wasting crawl budget
+# on filtered/sorted variants of the same page (duplicate content risk).
+# Google should index the base URL, not every filter permutation.
+Disallow: /*?priceMin=
+Disallow: /*?priceMax=
+Disallow: /*?sizeMin=
+Disallow: /*?sizeMax=
+Disallow: /*?minRoi=
+Disallow: /*?sort=
+Disallow: /*?ripeness=
+Disallow: /*?maxDays=
+Disallow: /*?maxMonthly=
+
+# Allow specific crawlers to access the sitemap at higher frequency
+User-agent: Googlebot
+Crawl-delay: 1
+
+User-agent: Bingbot
+Crawl-delay: 2
+
+User-agent: YandexBot
+Crawl-delay: 3
+
+Sitemap: https://landmap.co.il/sitemap.xml
