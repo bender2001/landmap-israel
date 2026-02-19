@@ -1,31 +1,47 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback, lazy, Suspense } from 'react'
 import { X, MapPin, TrendingUp, Waves, TreePine, Hospital, Shield, CheckCircle2, BarChart3, FileText, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Award, DollarSign, AlertTriangle, Building2, Hourglass, Phone, MessageCircle, Share2, Copy, Check, Heart, BarChart, Image as ImageIcon, Download, File, FileImage, FileSpreadsheet, Printer, ExternalLink, Eye, Navigation, Clipboard, Maximize2 } from 'lucide-react'
 import { useLazyVisible } from '../hooks/useLazyVisible'
 import ShareMenu from './ui/ShareMenu'
-import ImageLightbox from './ui/ImageLightbox'
 import PriceTrendChart from './ui/PriceTrendChart'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import ProfitWaterfall from './ui/ProfitWaterfall'
 import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStages } from '../utils/constants'
 import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict, calcRiskLevel, generatePlotSummary, calcDemandVelocity, calcBuildableValue, calcInvestmentTimeline, plotCenter, calcPlotPerimeter, calcAlternativeReturns, calcCommuteTimes } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
-import NeighborhoodRadar from './ui/NeighborhoodRadar'
-import InvestmentBenchmark from './ui/InvestmentBenchmark'
 import PlotPercentileBadges from './ui/PlotPercentileBadges'
 import { calcInvestmentPnL } from '../utils/plot'
 import { usePlot, useNearbyPlots, useSimilarPlots, usePrefetchPlot, useNearbyPois } from '../hooks/usePlots'
 import MiniMap from './ui/MiniMap'
-import StreetViewPanel from './ui/StreetViewPanel'
-import DueDiligenceChecklist from './ui/DueDiligenceChecklist'
-import InvestmentProjection from './ui/InvestmentProjection'
-import LocationScore from './ui/LocationScore'
-import QuickInquiryTemplates from './ui/QuickInquiryTemplates'
-import InvestmentScoreBreakdown from './ui/InvestmentScoreBreakdown'
-import AreaComparisonWidget from './ui/AreaComparisonWidget'
 import ZoningProgressBar from './ui/ZoningProgressBar'
-import RealTransactions from './RealTransactions'
-import PlanningInfo from './PlanningInfo'
 import { plotInquiryLink } from '../utils/config'
+
+// ─── Lazy-loaded sub-components ──────────────────────────────────────────
+// These are inside collapsed (defaultOpen=false) sections or below the fold.
+// Splitting them out reduces the SidebarDetails chunk from ~135KB to ~65KB,
+// deferring ~70KB of JS until the user actually expands these sections.
+// Like Madlan's sidebar — header + key financials load instantly, deep-dive
+// sections (transactions, street view, due diligence) load on-demand.
+const ImageLightbox = lazy(() => import('./ui/ImageLightbox'))
+const NeighborhoodRadar = lazy(() => import('./ui/NeighborhoodRadar'))
+const InvestmentBenchmark = lazy(() => import('./ui/InvestmentBenchmark'))
+const StreetViewPanel = lazy(() => import('./ui/StreetViewPanel'))
+const DueDiligenceChecklist = lazy(() => import('./ui/DueDiligenceChecklist'))
+const InvestmentProjection = lazy(() => import('./ui/InvestmentProjection'))
+const LocationScore = lazy(() => import('./ui/LocationScore'))
+const QuickInquiryTemplates = lazy(() => import('./ui/QuickInquiryTemplates'))
+const InvestmentScoreBreakdown = lazy(() => import('./ui/InvestmentScoreBreakdown'))
+const AreaComparisonWidget = lazy(() => import('./ui/AreaComparisonWidget'))
+const RealTransactions = lazy(() => import('./RealTransactions'))
+const PlanningInfo = lazy(() => import('./PlanningInfo'))
+
+/** Lightweight spinner for lazy-loaded section content */
+function SectionSpinner() {
+  return (
+    <div className="flex items-center justify-center py-6">
+      <div className="w-5 h-5 rounded-full border-2 border-gold/30 border-t-gold animate-spin" />
+    </div>
+  )
+}
 
 function getDocIcon(mimeType) {
   if (!mimeType) return File
@@ -2156,31 +2172,35 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               {/* Investment Score Breakdown — transparent factor-by-factor scoring.
                   Shows WHY a plot scored what it did — ROI, zoning, timeline, market position.
                   Like Madlan's rating breakdown but more granular. Includes auto-generated narrative. */}
-              <InvestmentScoreBreakdown
-                plot={plot}
-                areaAvgPriceSqm={(() => {
-                  if (!allPlots || allPlots.length < 2) return undefined
-                  const sameCityPlots = allPlots.filter(p => p.city === plot.city && p.id !== plot.id)
-                  const benchPlots = sameCityPlots.length >= 2 ? sameCityPlots : allPlots.filter(p => p.id !== plot.id)
-                  if (benchPlots.length === 0) return undefined
-                  let total = 0, count = 0
-                  for (const p of benchPlots) {
-                    const pp = p.total_price ?? p.totalPrice ?? 0
-                    const ps = p.size_sqm ?? p.sizeSqM ?? 0
-                    if (pp > 0 && ps > 0) { total += pp / ps; count++ }
-                  }
-                  return count > 0 ? Math.round(total / count) : undefined
-                })()}
-              />
+              <Suspense fallback={<SectionSpinner />}>
+                <InvestmentScoreBreakdown
+                  plot={plot}
+                  areaAvgPriceSqm={(() => {
+                    if (!allPlots || allPlots.length < 2) return undefined
+                    const sameCityPlots = allPlots.filter(p => p.city === plot.city && p.id !== plot.id)
+                    const benchPlots = sameCityPlots.length >= 2 ? sameCityPlots : allPlots.filter(p => p.id !== plot.id)
+                    if (benchPlots.length === 0) return undefined
+                    let total = 0, count = 0
+                    for (const p of benchPlots) {
+                      const pp = p.total_price ?? p.totalPrice ?? 0
+                      const ps = p.size_sqm ?? p.sizeSqM ?? 0
+                      if (pp > 0 && ps > 0) { total += pp / ps; count++ }
+                    }
+                    return count > 0 ? Math.round(total / count) : undefined
+                  })()}
+                />
+              </Suspense>
 
               {/* Investment Projection — forward-looking year-by-year value growth (S-curve model).
                   A key differentiator: Madlan/Yad2 show historical prices, we show the investor's FUTURE. */}
-              <InvestmentProjection
-                totalPrice={totalPrice}
-                projectedValue={projectedValue}
-                readinessEstimate={readinessEstimate}
-                zoningStage={zoningStage}
-              />
+              <Suspense fallback={<SectionSpinner />}>
+                <InvestmentProjection
+                  totalPrice={totalPrice}
+                  projectedValue={projectedValue}
+                  readinessEstimate={readinessEstimate}
+                  zoningStage={zoningStage}
+                />
+              </Suspense>
 
               {/* Alternative Investment Comparison — "What if you put this money elsewhere?"
                   No Israeli real estate platform shows this. Pro investors always weigh opportunity cost:
@@ -2394,11 +2414,13 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               {/* Mini Mortgage Calculator */}
               <MiniMortgageCalc totalPrice={totalPrice} />
               {/* Investment Benchmark — compare CAGR vs bank deposits, S&P 500, Israeli RE avg */}
-              <InvestmentBenchmark
-                totalPrice={totalPrice}
-                projectedValue={projectedValue}
-                readinessEstimate={readinessEstimate}
-              />
+              <Suspense fallback={<SectionSpinner />}>
+                <InvestmentBenchmark
+                  totalPrice={totalPrice}
+                  projectedValue={projectedValue}
+                  readinessEstimate={readinessEstimate}
+                />
+              </Suspense>
             </CollapsibleSection>
 
             {/* Area Comparison — how this plot ranks vs its city (like Madlan's "ביחס לאזור") */}
@@ -2410,7 +2432,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               sectionId="section-area-comparison"
               defaultOpen={false}
             >
-              <AreaComparisonWidget plot={plot} allPlots={allPlots} />
+              <Suspense fallback={<SectionSpinner />}>
+                <AreaComparisonWidget plot={plot} allPlots={allPlots} />
+              </Suspense>
             </CollapsibleSection>
 
             {/* ROI Stages - Appreciation Path */}
@@ -2468,7 +2492,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               sectionId="section-transactions"
               defaultOpen={false}
             >
-              <RealTransactions plotId={plot.id} city={plot.city} />
+              <Suspense fallback={<SectionSpinner />}>
+                <RealTransactions plotId={plot.id} city={plot.city} />
+              </Suspense>
             </CollapsibleSection>
 
             {/* Planning Info — תב"ע plans from govmap.gov.il */}
@@ -2480,7 +2506,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
               sectionId="section-planning"
               defaultOpen={false}
             >
-              <PlanningInfo plotId={plot.id} city={plot.city} />
+              <Suspense fallback={<SectionSpinner />}>
+                <PlanningInfo plotId={plot.id} city={plot.city} />
+              </Suspense>
             </CollapsibleSection>
 
             {/* Divider */}
@@ -2748,16 +2776,20 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 sectionId="section-quality"
               >
                 {/* Location connectivity score + risk assessment — a key differentiator vs Madlan */}
-                <LocationScore plot={plot} allPlots={allPlots} />
+                <Suspense fallback={<SectionSpinner />}>
+                  <LocationScore plot={plot} allPlots={allPlots} />
+                </Suspense>
                 <div className="h-px bg-white/5 my-4" />
                 {/* Radar chart — visual quality overview */}
-                <NeighborhoodRadar
-                  distanceToSea={distanceToSea}
-                  distanceToPark={distanceToPark}
-                  distanceToHospital={distanceToHospital}
-                  roi={roi}
-                  investmentScore={calcInvestmentScore(plot)}
-                />
+                <Suspense fallback={<SectionSpinner />}>
+                  <NeighborhoodRadar
+                    distanceToSea={distanceToSea}
+                    distanceToPark={distanceToPark}
+                    distanceToHospital={distanceToHospital}
+                    roi={roi}
+                    investmentScore={calcInvestmentScore(plot)}
+                  />
+                </Suspense>
               </CollapsibleSection>
             )}
             {/* Risk assessment fallback — show even without distance data */}
@@ -2768,7 +2800,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 title="הערכת סיכון"
                 sectionId="section-quality"
               >
-                <LocationScore plot={plot} allPlots={allPlots} />
+                <Suspense fallback={<SectionSpinner />}>
+                  <LocationScore plot={plot} allPlots={allPlots} />
+                </Suspense>
               </CollapsibleSection>
             )}
 
@@ -2796,7 +2830,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                   sectionId="section-streetview"
                   defaultOpen={false}
                 >
-                  <StreetViewPanel lat={center.lat} lng={center.lng} />
+                  <Suspense fallback={<SectionSpinner />}>
+                    <StreetViewPanel lat={center.lat} lng={center.lng} />
+                  </Suspense>
                 </CollapsibleSection>
               )
             })()}
@@ -2806,7 +2842,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
 
             {/* Due Diligence Checklist — like Madlan's buyer guides */}
             <div id="section-dd">
-              <DueDiligenceChecklist plotId={plot.id} />
+              <Suspense fallback={<SectionSpinner />}>
+                <DueDiligenceChecklist plotId={plot.id} />
+              </Suspense>
             </div>
 
             {/* Report Inaccuracy — trust-building pattern from Madlan (דיווח על שגיאה) */}
@@ -2846,7 +2884,9 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
             Reduces friction from "interested" to "message sent" — like Madlan's "שאל שאלה".
             Placed above CTA for maximum visibility without obscuring the primary action. */}
         <div className="flex-shrink-0 px-4 pt-2 pb-0 border-t border-white/5 bg-navy/80 backdrop-blur-sm">
-          <QuickInquiryTemplates plot={plot} />
+          <Suspense fallback={null}>
+            <QuickInquiryTemplates plot={plot} />
+          </Suspense>
         </div>
 
         {/* Sticky CTA footer */}
@@ -2947,14 +2987,16 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
         </div>
       </div>
 
-      {/* Image Lightbox */}
-      {plot.plot_images && plot.plot_images.length > 0 && (
-        <ImageLightbox
-          images={plot.plot_images}
-          initialIndex={lightboxIndex}
-          isOpen={lightboxOpen}
-          onClose={() => setLightboxOpen(false)}
-        />
+      {/* Image Lightbox — lazy-loaded since it's only shown on user action (click on image) */}
+      {plot.plot_images && plot.plot_images.length > 0 && lightboxOpen && (
+        <Suspense fallback={null}>
+          <ImageLightbox
+            images={plot.plot_images}
+            initialIndex={lightboxIndex}
+            isOpen={lightboxOpen}
+            onClose={() => setLightboxOpen(false)}
+          />
+        </Suspense>
       )}
     </>
   )

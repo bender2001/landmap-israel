@@ -1070,6 +1070,33 @@ export default function MapView() {
         onClearFilters={handleClearFilters}
       />
 
+      {/* Empty state overlay — shows on the map when filters produce zero results.
+          Like Google Maps' "No results in this area" — prevents confusion about blank map.
+          The FilterSuggestions component shows actionable filter loosening tips;
+          this overlay provides the visual context that the map isn't broken, just empty. */}
+      {!isLoading && filteredPlots.length === 0 && plots.length > 0 && (
+        <div className="fixed inset-0 z-[25] pointer-events-none flex items-center justify-center" dir="rtl">
+          <div className="pointer-events-auto bg-navy/85 backdrop-blur-md border border-white/10 rounded-2xl px-8 py-7 max-w-sm text-center shadow-2xl animate-fade-in">
+            <div className="text-4xl mb-3">🔍</div>
+            <h3 className="text-lg font-bold text-slate-200 mb-2">אין חלקות מתאימות</h3>
+            <p className="text-sm text-slate-400 mb-5 leading-relaxed">
+              הסינון הנוכחי לא מציג תוצאות.{' '}
+              {boundsFilter ? 'נסה להרחיב את אזור החיפוש במפה או ' : ''}
+              נסה לשנות את הפילטרים.
+            </p>
+            <button
+              onClick={handleClearFilters}
+              className="px-6 py-2.5 bg-gradient-to-r from-gold to-gold-bright text-navy font-bold text-sm rounded-xl hover:shadow-lg hover:shadow-gold/30 transition-all"
+            >
+              🔄 נקה את כל הסינונים
+            </button>
+            <div className="text-[10px] text-slate-600 mt-3">
+              {plots.length} חלקות זמינות ללא סינון
+            </div>
+          </div>
+        </div>
+      )}
+
       <CompareBar
         compareIds={compareIds}
         plots={filteredPlots}
