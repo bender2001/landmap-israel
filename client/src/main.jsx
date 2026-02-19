@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './hooks/useAuth'
-import { ToastProvider } from './components/ui/ToastContainer'
+import { ToastProvider, useToast } from './components/ui/ToastContainer'
 import App from './App'
 import './index.css'
 import { initWebVitals } from './utils/webVitals'
@@ -110,6 +110,40 @@ function showUpdateNotification(registration) {
   document.body.appendChild(banner)
 }
 
+// ─── Global React Query error handler ─────────────────────────────────
+// Shows toast notifications when API calls fail, so users know something
+// went wrong instead of facing silent failures. Like Google Maps' error
+// toasts when tile loading or geocoding fails. Only fires once per error
+// (React Query deduplicates retries internally before calling onError).
+//
+// Debounce: avoids toast spam when multiple queries fail simultaneously
+// (e.g., network drops — all 5 in-flight queries fail at once). Only the
+// first error shows a toast; subsequent errors within 3s are suppressed.
+let lastErrorToastMs = 0
+const ERROR_TOAST_DEBOUNCE_MS = 3000
+
+function handleQueryError(error) {
+  const now = Date.now()
+  if (now - lastErrorToastMs < ERROR_TOAST_DEBOUNCE_MS) return
+  lastErrorToastMs = now
+
+  // Suppress toast for abort/timeout (user navigated away) and 404 (expected)
+  if (error?.name === 'AbortError' || error?.status === 404) return
+
+  // Use the injected toast function (set after render — see below)
+  if (window.__landmap_toast) {
+    const status = error?.status
+    const msg = status === 429
+      ? 'יותר מדי בקשות — נסו שוב בעוד דקה'
+      : status >= 500
+        ? 'שגיאת שרת — הנתונים עשויים להיות לא מעודכנים'
+        : error?.message?.includes('timeout') || error?.code === 'REQUEST_TIMEOUT'
+          ? 'השרת לא מגיב — בדקו את החיבור לאינטרנט'
+          : 'שגיאה בטעינת הנתונים'
+    window.__landmap_toast(msg, 'warning')
+  }
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -127,9 +161,29 @@ const queryClient = new QueryClient({
     },
     mutations: {
       networkMode: 'offlineFirst',
+      onError: handleQueryError,
     },
   },
 })
+
+// Wire up the global query error handler via the query cache's onError callback.
+// This fires AFTER all retries are exhausted — users see exactly one toast per failure,
+// not one per retry attempt. Combined with the debounce above, this prevents toast spam.
+queryClient.getQueryCache().config.onError = handleQueryError
+
+/**
+ * ToastInjector — bridges the React toast system with the global query error handler.
+ * Injects the toast function into window.__landmap_toast so handleQueryError() can
+ * show notifications without being inside the React tree. Runs once on mount.
+ */
+function ToastInjector() {
+  const { toast } = useToast()
+  React.useEffect(() => {
+    window.__landmap_toast = toast
+    return () => { delete window.__landmap_toast }
+  }, [toast])
+  return null
+}
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -137,6 +191,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <ToastProvider>
+            <ToastInjector />
             <App />
           </ToastProvider>
         </AuthProvider>

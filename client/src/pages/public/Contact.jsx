@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { User, Phone, Mail, MessageSquare, Lock, Send, CheckCircle2, BarChart3, MapPin, TrendingUp } from 'lucide-react'
 import { useCreateLead } from '../../hooks/useLeads'
 import { useMarketOverview } from '../../hooks/useMarketOverview'
+import { useToast } from '../../components/ui/ToastContainer'
 import PublicNav from '../../components/PublicNav'
 import PublicFooter from '../../components/PublicFooter'
 import BackToTopButton from '../../components/ui/BackToTopButton'
@@ -76,10 +77,14 @@ export default function Contact() {
   })
 
   const { data: overview } = useMarketOverview()
+  const { toast } = useToast()
   const [formData, setFormData] = useState({ name: '', phone: '', email: '', message: '' })
   const [errors, setErrors] = useState({})
   const [isSuccess, setIsSuccess] = useState(false)
   const createLead = useCreateLead()
+  // Honeypot ref — hidden field that bots auto-fill but humans never see.
+  // Checked server-side; if filled, submission is silently discarded.
+  const honeypotRef = useRef(null)
 
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -107,19 +112,24 @@ export default function Contact() {
         .replace(/[-\s]/g, '')
         .replace(/^\+?972/, '0')
       await createLead.mutateAsync({
-        full_name: formData.name.trim(),
+        name: formData.name.trim(),
         phone: normalizedPhone,
         email: formData.email.trim(),
         message: formData.message.trim(),
+        // Honeypot — bots fill this hidden field; server silently rejects if populated
+        website: honeypotRef.current?.value || '',
       })
       setIsSuccess(true)
+      toast('הפרטים נשלחו בהצלחה! ניצור קשר בהקדם 🎉', 'success')
       setTimeout(() => {
         setIsSuccess(false)
         setFormData({ name: '', phone: '', email: '', message: '' })
+        if (honeypotRef.current) honeypotRef.current.value = ''
         createLead.reset()
       }, 3000)
     } catch {
       setErrors({ form: 'אירעה שגיאה בשליחה. נסו שוב.' })
+      toast('שגיאה בשליחת הפרטים — נסו שוב', 'error')
     }
   }
 
@@ -264,6 +274,22 @@ export default function Contact() {
                     {errors.form && (
                       <p className="text-red-400 text-sm text-center">{errors.form}</p>
                     )}
+
+                    {/* Honeypot anti-spam field — invisible to humans, bots auto-fill it.
+                        Uses aria-hidden + tabIndex=-1 so screen readers and keyboard users skip it.
+                        The "website" label is attractive to bots (they love URL fields).
+                        Server returns fake 201 success when filled — doesn't tip off sophisticated bots. */}
+                    <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, height: 0, width: 0, overflow: 'hidden' }}>
+                      <label htmlFor="contact-website">Website</label>
+                      <input
+                        ref={honeypotRef}
+                        id="contact-website"
+                        type="text"
+                        name="website"
+                        tabIndex={-1}
+                        autoComplete="off"
+                      />
+                    </div>
 
                     {/* Name */}
                     <div>

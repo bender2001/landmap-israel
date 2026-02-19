@@ -12,6 +12,7 @@ export default function LeadModal({ isOpen, onClose, plot }) {
   const [errors, setErrors] = useState({})
   const createLead = useCreateLead()
   const { toast } = useToast()
+  const honeypotRef = useRef(null)
 
   // Animation phases: 'entering' -> 'open' -> 'leaving' -> hidden
   const [phase, setPhase] = useState('hidden')
@@ -77,9 +78,11 @@ export default function LeadModal({ isOpen, onClose, plot }) {
     try {
       await createLead.mutateAsync({
         plot_id: plot?.id,
-        full_name: formData.name.trim(),
+        name: formData.name.trim(),
         phone: formData.phone.replace(/-/g, ''),
         email: formData.email.trim(),
+        // Honeypot — bots fill this hidden field; server silently rejects
+        website: honeypotRef.current?.value || '',
       })
       setIsSuccess(true)
       toast('הפרטים נשלחו בהצלחה!', 'success')
@@ -185,6 +188,12 @@ export default function LeadModal({ isOpen, onClose, plot }) {
               {errors.form && (
                 <p className="text-red-400 text-sm mb-3 text-center">{errors.form}</p>
               )}
+
+              {/* Honeypot anti-spam — hidden from humans, bots auto-fill */}
+              <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, height: 0, width: 0, overflow: 'hidden' }}>
+                <label htmlFor="lead-website">Website</label>
+                <input ref={honeypotRef} id="lead-website" type="text" name="website" tabIndex={-1} autoComplete="off" />
+              </div>
 
               {/* Name */}
               <div className="mb-4">
