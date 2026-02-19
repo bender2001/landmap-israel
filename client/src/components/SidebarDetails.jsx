@@ -9,6 +9,7 @@ import { statusColors, statusLabels, zoningLabels, zoningPipelineStages, roiStag
 import { formatCurrency, formatDunam, calcInvestmentScore, getScoreLabel, calcCAGR, calcDaysOnMarket, calcMonthlyPayment, formatMonthlyPayment, calcInvestmentVerdict, calcRiskLevel, generatePlotSummary, calcDemandVelocity, calcBuildableValue, calcInvestmentTimeline, plotCenter, calcPlotPerimeter, calcAlternativeReturns, calcCommuteTimes } from '../utils/formatters'
 import AnimatedNumber from './ui/AnimatedNumber'
 import PlotPercentileBadges from './ui/PlotPercentileBadges'
+import DataCompletenessBar from './ui/DataCompletenessBar'
 import { calcInvestmentPnL } from '../utils/plot'
 import { usePlot, useNearbyPlots, useSimilarPlots, usePrefetchPlot, useNearbyPois } from '../hooks/usePlots'
 import MiniMap from './ui/MiniMap'
@@ -1900,6 +1901,14 @@ export default function SidebarDetails({ plot: rawPlot, onClose, onOpenLeadModal
                 <PlotPercentileBadges plot={plot} allPlots={allPlots} />
               </div>
             )}
+
+            {/* Data Completeness — Bloomberg-style data quality indicator.
+                Shows investors how much data we have for this plot (coordinates, images,
+                enrichment, zoning, etc.). Neither Madlan nor Yad2 surface data quality —
+                this builds trust through transparency. */}
+            <div className="mt-3 animate-stagger-3">
+              <DataCompletenessBar plot={plot} variant="compact" />
+            </div>
 
             {/* View Full Details CTA — prominent banner linking to the full PlotDetail page.
                 The sidebar is a quick-view; the full page has mortgage calc, investment benchmark,

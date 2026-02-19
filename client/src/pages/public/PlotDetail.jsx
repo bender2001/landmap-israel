@@ -34,6 +34,10 @@ const DueDiligenceChecklist = lazy(() => import('../../components/ui/DueDiligenc
 const MobilePlotActionBar = lazy(() => import('../../components/ui/MobilePlotActionBar.jsx'))
 const QuickInquiryTemplates = lazy(() => import('../../components/ui/QuickInquiryTemplates.jsx'))
 const BackToTopButton = lazy(() => import('../../components/ui/BackToTopButton.jsx'))
+const DataDisclaimer = lazy(() => import('../../components/DataDisclaimer.jsx'))
+
+// Eagerly imported — tiny component, used in the header area above the fold
+import DataCompletenessBar from '../../components/ui/DataCompletenessBar.jsx'
 
 // ─── Eager preloading of below-fold chunks ────────────────────────────
 // Unlike SidebarDetails (which may not open at all), PlotDetail always renders
@@ -1185,6 +1189,14 @@ export default function PlotDetail() {
             </div>
           )}
 
+          {/* Data Completeness — Bloomberg-style data quality bar.
+              Investors need to know how much they can trust the data for this specific plot.
+              Shows percentage of available data fields (coordinates, images, enrichment, etc.).
+              Unique to LandMap — builds trust through radical transparency. */}
+          <div className="mb-6">
+            <DataCompletenessBar plot={plot} variant="full" />
+          </div>
+
           {/* Location mini-map — like Madlan always shows location context */}
           {plot.coordinates && plot.coordinates.length >= 3 && (
             <div id="section-location" className="mb-8">
@@ -2057,6 +2069,19 @@ export default function PlotDetail() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Data Disclaimer — legal compliance + trust signal.
+          Shows government data sources (nadlan.gov.il, govmap.gov.il, tabu.gov.il),
+          investment warning, and data accuracy notice. Required for credibility with
+          professional investors and legal protection. Like Madlan's footer disclaimers
+          but more prominent and detailed — builds trust through transparency. */}
+      <div className="max-w-4xl mx-auto px-4 pb-8">
+        <Suspense fallback={null}>
+          <WidgetErrorBoundary name="DataDisclaimer" silent>
+            <DataDisclaimer variant="compact" lastUpdate={plot.updated_at ? new Date(plot.updated_at ?? plot.updatedAt).toLocaleDateString('he-IL') : null} />
+          </WidgetErrorBoundary>
+        </Suspense>
       </div>
 
       {/* Public footer — legal links, contact info, brand.

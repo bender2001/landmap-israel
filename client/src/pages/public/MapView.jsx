@@ -44,6 +44,7 @@ const MobilePlotActionBar = lazy(() => import('../../components/ui/MobilePlotAct
 const MarketPulse = lazy(() => import('../../components/MarketPulse.jsx'))
 const MarketVelocity = lazy(() => import('../../components/MarketVelocity.jsx'))
 const WelcomeBack = lazy(() => import('../../components/WelcomeBack.jsx'))
+const DealSpotlight = lazy(() => import('../../components/DealSpotlight.jsx'))
 
 // Preload PlotDetail chunk — imported but not rendered here.
 // When a user selects a plot (opens sidebar), we trigger this import to preload
@@ -1195,6 +1196,18 @@ export default function MapView() {
         <Suspense fallback={null}>
           <WidgetErrorBoundary name="PriceMovers" silent>
             <PriceMovers onSelectPlot={handleSelectPlot} plots={filteredPlots} />
+          </WidgetErrorBoundary>
+        </Suspense>
+      </IdleRender>
+
+      {/* Deal Spotlight — highlights the single best investment opportunity on the map.
+          Like Madlan's "הזדמנות!" featured listing but algorithm-driven.
+          Scores plots by investment grade, below-average pricing, freshness, and ROI.
+          Deferred via IdleRender — supplementary discovery widget, not critical path. */}
+      <IdleRender>
+        <Suspense fallback={null}>
+          <WidgetErrorBoundary name="DealSpotlight" silent>
+            <DealSpotlight plots={filteredPlots} onSelectPlot={handleSelectPlot} />
           </WidgetErrorBoundary>
         </Suspense>
       </IdleRender>
