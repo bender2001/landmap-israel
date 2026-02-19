@@ -70,6 +70,7 @@ const zoningOptions = [
 
 const sortOptions = [
   { label: 'ברירת מחדל', value: 'default', icon: ArrowUpDown },
+  { label: '🔥 עסקה הכי טובה', value: 'deal-desc', icon: ArrowDown },
   { label: 'הכי קרוב אליי 📍', value: 'distance-asc', icon: Navigation },
   { label: 'מחיר: נמוך לגבוה', value: 'price-asc', icon: ArrowUp },
   { label: 'מחיר: גבוה לנמוך', value: 'price-desc', icon: ArrowDown },

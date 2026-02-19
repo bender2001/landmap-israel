@@ -252,6 +252,31 @@ export async function getPublishedPlots(filters = {}) {
       }
       return getCagr(b) - getCagr(a) || tieBreak(a, b)
     })
+  } else if (filters.sort === 'deal-desc' && data) {
+    // "Best deal first" — sort by how far below the area average price/sqm each plot is.
+    // Compute average price/sqm across all results, then rank by discount.
+    // A plot 25% below average ranks higher than one 5% below. Critical investor sort:
+    // surfaces underpriced opportunities that Madlan/Yad2 don't explicitly expose.
+    let totalPsm = 0, psmCount = 0
+    for (const p of data) {
+      const psm = p._pricePerSqm
+      if (psm && psm > 0) { totalPsm += psm; psmCount++ }
+    }
+    const avgPsm = psmCount > 0 ? totalPsm / psmCount : 0
+    if (avgPsm > 0) {
+      // Add _dealDiscount enrichment: negative = below avg (good deal), positive = above
+      for (const p of data) {
+        const psm = p._pricePerSqm
+        p._dealDiscount = psm && psm > 0
+          ? Math.round(((psm - avgPsm) / avgPsm) * 100)
+          : null
+      }
+      data.sort((a, b) => {
+        const aDiscount = a._dealDiscount ?? Infinity
+        const bDiscount = b._dealDiscount ?? Infinity
+        return aDiscount - bDiscount || tieBreak(a, b)
+      })
+    }
   }
 
   return data

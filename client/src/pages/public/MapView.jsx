@@ -257,7 +257,7 @@ export default function MapView() {
     // score, ROI, CAGR, price/sqm, and monthly payment. Server enriches plots with
     // pre-computed _pricePerSqm, _monthlyPayment, _daysOnMarket fields, enabling
     // these sorts without redundant client-side computation.
-    if (['price-asc', 'price-desc', 'size-asc', 'size-desc', 'updated-desc', 'score-desc', 'roi-desc', 'roi-asc', 'cagr-desc', 'newest-first', 'ppsqm-asc', 'ppsqm-desc', 'monthly-asc'].includes(sortBy)) {
+    if (['price-asc', 'price-desc', 'size-asc', 'size-desc', 'updated-desc', 'score-desc', 'roi-desc', 'roi-asc', 'cagr-desc', 'newest-first', 'ppsqm-asc', 'ppsqm-desc', 'monthly-asc', 'deal-desc'].includes(sortBy)) {
       f.sort = sortBy
     }
     return f
@@ -466,6 +466,33 @@ export default function MapView() {
         }
         return getMonthly(a) - getMonthly(b) || tieBreak(a, b)
       }); break
+      // "Best deal first" — ranks plots by how far below the area average price/sqm they are.
+      // A plot 20% below average scores higher than one 5% below. Investors love this:
+      // it surfaces underpriced opportunities that Madlan/Yad2 don't explicitly sort by.
+      case 'deal-desc': {
+        // Compute area average price/sqm as the baseline
+        let totalPsm = 0, psmCount = 0
+        for (const p of sorted) {
+          const price = p.total_price ?? p.totalPrice ?? 0
+          const size = p.size_sqm ?? p.sizeSqM ?? 0
+          if (price > 0 && size > 0) { totalPsm += price / size; psmCount++ }
+        }
+        const avgPsm = psmCount > 0 ? totalPsm / psmCount : 0
+        if (avgPsm > 0) {
+          sorted.sort((a, b) => {
+            const getPsm = (p) => {
+              const price = p.total_price ?? p.totalPrice ?? 0
+              const size = p.size_sqm ?? p.sizeSqM ?? 0
+              return price > 0 && size > 0 ? price / size : Infinity
+            }
+            // Lower price/sqm relative to average = better deal (more negative = better)
+            const aDeal = getPsm(a) - avgPsm
+            const bDeal = getPsm(b) - avgPsm
+            return aDeal - bDeal || tieBreak(a, b)
+          })
+        }
+        break
+      }
     }
     return sorted
   }, [searchedPlots, sortBy, userLocation])
