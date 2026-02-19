@@ -281,7 +281,7 @@ export default function MapView() {
     // score, ROI, CAGR, price/sqm, and monthly payment. Server enriches plots with
     // pre-computed _pricePerSqm, _monthlyPayment, _daysOnMarket fields, enabling
     // these sorts without redundant client-side computation.
-    if (['price-asc', 'price-desc', 'size-asc', 'size-desc', 'updated-desc', 'score-desc', 'roi-desc', 'roi-asc', 'cagr-desc', 'newest-first', 'ppsqm-asc', 'ppsqm-desc', 'monthly-asc', 'deal-desc'].includes(sortBy)) {
+    if (['price-asc', 'price-desc', 'size-asc', 'size-desc', 'updated-desc', 'score-desc', 'roi-desc', 'roi-asc', 'cagr-desc', 'newest-first', 'ppsqm-asc', 'ppsqm-desc', 'monthly-asc', 'deal-desc', 'net-roi-desc'].includes(sortBy)) {
       f.sort = sortBy
     }
     return f
@@ -489,6 +489,13 @@ export default function MapView() {
           return payment ? payment.monthly : Infinity
         }
         return getMonthly(a) - getMonthly(b) || tieBreak(a, b)
+      }); break
+      // "Net ROI" — sort by real return after ALL Israeli costs (purchase tax, holding, exit).
+      // Uses server-computed _netRoi. Falls back to gross ROI if not enriched.
+      case 'net-roi-desc': sorted.sort((a, b) => {
+        const aNet = a._netRoi ?? (a._roi ?? 0)
+        const bNet = b._netRoi ?? (b._roi ?? 0)
+        return bNet - aNet || tieBreak(a, b)
       }); break
       // "Best deal first" — ranks plots by how far below the area average price/sqm they are.
       // A plot 20% below average scores higher than one 5% below. Investors love this:

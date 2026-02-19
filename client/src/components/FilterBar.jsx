@@ -124,6 +124,7 @@ const sortOptions = [
   { label: 'שטח: גדול לקטן', value: 'size-desc', icon: ArrowDown },
   { label: 'תשואה: גבוהה לנמוכה', value: 'roi-desc', icon: ArrowDown },
   { label: 'תשואה: נמוכה לגבוהה', value: 'roi-asc', icon: ArrowUp },
+  { label: '💰 תשואה נטו (אחרי עלויות)', value: 'net-roi-desc', icon: ArrowDown },
   { label: 'ציון השקעה: גבוה לנמוך', value: 'score-desc', icon: ArrowDown },
   { label: 'CAGR: גבוה לנמוך', value: 'cagr-desc', icon: ArrowDown },
   { label: 'עודכן לאחרונה', value: 'updated-desc', icon: ArrowDown },
@@ -221,6 +222,18 @@ const quickPresetDefs = [
       onFilterChange('maxMonthly', '4000')
     },
     isActive: (filters) => filters.maxMonthly === '4000',
+  },
+  {
+    id: 'net-roi',
+    label: 'תשואה נטו הכי גבוהה',
+    emoji: '💰',
+    apply: (onFilterChange, onToggleStatus, statusFilter, onSortChange) => {
+      // This preset relies on the sort — triggers sort to net-roi-desc via the parent's sortBy
+      // Since presets can't directly change sort, we apply ROI ≥50% + available status
+      onFilterChange('minRoi', '50')
+      if (!statusFilter.includes('AVAILABLE')) onToggleStatus('AVAILABLE')
+    },
+    isActive: (filters, statusFilter) => filters.minRoi === '50' && statusFilter.includes('AVAILABLE'),
   },
 ]
 

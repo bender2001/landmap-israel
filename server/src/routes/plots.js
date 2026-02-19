@@ -106,6 +106,10 @@ function applySparseFields(plots, fieldsParam) {
     if (p._dealDiscount != null) sparse._dealDiscount = p._dealDiscount
     if (p._investmentRank != null) sparse._investmentRank = p._investmentRank
     if (p._totalRanked != null) sparse._totalRanked = p._totalRanked
+    if (p._netRoi != null) sparse._netRoi = p._netRoi
+    if (p._totalEntryCost != null) sparse._totalEntryCost = p._totalEntryCost
+    if (p._netProfit != null) sparse._netProfit = p._netProfit
+    if (p._totalCosts != null) sparse._totalCosts = p._totalCosts
     return sparse
   })
 }

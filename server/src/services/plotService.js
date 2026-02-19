@@ -192,8 +192,74 @@ function computeRiskLevel(plot, cityAvgPsm) {
 }
 
 /**
+ * Compute full investment P&L (Profit & Loss) for a plot — server-side equivalent
+ * of the client's calcInvestmentPnL(). Returns net ROI after ALL Israeli costs:
+ * - Purchase: mas rechisha (6%), attorney (1.75%), appraiser, registration
+ * - Holding: arnona, management × holding years
+ * - Exit: betterment levy (50% of uplift), capital gains (25% on taxable gain), agent (1%)
+ *
+ * This is THE number professional investors use. Gross ROI of +200% might be
+ * only +45% net after all costs. Madlan/Yad2 only show listing price — we show reality.
+ */
+function computeNetReturn(plot) {
+  const price = plot.total_price || 0
+  const projected = plot.projected_value || 0
+  const sizeSqm = plot.size_sqm || 0
+  const zoning = plot.zoning_stage || 'AGRICULTURAL'
+  const readiness = plot.readiness_estimate || ''
+
+  if (price <= 0 || projected <= 0) return null
+
+  // Holding period estimate (from readiness)
+  let holdingYears = 5
+  if (readiness.includes('1-3')) holdingYears = 2
+  else if (readiness.includes('3-5')) holdingYears = 4
+  else if (readiness.includes('5+') || readiness.includes('5-')) holdingYears = 7
+
+  // ── Entry costs ────────────────────────────────────────────────────
+  const purchaseTax = Math.round(price * 0.06)
+  const attorneyFees = Math.round(price * 0.0175)
+  const appraiserFee = Math.round(Math.min(Math.max(price * 0.003, 2000), 8000))
+  const registrationFee = 167
+  const totalEntryCost = price + purchaseTax + attorneyFees + appraiserFee + registrationFee
+
+  // ── Holding costs ──────────────────────────────────────────────────
+  const isAdvancedZoning = ['DETAILED_PLAN_APPROVED', 'DEVELOPER_TENDER', 'BUILDING_PERMIT'].includes(zoning)
+  const arnonaPerSqm = isAdvancedZoning ? 5 : 2.5
+  const annualHolding = Math.round(sizeSqm * arnonaPerSqm) + Math.round(sizeSqm * 1.5)
+  const totalHolding = annualHolding * holdingYears
+
+  // ── Exit costs ─────────────────────────────────────────────────────
+  const grossProfit = projected - price
+  let bettermentLevy = 0
+  let capitalGains = 0
+  let agentCommission = 0
+  if (grossProfit > 0) {
+    bettermentLevy = Math.round(grossProfit * 0.5)
+    const purchaseCostsDeduction = Math.round(price * 0.0775)
+    const taxableGain = Math.max(0, grossProfit - bettermentLevy - purchaseCostsDeduction)
+    capitalGains = Math.round(taxableGain * 0.25)
+    agentCommission = Math.round(projected * 0.01)
+  }
+  const totalExitCost = bettermentLevy + capitalGains + agentCommission
+
+  // ── Net return ─────────────────────────────────────────────────────
+  const totalCosts = (totalEntryCost - price) + totalHolding + totalExitCost
+  const netProfit = grossProfit - totalCosts
+  const netRoi = totalEntryCost > 0 ? Math.round((netProfit / totalEntryCost) * 100) : 0
+
+  return {
+    totalEntryCost,  // price + all purchase costs
+    netProfit,       // profit after ALL costs
+    netRoi,          // % return after ALL costs
+    totalCosts,      // sum of all costs (entry surplus + holding + exit)
+    holdingYears,
+  }
+}
+
+/**
  * Enrich an array of plots with computed investment metrics.
- * Adds _investmentScore, _grade, _roi, _riskLevel, and more fields to each plot.
+ * Adds _investmentScore, _grade, _roi, _riskLevel, _netRoi, and more fields to each plot.
  */
 async function enrichPlotsWithScores(plots) {
   if (!plots || plots.length === 0) return plots
@@ -297,6 +363,24 @@ async function enrichPlotsWithScores(plots) {
       p._dealDiscount = discountPct // positive = below avg, negative = above avg
     } else {
       p._dealDiscount = null
+    }
+
+    // Net investment return — THE metric professional investors use.
+    // Accounts for all Israeli transaction costs (purchase tax 6%, attorney 1.75%,
+    // appraiser), annual holding costs (arnona, management), and exit costs
+    // (betterment levy 50%, capital gains 25%, agent 1%). Gross ROI of +200%
+    // might be only +45% net. Neither Madlan nor Yad2 surface this — differentiator.
+    const netReturn = computeNetReturn(p)
+    if (netReturn) {
+      p._netRoi = netReturn.netRoi             // % return after ALL costs
+      p._totalEntryCost = netReturn.totalEntryCost // price + purchase costs
+      p._netProfit = netReturn.netProfit         // absolute profit after ALL costs
+      p._totalCosts = netReturn.totalCosts       // sum of all costs
+    } else {
+      p._netRoi = null
+      p._totalEntryCost = null
+      p._netProfit = null
+      p._totalCosts = null
     }
   }
 
@@ -632,6 +716,10 @@ export async function getPublishedPlots(filters = {}) {
     // CAGR sort: uses pre-computed _cagr from enrichPlotsWithScores().
     // No need to recalculate here — enrichment already stored it.
     data.sort((a, b) => (b._cagr || 0) - (a._cagr || 0) || tieBreak(a, b))
+  } else if (filters.sort === 'net-roi-desc' && data) {
+    // Net ROI sort: uses pre-computed _netRoi from enrichPlotsWithScores().
+    // Ranks by REAL return after all costs — the metric pros actually use.
+    data.sort((a, b) => (b._netRoi || -Infinity) - (a._netRoi || -Infinity) || tieBreak(a, b))
   } else if (filters.sort === 'deal-desc' && data) {
     // "Best deal first" — sort by how far below the area average price/sqm each plot is.
     // Compute average price/sqm across all results, then rank by discount.

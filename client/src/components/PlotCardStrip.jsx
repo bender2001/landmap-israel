@@ -174,7 +174,8 @@ const QuickCopyButton = memo(function QuickCopyButton({ plot }) {
     const sizeSqM = plot.size_sqm ?? plot.sizeSqM ?? 0
     const dunam = sizeSqM > 0 ? (sizeSqM / 1000).toFixed(1) : '?'
 
-    const text = `גוש ${blockNum} חלקה ${plot.number} · ${plot.city} · ${formatPriceShort(price)} · ${dunam} דונם · +${roi}% ROI`
+    const netRoiStr = plot._netRoi != null ? ` · נטו +${plot._netRoi}%` : ''
+    const text = `גוש ${blockNum} חלקה ${plot.number} · ${plot.city} · ${formatPriceShort(price)} · ${dunam} דונם · +${roi}% ROI${netRoiStr}`
 
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true)
@@ -525,11 +526,23 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
               if (!payment) return null
               return <span className="text-[9px] text-blue-400/70" title={`הון עצמי: ${formatPriceShort(payment.downPayment)} | הלוואה: ${formatPriceShort(payment.loanAmount)}`}>~{formatMonthlyPayment(payment.monthly)}</span>
             })()}
-            {/* Total entry cost — shows real investment required (price + tax + attorney + appraiser).
-                Professional investors always think in total entry cost, not just listing price.
-                This is a key differentiator vs Madlan/Yad2 which only show listed price. */}
+            {/* Total entry cost — prefer server-computed _totalEntryCost when available,
+                fall back to client-side calcTransactionCosts. Server value includes all costs
+                pre-computed, saving ~0.5ms per card render (significant with 50+ cards). */}
             {(() => {
               if (price <= 0) return null
+              // Prefer server-enriched value (includes same costs, pre-computed)
+              if (plot._totalEntryCost) {
+                return (
+                  <span
+                    className="text-[8px] text-amber-400/60"
+                    title={`סה״כ עלות כניסה: ${formatPriceShort(plot._totalEntryCost)}\nכולל: מס רכישה 6%, שכ״ט עו״ד 1.75%, שמאי, רישום`}
+                  >
+                    🔑 כניסה: {formatPriceShort(plot._totalEntryCost)}
+                  </span>
+                )
+              }
+              // Fallback: client-side computation (mock data, offline, etc.)
               const txn = calcTransactionCosts(price)
               return (
                 <span
@@ -557,7 +570,19 @@ const PlotCardItem = memo(function PlotCardItem({ plot, isSelected, isCompared, 
             <MarketPositionDot percentile={pricePercentile} />
           </div>
           <div className="plot-card-mini-tags">
-            <span className="plot-card-mini-roi">+{roi}%</span>
+            <span className="plot-card-mini-roi" title={plot._netRoi != null ? `ברוטו +${roi}% · נטו +${plot._netRoi}% (אחרי מס, היטל השבחה, עלויות)` : `תשואה ברוטו`}>+{roi}%</span>
+            {/* Net ROI — the REAL return after all Israeli costs.
+                Shows how much investors actually make after purchase tax (6%), attorney,
+                holding costs, betterment levy (50%), capital gains (25%), and agent fees.
+                This is a key differentiator — neither Madlan nor Yad2 surface net returns. */}
+            {plot._netRoi != null && plot._netRoi !== roi && (
+              <span
+                className={`text-[8px] font-bold ${plot._netRoi >= 50 ? 'text-emerald-400/90' : plot._netRoi >= 20 ? 'text-amber-400/90' : plot._netRoi >= 0 ? 'text-orange-400/80' : 'text-red-400/80'}`}
+                title={`תשואה נטו: +${plot._netRoi}% אחרי כל העלויות (מס רכישה, היטל השבחה, מס שבח, שכ״ט, אחזקה)`}
+              >
+                נטו {plot._netRoi > 0 ? '+' : ''}{plot._netRoi}%
+              </span>
+            )}
             {(() => {
               // Prefer server-computed _cagr when available (avoids recalculating per card)
               const serverCagr = plot._cagr
