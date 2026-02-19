@@ -133,10 +133,15 @@ function handleQueryError(error) {
   // Use the injected toast function (set after render — see below)
   if (window.__landmap_toast) {
     const status = error?.status
+    const reqId = error?.requestId
+    // Include request ID in error toasts for traceability — users can report
+    // "I got error abc123" and we can find the exact request in server logs.
+    // Like Google Cloud Console's error reference codes.
+    const refSuffix = reqId ? ` (${reqId})` : ''
     const msg = status === 429
       ? 'יותר מדי בקשות — נסו שוב בעוד דקה'
       : status >= 500
-        ? 'שגיאת שרת — הנתונים עשויים להיות לא מעודכנים'
+        ? `שגיאת שרת — הנתונים עשויים להיות לא מעודכנים${refSuffix}`
         : error?.message?.includes('timeout') || error?.code === 'REQUEST_TIMEOUT'
           ? 'השרת לא מגיב — בדקו את החיבור לאינטרנט'
           : 'שגיאה בטעינת הנתונים'

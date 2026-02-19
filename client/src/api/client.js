@@ -98,10 +98,25 @@ async function request(path, options = {}) {
         const error = new Error(body.error || `Request failed (${res.status})`)
         error.status = res.status
         error.details = body.details
+        // Attach requestId from server response — enables user-facing error references.
+        // Users can say "I got error abc123" and we can trace the exact request in logs.
+        error.requestId = body.requestId || res.headers.get('x-request-id') || null
+        error.errorCode = body.errorCode || null
 
         // Retry on transient server errors (GET only)
         if (RETRY_STATUS_CODES.has(res.status) && (!options.method || options.method === 'GET') && attempt < MAX_RETRIES) {
-          const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 200
+          // For 429 (rate limit): use server-sent Retry-After instead of blind exponential backoff.
+          // The server knows the exact cooldown period — respecting it avoids premature retries
+          // that would just get rate-limited again, wasting bandwidth and time.
+          let delay
+          if (res.status === 429) {
+            const retryAfterSec = parseInt(res.headers.get('retry-after'), 10)
+              || body.retryAfter
+              || 60
+            delay = Math.min(retryAfterSec * 1000, 120_000) // cap at 2min to prevent infinite waits
+          } else {
+            delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 200
+          }
           await sleep(delay)
           lastError = error
           continue

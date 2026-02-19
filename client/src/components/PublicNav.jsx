@@ -5,6 +5,35 @@ import { useFavorites } from '../hooks/useFavorites'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import WhatsNew from './WhatsNew'
 
+/**
+ * Route chunk prefetch map — maps nav paths to lazy import functions.
+ * On hover, we trigger the dynamic import to preload the route's JS chunk.
+ * This way, clicking the link navigates instantly (no loading spinner).
+ * Same pattern used by Next.js <Link prefetch> and Remix's prefetch="intent".
+ */
+const routePrefetchMap = {
+  '/areas': () => import('../pages/public/Areas'),
+  '/compare': () => import('../pages/public/Compare'),
+  '/calculator': () => import('../pages/public/Calculator'),
+  '/about': () => import('../pages/public/About'),
+  '/contact': () => import('../pages/public/Contact'),
+  '/favorites': () => import('../pages/public/Favorites'),
+}
+// Track which routes have been prefetched to avoid duplicate imports
+const prefetchedRoutes = new Set()
+
+function prefetchRoute(path) {
+  if (prefetchedRoutes.has(path)) return
+  const loader = routePrefetchMap[path]
+  if (loader) {
+    prefetchedRoutes.add(path)
+    loader().catch(() => {
+      // Remove from set so it can be retried
+      prefetchedRoutes.delete(path)
+    })
+  }
+}
+
 const navLinks = [
   { to: '/areas', icon: BarChart3, label: 'אזורים' },
   { to: '/compare', icon: GitCompareArrows, label: 'השוואה', badge: 'compare' },
@@ -91,6 +120,8 @@ export default function PublicNav() {
                   key={to}
                   to={to}
                   aria-current={isActive ? 'page' : undefined}
+                  onMouseEnter={() => prefetchRoute(to)}
+                  onFocus={() => prefetchRoute(to)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-colors relative ${
                     isActive
                       ? 'bg-gold/15 text-gold font-medium'
@@ -146,6 +177,8 @@ export default function PublicNav() {
               key={to}
               to={to}
               aria-current={isActive ? 'page' : undefined}
+              onMouseEnter={() => prefetchRoute(to)}
+              onFocus={() => prefetchRoute(to)}
               className={isActive ? 'active' : ''}
               onClick={() => setMenuOpen(false)}
             >

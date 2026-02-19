@@ -120,6 +120,22 @@ app.use(cors({
   },
   credentials: true,
   maxAge: 86400, // Cache preflight for 24h — reduces OPTIONS round-trips
+  // Expose custom response headers to client-side JavaScript.
+  // Without this, CORS blocks access to ETag (breaking the api/client.js conditional
+  // request cache), X-Request-Id (needed for error reporting), and observability
+  // headers. Critical in cross-origin setups (dev: Vite:5173 → Express:3001,
+  // or future subdomain split like api.landmap.co.il).
+  exposedHeaders: [
+    'ETag',
+    'X-Request-Id',
+    'X-Cache',
+    'X-Data-Age',
+    'X-Response-Time',
+    'Server-Timing',
+    'RateLimit-Limit',
+    'RateLimit-Remaining',
+    'RateLimit-Reset',
+  ],
 }))
 
 // Vary header for correct CDN/proxy caching with CORS + compression
