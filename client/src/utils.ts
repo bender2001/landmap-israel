@@ -1,0 +1,182 @@
+import type { Plot, InvestmentGrade } from './types'
+
+// ── Constants ──
+export const PlotStatus = { AVAILABLE: 'AVAILABLE', SOLD: 'SOLD', RESERVED: 'RESERVED', IN_PLANNING: 'IN_PLANNING' } as const
+export const statusLabels: Record<string, string> = { AVAILABLE: 'זמין', SOLD: 'נמכר', RESERVED: 'שמור', IN_PLANNING: 'בתכנון' }
+export const statusColors: Record<string, string> = { AVAILABLE: '#10B981', SOLD: '#EF4444', RESERVED: '#F59E0B', IN_PLANNING: '#8B5CF6' }
+
+export const zoningLabels: Record<string, string> = {
+  AGRICULTURAL: 'קרקע חקלאית', MASTER_PLAN_DEPOSIT: 'הפקדת תוכנית מתאר',
+  MASTER_PLAN_APPROVED: 'תוכנית מתאר מאושרת', DETAILED_PLAN_PREP: 'הכנת תוכנית מפורטת',
+  DETAILED_PLAN_DEPOSIT: 'הפקדת תוכנית מפורטת', DETAILED_PLAN_APPROVED: 'תוכנית מפורטת מאושרת',
+  DEVELOPER_TENDER: 'מכרז יזמים', BUILDING_PERMIT: 'היתר בנייה',
+}
+
+export const zoningPipeline = [
+  { key: 'AGRICULTURAL', label: 'חקלאית', icon: '🌾' },
+  { key: 'MASTER_PLAN_DEPOSIT', label: 'הפקדת מתאר', icon: '📋' },
+  { key: 'MASTER_PLAN_APPROVED', label: 'אישור מתאר', icon: '✅' },
+  { key: 'DETAILED_PLAN_PREP', label: 'הכנת מפורטת', icon: '📐' },
+  { key: 'DETAILED_PLAN_DEPOSIT', label: 'הפקדת מפורטת', icon: '📋' },
+  { key: 'DETAILED_PLAN_APPROVED', label: 'מפורטת מאושרת', icon: '✅' },
+  { key: 'DEVELOPER_TENDER', label: 'מכרז יזמים', icon: '🏗️' },
+  { key: 'BUILDING_PERMIT', label: 'היתר בנייה', icon: '🏠' },
+]
+
+export const leadStatusLabels: Record<string, string> = {
+  new: 'חדש', contacted: 'נוצר קשר', qualified: 'מתאים', converted: 'הומר', lost: 'אבוד', closed: 'נסגר',
+}
+export const leadStatusColors: Record<string, string> = {
+  new: '#3B82F6', contacted: '#F59E0B', qualified: '#8B5CF6', converted: '#10B981', lost: '#EF4444', closed: '#64748B',
+}
+
+// ── Plot Field Accessors ──
+export const p = (plot: Plot) => ({
+  price: plot.total_price ?? plot.totalPrice ?? 0,
+  projected: plot.projected_value ?? plot.projectedValue ?? 0,
+  size: plot.size_sqm ?? plot.sizeSqM ?? 0,
+  block: String(plot.block_number ?? plot.blockNumber ?? ''),
+  zoning: (plot.zoning_stage ?? plot.zoningStage ?? 'AGRICULTURAL') as string,
+  readiness: String(plot.readiness_estimate ?? plot.readinessEstimate ?? ''),
+  created: plot.created_at ?? plot.createdAt ?? '',
+  updated: plot.updated_at ?? plot.updatedAt ?? '',
+  seaDist: plot.distance_to_sea ?? plot.distanceToSea ?? null,
+  parkDist: plot.distance_to_park ?? plot.distanceToPark ?? null,
+  density: plot.density_units_per_dunam ?? plot.densityUnitsPerDunam ?? 0,
+  context: plot.area_context ?? plot.areaContext ?? '',
+})
+
+export const roi = (plot: Plot) => {
+  const { price, projected } = p(plot)
+  return price > 0 ? ((projected - price) / price) * 100 : 0
+}
+
+// ── Formatting ──
+const currFmt = new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })
+const compactFmt = new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', notation: 'compact', maximumFractionDigits: 1 })
+
+export const fmt = {
+  price: (v: number) => currFmt.format(v),
+  compact: (v: number) => compactFmt.format(v),
+  short: (v: number) => v >= 1e6 ? `₪${(v/1e6).toFixed(1)}M` : v >= 1e3 ? `₪${Math.round(v/1e3)}K` : `₪${v}`,
+  dunam: (sqm: number) => { const d = sqm / 1000; return d % 1 === 0 ? String(d) : d.toFixed(1) },
+  date: (s: string | null | undefined) => s ? new Date(s).toLocaleDateString('he-IL', { year: 'numeric', month: 'short', day: 'numeric' }) : '',
+  relative: (s: string | null | undefined) => {
+    if (!s) return null
+    const d = Math.floor((Date.now() - new Date(s).getTime()) / 864e5)
+    if (d === 0) return 'היום'
+    if (d === 1) return 'אתמול'
+    if (d <= 7) return `לפני ${d} ימים`
+    if (d <= 30) return `לפני ${Math.floor(d / 7)} שבועות`
+    return `לפני ${Math.floor(d / 30)} חודשים`
+  },
+  pct: (v: number) => `${Math.round(v)}%`,
+}
+
+// ── Investment Calculations ──
+const ZONING_ORDER = ['AGRICULTURAL', 'MASTER_PLAN_DEPOSIT', 'MASTER_PLAN_APPROVED', 'DETAILED_PLAN_PREP', 'DETAILED_PLAN_DEPOSIT', 'DETAILED_PLAN_APPROVED', 'DEVELOPER_TENDER', 'BUILDING_PERMIT']
+
+export function calcScore(plot: Plot): number {
+  const plotRoi = roi(plot)
+  const { zoning, readiness } = p(plot)
+  const roiScore = Math.min(4, plotRoi / 50)
+  const zi = ZONING_ORDER.indexOf(zoning)
+  const zoningScore = zi >= 0 ? (zi / 7) * 3 : 0
+  let readinessScore = 1.5
+  if (readiness.includes('1-3')) readinessScore = 3
+  else if (readiness.includes('3-5')) readinessScore = 2
+  else if (readiness.includes('5+')) readinessScore = 0.5
+  return Math.max(1, Math.min(10, Math.round(roiScore + zoningScore + readinessScore)))
+}
+
+export function getGrade(score: number): InvestmentGrade {
+  if (score >= 9) return { grade: 'A+', color: '#10B981', tier: 'exceptional' }
+  if (score >= 8) return { grade: 'A', color: '#10B981', tier: 'excellent' }
+  if (score >= 7) return { grade: 'A-', color: '#4ADE80', tier: 'very-good' }
+  if (score >= 6) return { grade: 'B+', color: '#84CC16', tier: 'good' }
+  if (score >= 5) return { grade: 'B', color: '#F59E0B', tier: 'fair' }
+  if (score >= 4) return { grade: 'B-', color: '#F97316', tier: 'below-avg' }
+  return { grade: 'C', color: '#EF4444', tier: 'weak' }
+}
+
+export function calcCAGR(totalRoi: number, readiness: string): { cagr: number; years: number } | null {
+  if (totalRoi <= 0) return null
+  let years = 5
+  if (readiness.includes('1-3')) years = 2
+  else if (readiness.includes('3-5')) years = 4
+  else if (readiness.includes('5+')) years = 7
+  const cagr = (Math.pow(1 + totalRoi / 100, 1 / years) - 1) * 100
+  return { cagr: Math.round(cagr * 10) / 10, years }
+}
+
+export function calcMonthly(price: number, ltv = 0.5, rate = 0.06, years = 15) {
+  if (price <= 0) return null
+  const loan = Math.round(price * ltv)
+  const mr = rate / 12
+  const n = years * 12
+  const monthly = mr > 0 ? Math.round(loan * (mr * Math.pow(1 + mr, n)) / (Math.pow(1 + mr, n) - 1)) : Math.round(loan / n)
+  return { monthly, down: price - loan, loan, totalInterest: monthly * n - loan }
+}
+
+export function calcTimeline(plot: Plot) {
+  const { zoning } = p(plot)
+  const stages = [
+    { key: 'AGRICULTURAL', label: 'חקלאית', months: 0 },
+    { key: 'MASTER_PLAN_DEPOSIT', label: 'הפקדת מתאר', months: 12 },
+    { key: 'MASTER_PLAN_APPROVED', label: 'אישור מתאר', months: 8 },
+    { key: 'DETAILED_PLAN_PREP', label: 'הכנת מפורטת', months: 10 },
+    { key: 'DETAILED_PLAN_DEPOSIT', label: 'הפקדת מפורטת', months: 6 },
+    { key: 'DETAILED_PLAN_APPROVED', label: 'מפורטת מאושרת', months: 6 },
+    { key: 'DEVELOPER_TENDER', label: 'מכרז יזמים', months: 4 },
+    { key: 'BUILDING_PERMIT', label: 'היתר בנייה', months: 0 },
+  ]
+  const idx = stages.findIndex(s => s.key === zoning)
+  if (idx < 0) return null
+  const elapsed = stages.slice(1, idx + 1).reduce((s, st) => s + st.months, 0)
+  const remaining = stages.slice(idx + 1).reduce((s, st) => s + st.months, 0)
+  const total = elapsed + remaining
+  return { stages, currentIdx: idx, elapsed, remaining, progress: total > 0 ? Math.round((elapsed / total) * 100) : 100 }
+}
+
+export function daysOnMarket(created: string | null | undefined) {
+  if (!created) return null
+  const days = Math.floor((Date.now() - new Date(created).getTime()) / 864e5)
+  if (days <= 7) return { days, label: 'חדש בשוק', color: '#10B981' }
+  if (days <= 30) return { days, label: `${days} ימים`, color: '#84CC16' }
+  if (days <= 90) return { days, label: `${Math.floor(days / 7)} שבועות`, color: '#F59E0B' }
+  return { days, label: `${Math.floor(days / 30)} חודשים`, color: '#EF4444' }
+}
+
+// ── Geo ──
+export function plotCenter(coords: [number, number][] | null | undefined): { lat: number; lng: number } | null {
+  if (!coords?.length) return null
+  const valid = coords.filter(c => c.length >= 2 && isFinite(c[0]) && isFinite(c[1]))
+  if (!valid.length) return null
+  return { lat: valid.reduce((s, c) => s + c[0], 0) / valid.length, lng: valid.reduce((s, c) => s + c[1], 0) / valid.length }
+}
+
+export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+// ── Normalize mock data for API compatibility ──
+export function normalizePlot(plot: Plot): Plot {
+  return {
+    ...plot,
+    total_price: plot.totalPrice ?? plot.total_price,
+    projected_value: plot.projectedValue ?? plot.projected_value,
+    size_sqm: plot.sizeSqM ?? plot.size_sqm,
+    block_number: plot.blockNumber ?? plot.block_number,
+    zoning_stage: plot.zoningStage ?? plot.zoning_stage,
+    readiness_estimate: plot.readinessEstimate ?? plot.readiness_estimate,
+    distance_to_sea: plot.distanceToSea ?? plot.distance_to_sea,
+    distance_to_park: plot.distanceToPark ?? plot.distance_to_park,
+    distance_to_hospital: plot.distanceToHospital ?? plot.distance_to_hospital,
+    density_units_per_dunam: plot.densityUnitsPerDunam ?? plot.density_units_per_dunam,
+    area_context: plot.areaContext ?? plot.area_context,
+    created_at: plot.created_at ?? plot.createdAt,
+    updated_at: plot.updated_at ?? plot.updatedAt,
+  }
+}

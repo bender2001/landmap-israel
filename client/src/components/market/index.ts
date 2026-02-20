@@ -1,6 +1,0 @@
-export { MarketPulse } from './MarketPulse'
-export { MarketVelocity } from './MarketVelocity'
-export { MarketTicker } from './MarketTicker'
-export { PriceMovers } from './PriceMovers'
-export { DealSpotlight } from './DealSpotlight'
-export { FeaturedDeals } from './FeaturedDeals'

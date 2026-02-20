@@ -3,163 +3,44 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
-    <!-- Prevent Safari from auto-detecting phone numbers in Hebrew text.
-         Plot numbers (גוש 10043), prices (₪450,000), and coordinates get incorrectly
-         styled as clickable phone links without this. -->
     <meta name="format-detection" content="telephone=no" />
-    <!-- Security headers via meta tags — defense-in-depth alongside server headers.
-         Referrer-Policy: send full URL to same-origin (analytics), only origin to cross-origin
-         (privacy). Permissions-Policy: opt out of APIs we don't use (camera, mic, payment)
-         to reduce attack surface. Like Google's security best practices. -->
-    <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()" />
     <title>LandMap Israel — מפת קרקעות להשקעה</title>
     <meta name="description" content="פלטפורמת השקעות קרקעות בישראל — מפה אינטראקטיבית, נתוני תכנון, ועדות, שמאות ו-AI יועץ השקעות" />
-    <meta name="keywords" content="קרקעות להשקעה, נדלן ישראל, מפת קרקעות, השקעות נדלן, land investment Israel" />
     <meta property="og:title" content="LandMap Israel — מפת קרקעות להשקעה" />
     <meta property="og:description" content="מצא קרקעות להשקעה בישראל עם מפה אינטראקטיבית, נתונים פיננסיים ו-AI יועץ" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://landmap.co.il/" />
-    <meta property="og:image" content="https://landmap.co.il/icons/icon-512.png" />
-    <meta property="og:image:width" content="512" />
-    <meta property="og:image:height" content="512" />
     <meta property="og:locale" content="he_IL" />
-    <meta property="og:site_name" content="LandMap Israel" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="https://landmap.co.il/icons/icon-512.png" />
-    <meta name="twitter:title" content="LandMap Israel — מפת קרקעות להשקעה" />
-    <meta name="twitter:description" content="מצא קרקעות להשקעה בישראל עם מפה אינטראקטיבית, נתונים פיננסיים ו-AI יועץ" />
+    <meta name="theme-color" content="#0B1120" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#FFFFFF" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="LandMap" />
-    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="canonical" href="https://landmap.co.il/" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Preconnect to Supabase — the #1 bottleneck for first data paint.
-         Every API call (plots, market, leads) proxies through Express to Supabase.
-         Preconnect saves ~150-300ms on the TLS+TCP handshake for the first Supabase query.
-         This is the single highest-impact preconnect after fonts. -->
-    <link rel="preconnect" href="https://fivphcrtquxkxyxknzqc.supabase.co" crossorigin />
-    <link rel="dns-prefetch" href="https://fivphcrtquxkxyxknzqc.supabase.co" />
-    <!-- Preconnect to map tile servers for faster map loads -->
-    <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin />
-    <link rel="preconnect" href="https://a.tile.openstreetmap.org" crossorigin />
-    <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin />
-    <!-- DNS prefetch for tile subdomains, geocoding, and CDN -->
-    <link rel="dns-prefetch" href="https://unpkg.com" />
-    <link rel="dns-prefetch" href="https://server.arcgisonline.com" />
-    <link rel="dns-prefetch" href="https://b.tile.openstreetmap.org" />
-    <link rel="dns-prefetch" href="https://c.tile.openstreetmap.org" />
-    <link rel="dns-prefetch" href="https://b.basemaps.cartocdn.com" />
-    <link rel="dns-prefetch" href="https://c.basemaps.cartocdn.com" />
-    <link rel="dns-prefetch" href="https://israelhiking.osm.org.il" />
-    <link rel="dns-prefetch" href="https://a.tile.opentopomap.org" />
-    <link rel="dns-prefetch" href="https://b.tile.opentopomap.org" />
-    <link rel="dns-prefetch" href="https://c.tile.opentopomap.org" />
-    <link rel="dns-prefetch" href="https://nominatim.openstreetmap.org" />
-    <link rel="canonical" href="https://landmap.co.il/" />
-    <!-- Organization + WebSite structured data — enables Google Knowledge Panel and
-         sitelinks search box in SERP. Like Madlan/Yad2's rich brand presence in Google. -->
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "Organization",
-        "name": "LandMap Israel",
-        "alternateName": "לנדמאפ ישראל",
-        "url": "https://landmap.co.il",
-        "logo": "https://landmap.co.il/icons/icon-512.png",
-        "description": "פלטפורמת השקעות קרקעות בישראל — מפה אינטראקטיבית, נתוני תכנון, שמאות ו-AI יועץ",
-        "sameAs": [],
-        "contactPoint": {
-          "@type": "ContactPoint",
-          "contactType": "customer service",
-          "availableLanguage": ["Hebrew", "English"]
-        },
-        "areaServed": {
-          "@type": "Country",
-          "name": "Israel"
-        }
-      }
-    </script>
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        "name": "LandMap Israel",
-        "alternateName": "לנדמאפ ישראל",
-        "url": "https://landmap.co.il",
-        "potentialAction": {
-          "@type": "SearchAction",
-          "target": {
-            "@type": "EntryPoint",
-            "urlTemplate": "https://landmap.co.il/?q={search_term_string}"
-          },
-          "query-input": "required name=search_term_string"
-        }
-      }
-    </script>
-    <!-- Font: use fetchpriority=high since Heebo is the primary font and blocks render -->
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" as="style" fetchpriority="high" />
-    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-    <!-- Leaflet CSS: preload as render-blocking stylesheet for map page -->
-    <link rel="preload" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" as="style" />
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet" fetchpriority="high" />
+
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- Preload critical API data — start fetching plots before React mounts.
-         By the time the app hydrates and React Query fires useAllPlots(), the browser
-         already has the response in its HTTP cache. Saves 200-500ms on initial load.
-         Uses "as=fetch" + crossorigin to match the fetch() request signature.
-         fetchpriority=high tells the browser to prioritize this over other preloads
-         (fonts, CSS) since plot data is the critical path for first meaningful paint. -->
+
+    <!-- Preconnect to data sources -->
+    <link rel="preconnect" href="https://fivphcrtquxkxyxknzqc.supabase.co" crossorigin />
+    <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin />
     <link rel="preload" href="/api/plots" as="fetch" crossorigin="anonymous" fetchpriority="high" />
-    <!-- Preload market overview — used by the filter bar market stats (always visible above fold) -->
-    <link rel="preload" href="/api/market/overview" as="fetch" crossorigin="anonymous" />
+
+    <!-- Structured data -->
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"LandMap Israel","url":"https://landmap.co.il"}</script>
   </head>
   <body>
     <div id="root"></div>
     <noscript>
-      <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#FFFFFF;color:#1F2937;font-family:sans-serif;text-align:center;padding:2rem;">
+      <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0B1120;color:#F1F5F9;font-family:sans-serif;text-align:center;padding:2rem">
         <div>
-          <h1 style="font-size:2rem;margin-bottom:1rem;color:#1A73E8;">🏗️ LandMap Israel</h1>
-          <p style="font-size:1.1rem;margin-bottom:0.5rem;">מפת קרקעות להשקעה בישראל</p>
-          <p style="color:#94A3B8;">יש להפעיל JavaScript כדי להשתמש באפליקציה.</p>
-          <p style="color:#94A3B8;font-size:0.85rem;">Please enable JavaScript to use this application.</p>
+          <h1 style="font-size:1.5rem;margin-bottom:0.5rem;color:#D4A84B">🏗️ LandMap Israel</h1>
+          <p>יש להפעיל JavaScript כדי להשתמש באפליקציה</p>
         </div>
       </div>
     </noscript>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {})
-        })
-      }
-    </script>
-    <!-- Speculation Rules API (Chrome 109+) — pre-renders likely navigation targets.
-         When a user hovers over a link to these routes, Chrome starts pre-rendering the page
-         in a hidden tab. Clicking then navigates instantly (0ms perceived latency).
-         Browsers that don't support speculation rules silently ignore this script tag.
-         Like Next.js prefetch but at the browser level — works with any SPA/MPA. -->
-    <script type="speculationrules">
-      {
-        "prerender": [
-          {
-            "where": {
-              "href_matches": ["/areas", "/calculator", "/compare", "/favorites", "/about", "/contact", "/pricing"]
-            },
-            "eagerness": "moderate"
-          }
-        ],
-        "prefetch": [
-          {
-            "where": {
-              "href_matches": "/plot/*"
-            },
-            "eagerness": "moderate"
-          }
-        ]
-      }
-    </script>
   </body>
 </html>
