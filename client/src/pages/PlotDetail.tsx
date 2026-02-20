@@ -1,306 +1,187 @@
-import { useState, useMemo, lazy, Suspense } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import styled, { keyframes } from 'styled-components'
-import { ArrowRight, MapPin, TrendingUp, Building2, FileText, Phone, Share2, Heart, Navigation, ExternalLink, Shield, ChevronLeft, Clock } from 'lucide-react'
-import { t, media } from '../theme'
+import { useState, lazy, Suspense } from 'react'
+import { useParams, Link } from 'react-router-dom'
+import styled from 'styled-components'
+import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, Shield } from 'lucide-react'
+import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites } from '../hooks'
-import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary } from '../components/UI'
-import { fmt, p, roi, calcScore, getGrade, calcCAGR, calcMonthly, calcTimeline, zoningLabels, statusLabels, statusColors, plotCenter, daysOnMarket } from '../utils'
+import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard } from '../components/UI'
+import { PublicLayout } from '../components/Layout'
+import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline } from '../utils'
 import type { Plot } from '../types'
 
 const LeadModal = lazy(() => import('../components/LeadModal'))
 
-const fadeIn = keyframes`from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); }`
+/* ── styled ── */
+const Back = styled(Link)`display:inline-flex;align-items:center;gap:6px;color:${t.lTextSec};font-size:13px;font-weight:500;margin-bottom:16px;text-decoration:none!important;transition:color ${t.tr};&:hover{color:${t.gold};}`
+const Page = styled.div`max-width:1120px;margin:0 auto;padding:24px;direction:rtl;`
+const TitleRow = styled.div`display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px;`
+const TitleLeft = styled.div`display:flex;flex-direction:column;gap:8px;`
+const Badges = styled.div`display:flex;align-items:center;gap:8px;flex-wrap:wrap;`
+const Title = styled.h1`font-size:clamp(22px,3vw,30px);font-weight:800;color:${t.lText};font-family:${t.font};`
+const Actions = styled.div`display:flex;gap:8px;`
+const IconBtn = styled.button<{$active?:boolean}>`display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:${t.r.md};border:1px solid ${t.lBorder};background:${pr=>pr.$active?t.goldDim:'#fff'};color:${pr=>pr.$active?t.gold:t.lTextSec};cursor:pointer;transition:all ${t.tr};&:hover{border-color:${t.gold};color:${t.gold};}`
 
-const Page = styled.div`
-  min-height: 100vh; background: ${t.colors.bg};
-  padding-bottom: 80px;
-`
-const Hero = styled.div`
-  padding: 24px 24px 0;
-  max-width: 960px; margin: 0 auto;
-  animation: ${fadeIn} 0.4s ease;
-`
-const BackLink = styled(Link)`
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13px; color: ${t.colors.textDim}; text-decoration: none;
-  margin-bottom: 16px;
-  &:hover { color: ${t.colors.gold}; }
-`
-const TitleRow = styled.div`
-  display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
-  flex-wrap: wrap; margin-bottom: 20px;
-`
-const TitleBlock = styled.div``
-const PageTitle = styled.h1`font-size: 28px; font-weight: 800; color: ${t.colors.text}; line-height: 1.2;`
-const PageSub = styled.p`font-size: 14px; color: ${t.colors.textSec}; margin-top: 4px;`
-const ActionRow = styled.div`display: flex; gap: 8px; align-items: flex-start;`
+const Metrics = styled.div`display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;${sm}{grid-template-columns:repeat(2,1fr);}`
+const Metric = styled(AnimatedCard)`padding:20px;background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};text-align:center;transition:all ${t.tr};&:hover{border-color:${t.goldBorder};box-shadow:${t.sh.glow};}`
+const MetricVal = styled.div`font-size:24px;font-weight:800;color:${t.lText};font-family:${t.font};`
+const MetricLabel = styled.div`font-size:12px;color:${t.lTextSec};margin-top:4px;`
 
-const MetricsGrid = styled.div`
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;
-  margin-bottom: 32px;
-`
-const MetricCard = styled.div<{ $accent?: boolean }>`
-  padding: 16px; border-radius: ${t.radius.md};
-  background: ${({ $accent }) => $accent ? `linear-gradient(135deg, ${t.colors.gold}12, ${t.colors.goldBright}08)` : t.colors.surface};
-  border: 1px solid ${({ $accent }) => $accent ? t.colors.goldBorder : t.colors.border};
-  animation: ${fadeIn} 0.4s ease both;
-`
-const MLabel = styled.div`font-size: 11px; color: ${t.colors.textDim}; margin-bottom: 6px; font-weight: 500;`
-const MValue = styled.div<{ $color?: string }>`font-size: 22px; font-weight: 800; color: ${({ $color }) => $color || t.colors.text}; font-variant-numeric: tabular-nums;`
-const MSub = styled.div`font-size: 11px; color: ${t.colors.textDim}; margin-top: 2px;`
+const Grid = styled.div`display:grid;grid-template-columns:1fr 360px;gap:24px;${md}{grid-template-columns:1fr;}`
+const Card = styled(AnimatedCard)`background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};padding:24px;`
+const CardTitle = styled.h3`font-size:16px;font-weight:700;color:${t.lText};display:flex;align-items:center;gap:8px;margin-bottom:16px;font-family:${t.font};`
+const Row = styled.div`display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid ${t.lBorder};&:last-child{border:none;}`
+const Label = styled.span`font-size:13px;color:${t.lTextSec};`
+const Value = styled.span`font-size:13px;font-weight:600;color:${t.lText};`
 
-const ContentGrid = styled.div`
-  max-width: 960px; margin: 0 auto; padding: 0 24px;
-  display: grid; grid-template-columns: 1fr; gap: 24px;
-  ${media.lg} { grid-template-columns: 2fr 1fr; }
-`
-const Main = styled.div`display: flex; flex-direction: column; gap: 24px;`
-const Side = styled.div`display: flex; flex-direction: column; gap: 24px;`
+const ProgressTrack = styled.div`width:100%;height:8px;background:${t.lBorder};border-radius:${t.r.full};overflow:hidden;margin:12px 0;`
+const ProgressFill = styled.div<{$pct:number}>`width:${pr=>pr.$pct}%;height:100%;background:linear-gradient(90deg,${t.gold},${t.goldBright});border-radius:${t.r.full};transition:width 1s ease;`
+const Stages = styled.div`display:flex;flex-direction:column;gap:6px;`
+const Stage = styled.div<{$done:boolean;$current:boolean}>`display:flex;align-items:center;gap:8px;font-size:12px;color:${pr=>pr.$current?t.gold:pr.$done?t.lText:t.lTextSec};font-weight:${pr=>pr.$current?700:400};`
+const Dot = styled.div<{$done:boolean}>`width:8px;height:8px;border-radius:50%;background:${pr=>pr.$done?t.gold:t.lBorder};flex-shrink:0;`
 
-const Section = styled.div`
-  background: ${t.colors.surface}; border: 1px solid ${t.colors.border};
-  border-radius: ${t.radius.lg}; padding: 20px;
-  animation: ${fadeIn} 0.4s ease both;
-`
-const STitle = styled.h2`font-size: 16px; font-weight: 700; color: ${t.colors.text}; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;`
-const Row = styled.div`
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 0; font-size: 13px; border-bottom: 1px solid ${t.colors.border};
-  &:last-child { border-bottom: none; }
-`
-const RLabel = styled.span`color: ${t.colors.textDim};`
-const RValue = styled.span<{ $color?: string }>`font-weight: 600; color: ${({ $color }) => $color || t.colors.text};`
+const DocItem = styled.a`display:flex;align-items:center;gap:8px;padding:8px 12px;background:${t.lBg};border-radius:${t.r.md};font-size:13px;color:${t.lText};text-decoration:none!important;transition:all ${t.tr};&:hover{background:${t.lBorder};}`
 
-const ProgressBar = styled.div`
-  height: 6px; background: ${t.colors.surfaceHover}; border-radius: 3px; overflow: hidden; margin: 8px 0 16px;
-`
-const ProgressFill = styled.div<{ $pct: number }>`
-  height: 100%; width: ${({ $pct }) => $pct}%;
-  background: linear-gradient(90deg, ${t.colors.gold}, ${t.colors.goldBright});
-  border-radius: 3px; transition: width 0.6s ease;
-`
+const BottomBar = styled.div`position:fixed;bottom:0;left:0;right:0;z-index:40;background:rgba(255,255,255,0.97);backdrop-filter:blur(12px);border-top:1px solid ${t.lBorder};padding:12px 24px;display:flex;align-items:center;justify-content:center;gap:16px;`
+const BarPrice = styled.span`font-size:20px;font-weight:800;color:${t.lText};font-family:${t.font};`
 
-const StageRow = styled.div<{ $active: boolean; $done: boolean }>`
-  display: flex; align-items: center; gap: 8px; padding: 5px 8px;
-  border-radius: ${t.radius.sm};
-  background: ${({ $active }) => $active ? `${t.colors.gold}12` : 'transparent'};
-  opacity: ${({ $done, $active }) => $done || $active ? 1 : 0.4};
-  font-size: 12px; color: ${t.colors.text};
-`
-const StageDot = styled.div<{ $done: boolean; $active: boolean }>`
-  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-  background: ${({ $done, $active }) => $done ? t.colors.success : $active ? t.colors.gold : t.colors.textDim};
-`
-
-const FixedCTA = styled.div`
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: ${t.z.filter};
-  padding: 12px 24px; display: flex; gap: 8px; justify-content: center;
-  background: linear-gradient(transparent, ${t.colors.bg} 30%);
-`
-
-const LoadWrap = styled.div`
-  display: flex; align-items: center; justify-content: center;
-  min-height: 60vh;
-`
+const Center = styled.div`display:flex;align-items:center;justify-content:center;min-height:60vh;`
 
 export default function PlotDetail() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const { data: plot, isLoading, error } = usePlot(id)
-  const favorites = useFavorites()
-  const [showLead, setShowLead] = useState(false)
+  const { isFav, toggle } = useFavorites()
+  const [leadOpen, setLeadOpen] = useState(false)
 
-  if (isLoading) return <LoadWrap><Spinner size={40} /></LoadWrap>
-  if (error || !plot) return <LoadWrap><p style={{ color: t.colors.textSec }}>החלקה לא נמצאה</p></LoadWrap>
+  if (isLoading) return <PublicLayout><Center><Spinner size={36} /></Center></PublicLayout>
+  if (error || !plot) return <PublicLayout><Center><p style={{color:t.lTextSec}}>Plot not found</p></Center></PublicLayout>
 
-  const d = p(plot)
-  const plotRoi = roi(plot)
-  const score = calcScore(plot)
-  const grade = getGrade(score)
-  const cagr = calcCAGR(plotRoi, d.readiness)
-  const monthly = calcMonthly(d.price)
-  const timeline = calcTimeline(plot)
-  const dom = daysOnMarket(d.created)
-  const status = plot.status || 'AVAILABLE'
-  const center = plotCenter(plot.coordinates)
-  const isFav = favorites.isFav(plot.id)
+  const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
+  const cagr = calcCAGR(r, d.readiness), timeline = calcTimeline(plot), dom = daysOnMarket(d.created)
 
   return (
-    <Page>
-      <Hero>
-        <BackLink to="/"><ArrowRight size={15} /> חזרה למפה</BackLink>
-        <TitleRow>
-          <TitleBlock>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-              <Badge $color={statusColors[status]}>{statusLabels[status]}</Badge>
-              <Badge $color={grade.color}>ציון {score}/10 · {grade.grade}</Badge>
-              {dom && <Badge $color={dom.color}>{dom.label}</Badge>}
+    <PublicLayout>
+      <ErrorBoundary>
+        <Page>
+          <Back to="/explore"><ArrowRight size={16} /> חזרה למפה</Back>
+
+          <TitleRow>
+            <TitleLeft>
+              <Badges>
+                <Badge $color={statusColors[plot.status || 'AVAILABLE']}>{statusLabels[plot.status || 'AVAILABLE'] || plot.status}</Badge>
+                <Badge $color={grade.color}>{grade.grade}</Badge>
+                {dom && <Badge $color={dom.color}>{dom.label}</Badge>}
+              </Badges>
+              <Title>גוש {d.block} חלקה {plot.number} - {plot.city}</Title>
+            </TitleLeft>
+            <Actions>
+              <IconBtn $active={isFav(plot.id)} onClick={() => toggle(plot.id)} aria-label="מועדפים"><Heart size={20} /></IconBtn>
+              <IconBtn aria-label="ניווט"><Navigation size={20} /></IconBtn>
+            </Actions>
+          </TitleRow>
+
+          <Metrics>
+            <Metric $delay={0}><MetricVal>{fmt.compact(d.price)}</MetricVal><MetricLabel>מחיר</MetricLabel></Metric>
+            <Metric $delay={0.08}><MetricVal>{fmt.dunam(d.size)} דונם</MetricVal><MetricLabel>שטח</MetricLabel></Metric>
+            <Metric $delay={0.16}><MetricVal style={{color:t.ok}}>{fmt.pct(r)}</MetricVal><MetricLabel>ROI צפוי</MetricLabel></Metric>
+            <Metric $delay={0.24}><MetricVal style={{color:t.gold}}>{cagr ? `${cagr.cagr}%` : '--'}</MetricVal><MetricLabel>CAGR ({cagr?.years || '-'} שנים)</MetricLabel></Metric>
+          </Metrics>
+
+          <Grid>
+            {/* Main column */}
+            <div style={{display:'flex',flexDirection:'column',gap:24}}>
+              <Card $delay={0.1}>
+                <CardTitle><TrendingUp size={18} color={t.gold} /> ניתוח השקעה</CardTitle>
+                <Row><Label>מחיר שמאי</Label><Value>{fmt.price(plot.standard22?.value || 0)}</Value></Row>
+                <Row><Label>שווי חזוי</Label><Value style={{color:t.ok}}>{fmt.price(d.projected)}</Value></Row>
+                <Row><Label>ציון השקעה</Label><Value style={{color:grade.color}}>{score}/10 ({grade.grade})</Value></Row>
+                <Row><Label>צפיפות</Label><Value>{d.density} יח"ד/דונם</Value></Row>
+                <Row><Label>אומדן מוכנות</Label><Value>{d.readiness || '--'}</Value></Row>
+              </Card>
+
+              {timeline && (
+                <Card $delay={0.2}>
+                  <CardTitle><Clock size={18} color={t.gold} /> ציר זמן תכנוני</CardTitle>
+                  <ProgressTrack><ProgressFill $pct={timeline.progress} /></ProgressTrack>
+                  <Stages>
+                    {timeline.stages.map((s, i) => (
+                      <Stage key={s.key} $done={i <= timeline.currentIdx} $current={i === timeline.currentIdx}>
+                        <Dot $done={i <= timeline.currentIdx} />
+                        {s.label}
+                      </Stage>
+                    ))}
+                  </Stages>
+                </Card>
+              )}
+
+              {plot.committees && (
+                <Card $delay={0.3}>
+                  <CardTitle><Landmark size={18} color={t.gold} /> ועדות</CardTitle>
+                  {Object.entries(plot.committees).map(([k, c]) => (
+                    <Row key={k}>
+                      <Label>{c.label}</Label>
+                      <Value>
+                        <Badge $color={c.status === 'approved' ? t.ok : c.status === 'in_preparation' ? t.warn : t.info}>
+                          {c.status === 'approved' ? 'מאושר' : c.status === 'in_preparation' ? 'בהכנה' : c.status === 'pending' ? 'ממתין' : c.status === 'in_discussion' ? 'בדיון' : 'טרם התחיל'}
+                        </Badge>
+                        {c.date && <span style={{marginRight:8,fontSize:11,color:t.lTextSec}}>{c.date}</span>}
+                      </Value>
+                    </Row>
+                  ))}
+                </Card>
+              )}
+
+              {plot.description && (
+                <Card $delay={0.35}>
+                  <CardTitle><FileText size={18} color={t.gold} /> תיאור</CardTitle>
+                  <p style={{fontSize:14,color:t.lTextSec,lineHeight:1.8}}>{plot.description}</p>
+                  {plot.area_context && <p style={{fontSize:13,color:t.lTextSec,marginTop:12}}>{plot.area_context}</p>}
+                </Card>
+              )}
             </div>
-            <PageTitle>גוש {d.block} | חלקה {plot.number}</PageTitle>
-            <PageSub><MapPin size={13} style={{ verticalAlign: -2 }} /> {plot.city} · {zoningLabels[d.zoning]}</PageSub>
-          </TitleBlock>
-          <ActionRow>
-            <GhostButton onClick={() => favorites.toggle(plot.id)}>
-              <Heart size={14} fill={isFav ? '#EF4444' : 'none'} color={isFav ? '#EF4444' : undefined} />
-              {isFav ? 'שמור' : 'שמור'}
-            </GhostButton>
-            {center && (
-              <GhostButton as="a" href={`https://www.google.com/maps/@${center.lat},${center.lng},17z`} target="_blank">
-                <Navigation size={14} /> נווט
-              </GhostButton>
-            )}
-          </ActionRow>
-        </TitleRow>
 
-        <MetricsGrid>
-          <MetricCard $accent>
-            <MLabel>מחיר</MLabel>
-            <MValue $color={t.colors.goldBright}>{fmt.price(d.price)}</MValue>
-            <MSub>{d.size > 0 ? `${fmt.price(Math.round(d.price / d.size))}/מ"ר` : ''}</MSub>
-          </MetricCard>
-          <MetricCard>
-            <MLabel>שטח</MLabel>
-            <MValue>{fmt.dunam(d.size)} דונם</MValue>
-            <MSub>{d.size.toLocaleString()} מ"ר</MSub>
-          </MetricCard>
-          <MetricCard>
-            <MLabel>תשואה צפויה</MLabel>
-            <MValue $color={t.colors.success}>+{fmt.pct(plotRoi)}</MValue>
-            <MSub>שווי חזוי {fmt.compact(d.projected)}</MSub>
-          </MetricCard>
-          <MetricCard>
-            <MLabel>צמיחה שנתית</MLabel>
-            <MValue>{cagr ? `${cagr.cagr}%` : '—'}</MValue>
-            <MSub>{cagr ? `${cagr.years} שנים` : ''}</MSub>
-          </MetricCard>
-        </MetricsGrid>
-      </Hero>
+            {/* Side column */}
+            <div style={{display:'flex',flexDirection:'column',gap:24}}>
+              <Card $delay={0.15}>
+                <CardTitle><MapPin size={18} color={t.gold} /> מיקום</CardTitle>
+                <Row><Label>עיר</Label><Value>{plot.city}</Value></Row>
+                <Row><Label>גוש / חלקה</Label><Value>{d.block} / {plot.number}</Value></Row>
+                {d.seaDist && <Row><Label>מרחק לים</Label><Value>{fmt.num(d.seaDist)} מ'</Value></Row>}
+                {d.parkDist && <Row><Label>מרחק לפארק</Label><Value>{fmt.num(d.parkDist)} מ'</Value></Row>}
+              </Card>
 
-      <ContentGrid>
-        <Main>
-          {/* Investment Analysis */}
-          <Section>
-            <STitle><TrendingUp size={18} color={t.colors.gold} /> ניתוח השקעה</STitle>
-            <Row><RLabel>ציון השקעה</RLabel><RValue $color={grade.color}>{score}/10 ({grade.grade})</RValue></Row>
-            <Row><RLabel>מחיר רכישה</RLabel><RValue>{fmt.price(d.price)}</RValue></Row>
-            <Row><RLabel>שווי חזוי</RLabel><RValue $color={t.colors.success}>{fmt.price(d.projected)}</RValue></Row>
-            <Row><RLabel>רווח גולמי</RLabel><RValue>{fmt.price(d.projected - d.price)}</RValue></Row>
-            {monthly && <Row><RLabel>החזר חודשי (50% מימון)</RLabel><RValue>₪{monthly.monthly.toLocaleString()}/חודש</RValue></Row>}
-            {d.density > 0 && <Row><RLabel>צפיפות</RLabel><RValue>{d.density} יח"ד/דונם</RValue></Row>}
-          </Section>
+              {plot.standard22 && (
+                <Card $delay={0.25}>
+                  <CardTitle><Shield size={18} color={t.gold} /> שומת תקן 22</CardTitle>
+                  <Row><Label>שמאי</Label><Value>{plot.standard22.appraiser}</Value></Row>
+                  <Row><Label>תאריך</Label><Value>{plot.standard22.date}</Value></Row>
+                  <Row><Label>שווי</Label><Value style={{color:t.gold}}>{fmt.price(plot.standard22.value)}</Value></Row>
+                  <Row><Label>מתודולוגיה</Label><Value style={{fontSize:12}}>{plot.standard22.methodology}</Value></Row>
+                </Card>
+              )}
 
-          {/* Zoning Timeline */}
-          {timeline && (
-            <Section>
-              <STitle><Building2 size={18} color={t.colors.gold} /> התקדמות תכנונית</STitle>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: t.colors.textDim, marginBottom: 4 }}>
-                <span>התקדמות כללית</span>
-                <span>{timeline.progress}%</span>
-              </div>
-              <ProgressBar><ProgressFill $pct={timeline.progress} /></ProgressBar>
-              {timeline.stages.map((stage, i) => (
-                <StageRow key={stage.key} $active={i === timeline.currentIdx} $done={i < timeline.currentIdx}>
-                  <StageDot $done={i < timeline.currentIdx} $active={i === timeline.currentIdx} />
-                  {stage.label}
-                </StageRow>
-              ))}
-              {d.readiness && <Row style={{ marginTop: 12 }}><RLabel>אומדן מוכנות</RLabel><RValue>{d.readiness}</RValue></Row>}
-            </Section>
-          )}
-
-          {/* Committees */}
-          {plot.committees && (
-            <Section>
-              <STitle><Shield size={18} color={t.colors.gold} /> ועדות תכנון</STitle>
-              {Object.entries(plot.committees).map(([key, c]) => {
-                const sMap: Record<string, { l: string; c: string }> = {
-                  approved: { l: 'מאושר', c: t.colors.success }, in_preparation: { l: 'בהכנה', c: t.colors.warning },
-                  pending: { l: 'ממתין', c: t.colors.warning }, in_discussion: { l: 'בדיון', c: t.colors.info },
-                  not_started: { l: 'טרם החל', c: t.colors.textDim },
-                }
-                const s = sMap[c.status] || { l: c.status, c: t.colors.textDim }
-                return (
-                  <Row key={key}>
-                    <RLabel>{c.label}</RLabel>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {c.date && <span style={{ fontSize: 11, color: t.colors.textDim }}>{c.date}</span>}
-                      <Badge $color={s.c}>{s.l}</Badge>
-                    </div>
-                  </Row>
-                )
-              })}
-            </Section>
-          )}
-
-          {/* Description */}
-          {plot.description && (
-            <Section>
-              <STitle><FileText size={18} color={t.colors.gold} /> תיאור</STitle>
-              <p style={{ fontSize: 14, lineHeight: 1.8, color: t.colors.textSec }}>{plot.description}</p>
-              {plot.areaContext ?? (plot as any).area_context ? (
-                <p style={{ fontSize: 13, lineHeight: 1.7, color: t.colors.textDim, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${t.colors.border}` }}>
-                  {(plot as any).areaContext || (plot as any).area_context}
-                </p>
+              {plot.documents?.length ? (
+                <Card $delay={0.3}>
+                  <CardTitle><FileText size={18} color={t.gold} /> מסמכים</CardTitle>
+                  <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                    {plot.documents.map((doc, i) => (
+                      <DocItem key={i} href="#"><FileText size={14} color={t.lTextSec} />{doc}</DocItem>
+                    ))}
+                  </div>
+                </Card>
               ) : null}
-            </Section>
-          )}
-        </Main>
+            </div>
+          </Grid>
+        </Page>
 
-        <Side>
-          {/* Location */}
-          <Section>
-            <STitle><MapPin size={18} color={t.colors.gold} /> מיקום</STitle>
-            {d.seaDist != null && <Row><RLabel>🌊 מהים</RLabel><RValue>{d.seaDist} מ׳</RValue></Row>}
-            {d.parkDist != null && <Row><RLabel>🌳 מפארק</RLabel><RValue>{d.parkDist} מ׳</RValue></Row>}
-            {(plot.distance_to_hospital ?? plot.distanceToHospital) != null && (
-              <Row><RLabel>🏥 מבי"ח</RLabel><RValue>{plot.distance_to_hospital ?? plot.distanceToHospital} מ׳</RValue></Row>
-            )}
-            {center && (
-              <a
-                href={`https://www.google.com/maps/dir/?api=1&destination=${center.lat},${center.lng}`}
-                target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: t.colors.gold, marginTop: 12 }}
-              >
-                <Navigation size={13} /> נווט לחלקה <ExternalLink size={11} />
-              </a>
-            )}
-          </Section>
+        <BottomBar>
+          <BarPrice>{fmt.price(d.price)}</BarPrice>
+          <GoldButton onClick={() => setLeadOpen(true)} style={{padding:'12px 32px',borderRadius:t.r.full}}>קבל פרטים</GoldButton>
+        </BottomBar>
 
-          {/* Standard 22 */}
-          {plot.standard22 && typeof plot.standard22 === 'object' && (
-            <Section>
-              <STitle>📋 שמאות (תקן 22)</STitle>
-              <Row><RLabel>שמאי</RLabel><RValue>{(plot.standard22 as any).appraiser}</RValue></Row>
-              <Row><RLabel>תאריך</RLabel><RValue>{(plot.standard22 as any).date}</RValue></Row>
-              <Row><RLabel>שווי מוערך</RLabel><RValue $color={t.colors.goldBright}>{fmt.price((plot.standard22 as any).value)}</RValue></Row>
-              <Row><RLabel>מתודולוגיה</RLabel><RValue style={{ fontSize: 11 }}>{(plot.standard22 as any).methodology}</RValue></Row>
-            </Section>
-          )}
-
-          {/* Documents */}
-          {plot.documents && (plot.documents as string[]).length > 0 && (
-            <Section>
-              <STitle><FileText size={18} color={t.colors.gold} /> מסמכים</STitle>
-              {(plot.documents as string[]).map((doc, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 13, color: t.colors.textSec }}>
-                  <FileText size={13} color={t.colors.textDim} /> {doc}
-                </div>
-              ))}
-            </Section>
-          )}
-        </Side>
-      </ContentGrid>
-
-      <FixedCTA>
-        <GoldButton onClick={() => setShowLead(true)} style={{ padding: '12px 32px', fontSize: 14 }}>
-          <Phone size={16} /> קבל פרטים על החלקה
-        </GoldButton>
-      </FixedCTA>
-
-      <Suspense fallback={null}>
-        <LeadModal open={showLead} onClose={() => setShowLead(false)} plot={plot} />
-      </Suspense>
-    </Page>
+        <Suspense fallback={null}>
+          <LeadModal plot={plot} open={leadOpen} onClose={() => setLeadOpen(false)} />
+        </Suspense>
+      </ErrorBoundary>
+    </PublicLayout>
   )
 }

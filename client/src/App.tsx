@@ -1,22 +1,23 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { ErrorBoundary, PageLoader } from './components/UI'
+import { RoleGuard } from './components/Layout'
 
-const MapView = lazy(() => import('./pages/MapView'))
+const Landing = lazy(() => import('./pages/Landing'))
+const Explore = lazy(() => import('./pages/Explore'))
 const PlotDetail = lazy(() => import('./pages/PlotDetail'))
-const Favorites = lazy(() => import('./pages/Favorites'))
-const Compare = lazy(() => import('./pages/Compare'))
-const Calculator = lazy(() => import('./pages/Calculator'))
-const Areas = lazy(() => import('./pages/Areas'))
-const Static = lazy(() => import('./pages/Static'))
-const Admin = lazy(() => import('./pages/admin/Admin'))
+const Auth = lazy(() => import('./pages/Auth'))
+const Public = lazy(() => import('./pages/Public'))
+const UserDash = lazy(() => import('./pages/UserDash'))
+const Business = lazy(() => import('./pages/Business'))
+const Admin = lazy(() => import('./pages/Admin'))
 
 const NotFound = () => (
-  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 12, color: '#94A3B8' }}>
-    <span style={{ fontSize: 48 }}>🏗️</span>
-    <h1 style={{ fontSize: 24, fontWeight: 800, color: '#F1F5F9' }}>404</h1>
-    <p>העמוד לא נמצא</p>
-    <a href="/" style={{ color: '#D4A84B' }}>חזרה למפה</a>
+  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 16, background: '#0B1120', color: '#94A3B8' }}>
+    <span style={{ fontSize: 56 }}>🏗️</span>
+    <h1 style={{ fontSize: 32, fontWeight: 800, color: '#F1F5F9' }}>404</h1>
+    <p style={{ fontSize: 15 }}>העמוד לא נמצא</p>
+    <a href="/" style={{ color: '#D4A84B', fontSize: 14 }}>חזרה לדף הבית</a>
   </div>
 )
 
@@ -28,18 +29,30 @@ export default function App() {
     <ErrorBoundary>
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/" element={<MapView />} />
+          {/* Public */}
+          <Route path="/" element={<Landing />} />
+          <Route path="/explore" element={<Explore />} />
           <Route path="/plot/:id" element={<PlotDetail />} />
-          <Route path="/favorites" element={<Favorites />} />
-          <Route path="/compare" element={<Compare />} />
-          <Route path="/calculator" element={<Calculator />} />
-          <Route path="/areas" element={<Areas />} />
-          <Route path="/about" element={<Static />} />
-          <Route path="/contact" element={<Static />} />
-          <Route path="/terms" element={<Static />} />
-          <Route path="/privacy" element={<Static />} />
-          <Route path="/pricing" element={<Static />} />
-          <Route path="/admin/*" element={<Admin />} />
+          <Route path="/login" element={<Auth />} />
+          <Route path="/about" element={<Public />} />
+          <Route path="/contact" element={<Public />} />
+          <Route path="/pricing" element={<Public />} />
+
+          {/* User */}
+          <Route path="/dashboard" element={<RoleGuard role={['user', 'business', 'admin']}><UserDash /></RoleGuard>} />
+          <Route path="/favorites" element={<RoleGuard role={['user', 'business', 'admin']}><UserDash /></RoleGuard>} />
+          <Route path="/compare" element={<RoleGuard role={['user', 'business', 'admin']}><UserDash /></RoleGuard>} />
+          <Route path="/calculator" element={<RoleGuard role={['user', 'business', 'admin']}><UserDash /></RoleGuard>} />
+          <Route path="/settings" element={<RoleGuard role={['user', 'business', 'admin']}><UserDash /></RoleGuard>} />
+
+          {/* Business */}
+          <Route path="/business" element={<RoleGuard role={['business', 'admin']}><Business /></RoleGuard>} />
+          <Route path="/business/*" element={<RoleGuard role={['business', 'admin']}><Business /></RoleGuard>} />
+
+          {/* Admin */}
+          <Route path="/admin" element={<RoleGuard role="admin"><Admin /></RoleGuard>} />
+          <Route path="/admin/*" element={<RoleGuard role="admin"><Admin /></RoleGuard>} />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

@@ -1,173 +1,22 @@
-import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, ZoomControl, useMap } from 'react-leaflet'
+import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, ZoomControl, useMap, WMSTileLayer } from 'react-leaflet'
 import L from 'leaflet'
-import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
-import { Heart, Phone, Eye } from 'lucide-react'
-import { statusColors, statusLabels, zoningLabels, fmt, p, roi, calcScore, getGrade, plotCenter } from '../utils'
+import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain } from 'lucide-react'
+import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
+import { israelAreas } from '../data'
+import { t } from '../theme'
 
-// ── URL Hash Sync ──
-function MapUrlSync() {
-  const map = useMap()
-  const ready = useRef(false)
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+// ── Tile Configs ──
+const TILES = [
+  { id: 'voyager', label: 'מפה', icon: MapIcon, url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', attr: '&copy; CartoDB' },
+  { id: 'satellite', label: 'לוויין', icon: Satellite, url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr: '&copy; Esri' },
+  { id: 'dark', label: 'כהה', icon: Mountain, url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png', attr: '&copy; CartoDB' },
+  { id: 'israel', label: 'ישראל', icon: Layers, url: 'https://israelhiking.osm.org.il/Hebrew/Tiles/{z}/{x}/{y}.png', attr: '&copy; Israel Hiking' },
+] as const
 
-  useEffect(() => {
-    const hash = window.location.hash
-    const m = hash.match(/#map=(\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)/)
-    if (m) {
-      const [, z, la, ln] = m.map(Number)
-      if (isFinite(z) && isFinite(la) && isFinite(ln)) map.setView([la, ln], z, { animate: false })
-    }
-    const t = setTimeout(() => { ready.current = true }, 2000)
-    return () => clearTimeout(t)
-  }, [map])
-
-  useEffect(() => {
-    const update = () => {
-      if (!ready.current) return
-      if (timer.current) clearTimeout(timer.current)
-      timer.current = setTimeout(() => {
-        const c = map.getCenter()
-        const h = `#map=${map.getZoom()}/${c.lat.toFixed(5)}/${c.lng.toFixed(5)}`
-        if (window.location.hash !== h) window.history.replaceState(null, '', h)
-      }, 600)
-    }
-    map.on('moveend', update).on('zoomend', update)
-    return () => { map.off('moveend', update).off('zoomend', update); if (timer.current) clearTimeout(timer.current) }
-  }, [map])
-
-  return null
-}
-
-// ── Fly to Selected ──
-function FlyTo({ plot }: { plot: Plot | null }) {
-  const map = useMap()
-  useEffect(() => {
-    if (!plot?.coordinates?.length) return
-    const center = plotCenter(plot.coordinates)
-    if (center) map.flyTo([center.lat, center.lng], 15, { duration: 1 })
-  }, [plot, map])
-  return null
-}
-
-// ── Auto Fit Bounds ──
-function AutoFit({ plots }: { plots: Plot[] }) {
-  const map = useMap()
-  const fitted = useRef(false)
-  useEffect(() => {
-    if (fitted.current || !plots.length) return
-    const coords: [number, number][] = []
-    plots.forEach(pl => pl.coordinates?.forEach(c => {
-      if (c.length >= 2 && isFinite(c[0]) && isFinite(c[1])) coords.push(c)
-    }))
-    if (coords.length < 2) return
-    const bounds = L.latLngBounds(coords)
-    if (bounds.isValid()) { map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14, animate: true }); fitted.current = true }
-  }, [plots, map])
-  return null
-}
-
-// ── City Filter Bounds ──
-function CityBounds({ plots }: { plots: Plot[] }) {
-  const map = useMap()
-  const prevHash = useRef<string>('')
-  const init = useRef(false)
-
-  useEffect(() => {
-    if (!plots.length) return
-    const hash = [...new Set(plots.map(pp => pp.city).filter(Boolean))].sort().join(',')
-    if (!init.current) { prevHash.current = hash; init.current = true; return }
-    if (hash === prevHash.current) return
-    prevHash.current = hash
-    const coords: [number, number][] = []
-    plots.forEach(pl => pl.coordinates?.forEach(c => {
-      if (c.length >= 2 && isFinite(c[0]) && isFinite(c[1])) coords.push(c)
-    }))
-    if (coords.length < 2) return
-    const bounds = L.latLngBounds(coords)
-    if (bounds.isValid()) map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 15, duration: 1 })
-  }, [plots, map])
-
-  return null
-}
-
-// ── Polygon Tooltip ──
-function PriceTooltip({ plot }: { plot: Plot }) {
-  const { price } = p(plot)
-  const score = calcScore(plot)
-  const grade = getGrade(score)
-  return (
-    <Tooltip className="price-tooltip" permanent direction="center" offset={[0, 0]}>
-      <span>{fmt.short(price)}</span>
-      <span style={{ fontSize: 8, color: grade.color, fontWeight: 800 }}>{grade.grade}</span>
-    </Tooltip>
-  )
-}
-
-// ── Popup Content ──
-function PlotPopup({ plot, onLead, onFav, isFav }: { plot: Plot; onLead: () => void; onFav: () => void; isFav: boolean }) {
-  const d = p(plot)
-  const plotRoi = roi(plot)
-  const status = plot.status || 'AVAILABLE'
-  const color = statusColors[status] || '#10B981'
-
-  return (
-    <div className="plot-popup">
-      <div className="plot-popup-header">
-        <span className="plot-popup-title">גוש {d.block} | חלקה {plot.number}</span>
-        <span className="plot-popup-status" style={{ background: `${color}20`, color, border: `1px solid ${color}40` }}>
-          {statusLabels[status] || status}
-        </span>
-      </div>
-      <div className="plot-popup-row">
-        <span className="plot-popup-label">מחיר</span>
-        <span className="plot-popup-value gold">{fmt.price(d.price)}</span>
-      </div>
-      <div className="plot-popup-row">
-        <span className="plot-popup-label">שטח</span>
-        <span className="plot-popup-value">{fmt.dunam(d.size)} דונם</span>
-      </div>
-      <div className="plot-popup-row">
-        <span className="plot-popup-label">תשואה צפויה</span>
-        <span className="plot-popup-value" style={{ color: '#10B981' }}>+{fmt.pct(plotRoi)}</span>
-      </div>
-      <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
-        <button className="plot-popup-cta" onClick={onLead}><Phone size={13} /> קבל פרטים</button>
-        <button
-          onClick={onFav}
-          style={{
-            width: 36, height: 36, flexShrink: 0, borderRadius: 8,
-            border: `1px solid ${isFav ? '#EF444440' : 'rgba(212,168,75,0.2)'}`,
-            background: isFav ? '#EF444418' : 'rgba(212,168,75,0.06)',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <Heart size={14} fill={isFav ? '#EF4444' : 'none'} color={isFav ? '#EF4444' : '#94A3B8'} />
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ── POI Markers ──
-function PoiMarkers({ pois }: { pois: Poi[] }) {
-  return (
-    <>
-      {pois.map(poi => {
-        const icon = L.divIcon({
-          className: 'poi-marker',
-          html: `<div class="poi-marker-inner"><span class="poi-marker-emoji">${(poi as any).icon || '📍'}</span><span class="poi-marker-label">${poi.name}</span></div>`,
-          iconSize: [60, 40],
-          iconAnchor: [30, 20],
-        })
-        return <Marker key={poi.id} position={[poi.lat, poi.lng]} icon={icon} />
-      })}
-    </>
-  )
-}
-
-// ── Main Map Component ──
+// ── Props ──
 interface MapProps {
   plots: Plot[]
   pois: Poi[]
@@ -175,85 +24,234 @@ interface MapProps {
   onSelect: (plot: Plot) => void
   onLead: (plot: Plot) => void
   favorites: { isFav: (id: string) => boolean; toggle: (id: string) => void }
+  darkMode?: boolean
 }
 
-function MapArea({ plots, pois, selected, onSelect, onLead, favorites }: MapProps) {
-  const prefetch = usePrefetchPlot()
-  const [userLoc, setUserLoc] = useState<[number, number] | null>(null)
+// ── URL Sync ──
+function MapUrlSync() {
+  const map = useMap()
+  useEffect(() => {
+    const restore = () => {
+      const h = window.location.hash.replace('#', '').split('/')
+      if (h.length >= 3) map.setView([+h[0], +h[1]], +h[2])
+    }
+    restore()
+    const save = () => {
+      const c = map.getCenter(), z = map.getZoom()
+      window.history.replaceState(null, '', `#${c.lat.toFixed(4)}/${c.lng.toFixed(4)}/${z}`)
+    }
+    map.on('moveend', save)
+    return () => { map.off('moveend', save) }
+  }, [map])
+  return null
+}
 
+// ── Fly to Selected ──
+function FlyToSelected({ plot }: { plot: Plot | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!plot) return
+    const c = plotCenter(plot.coordinates)
+    if (c) map.flyTo([c.lat, c.lng], Math.max(map.getZoom(), 15), { duration: 0.8 })
+  }, [plot, map])
+  return null
+}
+
+// ── Auto Fit Bounds ──
+function AutoFitBounds({ plots }: { plots: Plot[] }) {
+  const map = useMap()
+  const done = useRef(false)
+  useEffect(() => {
+    if (done.current || !plots.length) return
+    const pts = plots.flatMap(pl => (pl.coordinates || []).filter(c => c.length >= 2 && isFinite(c[0]) && isFinite(c[1])))
+    if (!pts.length) return
+    const bounds = L.latLngBounds(pts.map(c => [c[0], c[1]] as [number, number]))
+    if (bounds.isValid()) { map.fitBounds(bounds, { padding: [60, 60], maxZoom: 14 }); done.current = true }
+  }, [plots, map])
+  return null
+}
+
+// ── User Location ──
+function UserLocation() {
+  const map = useMap()
+  const [pos, setPos] = useState<[number, number] | null>(null)
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(
-      pos => setUserLoc([pos.coords.latitude, pos.coords.longitude]),
-      () => {}, { timeout: 8000, maximumAge: 300000 }
+      p => setPos([p.coords.latitude, p.coords.longitude]),
+      () => {}, { enableHighAccuracy: false, timeout: 8000 }
     )
   }, [])
+  if (!pos) return null
+  const icon = L.divIcon({ className: 'user-location-marker', html: '<div class="user-dot-outer"><div class="user-dot-inner"></div></div>', iconSize: [22, 22] })
+  return <Marker position={pos} icon={icon} />
+}
 
-  const userIcon = useMemo(() => L.divIcon({
-    className: 'user-location-marker',
-    html: '<div class="user-dot-outer"><div class="user-dot-inner"></div></div>',
-    iconSize: [22, 22], iconAnchor: [11, 11],
-  }), [])
+// ── POI Icons ──
+const poiIcon = (emoji: string) => L.divIcon({
+  className: 'poi-marker', iconSize: [32, 40], iconAnchor: [16, 40],
+  html: `<div class="poi-marker-inner"><span class="poi-marker-emoji">${emoji}</span></div>`,
+})
+
+// ── Main Component ──
+function MapArea({ plots, pois, selected, onSelect, onLead, favorites, darkMode = false }: MapProps) {
+  const [tileIdx, setTileIdx] = useState(0)
+  const [showCadastral, setShowCadastral] = useState(false)
+  const [showAreas, setShowAreas] = useState(true)
+  const [switcherOpen, setSwitcherOpen] = useState(false)
+  const prefetch = usePrefetchPlot()
+
+  const tile = TILES[tileIdx]
+  const center = useMemo<[number, number]>(() => {
+    if (selected) { const c = plotCenter(selected.coordinates); if (c) return [c.lat, c.lng] }
+    return [32.44, 34.88]
+  }, [selected])
+
+  const renderPopup = useCallback((plot: Plot) => {
+    const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score), fav = favorites.isFav(plot.id)
+    return (
+      <div className="plot-popup">
+        <div className="plot-popup-header">
+          <span className="plot-popup-title">גוש {d.block} | חלקה {plot.number}</span>
+          <span className="plot-popup-status" style={{ background: (statusColors[plot.status || ''] || '#888') + '20', color: statusColors[plot.status || ''] || '#888' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
+            {statusLabels[plot.status || ''] || plot.status}
+          </span>
+        </div>
+        <div className="plot-popup-row"><span className="plot-popup-label">מחיר</span><span className="plot-popup-value">{fmt.compact(d.price)}</span></div>
+        <div className="plot-popup-row"><span className="plot-popup-label">שטח</span><span className="plot-popup-value">{fmt.dunam(d.size)} דונם</span></div>
+        <div className="plot-popup-row"><span className="plot-popup-label">תשואה צפויה</span><span className="plot-popup-value gold">+{fmt.pct(r)}</span></div>
+        <div className="plot-popup-row"><span className="plot-popup-label">ציון השקעה</span><span className="plot-popup-value" style={{ color: grade.color }}>{grade.grade}</span></div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button className="plot-popup-cta" style={{ flex: 1 }} onClick={() => onLead(plot)}>
+            <Phone size={13} /> קבל פרטים
+          </button>
+          <button
+            onClick={() => favorites.toggle(plot.id)}
+            style={{ width: 36, height: 36, border: `1px solid ${fav ? t.gold : t.border}`, borderRadius: t.r.sm, background: fav ? t.goldDim : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: `all ${t.tr}` }}
+          >
+            <Heart size={16} fill={fav ? t.gold : 'none'} color={fav ? t.gold : t.textDim} />
+          </button>
+        </div>
+      </div>
+    )
+  }, [favorites, onLead])
 
   return (
-    <MapContainer
-      center={[32.35, 34.88]}
-      zoom={10}
-      zoomControl={false}
-      style={{ height: '100%', width: '100%' }}
-      attributionControl={true}
-    >
-      <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        attribution='&copy; <a href="https://carto.com">CARTO</a>'
-      />
+    <div style={{ position: 'relative', width: '100%', height: '100%' }} className={darkMode ? 'dark' : ''}>
+      <MapContainer center={center} zoom={13} zoomControl={false} style={{ width: '100%', height: '100%', zIndex: t.z.map }}
+        attributionControl={false}>
+        <TileLayer url={tile.url} attribution={tile.attr} maxZoom={19} />
 
-      <ZoomControl position="bottomright" />
-      <MapUrlSync />
-      <AutoFit plots={plots} />
-      <CityBounds plots={plots} />
-      <FlyTo plot={selected} />
+        {showCadastral && (
+          <WMSTileLayer url="https://open.govmap.gov.il/geoserver/opendata/wms" layers="opendata:PARCEL_ALL"
+            transparent={true} format="image/png" opacity={0.5} />
+        )}
 
-      {plots.map(plot => {
-        const coords = plot.coordinates
-        if (!coords?.length) return null
-        const status = plot.status || 'AVAILABLE'
-        const color = statusColors[status] || '#10B981'
-        const isSelected = selected?.id === plot.id
+        <ZoomControl position="topleft" />
+        <MapUrlSync />
+        <FlyToSelected plot={selected} />
+        <AutoFitBounds plots={plots} />
+        <UserLocation />
 
-        return (
-          <Polygon
-            key={plot.id}
-            positions={coords as [number, number][]}
-            pathOptions={{
-              color,
-              weight: isSelected ? 3 : 2,
-              fillColor: color,
-              fillOpacity: isSelected ? 0.35 : 0.2,
-            }}
-            eventHandlers={{
+        {/* Area divisions */}
+        {showAreas && israelAreas.map(area => (
+          <Polygon key={area.name} positions={area.bounds} pathOptions={{ color: area.color, weight: 1.5, fillColor: area.color, fillOpacity: 0.06, dashArray: '6 4' }}>
+            <Tooltip permanent direction="center" className="price-tooltip">
+              <span style={{ fontSize: 11, fontWeight: 700, color: area.color }}>{area.name}</span>
+            </Tooltip>
+          </Polygon>
+        ))}
+
+        {/* Plot polygons */}
+        {plots.map(plot => {
+          if (!plot.coordinates?.length) return null
+          const d = p(plot), color = statusColors[plot.status || ''] || '#10B981', isSel = selected?.id === plot.id
+          return (
+            <Polygon key={plot.id} positions={plot.coordinates} eventHandlers={{
               click: () => onSelect(plot),
               mouseover: () => prefetch(plot.id),
-            }}
-          >
-            <PriceTooltip plot={plot} />
-            <Popup>
-              <PlotPopup
-                plot={plot}
-                onLead={() => onLead(plot)}
-                onFav={() => favorites.toggle(plot.id)}
-                isFav={favorites.isFav(plot.id)}
-              />
-            </Popup>
-          </Polygon>
-        )
-      })}
+            }} pathOptions={{ color, weight: isSel ? 3.5 : 2, fillColor: color, fillOpacity: isSel ? 0.35 : 0.18 }}>
+              <Tooltip className="price-tooltip" direction="top" offset={[0, -8]} opacity={1}>
+                {fmt.short(d.price)}
+              </Tooltip>
+              <Popup maxWidth={280} minWidth={240}>{renderPopup(plot)}</Popup>
+            </Polygon>
+          )
+        })}
 
-      <PoiMarkers pois={pois} />
+        {/* POI markers */}
+        {pois.map(poi => (
+          <Marker key={poi.id} position={[poi.lat, poi.lng]} icon={poiIcon(poi.icon || '📍')}>
+            <Tooltip className="price-tooltip">{poi.name}</Tooltip>
+          </Marker>
+        ))}
+      </MapContainer>
 
-      {userLoc && <Marker position={userLoc} icon={userIcon} />}
-
+      {/* Vignette overlay */}
       <div className="map-vignette" />
-    </MapContainer>
+
+      {/* Layer Switcher - Glass Panel */}
+      <div style={{
+        position: 'absolute', bottom: 24, left: 16, zIndex: t.z.controls,
+        background: darkMode ? 'rgba(11,17,32,0.88)' : 'rgba(255,255,255,0.92)',
+        backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+        border: `1px solid ${darkMode ? t.goldBorder : t.lBorder}`, borderRadius: t.r.lg,
+        boxShadow: t.sh.lg, padding: switcherOpen ? '10px' : '0',
+        transition: `all ${t.tr}`, overflow: 'hidden',
+        maxWidth: switcherOpen ? 320 : 40, maxHeight: switcherOpen ? 200 : 40,
+      }}>
+        {/* Toggle button */}
+        {!switcherOpen && (
+          <button onClick={() => setSwitcherOpen(true)} style={{
+            width: 40, height: 40, border: 'none', background: 'transparent', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: darkMode ? t.gold : t.lText,
+          }} aria-label="Layer switcher">
+            <Layers size={20} />
+          </button>
+        )}
+
+        {switcherOpen && (
+          <div>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, padding: '0 2px' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: darkMode ? t.textSec : t.lTextSec, letterSpacing: 0.5 }}>שכבות</span>
+              <button onClick={() => setSwitcherOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: darkMode ? t.textDim : t.lTextSec, fontSize: 16, lineHeight: 1 }}>&times;</button>
+            </div>
+
+            {/* Tile buttons */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+              {TILES.map((tl, i) => {
+                const Icon = tl.icon; const active = i === tileIdx
+                return (
+                  <button key={tl.id} onClick={() => setTileIdx(i)} style={{
+                    width: 56, height: 48, borderRadius: t.r.sm, cursor: 'pointer', display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center', gap: 3, transition: `all ${t.tr}`,
+                    border: active ? `2px solid ${t.gold}` : `1px solid ${darkMode ? t.border : t.lBorder}`,
+                    background: active ? t.goldDim : (darkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'),
+                    boxShadow: active ? t.sh.glow : 'none',
+                  }}>
+                    <Icon size={16} color={active ? t.gold : (darkMode ? t.textSec : t.lTextSec)} />
+                    <span style={{ fontSize: 9, fontWeight: 600, color: active ? t.gold : (darkMode ? t.textDim : t.lTextSec) }}>{tl.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Toggle rows */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 2px', borderRadius: t.r.sm, fontSize: 12, color: darkMode ? t.textSec : t.lTextSec, fontWeight: 500 }}>
+                <input type="checkbox" checked={showCadastral} onChange={() => setShowCadastral(v => !v)} style={{ accentColor: t.gold }} />
+                גוש/חלקה (קדסטר)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 2px', borderRadius: t.r.sm, fontSize: 12, color: darkMode ? t.textSec : t.lTextSec, fontWeight: 500 }}>
+                <input type="checkbox" checked={showAreas} onChange={() => setShowAreas(v => !v)} style={{ accentColor: t.gold }} />
+                אזורים
+              </label>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 

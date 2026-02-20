@@ -8,15 +8,10 @@ export const plots: Plot[] = [
     projectedValue: 1200000, zoningStage: 'DETAILED_PLAN_PREP', readinessEstimate: '3-5 שנים',
     coordinates: [[32.4505,34.8735],[32.4505,34.8755],[32.4495,34.8755],[32.4495,34.8735]],
     documents: ['תוכנית 302-0340539', 'נסח טאבו', 'חוות דעת שמאי'],
-    description: 'חלקה 168 ממוקמת 500 מטר מקו החוף במתחם רובע הים חדרה — פרויקט הדגל היוקרתי של העיר. התוכנית כוללת כ-10,000 יח"ד, שדרת מלונאות, טיילת חוף ופארקים ציבוריים. צפיפות של 15 יח"ד לדונם עם פוטנציאל תשואה משמעותי.',
-    areaContext: 'מתחם רובע הים המתפתח — גישה ישירה לפארק נחל חדרה ולמרכז הרפואי הלל יפה.',
-    nearbyDevelopment: 'שכונת מגורים חדשה 800 מטר צפונה, מתחם מסחרי 1.2 ק"מ דרומה.',
+    description: 'חלקה 168 ממוקמת 500 מטר מקו החוף במתחם רובע הים חדרה — פרויקט הדגל היוקרתי של העיר עם כ-10,000 יח"ד, שדרת מלונאות וטיילת חוף.',
+    areaContext: 'מתחם רובע הים — גישה ישירה לפארק נחל חדרה ולמרכז הרפואי הלל יפה.',
     distanceToSea: 500, distanceToPark: 300, distanceToHospital: 2500, densityUnitsPerDunam: 15,
-    committees: {
-      national: { status: 'approved', label: 'ועדה ארצית', date: '2023-06' },
-      district: { status: 'approved', label: 'ועדה מחוזית', date: '2024-01' },
-      local: { status: 'in_preparation', label: 'ועדה מקומית', date: null },
-    },
+    committees: { national: { status: 'approved', label: 'ועדה ארצית', date: '2023-06' }, district: { status: 'approved', label: 'ועדה מחוזית', date: '2024-01' }, local: { status: 'in_preparation', label: 'ועדה מקומית', date: null } },
     standard22: { appraiser: 'רו"ח משה לוי', date: '2024-03', value: 380000, methodology: 'גישת ההשוואה + היוון הכנסות' },
   },
   {
@@ -26,15 +21,10 @@ export const plots: Plot[] = [
     projectedValue: 1800000, zoningStage: 'MASTER_PLAN_APPROVED', readinessEstimate: '3-5 שנים',
     coordinates: [[32.3330,34.8570],[32.3330,34.8595],[32.3315,34.8595],[32.3315,34.8570]],
     documents: ['תוכנית נת/620', 'נסח טאבו', 'חוות דעת שמאי', 'סקר סביבתי'],
-    description: 'חלקה 54 בגוש 7842 בצפון נתניה, קרוב לשכונת פולג. תוכנית מתאר מאושרת עם ייעוד למגורים צפוף. מיקום אסטרטגי עם נגישות מצוינת.',
-    areaContext: 'צפון נתניה — אזור עם ביקוש גבוה למגורים צפופים.',
-    nearbyDevelopment: 'שכונת פולג בשלבי אכלוס מתקדמים, מתחם עסקים 600 מטר מערבה.',
+    description: 'חלקה 54 בגוש 7842 בצפון נתניה. תוכנית מתאר מאושרת עם ייעוד למגורים צפוף. מיקום אסטרטגי.',
+    areaContext: 'צפון נתניה — אזור ביקוש גבוה למגורים.',
     distanceToSea: 800, distanceToPark: 450, distanceToHospital: 3200, densityUnitsPerDunam: 18,
-    committees: {
-      national: { status: 'approved', label: 'ועדה ארצית', date: '2023-03' },
-      district: { status: 'approved', label: 'ועדה מחוזית', date: '2023-11' },
-      local: { status: 'pending', label: 'ועדה מקומית', date: null },
-    },
+    committees: { national: { status: 'approved', label: 'ועדה ארצית', date: '2023-03' }, district: { status: 'approved', label: 'ועדה מחוזית', date: '2023-11' }, local: { status: 'pending', label: 'ועדה מקומית', date: null } },
     standard22: { appraiser: 'שמאי יעקב כהן', date: '2024-05', value: 510000, methodology: 'גישת ההשוואה' },
   },
   {
@@ -44,15 +34,10 @@ export const plots: Plot[] = [
     projectedValue: 950000, zoningStage: 'AGRICULTURAL', readinessEstimate: '5+ שנים',
     coordinates: [[32.5000,34.8870],[32.5000,34.8905],[32.4980,34.8905],[32.4980,34.8870]],
     documents: ['נסח טאבו', 'חוות דעת שמאי'],
-    description: 'חלקה 23 בקיסריה — קרקע חקלאית בשטח גדול עם פוטנציאל ארוך טווח. מיקום יוקרתי בסמיכות לקיסריה.',
+    description: 'חלקה 23 בקיסריה — קרקע חקלאית גדולה עם פוטנציאל ארוך טווח. מיקום יוקרתי.',
     areaContext: 'קיסריה — אזור חקלאי יוקרתי, קרקע מיועדת לפיתוח עתידי.',
-    nearbyDevelopment: 'פארק הייטק קיסריה 2 ק"מ דרומה, אזור מגורים חדש 1.5 ק"מ מזרחה.',
     distanceToSea: 1200, distanceToPark: 600, distanceToHospital: 5000, densityUnitsPerDunam: 8,
-    committees: {
-      national: { status: 'in_discussion', label: 'ועדה ארצית', date: null },
-      district: { status: 'not_started', label: 'ועדה מחוזית', date: null },
-      local: { status: 'not_started', label: 'ועדה מקומית', date: null },
-    },
+    committees: { national: { status: 'in_discussion', label: 'ועדה ארצית', date: null }, district: { status: 'not_started', label: 'ועדה מחוזית', date: null }, local: { status: 'not_started', label: 'ועדה מקומית', date: null } },
     standard22: { appraiser: 'שמאי דוד אברהם', date: '2024-01', value: 250000, methodology: 'גישת ההשוואה + שיטת החילוץ' },
   },
 ]
@@ -65,22 +50,27 @@ export const pois: Poi[] = [
 
 export const chatMessages: Record<string, ChatMessage[]> = {
   'plot-1': [
-    { role: 'assistant', content: 'שלום! בואו נדבר על חלקה 168 בגוש 10006, חדרה. שטח של כ-2 דונם, 500 מטר מקו החוף במתחם רובע הים.' },
-    { role: 'assistant', content: 'הוועדה הארצית והמחוזית אישרו. המקומית בהכנה. פוטנציאל תשואה של עד 200% באופק 3-5 שנים.' },
-    { role: 'assistant', content: 'המלצה: הזדמנות השקעה טובה עם פרופיל סיכון נמוך. שווי שמאי ₪380,000 — קרוב למחיר המבוקש.' },
+    { role: 'assistant', content: 'חלקה 168 בגוש 10006, חדרה. ~2 דונם, 500 מטר מהחוף. ועדה ארצית ומחוזית אישרו. פוטנציאל +200% באופק 3-5 שנים.' },
+    { role: 'assistant', content: 'המלצה: הזדמנות טובה עם סיכון נמוך. שווי שמאי ₪380K — קרוב למחיר.' },
   ],
   'plot-2': [
-    { role: 'assistant', content: 'חלקה 54 בגוש 7842, נתניה. מיקום אסטרטגי בצפון העיר, קרוב לשכונת פולג.' },
-    { role: 'assistant', content: 'תוכנית מתאר מאושרת — סיכון מופחת. צפיפות 18 יח"ד/דונם. פוטנציאל תשואה ~246%.' },
+    { role: 'assistant', content: 'חלקה 54 בגוש 7842, נתניה. תוכנית מתאר מאושרת — סיכון מופחת. צפיפות 18 יח"ד/דונם. פוטנציאל +246%.' },
     { role: 'assistant', content: 'מתאימה למשקיעים המחפשים איזון סיכון-תשואה. אופק 3-5 שנים.' },
   ],
   'plot-3': [
-    { role: 'assistant', content: 'חלקה 23 בגוש 10234, קיסריה. קרקע חקלאית בשטח 3.2 דונם במיקום יוקרתי.' },
-    { role: 'assistant', content: 'מחיר כניסה נמוך — ~88 ₪/מ"ר. פוטנציאל תשואה 239%. אופק 5+ שנים.' },
-    { role: 'assistant', content: 'מתאימה למשקיעים עם אופק ארוך וסבלנות. המחיר הנמוך מהווה נקודת כניסה אטרקטיבית.' },
+    { role: 'assistant', content: 'חלקה 23 בקיסריה. קרקע חקלאית 3.2 דונם. מחיר כניסה ~88 ₪/מ"ר. פוטנציאל +239%. אופק 5+ שנים.' },
+    { role: 'assistant', content: 'למשקיעים עם סבלנות. המחיר הנמוך נקודת כניסה אטרקטיבית.' },
   ],
 }
-
 export const defaultChat: ChatMessage[] = [
-  { role: 'assistant', content: 'שלום! אני היועץ הדיגיטלי שלך להשקעות בקרקעות. בחרו חלקה על המפה כדי לקבל ניתוח.' },
+  { role: 'assistant', content: 'שלום! אני היועץ הדיגיטלי שלך. בחרו חלקה על המפה לניתוח.' },
+]
+
+// Israeli area boundaries (simplified GeoJSON-like) for map overlay
+export const israelAreas = [
+  { name: 'חדרה', center: [32.44, 34.88] as [number, number], bounds: [[32.42,34.84],[32.42,34.92],[32.47,34.92],[32.47,34.84]] as [number, number][], color: '#3B82F6' },
+  { name: 'נתניה', center: [32.33, 34.86] as [number, number], bounds: [[32.30,34.83],[32.30,34.89],[32.36,34.89],[32.36,34.83]] as [number, number][], color: '#8B5CF6' },
+  { name: 'קיסריה', center: [32.50, 34.89] as [number, number], bounds: [[32.48,34.86],[32.48,34.92],[32.52,34.92],[32.52,34.86]] as [number, number][], color: '#10B981' },
+  { name: 'הרצליה', center: [32.16, 34.79] as [number, number], bounds: [[32.14,34.77],[32.14,34.81],[32.18,34.81],[32.18,34.77]] as [number, number][], color: '#F59E0B' },
+  { name: 'כפר סבא', center: [32.18, 34.91] as [number, number], bounds: [[32.16,34.88],[32.16,34.94],[32.20,34.94],[32.20,34.88]] as [number, number][], color: '#EC4899' },
 ]

@@ -1,160 +1,172 @@
-import { useState, useRef, useEffect, memo } from 'react'
+import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { MessageCircle, X, Send, Bot, ChevronDown } from 'lucide-react'
-import { t, media } from '../theme'
+import { MessageCircle, X, Send, Bot } from 'lucide-react'
+import { t, mobile, fadeInUp } from '../theme'
 import { chatMessages, defaultChat } from '../data'
-import type { Plot, ChatMessage } from '../types'
+import type { ChatMessage } from '../types'
 
-const fadeIn = keyframes`from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); }`
-const slideUp = keyframes`from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); }`
+/* ── animations ── */
+const bubbleIn = keyframes`from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}`
+const fabPop = keyframes`from{transform:scale(0)}to{transform:scale(1)}`
 
-const Fab = styled.button<{ $open: boolean }>`
-  position: fixed; bottom: 20px; left: 20px; z-index: ${t.z.sidebar};
-  width: 52px; height: 52px; border-radius: 50%;
-  border: 1px solid ${t.colors.goldBorder};
-  background: linear-gradient(135deg, ${t.colors.gold}, ${t.colors.goldBright});
-  color: ${t.colors.bg}; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: ${t.shadow.lg}, ${t.shadow.glow};
-  transition: all ${t.transition};
-  transform: ${({ $open }) => $open ? 'scale(0)' : 'scale(1)'};
-  &:hover { transform: ${({ $open }) => $open ? 'scale(0)' : 'scale(1.08)'}; }
-
-  ${media.mobile} { bottom: 76px; }
+/* ── styled ── */
+const Fab = styled.button`
+  position:fixed;bottom:24px;left:24px;z-index:${t.z.controls};width:56px;height:56px;border-radius:50%;
+  background:linear-gradient(135deg,${t.gold},${t.goldBright});border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;color:${t.bg};
+  box-shadow:${t.sh.lg},${t.sh.glow};transition:all ${t.tr};animation:${fabPop} 0.3s ease-out;
+  &:hover{transform:translateY(-2px);box-shadow:${t.sh.xl},0 0 32px rgba(212,168,75,0.35);}
+  &:active{transform:translateY(0);}
+  ${mobile}{bottom:16px;left:16px;width:52px;height:52px;}
 `
 
-const Panel = styled.div<{ $open: boolean }>`
-  position: fixed; bottom: 20px; left: 20px; z-index: ${t.z.sidebar};
-  width: 360px; height: 480px;
-  background: ${t.colors.surface}; border: 1px solid ${t.colors.border};
-  border-radius: ${t.radius.xl}; box-shadow: ${t.shadow.xl};
-  display: ${({ $open }) => $open ? 'flex' : 'none'};
-  flex-direction: column; overflow: hidden;
-  animation: ${slideUp} 0.3s ease;
-
-  ${media.mobile} {
-    left: 8px; right: 8px; bottom: 8px; width: auto;
-    height: calc(100vh - 16px); border-radius: ${t.radius.lg};
-  }
+const Panel = styled.div<{$open:boolean}>`
+  position:fixed;bottom:92px;left:24px;z-index:${t.z.controls};width:360px;max-height:520px;
+  background:${t.surface};border:1px solid ${t.goldBorder};border-radius:${t.r.lg};
+  box-shadow:${t.sh.xl};display:${p=>p.$open?'flex':'none'};flex-direction:column;overflow:hidden;
+  animation:${fadeInUp} 0.3s ease-out;
+  ${mobile}{inset:0;bottom:0;left:0;width:100%;max-height:100%;border-radius:0;border:none;}
 `
 
-const PanelHeader = styled.div`
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px; border-bottom: 1px solid ${t.colors.border};
+const Header = styled.div`
+  display:flex;align-items:center;gap:10px;padding:14px 16px;
+  background:linear-gradient(135deg,rgba(212,168,75,0.08),transparent);
+  border-bottom:1px solid ${t.border};flex-shrink:0;
 `
-const HeaderTitle = styled.div`
-  display: flex; align-items: center; gap: 8px;
-  font-size: 14px; font-weight: 700; color: ${t.colors.text};
+const Avatar = styled.div`
+  width:36px;height:36px;border-radius:50%;
+  background:linear-gradient(135deg,${t.gold},${t.goldBright});
+  display:flex;align-items:center;justify-content:center;color:${t.bg};flex-shrink:0;
 `
-const BotBadge = styled.div`
-  width: 28px; height: 28px; border-radius: 50%;
-  background: linear-gradient(135deg, ${t.colors.gold}20, ${t.colors.goldBright}10);
-  border: 1px solid ${t.colors.goldBorder};
-  display: flex; align-items: center; justify-content: center;
+const HeaderTitle = styled.div`flex:1;`
+const Name = styled.div`font-size:14px;font-weight:700;color:${t.text};font-family:${t.font};`
+const Status = styled.div`font-size:11px;color:${t.ok};display:flex;align-items:center;gap:4px;
+  &::before{content:'';width:6px;height:6px;border-radius:50%;background:${t.ok};display:inline-block;}
 `
 const CloseBtn = styled.button`
-  width: 28px; height: 28px; border-radius: ${t.radius.sm};
-  border: none; background: ${t.colors.surfaceHover}; color: ${t.colors.textDim};
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  transition: all ${t.transition};
-  &:hover { background: ${t.colors.surfaceLight}; color: ${t.colors.text}; }
+  background:none;border:none;color:${t.textSec};cursor:pointer;padding:4px;
+  border-radius:${t.r.sm};transition:all ${t.tr};
+  &:hover{color:${t.text};background:${t.hover};}
 `
 
 const Messages = styled.div`
-  flex: 1; overflow-y: auto; padding: 16px;
-  display: flex; flex-direction: column; gap: 10px;
-  &::-webkit-scrollbar { width: 3px; }
-  &::-webkit-scrollbar-thumb { background: ${t.colors.surfaceLight}; border-radius: 2px; }
+  flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;
+  direction:rtl;
 `
-
-const Bubble = styled.div<{ $role: 'assistant' | 'user' }>`
-  max-width: 85%; padding: 10px 14px;
-  border-radius: ${t.radius.md};
-  font-size: 13px; line-height: 1.6;
-  animation: ${fadeIn} 0.3s ease;
-  ${({ $role }) => $role === 'assistant' ? `
-    align-self: flex-start;
-    background: ${t.colors.surfaceHover};
-    color: ${t.colors.text};
-    border: 1px solid ${t.colors.border};
-    border-bottom-right: 4px;
-  ` : `
-    align-self: flex-end;
-    background: linear-gradient(135deg, ${t.colors.gold}20, ${t.colors.goldBright}10);
-    color: ${t.colors.text};
-    border: 1px solid ${t.colors.goldBorder};
-  `}
+const Bubble = styled.div<{$user:boolean;$delay:number}>`
+  max-width:82%;padding:10px 14px;font-size:13px;line-height:1.6;font-family:${t.font};
+  border-radius:${p=>p.$user?`${t.r.lg} ${t.r.sm} ${t.r.lg} ${t.r.lg}`:`${t.r.sm} ${t.r.lg} ${t.r.lg} ${t.r.lg}`};
+  align-self:${p=>p.$user?'flex-start':'flex-end'};
+  background:${p=>p.$user?'linear-gradient(135deg,rgba(212,168,75,0.15),rgba(212,168,75,0.08))':t.surfaceLight};
+  color:${p=>p.$user?t.goldBright:t.text};
+  border:1px solid ${p=>p.$user?t.goldBorder:t.border};
+  animation:${bubbleIn} 0.3s ease-out both;animation-delay:${p=>p.$delay}s;
+`
+const TypingDots = styled.div`
+  display:flex;gap:4px;padding:10px 14px;align-self:flex-end;
+  background:${t.surfaceLight};border-radius:${t.r.sm} ${t.r.lg} ${t.r.lg} ${t.r.lg};
+  border:1px solid ${t.border};animation:${bubbleIn} 0.2s ease-out;
+`
+const Dot = styled.span<{$i:number}>`
+  width:6px;height:6px;border-radius:50%;background:${t.textSec};
+  animation:dotPulse 1.2s ease-in-out infinite;animation-delay:${p=>p.$i*0.15}s;
+  @keyframes dotPulse{0%,60%,100%{opacity:0.3;transform:scale(1)}30%{opacity:1;transform:scale(1.3)}}
 `
 
 const InputBar = styled.form`
-  display: flex; align-items: center; gap: 8px;
-  padding: 12px 16px; border-top: 1px solid ${t.colors.border};
+  display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid ${t.border};
+  background:rgba(17,24,39,0.6);flex-shrink:0;
 `
-const ChatInput = styled.input`
-  flex: 1; border: none; background: ${t.colors.surfaceHover};
-  border-radius: ${t.radius.sm}; padding: 8px 12px;
-  font-size: 13px; color: ${t.colors.text}; font-family: ${t.font}; outline: none;
-  &::placeholder { color: ${t.colors.textDim}; }
+const Input = styled.input`
+  flex:1;background:${t.surfaceLight};border:1px solid ${t.border};border-radius:${t.r.full};
+  padding:9px 16px;font-size:13px;font-family:${t.font};color:${t.text};outline:none;
+  transition:border-color ${t.tr};direction:rtl;
+  &::placeholder{color:${t.textDim};}
+  &:focus{border-color:${t.gold};}
 `
 const SendBtn = styled.button`
-  width: 34px; height: 34px; border-radius: ${t.radius.sm}; border: none;
-  background: linear-gradient(135deg, ${t.colors.gold}, ${t.colors.goldBright});
-  color: ${t.colors.bg}; cursor: pointer; display: flex; align-items: center; justify-content: center;
-  transition: all ${t.transition}; flex-shrink: 0;
-  &:hover { box-shadow: ${t.shadow.glow}; }
-  &:disabled { opacity: 0.4; cursor: not-allowed; }
+  width:36px;height:36px;border-radius:50%;border:none;cursor:pointer;
+  background:linear-gradient(135deg,${t.gold},${t.goldBright});color:${t.bg};
+  display:flex;align-items:center;justify-content:center;transition:all ${t.tr};flex-shrink:0;
+  &:hover{box-shadow:${t.sh.glow};transform:scale(1.05);}
+  &:disabled{opacity:0.4;cursor:not-allowed;transform:none;box-shadow:none;}
 `
 
-interface ChatProps { plotId: string | null }
-
-function Chat({ plotId }: ChatProps) {
+/* ── component ── */
+function Chat({ plotId }: { plotId: string | null }) {
   const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [msgs, setMsgs] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
+  const [typing, setTyping] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // Load messages when plotId changes or chat opens
   useEffect(() => {
-    setMessages(plotId && chatMessages[plotId] ? chatMessages[plotId] : defaultChat)
+    const base = plotId && chatMessages[plotId] ? chatMessages[plotId] : defaultChat
+    setMsgs([...base])
   }, [plotId])
 
+  // Auto-scroll to bottom
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-  }, [messages])
+    const el = scrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [msgs, typing])
 
-  const send = (e: React.FormEvent) => {
+  const handleSend = useCallback((e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim()) return
-    setMessages(prev => [...prev, { role: 'user', content: input.trim() }])
+    const text = input.trim()
+    if (!text || typing) return
+    setMsgs(prev => [...prev, { role: 'user', content: text }])
     setInput('')
+    setTyping(true)
     setTimeout(() => {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'תודה על השאלה! בקרוב נשיק את הצ\'אט האינטראקטיבי המלא. בינתיים, תוכלו לקבל מידע באמצעות טופס יצירת קשר.' }])
+      setTyping(false)
+      setMsgs(prev => [
+        ...prev,
+        { role: 'assistant', content: 'תודה על השאלה! אני מנתח את הנתונים. לפרטים נוספים, השאירו פנייה ונחזור אליכם.' },
+      ])
     }, 800)
-  }
+  }, [input, typing])
 
   return (
     <>
-      <Fab $open={open} onClick={() => setOpen(true)} aria-label="פתח צ'אט">
-        <MessageCircle size={22} />
+      <Fab onClick={() => setOpen(p => !p)} aria-label={open ? 'סגור צ\'אט' : 'פתח צ\'אט'}>
+        {open ? <X size={24} /> : <MessageCircle size={24} />}
       </Fab>
 
       <Panel $open={open}>
-        <PanelHeader>
+        <Header>
+          <Avatar><Bot size={20} /></Avatar>
           <HeaderTitle>
-            <BotBadge><Bot size={15} color={t.colors.gold} /></BotBadge>
-            יועץ השקעות AI
+            <Name>יועץ AI</Name>
+            <Status>מחובר</Status>
           </HeaderTitle>
-          <CloseBtn onClick={() => setOpen(false)}><X size={16} /></CloseBtn>
-        </PanelHeader>
+          <CloseBtn onClick={() => setOpen(false)} aria-label="סגור"><X size={18} /></CloseBtn>
+        </Header>
 
         <Messages ref={scrollRef}>
-          {messages.map((msg, i) => (
-            <Bubble key={i} $role={msg.role}>{msg.content}</Bubble>
+          {msgs.map((m, i) => (
+            <Bubble key={i} $user={m.role === 'user'} $delay={i * 0.05}>
+              {m.content}
+            </Bubble>
           ))}
+          {typing && (
+            <TypingDots>
+              <Dot $i={0} /><Dot $i={1} /><Dot $i={2} />
+            </TypingDots>
+          )}
         </Messages>
 
-        <InputBar onSubmit={send}>
-          <ChatInput value={input} onChange={e => setInput(e.target.value)} placeholder="שאל שאלה..." />
-          <SendBtn type="submit" disabled={!input.trim()}><Send size={15} /></SendBtn>
+        <InputBar onSubmit={handleSend}>
+          <Input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            placeholder="שאלו על החלקה..."
+            disabled={typing}
+          />
+          <SendBtn type="submit" disabled={!input.trim() || typing} aria-label="שלח">
+            <Send size={16} />
+          </SendBtn>
         </InputBar>
       </Panel>
     </>

@@ -1,178 +1,153 @@
 import { Component, useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { t } from '../theme'
+import { t, fadeInUp, popIn, countUp } from '../theme'
 import { X, AlertTriangle } from 'lucide-react'
 
-// ── Spinner ──
-const spin = keyframes`to { transform: rotate(360deg); }`
-const SpinnerSvg = styled.svg`animation: ${spin} 0.8s linear infinite;`
+/* ── Spinner ── */
+export const Spinner = ({ size = 24, color = '#D4A84B' }: { size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 0.8s linear infinite' }}>
+    <circle cx="12" cy="12" r="10" stroke={color} strokeWidth="3" opacity=".25" />
+    <path d="M12 2a10 10 0 0 1 10 10" stroke={color} strokeWidth="3" strokeLinecap="round" />
+    <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+  </svg>
+)
 
-export function Spinner({ size = 24, color = t.colors.gold }: { size?: number; color?: string }) {
-  return (
-    <SpinnerSvg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="10" stroke={color} strokeWidth="3" opacity="0.2" />
-      <path d="M12 2a10 10 0 0 1 10 10" stroke={color} strokeWidth="3" strokeLinecap="round" />
-    </SpinnerSvg>
-  )
-}
+/* ── PageLoader ── */
+export const PageLoader = () => (
+  <LoaderWrap><Spinner size={36} /></LoaderWrap>
+)
+const LoaderWrap = styled.div`display:flex;align-items:center;justify-content:center;height:100vh;width:100%;background:${t.bg};`
 
-// ── Page Loader ──
-const LoaderWrap = styled.div`
-  height: var(--vh, 100vh); width: 100vw;
-  display: flex; align-items: center; justify-content: center;
-  background: ${t.colors.bg};
-`
-export function PageLoader() {
-  return <LoaderWrap data-page-loader><Spinner size={40} /></LoaderWrap>
-}
+/* ── Toast System ── */
+type Variant = 'success' | 'warning' | 'error' | 'info'
+type Toast = { id: number; msg: string; variant: Variant }
+type Ctx = { toast: (msg: string, variant?: Variant) => void }
 
-// ── Toast System ──
-type ToastVariant = 'success' | 'warning' | 'error' | 'info'
-type Toast = { id: number; message: string; variant: ToastVariant }
-type ToastCtx = { toast: (message: string, variant?: ToastVariant) => void }
-
-const ToastCtx = createContext<ToastCtx>({ toast: () => {} })
+const ToastCtx = createContext<Ctx>({ toast: () => {} })
 export const useToast = () => useContext(ToastCtx)
 
-const ToastWrap = styled.div`
-  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-  z-index: ${t.z.toast}; display: flex; flex-direction: column; gap: 8px; align-items: center;
-  pointer-events: none;
-`
-const fadeSlide = keyframes`
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-`
-const variantColors: Record<ToastVariant, string> = {
-  success: t.colors.success, warning: t.colors.warning, error: t.colors.danger, info: t.colors.info,
-}
-const ToastItem = styled.div<{ $variant: ToastVariant }>`
-  display: flex; align-items: center; gap: 8px; padding: 10px 16px;
-  background: ${t.colors.surface}; border: 1px solid ${({ $variant }) => variantColors[$variant]}30;
-  border-radius: ${t.radius.md}; box-shadow: ${t.shadow.lg};
-  font-size: 13px; color: ${t.colors.text}; pointer-events: auto;
-  animation: ${fadeSlide} 0.3s ease;
-  &::before {
-    content: ''; width: 3px; height: 16px; border-radius: 2px;
-    background: ${({ $variant }) => variantColors[$variant]};
-    flex-shrink: 0;
-  }
-`
-
-let nextId = 0
-export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([])
-  const toast = useCallback((message: string, variant: ToastVariant = 'info') => {
-    const id = nextId++
-    setToasts(prev => [...prev, { id, message, variant }])
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
+let _id = 0
+export const ToastProvider = ({ children }: { children: ReactNode }) => {
+  const [items, setItems] = useState<Toast[]>([])
+  const toast = useCallback((msg: string, variant: Variant = 'info') => {
+    const id = ++_id
+    setItems(p => [...p, { id, msg, variant }])
+    setTimeout(() => setItems(p => p.filter(t => t.id !== id)), 4000)
   }, [])
-
   return (
     <ToastCtx.Provider value={{ toast }}>
       {children}
-      <ToastWrap>
-        {toasts.map(t => <ToastItem key={t.id} $variant={t.variant}>{t.message}</ToastItem>)}
-      </ToastWrap>
+      <ToastList>{items.map(i => (
+        <ToastItem key={i.id} $v={i.variant}>
+          <span>{i.msg}</span>
+          <X size={14} style={{ cursor: 'pointer', flexShrink: 0 }} onClick={() => setItems(p => p.filter(t => t.id !== i.id))} />
+        </ToastItem>
+      ))}</ToastList>
     </ToastCtx.Provider>
   )
 }
 
-// ── Error Boundary ──
-interface EBState { hasError: boolean; error?: Error }
+const VCOLORS: Record<Variant, string> = { success: t.ok, warning: t.warn, error: t.err, info: t.info }
+const slideIn = keyframes`from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}`
+
+const ToastList = styled.div`position:fixed;bottom:24px;right:24px;z-index:${t.z.toast};display:flex;flex-direction:column;gap:8px;pointer-events:none;`
+const ToastItem = styled.div<{ $v: Variant }>`
+  display:flex;align-items:center;gap:10px;padding:10px 16px;min-width:260px;
+  background:${t.surface};border:1px solid ${({ $v }) => VCOLORS[$v]};border-radius:${t.r.md};
+  color:${t.text};font-size:13px;font-family:${t.font};box-shadow:${t.sh.lg};
+  pointer-events:auto;animation:${slideIn} 0.3s ease-out;
+  &::before{content:'';width:4px;height:100%;position:absolute;left:0;top:0;border-radius:${t.r.md} 0 0 ${t.r.md};background:${({ $v }) => VCOLORS[$v]};}
+  position:relative;overflow:hidden;
+`
+
+/* ── ErrorBoundary ── */
+type EBState = { err: Error | null }
 export class ErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, EBState> {
-  state: EBState = { hasError: false }
-  static getDerivedStateFromError(error: Error) { return { hasError: true, error } }
+  state: EBState = { err: null }
+  static getDerivedStateFromError(err: Error) { return { err } }
   render() {
-    if (this.state.hasError) {
-      return this.props.fallback || (
-        <ErrorBox>
-          <AlertTriangle size={32} color={t.colors.warning} />
-          <p>משהו השתבש. נסו לרענן את הדף.</p>
-          <ErrorBtn onClick={() => window.location.reload()}>רענן</ErrorBtn>
-        </ErrorBox>
-      )
-    }
+    if (this.state.err) return this.props.fallback ?? (
+      <ErrWrap>
+        <AlertTriangle size={32} color={t.err} />
+        <h3 style={{ color: t.text, margin: '12px 0 4px' }}>Something went wrong</h3>
+        <p style={{ color: t.textSec, fontSize: 13 }}>{this.state.err.message}</p>
+      </ErrWrap>
+    )
     return this.props.children
   }
 }
+const ErrWrap = styled.div`display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px;text-align:center;`
 
-const ErrorBox = styled.div`
-  display: flex; flex-direction: column; align-items: center; gap: 12px;
-  padding: 40px; text-align: center; color: ${t.colors.textSec}; font-size: 14px;
-`
-const ErrorBtn = styled.button`
-  padding: 8px 20px; background: ${t.colors.surface}; border: 1px solid ${t.colors.border};
-  border-radius: ${t.radius.sm}; color: ${t.colors.text}; font-size: 13px;
-  cursor: pointer; font-family: inherit; transition: all ${t.transition};
-  &:hover { background: ${t.colors.surfaceLight}; }
+/* ── Glass Panel ── */
+export const Glass = styled.div`
+  background:${t.glass};backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid ${t.border};border-radius:${t.r.lg};
 `
 
-// ── Glass Card ──
-export const Glass = styled.div<{ $hover?: boolean }>`
-  background: ${t.colors.glass};
-  backdrop-filter: blur(24px) saturate(1.3);
-  -webkit-backdrop-filter: blur(24px) saturate(1.3);
-  border: 1px solid ${t.colors.glassBorder};
-  border-radius: ${t.radius.lg};
-  box-shadow: ${t.shadow.lg};
-  transition: border-color ${t.transition}, box-shadow ${t.transition};
-  ${({ $hover }) => $hover && `
-    &:hover {
-      border-color: ${t.colors.goldBorder};
-      box-shadow: ${t.shadow.lg}, ${t.shadow.glow};
-    }
-  `}
-`
-
-// ── Gold Button ──
+/* ── Buttons ── */
 export const GoldButton = styled.button`
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 10px 24px; border: none; border-radius: ${t.radius.sm};
-  background: linear-gradient(135deg, ${t.colors.gold}, ${t.colors.goldBright});
-  color: ${t.colors.bg}; font-weight: 700; font-size: 13px;
-  cursor: pointer; font-family: inherit; transition: all ${t.transition};
-  &:hover { transform: translateY(-1px); box-shadow: ${t.shadow.glow}; }
-  &:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 24px;
+  background:linear-gradient(135deg,${t.gold},${t.goldBright});color:${t.bg};
+  border:none;border-radius:${t.r.md};font-weight:700;font-size:14px;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};
+  &:hover{box-shadow:${t.sh.glow};transform:translateY(-1px);}
+  &:active{transform:translateY(0);}
+  &:disabled{opacity:0.5;cursor:not-allowed;transform:none;box-shadow:none;}
 `
 
-// ── Ghost Button ──
 export const GhostButton = styled.button`
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 8px 16px; border: 1px solid ${t.colors.border};
-  border-radius: ${t.radius.sm}; background: transparent;
-  color: ${t.colors.textSec}; font-size: 12px; font-weight: 500;
-  cursor: pointer; font-family: inherit; transition: all ${t.transition};
-  &:hover { background: ${t.colors.surfaceHover}; border-color: ${t.colors.goldBorder}; color: ${t.colors.text}; }
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 24px;
+  background:transparent;color:${t.gold};border:1px solid ${t.goldBorder};border-radius:${t.r.md};
+  font-weight:600;font-size:14px;font-family:${t.font};cursor:pointer;transition:all ${t.tr};
+  &:hover{background:${t.goldDim};border-color:${t.gold};}
+  &:active{transform:translateY(0);}
+  &:disabled{opacity:0.5;cursor:not-allowed;}
 `
 
-// ── Badge ──
+/* ── Badge ── */
 export const Badge = styled.span<{ $color?: string }>`
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 8px; border-radius: ${t.radius.full};
-  font-size: 10px; font-weight: 600;
-  background: ${({ $color }) => `${$color || t.colors.gold}18`};
-  color: ${({ $color }) => $color || t.colors.gold};
-  border: 1px solid ${({ $color }) => `${$color || t.colors.gold}30`};
+  display:inline-flex;align-items:center;padding:2px 10px;font-size:11px;font-weight:700;
+  border-radius:${t.r.full};color:${({ $color }) => $color || t.gold};
+  background:${({ $color }) => ($color || t.gold) + '18'};
 `
 
-// ── Section Title ──
+/* ── SectionTitle ── */
 export const SectionTitle = styled.h3`
-  font-size: 15px; font-weight: 700; color: ${t.colors.text}; margin-bottom: 12px;
+  font-size:15px;font-weight:700;color:${t.text};margin-bottom:12px;
+  display:flex;align-items:center;gap:8px;font-family:${t.font};
 `
 
-// ── Close Button ──
-export function CloseBtn({ onClick, size = 20 }: { onClick: () => void; size?: number }) {
-  return (
-    <CloseBtnStyled onClick={onClick} aria-label="סגור">
-      <X size={size} />
-    </CloseBtnStyled>
-  )
-}
-const CloseBtnStyled = styled.button`
-  display: flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px; border-radius: ${t.radius.sm};
-  border: none; background: ${t.colors.surfaceHover};
-  color: ${t.colors.textDim}; cursor: pointer; transition: all ${t.transition};
-  &:hover { background: ${t.colors.surfaceLight}; color: ${t.colors.text}; }
+/* ── CloseBtn ── */
+const CloseBtnWrap = styled.button`
+  display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:${t.r.sm};
+  background:transparent;border:1px solid ${t.border};color:${t.textSec};cursor:pointer;transition:all ${t.tr};
+  &:hover{background:${t.hover};color:${t.text};border-color:${t.goldBorder};}
 `
+export const CloseBtn = ({ onClick, size = 18 }: { onClick: () => void; size?: number }) => (
+  <CloseBtnWrap onClick={onClick} aria-label="Close"><X size={size} /></CloseBtnWrap>
+)
+
+/* ── AnimatedCard ── */
+export const AnimatedCard = styled.div<{ $delay?: number }>`
+  animation:${fadeInUp} 0.5s ease-out both;
+  animation-delay:${({ $delay }) => $delay ?? 0}s;
+`
+
+/* ── CountUpNumber ── */
+export const CountUpNumber = ({ value, duration = 1000 }: { value: number; duration?: number }) => {
+  const [display, setDisplay] = useState(0)
+  useEffect(() => {
+    let start = 0
+    const t0 = performance.now()
+    const step = (now: number) => {
+      const progress = Math.min((now - t0) / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3) // ease-out cubic
+      setDisplay(Math.round(eased * value))
+      if (progress < 1) start = requestAnimationFrame(step)
+    }
+    start = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(start)
+  }, [value, duration])
+  return <CountWrap>{display.toLocaleString()}</CountWrap>
+}
+const CountWrap = styled.span`animation:${countUp} 0.4s ease-out;display:inline-block;`
