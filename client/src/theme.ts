@@ -43,10 +43,11 @@ export const GlobalStyles = createGlobalStyle`
   :root{--vh:100vh}
   @supports(height:100dvh){:root{--vh:100dvh}}
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-  html,body,#root{height:100%;width:100%;overflow:auto}
+  html,body,#root{min-height:100%;width:100%}
   body{font-family:${t.font};background:${t.lBg};color:${t.lText};-webkit-font-smoothing:antialiased;line-height:1.6}
   ::selection{background:rgba(212,168,75,0.25);color:${t.black}}
-  a{color:${t.gold};text-decoration:none}&:hover{text-decoration:underline}
+  a{color:${t.gold};text-decoration:none;}
+  a:hover{text-decoration:none;}
   ::-webkit-scrollbar{width:5px}
   ::-webkit-scrollbar-track{background:transparent}
   ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:3px}

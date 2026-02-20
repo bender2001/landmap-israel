@@ -15,7 +15,7 @@ const Sidebar = lazy(() => import('../components/Sidebar'))
 const LeadModal = lazy(() => import('../components/LeadModal'))
 const Chat = lazy(() => import('../components/Chat'))
 
-const DEFAULTS: Filters = { city: 'all', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '' }
+const DEFAULTS: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '' }
 
 /* ── styled ── */
 const Wrap = styled.div`position:relative;width:100vw;height:100vh;height:100dvh;overflow:hidden;background:${t.bg};`
@@ -83,7 +83,7 @@ export default function Explore() {
           onSelect={setSelected} onLead={setLeadPlot}
           favorites={{ isFav, toggle }}
         />
-        <FilterBar filters={filters} onChange={setFilters} />
+        <FilterBar filters={filters} onChange={setFilters} resultCount={filtered.length} />
 
         <Suspense fallback={null}>
           {selected && <Sidebar plot={selected} open={!!selected} onClose={() => setSelected(null)} onLead={() => setLeadPlot(selected)} />}

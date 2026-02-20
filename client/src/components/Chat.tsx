@@ -11,21 +11,21 @@ const fabPop = keyframes`from{transform:scale(0)}to{transform:scale(1)}`
 
 /* ── styled ── */
 const Fab = styled.button`
-  position:fixed;bottom:24px;left:24px;z-index:${t.z.controls};width:56px;height:56px;border-radius:50%;
+  position:fixed;bottom:24px;right:24px;z-index:${t.z.controls};width:56px;height:56px;border-radius:50%;
   background:linear-gradient(135deg,${t.gold},${t.goldBright});border:none;cursor:pointer;
   display:flex;align-items:center;justify-content:center;color:${t.bg};
   box-shadow:${t.sh.lg},${t.sh.glow};transition:all ${t.tr};animation:${fabPop} 0.3s ease-out;
   &:hover{transform:translateY(-2px);box-shadow:${t.sh.xl},0 0 32px rgba(212,168,75,0.35);}
   &:active{transform:translateY(0);}
-  ${mobile}{bottom:16px;left:16px;width:52px;height:52px;}
+  ${mobile}{bottom:72px;right:16px;width:48px;height:48px;}
 `
 
 const Panel = styled.div<{$open:boolean}>`
-  position:fixed;bottom:92px;left:24px;z-index:${t.z.controls};width:360px;max-height:520px;
+  position:fixed;bottom:92px;right:24px;z-index:${t.z.controls};width:360px;max-height:520px;
   background:${t.surface};border:1px solid ${t.goldBorder};border-radius:${t.r.lg};
   box-shadow:${t.sh.xl};display:${p=>p.$open?'flex':'none'};flex-direction:column;overflow:hidden;
   animation:${fadeInUp} 0.3s ease-out;
-  ${mobile}{inset:0;bottom:0;left:0;width:100%;max-height:100%;border-radius:0;border:none;}
+  ${mobile}{position:fixed;inset:0;width:100%;max-height:100%;border-radius:0;border:none;}
 `
 
 const Header = styled.div`

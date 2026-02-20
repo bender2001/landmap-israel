@@ -62,9 +62,8 @@ const CloseBtn = styled.button`
 `
 
 const NAV_ITEMS = [
-  { to: '/map', label: 'מפה' }, { to: '/regions', label: 'אזורים' },
-  { to: '/calculator', label: 'מחשבון' }, { to: '/about', label: 'אודות' },
-  { to: '/pricing', label: 'מחירים' },
+  { to: '/explore', label: 'מפה' }, { to: '/about', label: 'אודות' },
+  { to: '/pricing', label: 'מחירים' }, { to: '/contact', label: 'צור קשר' },
 ]
 
 export function PublicNav() {
@@ -90,7 +89,7 @@ export function PublicNav() {
           </NavLinks>
           <AuthBtns>
             <BtnGhost to="/login">התחבר</BtnGhost>
-            <BtnGold to="/register">הרשם</BtnGold>
+            <BtnGold to="/login">הרשם</BtnGold>
           </AuthBtns>
           <Burger onClick={() => setMobileOpen(true)} aria-label="תפריט"><Menu size={24} /></Burger>
         </NavInner>
@@ -99,7 +98,7 @@ export function PublicNav() {
         <CloseBtn onClick={() => setMobileOpen(false)} aria-label="סגור"><X size={28} /></CloseBtn>
         {NAV_ITEMS.map(n => <MobileLink key={n.to} to={n.to} onClick={() => setMobileOpen(false)}>{n.label}</MobileLink>)}
         <MobileLink to="/login" onClick={() => setMobileOpen(false)}>התחבר</MobileLink>
-        <MobileLink to="/register" onClick={() => setMobileOpen(false)} style={{ color: t.gold }}>הרשם</MobileLink>
+        <MobileLink to="/login" onClick={() => setMobileOpen(false)} style={{ color: t.gold }}>הרשם</MobileLink>
       </MobileMenu>
     </>
   )

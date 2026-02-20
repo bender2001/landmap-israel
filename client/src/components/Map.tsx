@@ -1,5 +1,5 @@
 import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, ZoomControl, useMap, WMSTileLayer } from 'react-leaflet'
+import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, useMap, WMSTileLayer } from 'react-leaflet'
 import L from 'leaflet'
 import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain } from 'lucide-react'
 import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter } from '../utils'
@@ -92,6 +92,91 @@ const poiIcon = (emoji: string) => L.divIcon({
   html: `<div class="poi-marker-inner"><span class="poi-marker-emoji">${emoji}</span></div>`,
 })
 
+// ── Map ref for external zoom control ──
+const mapRef = { current: null as L.Map | null }
+function MapRefCapture() {
+  const map = useMap()
+  useEffect(() => { mapRef.current = map }, [map])
+  return null
+}
+
+// ── Map Controls Column (Zoom + Layers) ──
+function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCadastral, showAreas, setShowAreas, switcherOpen, setSwitcherOpen }: {
+  darkMode: boolean; tileIdx: number; setTileIdx: (i: number) => void
+  showCadastral: boolean; setShowCadastral: (fn: (v: boolean) => boolean) => void
+  showAreas: boolean; setShowAreas: (fn: (v: boolean) => boolean) => void
+  switcherOpen: boolean; setSwitcherOpen: (v: boolean) => void
+}) {
+  const btnStyle = (darkMode: boolean): React.CSSProperties => ({
+    width: 40, height: 40, border: `1px solid ${darkMode ? t.goldBorder : t.lBorder}`,
+    borderRadius: t.r.md, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: darkMode ? 'rgba(11,17,32,0.88)' : 'rgba(255,255,255,0.92)',
+    backdropFilter: 'blur(12px)', color: darkMode ? t.gold : t.lText,
+    fontSize: 18, fontWeight: 700, transition: `all ${t.tr}`, fontFamily: t.font,
+  })
+
+  return (
+    <div style={{ position: 'absolute', bottom: 24, left: 16, zIndex: t.z.controls, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Zoom buttons */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, borderRadius: t.r.md, overflow: 'hidden', boxShadow: t.sh.md }}>
+        <button onClick={() => mapRef.current?.zoomIn()}
+          style={{ ...btnStyle(darkMode), borderRadius: `${t.r.md} ${t.r.md} 0 0`, borderBottom: 'none' }} aria-label="הגדל">+</button>
+        <button onClick={() => mapRef.current?.zoomOut()}
+          style={{ ...btnStyle(darkMode), borderRadius: `0 0 ${t.r.md} ${t.r.md}` }} aria-label="הקטן">−</button>
+      </div>
+
+      {/* Layer button */}
+      <div style={{
+        borderRadius: t.r.md, overflow: 'hidden', boxShadow: t.sh.md,
+        background: darkMode ? 'rgba(11,17,32,0.88)' : 'rgba(255,255,255,0.92)',
+        backdropFilter: 'blur(12px)', border: `1px solid ${darkMode ? t.goldBorder : t.lBorder}`,
+        transition: `all ${t.tr}`,
+      }}>
+        {!switcherOpen ? (
+          <button onClick={() => setSwitcherOpen(true)} style={{
+            ...btnStyle(darkMode), border: 'none', background: 'transparent',
+          }} aria-label="שכבות מפה">
+            <Layers size={18} />
+          </button>
+        ) : (
+          <div style={{ padding: 10, minWidth: 240 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: darkMode ? t.textSec : t.lTextSec }}>שכבות</span>
+              <button onClick={() => setSwitcherOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: darkMode ? t.textDim : t.lTextSec, fontSize: 16 }}>&times;</button>
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+              {TILES.map((tl, i) => {
+                const Icon = tl.icon; const active = i === tileIdx
+                return (
+                  <button key={tl.id} onClick={() => setTileIdx(i)} style={{
+                    width: 52, height: 44, borderRadius: t.r.sm, cursor: 'pointer', display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center', gap: 2, transition: `all ${t.tr}`,
+                    border: active ? `2px solid ${t.gold}` : `1px solid ${darkMode ? t.border : t.lBorder}`,
+                    background: active ? t.goldDim : 'transparent', boxShadow: active ? t.sh.glow : 'none',
+                  }}>
+                    <Icon size={14} color={active ? t.gold : (darkMode ? t.textSec : t.lTextSec)} />
+                    <span style={{ fontSize: 8, fontWeight: 600, color: active ? t.gold : (darkMode ? t.textDim : t.lTextSec) }}>{tl.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 2px', fontSize: 12, color: darkMode ? t.textSec : t.lTextSec, fontWeight: 500 }}>
+                <input type="checkbox" checked={showCadastral} onChange={() => setShowCadastral((v: boolean) => !v)} style={{ accentColor: t.gold }} />
+                גוש/חלקה
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 2px', fontSize: 12, color: darkMode ? t.textSec : t.lTextSec, fontWeight: 500 }}>
+                <input type="checkbox" checked={showAreas} onChange={() => setShowAreas((v: boolean) => !v)} style={{ accentColor: t.gold }} />
+                אזורים
+              </label>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main Component ──
 function MapArea({ plots, pois, selected, onSelect, onLead, favorites, darkMode = false }: MapProps) {
   const [tileIdx, setTileIdx] = useState(0)
@@ -147,7 +232,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, darkMode 
             transparent={true} format="image/png" opacity={0.5} />
         )}
 
-        <ZoomControl position="topleft" />
+        <MapRefCapture />
         <MapUrlSync />
         <FlyToSelected plot={selected} />
         <AutoFitBounds plots={plots} />
@@ -190,67 +275,11 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, darkMode 
       {/* Vignette overlay */}
       <div className="map-vignette" />
 
-      {/* Layer Switcher - Glass Panel */}
-      <div style={{
-        position: 'absolute', bottom: 24, left: 16, zIndex: t.z.controls,
-        background: darkMode ? 'rgba(11,17,32,0.88)' : 'rgba(255,255,255,0.92)',
-        backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-        border: `1px solid ${darkMode ? t.goldBorder : t.lBorder}`, borderRadius: t.r.lg,
-        boxShadow: t.sh.lg, padding: switcherOpen ? '10px' : '0',
-        transition: `all ${t.tr}`, overflow: 'hidden',
-        maxWidth: switcherOpen ? 320 : 40, maxHeight: switcherOpen ? 200 : 40,
-      }}>
-        {/* Toggle button */}
-        {!switcherOpen && (
-          <button onClick={() => setSwitcherOpen(true)} style={{
-            width: 40, height: 40, border: 'none', background: 'transparent', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', color: darkMode ? t.gold : t.lText,
-          }} aria-label="Layer switcher">
-            <Layers size={20} />
-          </button>
-        )}
-
-        {switcherOpen && (
-          <div>
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, padding: '0 2px' }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: darkMode ? t.textSec : t.lTextSec, letterSpacing: 0.5 }}>שכבות</span>
-              <button onClick={() => setSwitcherOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: darkMode ? t.textDim : t.lTextSec, fontSize: 16, lineHeight: 1 }}>&times;</button>
-            </div>
-
-            {/* Tile buttons */}
-            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-              {TILES.map((tl, i) => {
-                const Icon = tl.icon; const active = i === tileIdx
-                return (
-                  <button key={tl.id} onClick={() => setTileIdx(i)} style={{
-                    width: 56, height: 48, borderRadius: t.r.sm, cursor: 'pointer', display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', justifyContent: 'center', gap: 3, transition: `all ${t.tr}`,
-                    border: active ? `2px solid ${t.gold}` : `1px solid ${darkMode ? t.border : t.lBorder}`,
-                    background: active ? t.goldDim : (darkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'),
-                    boxShadow: active ? t.sh.glow : 'none',
-                  }}>
-                    <Icon size={16} color={active ? t.gold : (darkMode ? t.textSec : t.lTextSec)} />
-                    <span style={{ fontSize: 9, fontWeight: 600, color: active ? t.gold : (darkMode ? t.textDim : t.lTextSec) }}>{tl.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Toggle rows */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 2px', borderRadius: t.r.sm, fontSize: 12, color: darkMode ? t.textSec : t.lTextSec, fontWeight: 500 }}>
-                <input type="checkbox" checked={showCadastral} onChange={() => setShowCadastral(v => !v)} style={{ accentColor: t.gold }} />
-                גוש/חלקה (קדסטר)
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 2px', borderRadius: t.r.sm, fontSize: 12, color: darkMode ? t.textSec : t.lTextSec, fontWeight: 500 }}>
-                <input type="checkbox" checked={showAreas} onChange={() => setShowAreas(v => !v)} style={{ accentColor: t.gold }} />
-                אזורים
-              </label>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Map Controls Column: Zoom + Layers */}
+      <MapControls darkMode={darkMode} tileIdx={tileIdx} setTileIdx={setTileIdx}
+        showCadastral={showCadastral} setShowCadastral={setShowCadastral}
+        showAreas={showAreas} setShowAreas={setShowAreas}
+        switcherOpen={switcherOpen} setSwitcherOpen={setSwitcherOpen} />
     </div>
   )
 }
