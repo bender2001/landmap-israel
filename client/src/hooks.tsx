@@ -247,6 +247,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() { return useContext(AuthContext) }
 
+// ── User Geolocation ──
+
+export function useUserLocation() {
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(() => {
+    try {
+      const cached = sessionStorage.getItem('user_location')
+      return cached ? JSON.parse(cached) : null
+    } catch { return null }
+  })
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const request = useCallback(() => {
+    if (!navigator.geolocation) {
+      setError('הדפדפן לא תומך בשירותי מיקום')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        setLocation(loc)
+        setLoading(false)
+        try { sessionStorage.setItem('user_location', JSON.stringify(loc)) } catch {}
+      },
+      (err) => {
+        setError(err.code === 1 ? 'גישה למיקום נדחתה' : 'לא ניתן לקבל מיקום')
+        setLoading(false)
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    )
+  }, [])
+
+  return { location, error, loading, request }
+}
+
 // ── Debounce ──
 
 export function useDebounce<T>(value: T, ms = 300): T {

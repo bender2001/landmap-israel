@@ -3,7 +3,7 @@ import styled, { keyframes } from 'styled-components'
 import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, pricePerSqm, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, pricePerSqm, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance } from '../utils'
 import { Skeleton } from './UI'
 import type { Plot } from '../types'
 
@@ -114,6 +114,14 @@ const DetailLink = styled.button`
   color:${t.textDim};cursor:pointer;transition:all ${t.tr};flex-shrink:0;
   margin-inline-start:auto;
   &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
+`
+
+/* ── Distance Badge ── */
+const DistanceBadge = styled.span`
+  display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;
+  padding:1px 7px;border-radius:${t.r.full};color:${t.info};
+  background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);
+  white-space:nowrap;
 `
 
 /* ── Price Position Badge ── */
@@ -279,16 +287,19 @@ interface Props {
   open: boolean
   onToggle: () => void
   isLoading?: boolean
+  userLocation?: { lat: number; lng: number } | null
 }
 
-function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick }: {
+function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userLocation }: {
   plot: Plot; active: boolean; index: number; onClick: () => void; allPlots: Plot[]; onDetailClick: (id: string) => void
+  userLocation?: { lat: number; lng: number } | null
 }) {
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
   const status = (plot.status || 'AVAILABLE') as string
   const sColor = statusColors[status] || t.gold
   const dom = daysOnMarket(d.created)
   const pos = pricePosition(plot, allPlots)
+  const distance = userLocation ? plotDistanceFromUser(plot, userLocation.lat, userLocation.lng) : null
 
   return (
     <ItemWrap $active={active} $i={index} onClick={onClick} aria-label={`חלקה ${plot.number} גוש ${d.block}`}>
@@ -298,6 +309,7 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick }: {
           <ItemBadge $c={sColor}>{statusLabels[status] || status}</ItemBadge>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {distance != null && <DistanceBadge>📍 {fmtDistance(distance)}</DistanceBadge>}
           {pos && (
             <PricePosTag $c={pos.color}>
               {pos.direction === 'below' ? <ArrowDown size={9} /> : pos.direction === 'above' ? <ArrowUp size={9} /> : <Minus size={9} />}
@@ -336,7 +348,7 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick }: {
   )
 }
 
-function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading }: Props) {
+function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, userLocation }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const [cityFilter, setCityFilter] = useState<string | null>(null)
@@ -459,6 +471,7 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading }:
                 onClick={() => onSelect(plot)}
                 allPlots={plots}
                 onDetailClick={goToDetail}
+                userLocation={userLocation}
               />
             ))
           )}

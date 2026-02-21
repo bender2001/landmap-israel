@@ -186,6 +186,90 @@ function Sparkline({ data, width = 80, height = 28, color }: { data: number[]; w
   )
 }
 
+/* ── Investment Projection Step Chart ── */
+const ProjWrap = styled.div`
+  padding:12px 0;margin-bottom:4px;
+`
+const ProjTitle = styled.div`
+  font-size:11px;font-weight:700;color:${t.textDim};margin-bottom:10px;
+  display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:0.3px;
+`
+const ProjChart = styled.div`
+  display:flex;align-items:flex-end;gap:3px;height:80px;padding:0 4px;
+`
+const ProjBar = styled.div<{ $h: number; $active: boolean; $color: string }>`
+  flex:1;min-width:0;border-radius:4px 4px 0 0;position:relative;
+  height:${pr => Math.max(8, pr.$h)}%;
+  background:${pr => pr.$active
+    ? `linear-gradient(180deg,${pr.$color},${pr.$color}88)`
+    : t.surfaceLight};
+  border:1px solid ${pr => pr.$active ? `${pr.$color}44` : 'transparent'};
+  border-bottom:none;
+  transition:all 0.5s cubic-bezier(0.32,0.72,0,1);
+  cursor:default;
+  &:hover{opacity:0.85;transform:scaleY(1.03);transform-origin:bottom;}
+`
+const ProjBarLabel = styled.div<{ $active: boolean }>`
+  position:absolute;top:-18px;left:50%;transform:translateX(-50%);
+  font-size:8px;font-weight:${pr => pr.$active ? 800 : 600};
+  color:${pr => pr.$active ? t.gold : t.textDim};white-space:nowrap;
+`
+const ProjLabels = styled.div`
+  display:flex;gap:3px;margin-top:4px;padding:0 4px;
+`
+const ProjStageLabel = styled.div<{ $active: boolean }>`
+  flex:1;text-align:center;font-size:7px;font-weight:600;
+  color:${pr => pr.$active ? t.gold : t.textDim};
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+`
+const ProjSummary = styled.div`
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:10px;padding:8px 12px;
+  background:${t.goldDim};border:1px solid ${t.goldBorder};border-radius:${t.r.md};
+`
+const ProjSumLabel = styled.span`font-size:11px;color:${t.textSec};`
+const ProjSumVal = styled.span<{ $c?: string }>`font-size:14px;font-weight:800;color:${pr => pr.$c || t.gold};`
+
+/** Generate investment projection data through planning stages */
+function useProjectionChart(plot: Plot | null) {
+  return useMemo(() => {
+    if (!plot) return null
+    const d = p(plot), price = d.price, projected = d.projected
+    if (!price || !projected) return null
+
+    const stages = [
+      { key: 'AGRICULTURAL', label: 'חקלאית', short: '🌾' },
+      { key: 'MASTER_PLAN', label: 'מתאר', short: '📋' },
+      { key: 'DETAILED_PLAN', label: 'מפורטת', short: '📐' },
+      { key: 'TENDER', label: 'מכרז', short: '🏗️' },
+      { key: 'PERMIT', label: 'היתר', short: '🏠' },
+    ]
+
+    // Calculate value at each stage (exponential growth curve from price to projected)
+    const totalGrowth = projected / price
+    const n = stages.length
+    const values = stages.map((_, i) => {
+      const progress = i / (n - 1) // 0 to 1
+      // Exponential interpolation: price * (totalGrowth ^ progress)
+      return Math.round(price * Math.pow(totalGrowth, progress))
+    })
+
+    // Determine current stage index
+    const zoning = d.zoning
+    let currentIdx = 0
+    if (zoning.includes('BUILDING_PERMIT') || zoning.includes('DEVELOPER_TENDER')) currentIdx = 4
+    else if (zoning.includes('DETAILED_PLAN_APPROVED')) currentIdx = 3
+    else if (zoning.includes('DETAILED_PLAN')) currentIdx = 2
+    else if (zoning.includes('MASTER_PLAN')) currentIdx = 1
+
+    const maxVal = Math.max(...values)
+    const currentVal = values[currentIdx]
+    const remainingGrowth = ((projected - currentVal) / currentVal) * 100
+
+    return { stages, values, currentIdx, maxVal, currentVal, remainingGrowth }
+  }, [plot])
+}
+
 /* ── Market Trend Card ── */
 const TrendCard = styled.div`
   display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:16px;
@@ -313,6 +397,7 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
   }, [plot])
 
   const marketTrend = useMarketTrend(plot)
+  const projection = useProjectionChart(plot)
   const pricePos = useMemo(() => plot && plots ? pricePosition(plot, plots) : null, [plot, plots])
   const risk = useMemo(() => plot ? calcRisk(plot, plots) : null, [plot, plots])
 
@@ -405,6 +490,41 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
               <RiskMeterMini $pct={risk.score * 10} $c={risk.color} />
               <span style={{ fontSize: 11, fontWeight: 800, color: risk.color }}>{risk.score}/10</span>
             </RiskBadge>
+          )}
+
+          {/* Investment Projection Chart — visual value growth through planning stages */}
+          {projection && (
+            <ProjWrap>
+              <ProjTitle><TrendingUp size={12} color={t.gold} /> תחזית צמיחת ערך</ProjTitle>
+              <ProjChart>
+                {projection.stages.map((stage, i) => (
+                  <ProjBar
+                    key={stage.key}
+                    $h={(projection.values[i] / projection.maxVal) * 100}
+                    $active={i <= projection.currentIdx}
+                    $color={i === projection.currentIdx ? t.gold : t.ok}
+                    title={`${stage.label}: ${fmt.compact(projection.values[i])}`}
+                  >
+                    <ProjBarLabel $active={i === projection.currentIdx}>
+                      {fmt.short(projection.values[i])}
+                    </ProjBarLabel>
+                  </ProjBar>
+                ))}
+              </ProjChart>
+              <ProjLabels>
+                {projection.stages.map((stage, i) => (
+                  <ProjStageLabel key={stage.key} $active={i === projection.currentIdx}>
+                    {stage.short} {stage.label}
+                  </ProjStageLabel>
+                ))}
+              </ProjLabels>
+              {projection.remainingGrowth > 0 && (
+                <ProjSummary>
+                  <ProjSumLabel>פוטנציאל צמיחה נותר</ProjSumLabel>
+                  <ProjSumVal $c={t.ok}>+{Math.round(projection.remainingGrowth)}%</ProjSumVal>
+                </ProjSummary>
+              )}
+            </ProjWrap>
           )}
 
           {/* Market Trend Card — like Madlan's area trend indicator */}

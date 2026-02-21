@@ -3,11 +3,11 @@ import { useSearchParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink, MessageCircle, Clock } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed } from '../hooks'
+import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation } from '../hooks'
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, Spinner, useToast, Badge } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -250,6 +250,62 @@ const RecentChip = styled.button`
   &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
 `
 
+/* ── Keyboard Shortcuts Dialog ── */
+const KbdBackdrop = styled.div<{$open:boolean}>`
+  position:fixed;inset:0;z-index:${t.z.modal};
+  background:rgba(0,0,0,0.6);backdrop-filter:blur(6px);
+  opacity:${pr=>pr.$open?1:0};pointer-events:${pr=>pr.$open?'auto':'none'};
+  transition:opacity 0.3s;display:flex;align-items:center;justify-content:center;
+`
+const KbdPanel = styled.div`
+  width:min(440px,calc(100vw - 32px));background:${t.surface};
+  border:1px solid ${t.goldBorder};border-radius:${t.r.xl};
+  box-shadow:${t.sh.xl};direction:rtl;overflow:hidden;
+`
+const KbdHeader = styled.div`
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;border-bottom:1px solid ${t.border};
+  background:linear-gradient(180deg,rgba(212,168,75,0.06),transparent);
+`
+const KbdTitle = styled.h3`
+  font-size:16px;font-weight:700;color:${t.text};margin:0;
+  display:flex;align-items:center;gap:8px;font-family:${t.font};
+`
+const KbdCloseBtn = styled.button`
+  width:30px;height:30px;border-radius:${t.r.sm};background:transparent;
+  border:1px solid ${t.border};color:${t.textSec};cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all ${t.tr};&:hover{border-color:${t.goldBorder};color:${t.gold};}
+`
+const KbdList = styled.div`padding:12px 20px;`
+const KbdRow = styled.div`
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 0;border-bottom:1px solid ${t.border};
+  &:last-child{border-bottom:none;}
+`
+const KbdLabel = styled.span`font-size:13px;color:${t.textSec};`
+const KbdKey = styled.kbd`
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:28px;height:26px;padding:0 8px;
+  background:${t.surfaceLight};border:1px solid ${t.border};
+  border-radius:${t.r.sm};font-size:12px;font-weight:700;
+  color:${t.gold};font-family:${t.font};
+  box-shadow:inset 0 -1px 0 ${t.border};
+`
+const KbdCombo = styled.div`display:flex;align-items:center;gap:4px;`
+const KbdFooter = styled.div`
+  padding:10px 20px;border-top:1px solid ${t.border};
+  font-size:11px;color:${t.textDim};text-align:center;
+`
+
+const SHORTCUTS = [
+  { keys: ['?'], label: 'פתח/סגור קיצורי מקשים' },
+  { keys: ['L'], label: 'פתח/סגור רשימת חלקות' },
+  { keys: ['Esc'], label: 'סגור סרגל צד / חלון' },
+  { keys: ['←'], label: 'חלקה הבאה (כשסרגל צד פתוח)' },
+  { keys: ['→'], label: 'חלקה קודמת (כשסרגל צד פתוח)' },
+]
+
 // ── URL ↔ Filters sync helpers ──
 const FILTER_PARAMS: (keyof Filters)[] = ['city', 'priceMin', 'priceMax', 'sizeMin', 'sizeMax', 'ripeness', 'minRoi', 'zoning', 'search', 'belowAvg']
 
@@ -288,6 +344,8 @@ export default function Explore() {
   const { ids: recentIds, add: addRecentlyViewed } = useRecentlyViewed()
   const { toast } = useToast()
   const sortRef = useRef<HTMLDivElement>(null)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const userGeo = useUserLocation()
 
   // Mobile calculator state
   const [calcPrice, setCalcPrice] = useState(500000)
@@ -319,11 +377,15 @@ export default function Explore() {
 
   // Sync sort → URL params
   const setSortWithUrl = useCallback((key: SortKey) => {
+    // Auto-request geolocation when switching to "nearest" sort
+    if (key === 'nearest' && !userGeo.location && !userGeo.loading) {
+      userGeo.request()
+    }
     setSortKey(key)
     const sp = filtersToParams(filters)
     if (key !== 'recommended') sp.set('sort', key)
     setSearchParams(sp, { replace: true })
-  }, [filters, setSearchParams])
+  }, [filters, setSearchParams, userGeo])
 
   const apiFilters = useMemo(() => {
     const f: Record<string, string> = {}
@@ -372,7 +434,7 @@ export default function Explore() {
     return list
   }, [plots, filters.sizeMin, filters.sizeMax, filters.belowAvg, dSearch])
 
-  const sorted = useMemo(() => sortPlots(filtered, sortKey), [filtered, sortKey])
+  const sorted = useMemo(() => sortPlots(filtered, sortKey, userGeo.location), [filtered, sortKey, userGeo.location])
 
   const avg = filtered.length ? filtered.reduce((s, pl) => s + p(pl).price, 0) / filtered.length : 0
   const avgPps = filtered.length ? Math.round(filtered.reduce((s, pl) => s + pricePerSqm(pl), 0) / filtered.length) : 0
@@ -442,20 +504,25 @@ export default function Explore() {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (e.key === 'Escape') {
+        if (shortcutsOpen) { setShortcutsOpen(false); return }
         if (sortOpen) setSortOpen(false)
         else if (selected) setSelected(null)
         else if (listOpen) setListOpen(false)
       }
+      // '?' key to toggle shortcuts help
+      if (e.key === '?') {
+        setShortcutsOpen(o => !o)
+      }
       // 'L' key to toggle list panel
       if (e.key === 'l' || e.key === 'L') {
-        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
         setListOpen(o => !o)
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selected, sortOpen, listOpen])
+  }, [selected, sortOpen, listOpen, shortcutsOpen])
 
   return (
     <Wrap className="dark">
@@ -505,6 +572,7 @@ export default function Explore() {
             open={listOpen}
             onToggle={() => setListOpen(o => !o)}
             isLoading={isLoading}
+            userLocation={sortKey === 'nearest' ? userGeo.location : null}
           />
         </Suspense>
         <Suspense fallback={null}>
@@ -557,6 +625,9 @@ export default function Explore() {
           {avgPps > 0 && <Stat>₪/מ״ר <Val>{fmt.num(avgPps)}</Val></Stat>}
           {favIds.length > 0 && <Stat><Heart size={12} color={t.gold} /><Val>{favIds.length}</Val> מועדפים</Stat>}
           {compareIds.length > 0 && <Stat><GitCompareArrows size={12} color={t.gold} /><Val>{compareIds.length}</Val> להשוואה</Stat>}
+          {sortKey === 'nearest' && userGeo.location && <Stat>📍 <Val>מיון לפי קרבה</Val></Stat>}
+          {sortKey === 'nearest' && userGeo.loading && <Stat>📍 מאתר מיקום...</Stat>}
+          {sortKey === 'nearest' && userGeo.error && <Stat style={{color:t.err}}>⚠️ {userGeo.error}</Stat>}
           <Demo>DEMO</Demo>
         </Stats>
 
@@ -674,6 +745,32 @@ export default function Explore() {
           <MessageCircle size={26} />
         </WhatsAppFab>
         {waHover && <WhatsAppTooltip>דברו עם מומחה קרקע</WhatsAppTooltip>}
+
+        {/* Keyboard Shortcuts Help Dialog */}
+        <KbdBackdrop $open={shortcutsOpen} onClick={() => setShortcutsOpen(false)}>
+          <KbdPanel onClick={e => e.stopPropagation()}>
+            <KbdHeader>
+              <KbdTitle>⌨️ קיצורי מקשים</KbdTitle>
+              <KbdCloseBtn onClick={() => setShortcutsOpen(false)}><X size={16} /></KbdCloseBtn>
+            </KbdHeader>
+            <KbdList>
+              {SHORTCUTS.map(s => (
+                <KbdRow key={s.keys.join('+')}>
+                  <KbdLabel>{s.label}</KbdLabel>
+                  <KbdCombo>
+                    {s.keys.map((k, i) => (
+                      <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {i > 0 && <span style={{ fontSize: 10, color: t.textDim }}>+</span>}
+                        <KbdKey>{k}</KbdKey>
+                      </span>
+                    ))}
+                  </KbdCombo>
+                </KbdRow>
+              ))}
+            </KbdList>
+            <KbdFooter>לחצו <KbdKey style={{ display: 'inline-flex', margin: '0 4px' }}>?</KbdKey> בכל עת להצגת קיצורים</KbdFooter>
+          </KbdPanel>
+        </KbdBackdrop>
 
         <MobileNav role="navigation" aria-label="ניווט ראשי">
           <NavBtn $active={tab==='map'} onClick={()=>setTab('map')} aria-label="מפה" aria-current={tab==='map'?'page':undefined}><MapIcon size={20}/>מפה</NavBtn>

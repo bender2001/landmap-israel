@@ -87,10 +87,37 @@ export function daysOnMarket(created: string | null | undefined) {
   if (d <= 90) return { days: d, label: `${Math.floor(d / 7)} שבועות`, color: '#F59E0B' }; return { days: d, label: `${Math.floor(d / 30)} חודשים`, color: '#EF4444' }
 }
 
+// ── Geolocation Distance ──
+/** Haversine distance between two [lat, lng] points in meters */
+export function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000 // Earth radius in meters
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+/** Distance from user to plot center in meters, or null if no coordinates */
+export function plotDistanceFromUser(plot: Plot, userLat: number, userLng: number): number | null {
+  const center = plotCenter(plot.coordinates)
+  if (!center) return null
+  return haversineDistance(userLat, userLng, center.lat, center.lng)
+}
+
+/** Format distance for display */
+export function fmtDistance(meters: number): string {
+  if (meters < 1000) return `${Math.round(meters)} מ׳`
+  if (meters < 10000) return `${(meters / 1000).toFixed(1)} ק״מ`
+  return `${Math.round(meters / 1000)} ק״מ`
+}
+
 // ── Sort ──
-export type SortKey = 'recommended' | 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc' | 'roi-desc' | 'price-sqm-asc' | 'score-desc'
+export type SortKey = 'recommended' | 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc' | 'roi-desc' | 'price-sqm-asc' | 'score-desc' | 'nearest'
 export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'recommended', label: 'מומלץ' },
+  { key: 'nearest', label: '📍 קרוב אלי' },
   { key: 'price-asc', label: 'מחיר ↑' },
   { key: 'price-desc', label: 'מחיר ↓' },
   { key: 'price-sqm-asc', label: '₪/מ״ר ↑' },
@@ -117,12 +144,20 @@ function recommendationScore(plot: Plot, avgPps: number): number {
   return (score / 10) * 0.4 + Math.min(1, r / 100) * 0.3 + zoningProgress * 0.2 + ((priceBonus + 1) / 2) * 0.1
 }
 
-export function sortPlots(plots: Plot[], key: SortKey): Plot[] {
+export function sortPlots(plots: Plot[], key: SortKey, userLocation?: { lat: number; lng: number } | null): Plot[] {
   if (key === 'recommended') {
     // Smart recommendation: composite of score, ROI, zoning progress, and price position
     const ppsList = plots.map(pricePerSqm).filter(v => v > 0)
     const avgPps = ppsList.length ? ppsList.reduce((s, v) => s + v, 0) / ppsList.length : 0
     return [...plots].sort((a, b) => recommendationScore(b, avgPps) - recommendationScore(a, avgPps))
+  }
+  if (key === 'nearest') {
+    if (!userLocation) return [...plots] // can't sort without location
+    return [...plots].sort((a, b) => {
+      const dA = plotDistanceFromUser(a, userLocation.lat, userLocation.lng) ?? Infinity
+      const dB = plotDistanceFromUser(b, userLocation.lat, userLocation.lng) ?? Infinity
+      return dA - dB
+    })
   }
   const sorted = [...plots]
   switch (key) {
