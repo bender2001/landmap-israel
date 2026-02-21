@@ -27,7 +27,9 @@ export default function App() {
 
   return (
     <ErrorBoundary>
+      <a href="#main-content" className="skip-link">דלג לתוכן הראשי</a>
       <Suspense fallback={<PageLoader />}>
+        <main id="main-content">
         <Routes>
           {/* Public */}
           <Route path="/" element={<Landing />} />
@@ -55,6 +57,7 @@ export default function App() {
 
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </main>
       </Suspense>
     </ErrorBoundary>
   )

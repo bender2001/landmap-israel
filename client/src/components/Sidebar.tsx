@@ -270,6 +270,112 @@ function useProjectionChart(plot: Plot | null) {
   }, [plot])
 }
 
+/* ── Area Quality Radar Chart (Pentagon) ── */
+const RadarWrap = styled.div`
+  display:flex;align-items:center;gap:14px;padding:14px;margin-bottom:16px;
+  background:${t.surfaceLight};border:1px solid ${t.border};border-radius:${t.r.md};
+  animation:${fadeSection} 0.45s 0.1s both;
+`
+const RadarLabels = styled.div`
+  display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;
+`
+const RadarRow = styled.div`display:flex;align-items:center;gap:6px;`
+const RadarDot = styled.span<{ $c: string }>`
+  width:6px;height:6px;border-radius:50%;background:${pr => pr.$c};flex-shrink:0;
+`
+const RadarName = styled.span`font-size:10px;color:${t.textSec};flex:1;min-width:0;`
+const RadarVal = styled.span<{ $c: string }>`font-size:10px;font-weight:700;color:${pr => pr.$c};`
+
+interface RadarDimension { label: string; value: number; color: string }
+
+function RadarChart({ dims, size = 72 }: { dims: RadarDimension[]; size?: number }) {
+  const n = dims.length
+  if (n < 3) return null
+  const cx = size / 2, cy = size / 2, r = size / 2 - 4
+  const angle = (i: number) => ((2 * Math.PI * i) / n) - Math.PI / 2
+
+  // Grid rings
+  const rings = [0.33, 0.66, 1]
+  // Data points
+  const points = dims.map((d, i) => {
+    const a = angle(i), v = Math.min(1, Math.max(0, d.value / 10)) * r
+    return { x: cx + Math.cos(a) * v, y: cy + Math.sin(a) * v }
+  })
+  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ') + 'Z'
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
+      {/* Grid rings */}
+      {rings.map((ring, i) => (
+        <polygon key={i} fill="none" stroke={t.border} strokeWidth="0.5"
+          points={Array.from({ length: n }, (_, j) => {
+            const a = angle(j), v = r * ring
+            return `${(cx + Math.cos(a) * v).toFixed(1)},${(cy + Math.sin(a) * v).toFixed(1)}`
+          }).join(' ')} />
+      ))}
+      {/* Axis lines */}
+      {Array.from({ length: n }, (_, i) => {
+        const a = angle(i)
+        return <line key={i} x1={cx} y1={cy} x2={cx + Math.cos(a) * r} y2={cy + Math.sin(a) * r} stroke={t.border} strokeWidth="0.5" />
+      })}
+      {/* Data polygon */}
+      <polygon points={points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
+        fill={`${t.gold}22`} stroke={t.gold} strokeWidth="1.5" strokeLinejoin="round" />
+      {/* Data dots */}
+      {points.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r="2.5" fill={dims[i].color} />
+      ))}
+    </svg>
+  )
+}
+
+/** Compute area quality dimensions from plot data */
+function useAreaQuality(plot: Plot | null, allPlots?: Plot[]): RadarDimension[] | null {
+  return useMemo(() => {
+    if (!plot) return null
+    const d = p(plot), r = roi(plot), score = calcScore(plot)
+    const pps = pricePerSqm(plot)
+
+    // 1. Investment Grade (from calcScore, already 1-10)
+    const investmentScore = score
+
+    // 2. Planning Progress (zoning stage, 0=agricultural → 10=building permit)
+    const zoningStages = ['AGRICULTURAL','MASTER_PLAN_DEPOSIT','MASTER_PLAN_APPROVED','DETAILED_PLAN_PREP','DETAILED_PLAN_DEPOSIT','DETAILED_PLAN_APPROVED','DEVELOPER_TENDER','BUILDING_PERMIT']
+    const zi = zoningStages.indexOf(d.zoning)
+    const planningScore = zi >= 0 ? Math.round((zi / (zoningStages.length - 1)) * 10) : 0
+
+    // 3. Value Score (how well-priced vs market, inverse of overpricing)
+    let valueScore = 5
+    if (allPlots && allPlots.length > 2 && pps > 0) {
+      const allPps = allPlots.map(pricePerSqm).filter(v => v > 0)
+      const avg = allPps.reduce((s, v) => s + v, 0) / allPps.length
+      const diff = ((avg - pps) / avg) * 100 // positive = below avg = good
+      valueScore = Math.max(1, Math.min(10, 5 + diff / 10))
+    }
+
+    // 4. Growth Potential (from ROI)
+    const growthScore = Math.max(1, Math.min(10, r > 0 ? Math.min(10, r / 15 + 2) : 2))
+
+    // 5. Location (from distance to sea / parks)
+    let locationScore = 5
+    if (d.seaDist != null) locationScore = d.seaDist <= 200 ? 10 : d.seaDist <= 500 ? 8 : d.seaDist <= 1500 ? 6 : d.seaDist <= 5000 ? 4 : 2
+    if (d.parkDist != null) {
+      const parkBonus = d.parkDist <= 300 ? 2 : d.parkDist <= 800 ? 1 : 0
+      locationScore = Math.min(10, locationScore + parkBonus)
+    }
+
+    const scoreColor = (v: number) => v >= 7 ? t.ok : v >= 4 ? t.warn : t.err
+
+    return [
+      { label: 'השקעה', value: Math.round(investmentScore), color: scoreColor(investmentScore) },
+      { label: 'תכנון', value: Math.round(planningScore), color: scoreColor(planningScore) },
+      { label: 'משתלמות', value: Math.round(valueScore), color: scoreColor(valueScore) },
+      { label: 'צמיחה', value: Math.round(growthScore), color: scoreColor(growthScore) },
+      { label: 'מיקום', value: Math.round(locationScore), color: scoreColor(locationScore) },
+    ]
+  }, [plot, allPlots])
+}
+
 /* ── AI Insight Badge ── */
 const InsightWrap = styled.div`
   padding:12px 14px;margin-bottom:16px;
@@ -458,6 +564,7 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
   const pricePos = useMemo(() => plot && plots ? pricePosition(plot, plots) : null, [plot, plots])
   const risk = useMemo(() => plot ? calcRisk(plot, plots) : null, [plot, plots])
   const aiInsight = useAIInsight(plot, plots)
+  const areaQuality = useAreaQuality(plot, plots)
 
   if (!plot) return null
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
@@ -541,6 +648,23 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
             {pps > 0 && <MetricCard><MetricLabel>₪ / מ״ר</MetricLabel><MetricVal>{fmt.num(pps)}</MetricVal></MetricCard>}
             <MetricCard><MetricLabel>תשואה</MetricLabel><MetricVal $gold={r > 0}>{fmt.pct(r)}</MetricVal></MetricCard>
           </MetricsGrid>
+
+          {/* Area Quality Radar — visual pentagon score chart */}
+          {areaQuality && (
+            <RadarWrap>
+              <RadarChart dims={areaQuality} size={80} />
+              <RadarLabels>
+                <div style={{ fontSize: 11, fontWeight: 700, color: t.text, marginBottom: 4 }}>ציון איכות</div>
+                {areaQuality.map(dim => (
+                  <RadarRow key={dim.label}>
+                    <RadarDot $c={dim.color} />
+                    <RadarName>{dim.label}</RadarName>
+                    <RadarVal $c={dim.color}>{dim.value}/10</RadarVal>
+                  </RadarRow>
+                ))}
+              </RadarLabels>
+            </RadarWrap>
+          )}
 
           {/* Price position vs average — like Madlan's value indicator */}
           {pricePos && (

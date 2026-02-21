@@ -1,11 +1,13 @@
 import { memo, useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity } from 'lucide-react'
+import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, pricePerSqm, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, pricePerSqm, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline } from '../utils'
 import { Skeleton } from './UI'
 import type { Plot } from '../types'
+
+const PAGE_SIZE = 20
 
 /* ── Animations ── */
 const slideIn = keyframes`from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}`
@@ -216,6 +218,48 @@ const DistLabels = styled.div`
 `
 const DistLabel = styled.span`font-size:9px;color:${t.textDim};`
 
+/* ── Zoning Pipeline Mini Bar ── */
+const ZoningBar = styled.div`
+  display:flex;align-items:center;gap:2px;margin-top:6px;width:100%;
+`
+const ZoningStep = styled.div<{ $done: boolean; $current: boolean }>`
+  flex:1;height:3px;border-radius:1.5px;
+  background:${pr => pr.$current ? t.gold : pr.$done ? t.ok : t.surfaceLight};
+  ${pr => pr.$current && `box-shadow:0 0 4px ${t.gold};`}
+  transition:all 0.3s ease;
+`
+const ZoningLabel = styled.div`
+  display:flex;align-items:center;justify-content:space-between;margin-top:3px;
+  font-size:9px;color:${t.textDim};
+`
+
+/* ── Load More Button ── */
+const LoadMoreBtn = styled.button`
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  padding:14px;margin:8px 0 16px;background:${t.surfaceLight};border:1px solid ${t.border};
+  border-radius:${t.r.md};color:${t.textSec};font-size:13px;font-weight:600;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};transform:translateY(-1px);}
+`
+const LoadMoreCount = styled.span`
+  font-size:11px;font-weight:700;color:${t.gold};
+  background:${t.goldDim};padding:2px 8px;border-radius:${t.r.full};
+`
+
+/* ── Scroll-to-Top Button ── */
+const ScrollTopBtn = styled.button<{ $visible: boolean }>`
+  position:absolute;bottom:12px;right:12px;z-index:5;
+  width:36px;height:36px;border-radius:${t.r.full};
+  background:${t.gold};color:${t.bg};border:none;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all ${t.tr};
+  opacity:${pr => pr.$visible ? 1 : 0};
+  pointer-events:${pr => pr.$visible ? 'auto' : 'none'};
+  transform:translateY(${pr => pr.$visible ? '0' : '8px'});
+  box-shadow:${t.sh.md};
+  &:hover{transform:translateY(-2px);box-shadow:${t.sh.lg};}
+`
+
 function PriceDistribution({ plots, selectedPlot }: { plots: Plot[]; selectedPlot: Plot | null }) {
   const data = useMemo(() => {
     const prices = plots.map(pl => p(pl).price).filter(v => v > 0)
@@ -301,6 +345,10 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userL
   const pos = pricePosition(plot, allPlots)
   const distance = userLocation ? plotDistanceFromUser(plot, userLocation.lat, userLocation.lng) : null
 
+  // Zoning pipeline stage
+  const zoningIdx = zoningPipeline.findIndex(z => z.key === d.zoning)
+  const currentZoning = zoningIdx >= 0 ? zoningPipeline[zoningIdx] : null
+
   return (
     <ItemWrap $active={active} $i={index} onClick={onClick} aria-label={`חלקה ${plot.number} גוש ${d.block}`}>
       <ItemTop>
@@ -344,6 +392,20 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userL
           <ExternalLink size={13} />
         </DetailLink>
       </Metrics>
+      {/* Zoning pipeline progress mini-bar */}
+      {currentZoning && (
+        <>
+          <ZoningBar title={`שלב תכנוני: ${currentZoning.label}`}>
+            {zoningPipeline.map((step, i) => (
+              <ZoningStep key={step.key} $done={i < zoningIdx} $current={i === zoningIdx} />
+            ))}
+          </ZoningBar>
+          <ZoningLabel>
+            <span>{currentZoning.icon} {currentZoning.label}</span>
+            <span>{Math.round(((zoningIdx) / (zoningPipeline.length - 1)) * 100)}%</span>
+          </ZoningLabel>
+        </>
+      )}
     </ItemWrap>
   )
 }
@@ -352,6 +414,8 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, u
   const bodyRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const [cityFilter, setCityFilter] = useState<string | null>(null)
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [showScrollTop, setShowScrollTop] = useState(false)
   const stats = useMemo(() => calcAggregateStats(plots), [plots])
   const goToDetail = useCallback((id: string) => navigate(`/plot/${id}`), [navigate])
 
@@ -365,23 +429,56 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, u
   }, [plots])
 
   // Filtered plots by city
-  const visiblePlots = useMemo(() =>
+  const allVisiblePlots = useMemo(() =>
     cityFilter ? plots.filter(pl => pl.city === cityFilter) : plots
   , [plots, cityFilter])
+
+  // Paginated visible plots
+  const visiblePlots = useMemo(() =>
+    allVisiblePlots.slice(0, visibleCount)
+  , [allVisiblePlots, visibleCount])
+
+  const hasMore = allVisiblePlots.length > visibleCount
+  const remainingCount = allVisiblePlots.length - visibleCount
+
+  const loadMore = useCallback(() => {
+    setVisibleCount(prev => prev + PAGE_SIZE)
+  }, [])
+
+  // Reset pagination when filters/city change
+  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [cityFilter, plots])
 
   // Reset city filter when plots change substantially
   useEffect(() => {
     if (cityFilter && !plots.some(pl => pl.city === cityFilter)) setCityFilter(null)
   }, [plots, cityFilter])
 
-  // Scroll to active item
+  // Scroll tracking for scroll-to-top button
+  useEffect(() => {
+    const body = bodyRef.current
+    if (!body) return
+    const handler = () => setShowScrollTop(body.scrollTop > 300)
+    body.addEventListener('scroll', handler, { passive: true })
+    return () => body.removeEventListener('scroll', handler)
+  }, [])
+
+  const scrollToTop = useCallback(() => {
+    bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
+
+  // Scroll to active item — also expand pagination if needed
   useEffect(() => {
     if (!selected || !open || !bodyRef.current) return
-    const idx = visiblePlots.findIndex(pl => pl.id === selected.id)
+    const idx = allVisiblePlots.findIndex(pl => pl.id === selected.id)
     if (idx < 0) return
-    const item = bodyRef.current.children[idx] as HTMLElement
-    if (item) item.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }, [selected, open, visiblePlots])
+    // Expand pagination to include selected item
+    if (idx >= visibleCount) setVisibleCount(idx + PAGE_SIZE)
+    requestAnimationFrame(() => {
+      if (!bodyRef.current) return
+      const item = bodyRef.current.children[idx] as HTMLElement
+      if (item) item.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  }, [selected, open, allVisiblePlots])
 
   return (
     <>
@@ -431,51 +528,65 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, u
         )}
         {/* Price distribution histogram */}
         <PriceDistribution plots={visiblePlots} selectedPlot={selected} />
-        <Body ref={bodyRef}>
-          {isLoading ? (
-            /* Skeleton loading cards */
-            Array.from({ length: 6 }).map((_, i) => (
-              <SkeletonCard key={i} $i={i}>
-                <SkeletonRow>
-                  <Skeleton $w="80px" $h="12px" />
-                  <div style={{ flex: 1 }} />
-                  <Skeleton $w="36px" $h="20px" $r={t.r.sm} />
-                </SkeletonRow>
-                <Skeleton $w="140px" $h="10px" />
-                <SkeletonRow>
-                  <Skeleton $w="60px" $h="14px" />
-                  <Skeleton $w="60px" $h="14px" />
-                  <Skeleton $w="40px" $h="14px" />
-                </SkeletonRow>
-              </SkeletonCard>
-            ))
-          ) : visiblePlots.length === 0 ? (
-            <EmptyState>
-              <MapPin size={32} />
-              <span style={{ fontSize: 14 }}>{cityFilter ? `לא נמצאו חלקות ב${cityFilter}` : 'לא נמצאו חלקות'}</span>
-              <span style={{ fontSize: 12 }}>נסו לשנות את הסינון</span>
-              {cityFilter && (
-                <button onClick={() => setCityFilter(null)} style={{
-                  marginTop: 8, padding: '6px 16px', background: t.goldDim, border: `1px solid ${t.goldBorder}`,
-                  borderRadius: t.r.full, color: t.gold, fontSize: 12, fontWeight: 600, fontFamily: t.font, cursor: 'pointer',
-                }}>הצג את כל הערים</button>
-              )}
-            </EmptyState>
-          ) : (
-            visiblePlots.map((plot, i) => (
-              <PlotItem
-                key={plot.id}
-                plot={plot}
-                active={selected?.id === plot.id}
-                index={i}
-                onClick={() => onSelect(plot)}
-                allPlots={plots}
-                onDetailClick={goToDetail}
-                userLocation={userLocation}
-              />
-            ))
-          )}
-        </Body>
+        <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
+          <Body ref={bodyRef}>
+            {isLoading ? (
+              /* Skeleton loading cards */
+              Array.from({ length: 6 }).map((_, i) => (
+                <SkeletonCard key={i} $i={i}>
+                  <SkeletonRow>
+                    <Skeleton $w="80px" $h="12px" />
+                    <div style={{ flex: 1 }} />
+                    <Skeleton $w="36px" $h="20px" $r={t.r.sm} />
+                  </SkeletonRow>
+                  <Skeleton $w="140px" $h="10px" />
+                  <SkeletonRow>
+                    <Skeleton $w="60px" $h="14px" />
+                    <Skeleton $w="60px" $h="14px" />
+                    <Skeleton $w="40px" $h="14px" />
+                  </SkeletonRow>
+                </SkeletonCard>
+              ))
+            ) : allVisiblePlots.length === 0 ? (
+              <EmptyState>
+                <MapPin size={32} />
+                <span style={{ fontSize: 14 }}>{cityFilter ? `לא נמצאו חלקות ב${cityFilter}` : 'לא נמצאו חלקות'}</span>
+                <span style={{ fontSize: 12 }}>נסו לשנות את הסינון</span>
+                {cityFilter && (
+                  <button onClick={() => setCityFilter(null)} style={{
+                    marginTop: 8, padding: '6px 16px', background: t.goldDim, border: `1px solid ${t.goldBorder}`,
+                    borderRadius: t.r.full, color: t.gold, fontSize: 12, fontWeight: 600, fontFamily: t.font, cursor: 'pointer',
+                  }}>הצג את כל הערים</button>
+                )}
+              </EmptyState>
+            ) : (
+              <>
+                {visiblePlots.map((plot, i) => (
+                  <PlotItem
+                    key={plot.id}
+                    plot={plot}
+                    active={selected?.id === plot.id}
+                    index={i}
+                    onClick={() => onSelect(plot)}
+                    allPlots={plots}
+                    onDetailClick={goToDetail}
+                    userLocation={userLocation}
+                  />
+                ))}
+                {hasMore && (
+                  <LoadMoreBtn onClick={loadMore}>
+                    <LoadMoreIcon size={16} />
+                    טען עוד חלקות
+                    <LoadMoreCount>{remainingCount > 0 ? `+${remainingCount}` : ''}</LoadMoreCount>
+                  </LoadMoreBtn>
+                )}
+              </>
+            )}
+          </Body>
+          <ScrollTopBtn $visible={showScrollTop} onClick={scrollToTop} aria-label="גלול למעלה">
+            <ArrowUp size={16} />
+          </ScrollTopBtn>
+        </div>
       </Panel>
     </>
   )

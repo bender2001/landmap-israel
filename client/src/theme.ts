@@ -13,7 +13,7 @@ export const t = {
   font: "'Heebo', sans-serif",
   r: { sm: '8px', md: '12px', lg: '16px', xl: '24px', full: '9999px' },
   sh: { sm: '0 1px 3px rgba(0,0,0,0.08)', md: '0 4px 12px rgba(0,0,0,0.12)', lg: '0 8px 32px rgba(0,0,0,0.18)', xl: '0 20px 60px rgba(0,0,0,0.25)', glow: '0 0 24px rgba(212,168,75,0.2)' },
-  z: { map: 1, controls: 1000, filter: 30, sidebar: 50, modal: 70, toast: 80, nav: 90 },
+  z: { map: 1, controls: 12, filter: 30, sidebar: 50, modal: 70, toast: 80, nav: 90 },
   tr: '0.25s cubic-bezier(0.4, 0, 0.2, 1)',
   status: { AVAILABLE: '#10B981', SOLD: '#EF4444', RESERVED: '#F59E0B', IN_PLANNING: '#8B5CF6' } as Record<string, string>,
 } as const
@@ -121,6 +121,12 @@ export const GlobalStyles = createGlobalStyle`
   @keyframes userPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.3);opacity:0.7}}
 
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+  /* Skip to content link */
+  .skip-link{position:absolute;top:-100%;left:50%;transform:translateX(-50%);z-index:9999;
+    padding:12px 24px;background:${t.gold};color:${t.bg};font-weight:700;font-family:${t.font};font-size:14px;
+    border-radius:0 0 ${t.r.md} ${t.r.md};box-shadow:${t.sh.lg};text-decoration:none;transition:top 0.2s;}
+  .skip-link:focus{top:0;}
 
   @media(max-width:639px){
     .leaflet-control-zoom{margin-bottom:100px!important}
