@@ -1,7 +1,7 @@
 import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, useMap, WMSTileLayer } from 'react-leaflet'
 import L from 'leaflet'
-import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink } from 'lucide-react'
+import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2 } from 'lucide-react'
 import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, zoningLabels, zoningPipeline } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
@@ -95,9 +95,22 @@ const poiIcon = (emoji: string) => L.divIcon({
 
 // ── Map ref for external zoom control ──
 const mapRef = { current: null as L.Map | null }
+const plotBoundsRef = { current: null as L.LatLngBounds | null }
 function MapRefCapture() {
   const map = useMap()
   useEffect(() => { mapRef.current = map }, [map])
+  return null
+}
+
+// ── Track plot bounds (inside MapContainer) ──
+function PlotBoundsTracker({ plots }: { plots: Plot[] }) {
+  useEffect(() => {
+    if (!plots.length) return
+    const pts = plots.flatMap(pl => (pl.coordinates || []).filter(c => c.length >= 2 && isFinite(c[0]) && isFinite(c[1])))
+    if (pts.length) {
+      plotBoundsRef.current = L.latLngBounds(pts.map(c => [c[0], c[1]] as [number, number]))
+    }
+  }, [plots])
   return null
 }
 
@@ -118,6 +131,20 @@ function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCada
 
   return (
     <div style={{ position: 'absolute', bottom: 24, left: 16, zIndex: t.z.controls, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Fit all plots */}
+      <button
+        onClick={() => {
+          if (plotBoundsRef.current?.isValid() && mapRef.current) {
+            mapRef.current.flyToBounds(plotBoundsRef.current, { padding: [60, 60], maxZoom: 14, duration: 0.8 })
+          }
+        }}
+        style={{ ...btnStyle(darkMode), boxShadow: t.sh.md }}
+        aria-label="הצג את כל החלקות"
+        title="הצג הכל"
+      >
+        <Maximize2 size={16} />
+      </button>
+
       {/* Zoom buttons */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0, borderRadius: t.r.md, overflow: 'hidden', boxShadow: t.sh.md }}>
         <button onClick={() => mapRef.current?.zoomIn()}
@@ -257,6 +284,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         <FlyToSelected plot={selected} />
         <AutoFitBounds plots={plots} />
         <UserLocation />
+        <PlotBoundsTracker plots={plots} />
 
         {/* Area divisions with price stats */}
         {showAreas && israelAreas.map(area => {

@@ -98,8 +98,32 @@ export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'roi-desc', label: 'תשואה ↓' },
   { key: 'score-desc', label: 'ציון ↓' },
 ]
+/** Composite recommendation score: investment score (40%), ROI (30%), zoning progress (20%), below-avg price bonus (10%) */
+function recommendationScore(plot: Plot, avgPps: number): number {
+  const score = calcScore(plot) // 1-10
+  const r = roi(plot)
+  const { zoning } = p(plot)
+  const zi = ZO.indexOf(zoning)
+  const zoningProgress = zi >= 0 ? zi / (ZO.length - 1) : 0 // 0-1
+
+  // Price-per-sqm bonus: below average = bonus, above = penalty
+  const pps = pricePerSqm(plot)
+  let priceBonus = 0
+  if (pps > 0 && avgPps > 0) {
+    const diff = (avgPps - pps) / avgPps // positive = below avg = good
+    priceBonus = Math.max(-1, Math.min(1, diff)) // clamp to [-1, 1]
+  }
+
+  return (score / 10) * 0.4 + Math.min(1, r / 100) * 0.3 + zoningProgress * 0.2 + ((priceBonus + 1) / 2) * 0.1
+}
+
 export function sortPlots(plots: Plot[], key: SortKey): Plot[] {
-  if (key === 'recommended') return plots // default order from API
+  if (key === 'recommended') {
+    // Smart recommendation: composite of score, ROI, zoning progress, and price position
+    const ppsList = plots.map(pricePerSqm).filter(v => v > 0)
+    const avgPps = ppsList.length ? ppsList.reduce((s, v) => s + v, 0) / ppsList.length : 0
+    return [...plots].sort((a, b) => recommendationScore(b, avgPps) - recommendationScore(a, avgPps))
+  }
   const sorted = [...plots]
   switch (key) {
     case 'price-asc': return sorted.sort((a, b) => p(a).price - p(b).price)

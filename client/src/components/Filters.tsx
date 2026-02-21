@@ -8,10 +8,10 @@ import type { Filters, Plot } from '../types'
 
 const EMPTY: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '' }
 
-const CITIES: { value: string; label: string }[] = [
+const BASE_CITIES = [
   'חדרה', 'נתניה', 'קיסריה', 'הרצליה', 'כפר סבא', 'רעננה', 'הוד השרון', 'תל אביב',
   'חיפה', 'באר שבע', 'ראשון לציון', 'אשדוד', 'ירושלים',
-].map(c => ({ value: c, label: c }))
+]
 
 const ZONING: { value: string; label: string; icon?: string }[] = [
   { value: 'AGRICULTURAL', label: 'חקלאית', icon: '\u{1F33E}' },
@@ -168,6 +168,22 @@ interface Props { filters: Filters; onChange: (f: Filters) => void; resultCount?
 export default function FiltersBar({ filters, onChange, resultCount, plots, onSelectPlot }: Props) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Filters>(filters)
+
+  // Build city options with plot counts from actual data
+  const CITIES = useMemo(() => {
+    const counts: Record<string, number> = {}
+    if (plots?.length) {
+      for (const pl of plots) {
+        if (pl.city) counts[pl.city] = (counts[pl.city] || 0) + 1
+      }
+    }
+    // Merge base cities with any new ones found in data
+    const allCities = new Set([...BASE_CITIES, ...Object.keys(counts)])
+    return [...allCities].map(c => ({
+      value: c,
+      label: counts[c] ? `${c} (${counts[c]})` : c,
+    }))
+  }, [plots])
   const [phIdx, setPhIdx] = useState(0)
   const [activeQuick, setActiveQuick] = useState<Set<string>>(new Set())
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -299,6 +315,22 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
           />
           {resultCount != null && filters.search && (
             <span style={{ fontSize: 11, color: t.textDim, fontWeight: 600, whiteSpace: 'nowrap', padding: '0 4px' }}>{resultCount}</span>
+          )}
+          {filters.search && (
+            <button
+              onClick={() => { onChange({ ...filters, search: '' }); setShowSuggestions(false) }}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 28, height: 28, borderRadius: t.r.sm, border: `1px solid ${t.border}`,
+                background: 'transparent', color: t.textDim, cursor: 'pointer', flexShrink: 0,
+                transition: `all ${t.tr}`,
+              }}
+              aria-label="נקה חיפוש"
+              onMouseOver={e => { (e.target as HTMLElement).style.color = t.gold; (e.target as HTMLElement).style.borderColor = t.goldBorder }}
+              onMouseOut={e => { (e.target as HTMLElement).style.color = t.textDim; (e.target as HTMLElement).style.borderColor = t.border }}
+            >
+              <X size={14} />
+            </button>
           )}
           <FilterBtn $active={activeCount > 0} onClick={() => { setDraft(filters); setOpen(o => !o) }} aria-label="סננים">
             <SlidersHorizontal size={18} />
