@@ -178,5 +178,13 @@ export const GlobalStyles = createGlobalStyle`
     input[type="range"],input[type="checkbox"]{display:none!important;}
     /* Print watermark */
     body::after{content:"LandMap Israel — Investment Report";position:fixed;bottom:5mm;right:10mm;font-size:8pt;color:#aaa;font-family:${t.font};}
+    /* Sidebar print layout — show content inline */
+    aside[role="complementary"]{position:static!important;width:100%!important;max-width:100%!important;transform:none!important;
+      border:none!important;height:auto!important;overflow:visible!important;}
+    aside[role="complementary"] > div:first-child{display:none!important;} /* hide gold bar */
+    /* Force dark text for print */
+    aside[role="complementary"] *{color:#1a1a1a!important;background:white!important;border-color:#ddd!important;}
+    aside[role="complementary"] h2{color:#000!important;}
+    aside[role="complementary"] [class*="Badge"]{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important;}
   }
 `

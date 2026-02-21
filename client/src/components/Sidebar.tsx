@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef as useRefHook } from 'react'
 import styled, { keyframes, css } from 'styled-components'
-import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe, Sparkles } from 'lucide-react'
+import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe, Sparkles, Printer, Navigation, Map as MapIcon2, Eye } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter } from '../utils'
 import type { Plot } from '../types'
 import { GoldButton, GhostButton, Badge, RadialScore } from './UI'
 
@@ -489,6 +489,113 @@ const SimilarGrade = styled.span<{$c:string}>`
   color:${pr=>pr.$c};border:1px solid ${pr=>pr.$c}44;background:${t.bg};
 `
 
+/* ── Navigation Links (Google Maps, Street View, Waze) ── */
+const NavLinksGrid = styled.div`
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;
+`
+const NavLinkBtn = styled.a<{$bg:string;$c:string}>`
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  padding:10px 6px;border-radius:${t.r.md};text-decoration:none !important;
+  background:${pr=>pr.$bg};border:1px solid ${pr=>pr.$c}33;
+  color:${pr=>pr.$c};font-size:10px;font-weight:700;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};
+  &:hover{transform:translateY(-2px);box-shadow:0 4px 12px ${pr=>pr.$c}22;border-color:${pr=>pr.$c}55;}
+`
+
+/* ── Price Distribution Mini Chart ── */
+const DistWrap = styled.div`
+  margin-bottom:16px;padding:12px;background:${t.surfaceLight};
+  border:1px solid ${t.border};border-radius:${t.r.md};
+  animation:${fadeSection} 0.5s 0.14s both;
+`
+const DistTitle = styled.div`
+  font-size:11px;font-weight:700;color:${t.textDim};margin-bottom:10px;
+  display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:0.3px;
+`
+const DistChart = styled.div`
+  display:flex;align-items:flex-end;gap:1px;height:36px;position:relative;
+`
+const DistBar = styled.div<{$h:number;$active:boolean;$c:string}>`
+  flex:1;min-width:0;border-radius:2px 2px 0 0;
+  height:${pr=>Math.max(2,pr.$h)}%;
+  background:${pr=>pr.$active ? pr.$c : t.border};
+  opacity:${pr=>pr.$active ? 1 : 0.4};
+  transition:all 0.4s ease;position:relative;
+`
+const DistMarker = styled.div`
+  position:absolute;top:-14px;left:50%;transform:translateX(-50%);
+  font-size:8px;font-weight:800;color:${t.gold};white-space:nowrap;
+`
+const DistLabels = styled.div`
+  display:flex;justify-content:space-between;margin-top:4px;
+`
+const DistLabel = styled.span`font-size:9px;color:${t.textDim};`
+
+/** Price distribution histogram — shows where this plot sits among all plots */
+function PriceDistribution({ plot, allPlots }: { plot: Plot; allPlots: Plot[] }) {
+  const data = useMemo(() => {
+    const prices = allPlots.map(pl => p(pl).price).filter(v => v > 0).sort((a, b) => a - b)
+    if (prices.length < 3) return null
+    const plotPrice = p(plot).price
+    if (plotPrice <= 0) return null
+
+    const min = prices[0], max = prices[prices.length - 1]
+    const range = max - min
+    if (range <= 0) return null
+
+    const BINS = 12
+    const binSize = range / BINS
+    const bins = Array.from({ length: BINS }, () => 0)
+    let plotBin = -1
+
+    for (const price of prices) {
+      const idx = Math.min(BINS - 1, Math.floor((price - min) / binSize))
+      bins[idx]++
+    }
+    plotBin = Math.min(BINS - 1, Math.floor((plotPrice - min) / binSize))
+
+    const maxBin = Math.max(...bins)
+    const percentile = Math.round((prices.filter(pr => pr <= plotPrice).length / prices.length) * 100)
+
+    return { bins, plotBin, maxBin, min, max, percentile }
+  }, [plot, allPlots])
+
+  if (!data) return null
+
+  return (
+    <DistWrap>
+      <DistTitle>
+        <BarChart3 size={12} color={t.gold} />
+        פיזור מחירים — אחוזון {data.percentile}%
+      </DistTitle>
+      <DistChart>
+        {data.bins.map((count, i) => (
+          <DistBar
+            key={i}
+            $h={(count / data.maxBin) * 100}
+            $active={i === data.plotBin}
+            $c={t.gold}
+          >
+            {i === data.plotBin && <DistMarker>▼</DistMarker>}
+          </DistBar>
+        ))}
+      </DistChart>
+      <DistLabels>
+        <DistLabel>{fmt.compact(data.min)}</DistLabel>
+        <DistLabel>{fmt.compact(data.max)}</DistLabel>
+      </DistLabels>
+    </DistWrap>
+  )
+}
+
+/* ── Print Button ── */
+const PrintBtn = styled.button`
+  display:flex;align-items:center;justify-content:center;width:40px;height:40px;
+  border-radius:${t.r.md};border:1px solid ${t.border};
+  background:transparent;color:${t.textSec};cursor:pointer;transition:all ${t.tr};flex-shrink:0;
+  &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
+`
+
 /* ── Main Component ── */
 interface Props {
   plot: Plot | null; open: boolean; onClose: () => void; onLead?: () => void
@@ -500,6 +607,7 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
   const navigate = useNavigate()
   const bodyRef = React.useRef<HTMLDivElement>(null)
   const panelRef = useRefHook<HTMLDivElement>(null)
+  const closeBtnRef = useRefHook<HTMLButtonElement>(null)
   const [copied, setCopied] = useState(false)
 
   // Lock body scroll when sidebar is open
@@ -507,6 +615,8 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
     if (open) {
       const prev = document.body.style.overflow
       document.body.style.overflow = 'hidden'
+      // Focus management: move focus to close button for accessibility
+      requestAnimationFrame(() => closeBtnRef.current?.focus())
       return () => { document.body.style.overflow = prev }
     }
   }, [open])
@@ -642,7 +752,7 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
               <Badge $color={statusColors[plot.status || 'AVAILABLE']}>{statusLabels[plot.status || 'AVAILABLE']}</Badge>
               {dom && <Badge $color={dom.color}>{dom.label}</Badge>}
             </Badges>
-            <CloseBtn onClick={onClose} aria-label="סגור"><X size={18} /></CloseBtn>
+            <CloseBtn ref={closeBtnRef} onClick={onClose} aria-label="סגור"><X size={18} /></CloseBtn>
           </TopRow>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 4 }}>
             <RadialScore score={score} grade={grade.grade} color={grade.color} size={52} strokeWidth={4} />
@@ -788,7 +898,49 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
             )) : <Row><Label>אין נתונים</Label><Val>—</Val></Row>}
           </Section>
 
+          {/* Price Distribution — shows where this plot sits among all prices */}
+          {plots && plots.length >= 3 && (
+            <PriceDistribution plot={plot} allPlots={plots} />
+          )}
+
           <Section icon={MapPin} title="מיקום" idx={3}>
+            {/* Navigation Links — Google Maps, Street View, Waze */}
+            {(() => {
+              const center = plotCenter(plot.coordinates)
+              if (!center) return null
+              const { lat, lng } = center
+              return (
+                <NavLinksGrid>
+                  <NavLinkBtn
+                    href={`https://www.google.com/maps/@${lat},${lng},18z/data=!1m1!1e1`}
+                    target="_blank" rel="noopener noreferrer"
+                    $bg="rgba(66,133,244,0.08)" $c="#4285F4"
+                    title="פתח ב-Google Maps (לוויין)"
+                  >
+                    <MapIcon2 size={16} />
+                    Google Maps
+                  </NavLinkBtn>
+                  <NavLinkBtn
+                    href={`https://www.google.com/maps/@${lat},${lng},3a,75y,0h,90t/data=!3m1!1e1`}
+                    target="_blank" rel="noopener noreferrer"
+                    $bg="rgba(251,188,5,0.08)" $c="#FBBC05"
+                    title="Street View"
+                  >
+                    <Eye size={16} />
+                    Street View
+                  </NavLinkBtn>
+                  <NavLinkBtn
+                    href={`https://waze.com/ul?ll=${lat},${lng}&navigate=yes&zoom=17`}
+                    target="_blank" rel="noopener noreferrer"
+                    $bg="rgba(51,171,232,0.08)" $c="#33ABE8"
+                    title="נווט עם Waze"
+                  >
+                    <Navigation size={16} />
+                    Waze
+                  </NavLinkBtn>
+                </NavLinksGrid>
+              )
+            })()}
             {/* Visual Proximity Badges */}
             {(d.seaDist != null || d.parkDist != null || (plot.distance_to_hospital ?? plot.distanceToHospital) != null) && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
@@ -932,6 +1084,9 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
               <GitCompareArrows size={15} />
             </CompareBtn>
           )}
+          <PrintBtn onClick={() => window.print()} aria-label="הדפס דוח" title="הדפס דוח השקעה">
+            <Printer size={15} />
+          </PrintBtn>
           <FullPageLink onClick={() => navigate(`/plot/${plot.id}`)}><ExternalLink size={14} />עמוד מלא</FullPageLink>
         </Footer>
       </Panel>
