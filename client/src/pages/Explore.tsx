@@ -6,7 +6,7 @@ import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation, useOnlineStatus, useIsMobile } from '../hooks'
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
-import { ErrorBoundary, Spinner, useToast, Badge, NetworkBanner } from '../components/UI'
+import { ErrorBoundary, Spinner, useToast, Badge, NetworkBanner, AnimatedValue, DemoModeBanner } from '../components/UI'
 import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance, zoningLabels, calcAggregateStats, SITE_CONFIG } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
@@ -46,10 +46,20 @@ const MobileNav = styled.nav`
   background:${t.surface};border-top:1px solid ${t.border};
   ${mobile}{display:flex;justify-content:space-around;align-items:center;height:56px;}
 `
+const NavIndicator = styled.div<{$idx:number;$total:number}>`
+  position:absolute;top:-1px;height:3px;
+  width:${pr => Math.round(100 / pr.$total)}%;
+  right:${pr => Math.round((pr.$idx / pr.$total) * 100)}%;
+  background:linear-gradient(90deg,${t.gold},${t.goldBright});
+  border-radius:0 0 3px 3px;
+  transition:right 0.35s cubic-bezier(0.32,0.72,0,1);
+  box-shadow:0 2px 8px rgba(212,168,75,0.35);
+`
 const NavBtn = styled.button<{$active?:boolean}>`
   display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;
   color:${pr=>pr.$active?t.gold:t.textDim};font-size:10px;font-family:${t.font};cursor:pointer;
-  padding:4px 12px;transition:color ${t.tr};
+  padding:4px 12px;transition:color ${t.tr};transform:${pr=>pr.$active?'scale(1.05)':'scale(1)'};
+  transition:color ${t.tr},transform 0.2s cubic-bezier(0.32,0.72,0,1);
 `
 const Loader = styled.div`position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;`
 const TopProgress = styled.div<{$show:boolean}>`
@@ -947,6 +957,9 @@ export default function Explore() {
     <Wrap className="dark">
       <ErrorBoundary>
         <NetworkBanner online={online} wasOffline={wasOffline} onRetry={() => window.location.reload()} />
+        {dataSource === 'demo' && !isLoading && online && (
+          <DemoModeBanner onRetry={() => window.location.reload()} />
+        )}
         <TopProgress $show={isLoading} />
         {isLoading && <Loader><Spinner size={36} /></Loader>}
         <MapArea
@@ -1118,12 +1131,12 @@ export default function Explore() {
         </div>
 
         {!mapFullscreen && <Stats>
-          <Stat><Val>{filtered.length}</Val> חלקות</Stat>
-          {marketPulse && marketPulse.totalValue > 0 && <Stat>סה״כ <Val>{fmt.compact(marketPulse.totalValue)}</Val></Stat>}
-          <Stat>ממוצע <Val>{fmt.compact(avg)}</Val></Stat>
-          {medianPrice > 0 && <Stat>חציון <Val>{fmt.compact(medianPrice)}</Val></Stat>}
-          {avgPpd > 0 && <Stat>₪/דונם <Val>{fmt.num(avgPpd)}</Val></Stat>}
-          {marketPulse && marketPulse.avgRoi > 0 && <Stat>ROI <Val style={{color: marketPulse.avgRoi > 30 ? t.ok : t.warn}}>+{marketPulse.avgRoi}%</Val></Stat>}
+          <Stat><Val><AnimatedValue value={filtered.length} /></Val> חלקות</Stat>
+          {marketPulse && marketPulse.totalValue > 0 && <Stat>סה״כ <Val><AnimatedValue value={marketPulse.totalValue} format={fmt.compact} /></Val></Stat>}
+          <Stat>ממוצע <Val><AnimatedValue value={Math.round(avg)} format={fmt.compact} /></Val></Stat>
+          {medianPrice > 0 && <Stat>חציון <Val><AnimatedValue value={Math.round(medianPrice)} format={fmt.compact} /></Val></Stat>}
+          {avgPpd > 0 && <Stat>₪/דונם <Val><AnimatedValue value={avgPpd} format={fmt.num} /></Val></Stat>}
+          {marketPulse && marketPulse.avgRoi > 0 && <Stat>ROI <Val style={{color: marketPulse.avgRoi > 30 ? t.ok : t.warn}}>+<AnimatedValue value={marketPulse.avgRoi} />%</Val></Stat>}
           {favIds.length > 0 && <Stat><Heart size={12} color={t.gold} /><Val>{favIds.length}</Val></Stat>}
           {compareIds.length > 0 && <Stat><GitCompareArrows size={12} color={t.gold} /><Val>{compareIds.length}</Val></Stat>}
           {sortKey === 'nearest' && userGeo.location && <Stat>📍 <Val>לפי קרבה</Val></Stat>}
@@ -1347,30 +1360,37 @@ export default function Explore() {
           </KbdPanel>
         </KbdBackdrop>
 
-        {!mapFullscreen && <MobileNav role="navigation" aria-label="ניווט ראשי">
-          <NavBtn $active={tab==='map'} onClick={()=>setTab('map')} aria-label="מפה" aria-current={tab==='map'?'page':undefined}>
-            <NavBtnWrap>
-              <MapIcon size={20}/>
-              {activeFilterCount > 0 && <NavBadge>{activeFilterCount}</NavBadge>}
-            </NavBtnWrap>
-            מפה
-          </NavBtn>
-          <NavBtn $active={tab==='fav'} onClick={()=>setTab('fav')} aria-label={`מועדפים${favIds.length>0?` (${favIds.length})`:''}`} aria-current={tab==='fav'?'page':undefined}>
-            <NavBtnWrap>
-              <Heart size={20}/>
-              {favIds.length > 0 && <NavBadge>{favIds.length}</NavBadge>}
-            </NavBtnWrap>
-            מועדפים
-          </NavBtn>
-          <NavBtn $active={tab==='calc'} onClick={()=>setTab('calc')} aria-label="מחשבון מימון" aria-current={tab==='calc'?'page':undefined}><Calculator size={20}/>מחשבון</NavBtn>
-          <NavBtn $active={tab==='areas'} onClick={()=>{ setTab('map'); setListOpen(o => !o) }} aria-label="רשימת חלקות" aria-current={listOpen?'page':undefined}>
-            <NavBtnWrap>
-              <Layers size={20}/>
-              {sorted.length > 0 && <NavBadge>{sorted.length > 99 ? '99+' : sorted.length}</NavBadge>}
-            </NavBtnWrap>
-            רשימה
-          </NavBtn>
-        </MobileNav>}
+        {!mapFullscreen && (() => {
+          const tabOrder = ['map', 'fav', 'calc', 'areas'] as const
+          const activeIdx = tabOrder.indexOf(tab as any)
+          return (
+            <MobileNav role="navigation" aria-label="ניווט ראשי" style={{ position: 'relative' }}>
+              <NavIndicator $idx={activeIdx >= 0 ? activeIdx : 0} $total={tabOrder.length} />
+              <NavBtn $active={tab==='map'} onClick={()=>setTab('map')} aria-label="מפה" aria-current={tab==='map'?'page':undefined}>
+                <NavBtnWrap>
+                  <MapIcon size={20}/>
+                  {activeFilterCount > 0 && <NavBadge>{activeFilterCount}</NavBadge>}
+                </NavBtnWrap>
+                מפה
+              </NavBtn>
+              <NavBtn $active={tab==='fav'} onClick={()=>setTab('fav')} aria-label={`מועדפים${favIds.length>0?` (${favIds.length})`:''}`} aria-current={tab==='fav'?'page':undefined}>
+                <NavBtnWrap>
+                  <Heart size={20}/>
+                  {favIds.length > 0 && <NavBadge>{favIds.length}</NavBadge>}
+                </NavBtnWrap>
+                מועדפים
+              </NavBtn>
+              <NavBtn $active={tab==='calc'} onClick={()=>setTab('calc')} aria-label="מחשבון מימון" aria-current={tab==='calc'?'page':undefined}><Calculator size={20}/>מחשבון</NavBtn>
+              <NavBtn $active={tab==='areas'} onClick={()=>{ setTab('map'); setListOpen(o => !o) }} aria-label="רשימת חלקות" aria-current={listOpen?'page':undefined}>
+                <NavBtnWrap>
+                  <Layers size={20}/>
+                  {sorted.length > 0 && <NavBadge>{sorted.length > 99 ? '99+' : sorted.length}</NavBadge>}
+                </NavBtnWrap>
+                רשימה
+              </NavBtn>
+            </MobileNav>
+          )
+        })()}
       </ErrorBoundary>
     </Wrap>
   )

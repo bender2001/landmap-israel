@@ -197,6 +197,71 @@ export const CountUpNumber = ({ value, duration = 1000 }: { value: number; durat
 }
 const CountWrap = styled.span`animation:${countUp} 0.4s ease-out;display:inline-block;`
 
+/* ── AnimatedValue — smoothly interpolates between values with formatted output ── */
+export const AnimatedValue = ({ value, format, duration = 600 }: {
+  value: number; format?: (v: number) => string; duration?: number
+}) => {
+  const [display, setDisplay] = useState(value)
+  const prevRef = useRef(value)
+  const frameRef = useRef(0)
+
+  useEffect(() => {
+    const from = prevRef.current
+    const to = value
+    prevRef.current = value
+    if (from === to) return
+    const t0 = performance.now()
+    const step = (now: number) => {
+      const progress = Math.min((now - t0) / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 4) // ease-out quartic
+      setDisplay(Math.round(from + (to - from) * eased))
+      if (progress < 1) frameRef.current = requestAnimationFrame(step)
+    }
+    cancelAnimationFrame(frameRef.current)
+    frameRef.current = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(frameRef.current)
+  }, [value, duration])
+
+  return <AnimValWrap>{format ? format(display) : display.toLocaleString()}</AnimValWrap>
+}
+const AnimValWrap = styled.span`display:inline-block;transition:color 0.3s;`
+
+/* ── DemoModeBanner — shows when app is in demo/fallback mode ── */
+const demoPulse = keyframes`0%,100%{opacity:0.8}50%{opacity:1}`
+const demoSlideIn = keyframes`from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}`
+const DemoBannerWrap = styled.div`
+  position:fixed;top:0;left:0;right:0;z-index:${t.z.toast + 5};
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:8px 20px;direction:rtl;
+  background:linear-gradient(135deg, rgba(245,158,11,0.95), rgba(217,119,6,0.95));
+  color:#fff;font-size:12px;font-weight:600;font-family:${t.font};
+  box-shadow:0 2px 12px rgba(245,158,11,0.3);
+  animation:${demoSlideIn} 0.35s cubic-bezier(0.32,0.72,0,1);
+`
+const DemoBannerDot = styled.span`
+  width:6px;height:6px;border-radius:50%;background:#FDE68A;flex-shrink:0;
+  animation:${demoPulse} 2s ease-in-out infinite;
+`
+const DemoBannerClose = styled.button`
+  padding:2px 10px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);
+  border-radius:${t.r.full};color:#fff;font-size:11px;font-weight:600;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};
+  &:hover{background:rgba(255,255,255,0.35);}
+`
+
+export const DemoModeBanner = ({ onRetry, onDismiss }: { onRetry?: () => void; onDismiss?: () => void }) => {
+  const [dismissed, setDismissed] = useState(false)
+  if (dismissed) return null
+  return (
+    <DemoBannerWrap>
+      <DemoBannerDot />
+      <span>⚠️ מצב הדגמה — הנתונים אינם מעודכנים</span>
+      {onRetry && <DemoBannerClose onClick={onRetry}>🔄 נסה שוב</DemoBannerClose>}
+      <DemoBannerClose onClick={() => { setDismissed(true); onDismiss?.() }}>✕</DemoBannerClose>
+    </DemoBannerWrap>
+  )
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    CUSTOM FORM COMPONENTS
    ═══════════════════════════════════════════════════════════════════ */
