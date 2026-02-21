@@ -3,10 +3,10 @@ import { useSearchParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink, MessageCircle, Clock, Building2, BarChart3, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation } from '../hooks'
+import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation, useOnlineStatus } from '../hooks'
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
-import { ErrorBoundary, Spinner, useToast, Badge } from '../components/UI'
+import { ErrorBoundary, Spinner, useToast, Badge, NetworkBanner } from '../components/UI'
 import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance, zoningLabels, calcAggregateStats, SITE_CONFIG } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
@@ -405,6 +405,7 @@ export default function Explore() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [cityStatsDismissed, setCityStatsDismissed] = useState(false)
   const userGeo = useUserLocation()
+  const { online, wasOffline } = useOnlineStatus()
 
   // Mobile calculator state
   const [calcPrice, setCalcPrice] = useState(500000)
@@ -657,6 +658,7 @@ export default function Explore() {
   return (
     <Wrap className="dark">
       <ErrorBoundary>
+        <NetworkBanner online={online} wasOffline={wasOffline} onRetry={() => window.location.reload()} />
         <TopProgress $show={isLoading} />
         {isLoading && <Loader><Spinner size={36} /></Loader>}
         <MapArea

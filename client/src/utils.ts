@@ -321,6 +321,51 @@ export function removeOgMeta(properties: string[]) {
   }
 }
 
+// ── CSV Export ──
+export function exportPlotsCsv(plots: Plot[], filename = 'landmap-plots.csv') {
+  if (!plots.length) return
+
+  const headers = ['עיר', 'גוש', 'חלקה', 'מחיר (₪)', 'שטח (מ״ר)', '₪/מ״ר', 'תשואה (%)', 'ציון', 'דירוג', 'שלב תכנוני', 'סטטוס']
+  const rows = plots.map(plot => {
+    const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
+    const pps = pricePerSqm(plot)
+    return [
+      plot.city || '',
+      d.block,
+      plot.number || '',
+      d.price,
+      d.size,
+      pps,
+      Math.round(r),
+      score,
+      grade.grade,
+      zoningLabels[d.zoning] || d.zoning,
+      statusLabels[plot.status || 'AVAILABLE'] || plot.status || '',
+    ]
+  })
+
+  // BOM for Hebrew UTF-8 support in Excel
+  const BOM = '\uFEFF'
+  const csvContent = BOM + [
+    headers.join(','),
+    ...rows.map(row => row.map(cell => {
+      const str = String(cell)
+      // Escape cells containing commas, quotes, or newlines
+      return str.includes(',') || str.includes('"') || str.includes('\n')
+        ? `"${str.replace(/"/g, '""')}"`
+        : str
+    }).join(',')),
+  ].join('\n')
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 // ── Normalize ──
 export function normalizePlot(plot: Plot): Plot {
   return { ...plot, total_price: plot.totalPrice ?? plot.total_price, projected_value: plot.projectedValue ?? plot.projected_value,

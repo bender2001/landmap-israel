@@ -1,9 +1,9 @@
 import { memo, useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon } from 'lucide-react'
+import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, pricePerSqm, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, pricePerSqm, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv } from '../utils'
 import { Skeleton } from './UI'
 import type { Plot } from '../types'
 
@@ -56,6 +56,15 @@ const CloseBtn = styled.button`
   border-radius:${t.r.sm};background:transparent;border:1px solid ${t.border};
   color:${t.textSec};cursor:pointer;transition:all ${t.tr};
   &:hover{background:${t.hover};color:${t.text};border-color:${t.goldBorder};}
+`
+
+const ExportBtn = styled.button`
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  padding:5px 12px;border-radius:${t.r.sm};
+  background:transparent;border:1px solid ${t.border};
+  color:${t.textSec};cursor:pointer;font-size:11px;font-weight:600;font-family:${t.font};
+  transition:all ${t.tr};white-space:nowrap;
+  &:hover{background:${t.goldDim};color:${t.gold};border-color:${t.goldBorder};}
 `
 
 const Body = styled.div`
@@ -492,9 +501,16 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, u
           <Title>
             <List size={16} color={t.gold} />
             חלקות
-            <Count>{cityFilter ? visiblePlots.length : plots.length}</Count>
+            <Count>{cityFilter ? allVisiblePlots.length : plots.length}</Count>
           </Title>
-          <CloseBtn onClick={onToggle} aria-label="סגור"><X size={16} /></CloseBtn>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {allVisiblePlots.length > 0 && (
+              <ExportBtn onClick={() => exportPlotsCsv(allVisiblePlots, `landmap-${cityFilter || 'all'}-${new Date().toISOString().slice(0, 10)}.csv`)} title="ייצוא לאקסל">
+                <Download size={13} /> CSV
+              </ExportBtn>
+            )}
+            <CloseBtn onClick={onToggle} aria-label="סגור"><X size={16} /></CloseBtn>
+          </div>
         </Header>
         {/* Summary stats bar */}
         {stats && plots.length > 0 && (

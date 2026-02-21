@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { X, Phone, Mail, User, CheckCircle2 } from 'lucide-react'
 import { t, sm } from '../theme'
-import { useCreateLead } from '../hooks'
+import { useCreateLead, useFocusTrap } from '../hooks'
 import { useToast, GoldButton } from './UI'
 import type { Plot } from '../types'
 import { p } from '../utils'
@@ -93,6 +93,7 @@ export default function LeadModal({ plot, open, onClose }: Props) {
   const [closing, setClosing] = useState(false)
   const { toast } = useToast()
   const mutation = useCreateLead()
+  const focusTrapRef = useFocusTrap(open && !success)
 
   const close = useCallback(() => {
     setClosing(true)
@@ -117,7 +118,7 @@ export default function LeadModal({ plot, open, onClose }: Props) {
 
   return (
     <Backdrop $open={open || closing} $closing={closing} onClick={close}>
-      <Card $closing={closing} onClick={e => e.stopPropagation()}>
+      <Card $closing={closing} onClick={e => e.stopPropagation()} ref={focusTrapRef as React.Ref<HTMLDivElement>} role="dialog" aria-modal="true" aria-label="קבלת פרטים">
         <GoldBar />
         {success ? (
           <SuccessWrap>

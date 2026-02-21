@@ -360,6 +360,83 @@ export function useDebounce<T>(value: T, ms = 300): T {
   return debounced
 }
 
+// ── Online/Offline Status ──
+
+export function useOnlineStatus() {
+  const [online, setOnline] = useState(() => navigator.onLine)
+  const [wasOffline, setWasOffline] = useState(false)
+
+  useEffect(() => {
+    const goOnline = () => {
+      setOnline(true)
+      // Show "reconnected" briefly
+      if (!navigator.onLine) return
+      setWasOffline(true)
+      setTimeout(() => setWasOffline(false), 3000)
+    }
+    const goOffline = () => setOnline(false)
+
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
+
+  return { online, wasOffline }
+}
+
+// ── Focus Trap (for modals) ──
+
+export function useFocusTrap(active: boolean) {
+  const ref = React.useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!active || !ref.current) return
+
+    const el = ref.current
+    const focusableSelector = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+    const previouslyFocused = document.activeElement as HTMLElement | null
+
+    // Focus first focusable element
+    const focusables = el.querySelectorAll<HTMLElement>(focusableSelector)
+    if (focusables.length) {
+      requestAnimationFrame(() => focusables[0].focus())
+    }
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return
+      const nodes = el.querySelectorAll<HTMLElement>(focusableSelector)
+      if (!nodes.length) return
+
+      const first = nodes[0]
+      const last = nodes[nodes.length - 1]
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+
+    el.addEventListener('keydown', handler)
+    return () => {
+      el.removeEventListener('keydown', handler)
+      // Restore focus when trap is deactivated
+      previouslyFocused?.focus?.()
+    }
+  }, [active])
+
+  return ref
+}
+
 // ── Market Overview ──
 
 export function useMarketOverview() {

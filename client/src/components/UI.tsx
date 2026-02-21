@@ -519,7 +519,58 @@ const StLabel = styled.div`font-size:12px;color:${t.textDim};`
 const StVal = styled.div`font-size:20px;font-weight:800;color:${t.text};margin-top:1px;`
 const StTrend = styled.div<{ $up: boolean }>`display:flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:${({ $up }) => $up ? t.ok : t.err};`
 
-/* ── 8. ScrollToTop ── */
+/* ── 8. NetworkBanner ── */
+const bannerSlide = keyframes`from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}`
+const bannerFade = keyframes`from{opacity:0}to{opacity:1}`
+
+const BannerWrap = styled.div<{ $type: 'offline' | 'reconnected' }>`
+  position:fixed;top:0;left:0;right:0;z-index:${t.z.toast + 10};
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:10px 20px;direction:rtl;
+  background:${pr => pr.$type === 'offline'
+    ? 'linear-gradient(135deg, #991B1B, #DC2626)'
+    : 'linear-gradient(135deg, #065F46, #10B981)'};
+  color:#fff;font-size:13px;font-weight:600;font-family:${t.font};
+  box-shadow:0 4px 20px rgba(0,0,0,0.25);
+  animation:${bannerSlide} 0.35s cubic-bezier(0.32,0.72,0,1);
+`
+const BannerDot = styled.span<{ $type: 'offline' | 'reconnected' }>`
+  width:8px;height:8px;border-radius:50%;flex-shrink:0;
+  background:${pr => pr.$type === 'offline' ? '#FCA5A5' : '#6EE7B7'};
+  ${pr => pr.$type === 'offline' && `animation: ${pulse} 1.5s ease-in-out infinite;`}
+`
+const BannerRetryBtn = styled.button`
+  padding:4px 14px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);
+  border-radius:${t.r.full};color:#fff;font-size:12px;font-weight:700;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};
+  &:hover{background:rgba(255,255,255,0.35);}
+`
+
+export const NetworkBanner = ({ online, wasOffline, onRetry }: {
+  online: boolean; wasOffline: boolean; onRetry?: () => void
+}) => {
+  if (online && !wasOffline) return null
+
+  if (!online) {
+    return (
+      <BannerWrap $type="offline">
+        <BannerDot $type="offline" />
+        <span>אין חיבור לאינטרנט</span>
+        {onRetry && <BannerRetryBtn onClick={onRetry}>נסה שוב</BannerRetryBtn>}
+      </BannerWrap>
+    )
+  }
+
+  // wasOffline — show reconnected briefly
+  return (
+    <BannerWrap $type="reconnected">
+      <BannerDot $type="reconnected" />
+      <span>החיבור חזר ✓</span>
+    </BannerWrap>
+  )
+}
+
+/* ── 9. ScrollToTop ── */
 const scrollFadeIn = keyframes`from{opacity:0;transform:translateY(12px) scale(0.9)}to{opacity:1;transform:translateY(0) scale(1)}`
 
 const STTBtn = styled.button<{ $visible: boolean }>`

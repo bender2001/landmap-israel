@@ -2,8 +2,9 @@ import { memo, useMemo, useCallback, useEffect } from 'react'
 import styled, { keyframes, css } from 'styled-components'
 import { X, TrendingUp, TrendingDown, MapPin, Ruler, DollarSign, BarChart3, ExternalLink, Star, Shield, Clock, Award } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, pricePerSqm, statusLabels, statusColors, zoningLabels, calcCAGR, calcTimeline, calcRisk } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, pricePerSqm, statusLabels, statusColors, zoningLabels, calcCAGR, calcTimeline, calcRisk, exportPlotsCsv } from '../utils'
 import { GoldButton, Badge } from './UI'
+import { useFocusTrap } from '../hooks'
 import type { Plot } from '../types'
 
 /* ── Animations ── */
@@ -140,6 +141,8 @@ function findBest(plots: Plot[], getValue: (pl: Plot) => number, lowerIsBetter =
 }
 
 function CompareDrawer({ open, onClose, plots, allPlots }: CompareDrawerProps) {
+  const focusTrapRef = useFocusTrap(open)
+
   // Close on Escape
   useEffect(() => {
     if (!open) return
@@ -194,10 +197,24 @@ function CompareDrawer({ open, onClose, plots, allPlots }: CompareDrawerProps) {
   return (
     <>
       <Backdrop $open={open} onClick={onClose} />
-      <Panel $open={open} role="dialog" aria-label="השוואת חלקות">
+      <Panel $open={open} role="dialog" aria-modal="true" aria-label="השוואת חלקות" ref={focusTrapRef as any}>
         <Header>
           <Title><BarChart3 size={20} color={t.gold} /> השוואת {plots.length} חלקות</Title>
-          <CloseBtn onClick={onClose} aria-label="סגור"><X size={18} /></CloseBtn>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => exportPlotsCsv(plots, `landmap-compare-${new Date().toISOString().slice(0, 10)}.csv`)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px',
+                background: 'transparent', border: `1px solid ${t.border}`, borderRadius: t.r.sm,
+                color: t.textSec, fontSize: 11, fontWeight: 600, fontFamily: t.font, cursor: 'pointer',
+                transition: `all ${t.tr}`,
+              }}
+              title="ייצוא השוואה ל-CSV"
+            >
+              ↓ CSV
+            </button>
+            <CloseBtn onClick={onClose} aria-label="סגור"><X size={18} /></CloseBtn>
+          </div>
         </Header>
 
         {metrics ? (
