@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, Shield, Share2, Copy, Check, Waves, TreePine, Hospital } from 'lucide-react'
+import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler } from 'lucide-react'
 import { t, sm, md, lg, fadeInUp } from '../theme'
-import { usePlot, useFavorites } from '../hooks'
+import { usePlot, useFavorites, useSimilarPlots } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard } from '../components/UI'
 import { PublicLayout } from '../components/Layout'
-import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, plotCenter } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, plotCenter } from '../utils'
 import type { Plot } from '../types'
 
 const LeadModal = lazy(() => import('../components/LeadModal'))
@@ -45,6 +45,46 @@ const BottomBar = styled.div`position:fixed;bottom:0;left:0;right:0;z-index:40;b
 const BarPrice = styled.span`font-size:20px;font-weight:800;color:${t.lText};font-family:${t.font};`
 
 const Center = styled.div`display:flex;align-items:center;justify-content:center;min-height:60vh;`
+
+/* ── Mortgage Calculator ── */
+const CalcWrap = styled.div`display:flex;flex-direction:column;gap:14px;`
+const CalcSliderRow = styled.div`display:flex;flex-direction:column;gap:6px;`
+const CalcSliderLabel = styled.div`display:flex;align-items:center;justify-content:space-between;font-size:12px;`
+const CalcSliderName = styled.span`color:${t.lTextSec};font-weight:600;`
+const CalcSliderVal = styled.span`color:${t.lText};font-weight:700;font-size:13px;font-family:${t.font};`
+const CalcSlider = styled.input.attrs({ type: 'range' })`
+  width:100%;height:6px;-webkit-appearance:none;appearance:none;outline:none;border-radius:3px;
+  background:linear-gradient(90deg,${t.gold} 0%,${t.gold} var(--pct,50%),${t.lBorder} var(--pct,50%),${t.lBorder} 100%);
+  &::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+    background:linear-gradient(135deg,${t.gold},${t.goldBright});cursor:pointer;
+    box-shadow:0 2px 8px rgba(212,168,75,0.35);transition:transform 0.15s;border:2px solid #fff;}
+  &::-webkit-slider-thumb:hover{transform:scale(1.15);}
+  &::-moz-range-thumb{width:18px;height:18px;border-radius:50%;
+    background:linear-gradient(135deg,${t.gold},${t.goldBright});cursor:pointer;border:2px solid #fff;}
+`
+const CalcResult = styled.div`
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px;
+  background:linear-gradient(135deg,rgba(212,168,75,0.06),rgba(212,168,75,0.02));
+  border:1px solid ${t.goldBorder};border-radius:${t.r.md};
+`
+const CalcResultItem = styled.div`text-align:center;`
+const CalcResultVal = styled.div<{$gold?:boolean}>`font-size:18px;font-weight:800;color:${pr => pr.$gold ? t.gold : t.lText};font-family:${t.font};`
+const CalcResultLabel = styled.div`font-size:11px;color:${t.lTextSec};margin-top:2px;`
+
+/* ── Similar Plots ── */
+const SimilarGrid = styled.div`display:grid;grid-template-columns:repeat(2,1fr);gap:12px;${sm}{grid-template-columns:1fr;}`
+const SimilarCard = styled(Link)`
+  display:flex;flex-direction:column;gap:8px;padding:14px;
+  background:${t.lBg};border:1px solid ${t.lBorder};border-radius:${t.r.md};
+  text-decoration:none!important;color:inherit;transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};box-shadow:${t.sh.sm};transform:translateY(-2px);}
+`
+const SimilarTop = styled.div`display:flex;align-items:center;justify-content:space-between;gap:8px;`
+const SimilarCity = styled.span`font-size:13px;font-weight:700;color:${t.lText};`
+const SimilarBlock = styled.span`font-size:11px;color:${t.lTextSec};`
+const SimilarMetrics = styled.div`display:flex;align-items:center;gap:10px;flex-wrap:wrap;`
+const SimilarMetric = styled.span`font-size:12px;color:${t.lTextSec};display:flex;align-items:center;gap:3px;`
+const SimilarVal = styled.span<{$gold?:boolean}>`font-weight:700;color:${pr => pr.$gold ? t.gold : t.lText};`
 
 /* ── Mini Map ── */
 const MiniMapWrap = styled.div`
@@ -173,6 +213,9 @@ export default function PlotDetail() {
   const { isFav, toggle } = useFavorites()
   const [leadOpen, setLeadOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [ltvPct, setLtvPct] = useState(50)
+  const [loanYears, setLoanYears] = useState(15)
+  const [interestRate, setInterestRate] = useState(6)
 
   const handleShare = async () => {
     const url = window.location.href
@@ -189,11 +232,14 @@ export default function PlotDetail() {
   // Track recently viewed
   useEffect(() => { if (id) trackRecentlyViewed(id) }, [id])
 
+  const { data: similarPlots = [] } = useSimilarPlots(id)
+
   if (isLoading) return <PublicLayout><PlotDetailSkeleton /></PublicLayout>
   if (error || !plot) return <PublicLayout><Center><p style={{color:t.lTextSec}}>Plot not found</p></Center></PublicLayout>
 
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
   const cagr = calcCAGR(r, d.readiness), timeline = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot)
+  const mortgage = d.price > 0 ? calcMonthly(d.price, ltvPct / 100, interestRate / 100, loanYears) : null
 
   return (
     <PublicLayout>
@@ -341,8 +387,95 @@ export default function PlotDetail() {
                   </div>
                 </Card>
               ) : null}
+
+              {/* Mortgage Calculator */}
+              {d.price > 0 && (
+                <Card $delay={0.35}>
+                  <CardTitle><Calculator size={18} color={t.gold} /> מחשבון מימון</CardTitle>
+                  <CalcWrap>
+                    <CalcSliderRow>
+                      <CalcSliderLabel>
+                        <CalcSliderName>אחוז מימון (LTV)</CalcSliderName>
+                        <CalcSliderVal>{ltvPct}%</CalcSliderVal>
+                      </CalcSliderLabel>
+                      <CalcSlider min={10} max={80} step={5} value={ltvPct}
+                        style={{ '--pct': `${((ltvPct - 10) / 70) * 100}%` } as React.CSSProperties}
+                        onChange={e => setLtvPct(Number(e.target.value))} />
+                    </CalcSliderRow>
+                    <CalcSliderRow>
+                      <CalcSliderLabel>
+                        <CalcSliderName>ריבית שנתית</CalcSliderName>
+                        <CalcSliderVal>{interestRate}%</CalcSliderVal>
+                      </CalcSliderLabel>
+                      <CalcSlider min={2} max={12} step={0.5} value={interestRate}
+                        style={{ '--pct': `${((interestRate - 2) / 10) * 100}%` } as React.CSSProperties}
+                        onChange={e => setInterestRate(Number(e.target.value))} />
+                    </CalcSliderRow>
+                    <CalcSliderRow>
+                      <CalcSliderLabel>
+                        <CalcSliderName>תקופת הלוואה</CalcSliderName>
+                        <CalcSliderVal>{loanYears} שנים</CalcSliderVal>
+                      </CalcSliderLabel>
+                      <CalcSlider min={5} max={30} step={1} value={loanYears}
+                        style={{ '--pct': `${((loanYears - 5) / 25) * 100}%` } as React.CSSProperties}
+                        onChange={e => setLoanYears(Number(e.target.value))} />
+                    </CalcSliderRow>
+                    {mortgage && (
+                      <CalcResult>
+                        <CalcResultItem>
+                          <CalcResultVal $gold>{fmt.price(mortgage.monthly)}</CalcResultVal>
+                          <CalcResultLabel>החזר חודשי</CalcResultLabel>
+                        </CalcResultItem>
+                        <CalcResultItem>
+                          <CalcResultVal>{fmt.price(mortgage.down)}</CalcResultVal>
+                          <CalcResultLabel>הון עצמי</CalcResultLabel>
+                        </CalcResultItem>
+                        <CalcResultItem>
+                          <CalcResultVal>{fmt.price(mortgage.loan)}</CalcResultVal>
+                          <CalcResultLabel>סכום הלוואה</CalcResultLabel>
+                        </CalcResultItem>
+                        <CalcResultItem>
+                          <CalcResultVal>{fmt.price(mortgage.monthly * loanYears * 12)}</CalcResultVal>
+                          <CalcResultLabel>סה״כ החזר</CalcResultLabel>
+                        </CalcResultItem>
+                      </CalcResult>
+                    )}
+                  </CalcWrap>
+                </Card>
+              )}
             </div>
           </Grid>
+
+          {/* Similar Plots */}
+          {similarPlots.length > 0 && (
+            <div style={{ marginTop: 32 }}>
+              <Card $delay={0.4}>
+                <CardTitle><BarChart3 size={18} color={t.gold} /> חלקות דומות באזור</CardTitle>
+                <SimilarGrid>
+                  {similarPlots.slice(0, 4).map(sp => {
+                    const sd = p(sp), sr = roi(sp), sg = getGrade(calcScore(sp)), spps = pricePerSqm(sp)
+                    return (
+                      <SimilarCard key={sp.id} to={`/plot/${sp.id}`}>
+                        <SimilarTop>
+                          <div>
+                            <SimilarCity>{sp.city}</SimilarCity>
+                            <SimilarBlock>גוש {sd.block} · חלקה {sp.number}</SimilarBlock>
+                          </div>
+                          <Badge $color={sg.color} style={{ fontSize: 11 }}>{sg.grade}</Badge>
+                        </SimilarTop>
+                        <SimilarMetrics>
+                          <SimilarMetric><DollarSign size={11} /><SimilarVal $gold>{fmt.compact(sd.price)}</SimilarVal></SimilarMetric>
+                          <SimilarMetric><Ruler size={11} /><SimilarVal>{fmt.num(sd.size)} מ״ר</SimilarVal></SimilarMetric>
+                          {sr > 0 && <SimilarMetric><TrendingUp size={11} /><SimilarVal style={{ color: t.ok }}>{Math.round(sr)}%</SimilarVal></SimilarMetric>}
+                          {spps > 0 && <SimilarMetric>₪/מ״ר <SimilarVal>{fmt.num(spps)}</SimilarVal></SimilarMetric>}
+                        </SimilarMetrics>
+                      </SimilarCard>
+                    )
+                  })}
+                </SimilarGrid>
+              </Card>
+            </div>
+          )}
         </Page>
 
         <BottomBar>
