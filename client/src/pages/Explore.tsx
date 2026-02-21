@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import styled from 'styled-components'
-import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown } from 'lucide-react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import styled, { keyframes } from 'styled-components'
+import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2 } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { useAllPlots, useFavorites, useDebounce } from '../hooks'
+import { useAllPlots, useFavorites, useCompare, useDebounce } from '../hooks'
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, Spinner } from '../components/UI'
@@ -18,6 +18,10 @@ const Chat = lazy(() => import('../components/Chat'))
 const PlotListPanel = lazy(() => import('../components/PlotListPanel'))
 
 const DEFAULTS: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '' }
+
+/* ── animations ── */
+const slideUp = keyframes`from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}`
+const chipPop = keyframes`from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}`
 
 /* ── styled ── */
 const Wrap = styled.div`position:relative;width:100vw;height:100vh;height:100dvh;overflow:hidden;background:${t.bg};`
@@ -69,6 +73,40 @@ const SortOption = styled.button<{$active?:boolean}>`
   &:hover{background:${t.hover};color:${t.gold};}
 `
 
+/* ── Compare Bar (floating bottom tray) ── */
+const CompareBar = styled.div`
+  position:absolute;bottom:42px;left:50%;transform:translateX(-50%);z-index:${t.z.filter};
+  display:flex;align-items:center;gap:12px;padding:10px 18px;direction:rtl;
+  background:${t.glass};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid ${t.goldBorder};border-radius:${t.r.xl};box-shadow:${t.sh.lg};
+  animation:${slideUp} 0.3s cubic-bezier(0.32,0.72,0,1);
+  ${mobile}{bottom:96px;left:8px;right:8px;transform:none;padding:8px 14px;gap:8px;}
+`
+const CompareChip = styled.div`
+  display:flex;align-items:center;gap:6px;padding:4px 12px;
+  background:${t.goldDim};border:1px solid ${t.goldBorder};border-radius:${t.r.full};
+  font-size:12px;font-weight:600;color:${t.gold};animation:${chipPop} 0.2s ease-out;
+  white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;
+`
+const CompareChipX = styled.button`
+  display:flex;align-items:center;justify-content:center;background:none;border:none;
+  color:${t.goldBright};cursor:pointer;padding:0;flex-shrink:0;
+  &:hover{color:${t.text};}
+`
+const CompareAction = styled.button`
+  display:inline-flex;align-items:center;gap:6px;padding:8px 18px;
+  background:linear-gradient(135deg,${t.gold},${t.goldBright});color:${t.bg};
+  border:none;border-radius:${t.r.full};font-weight:700;font-size:13px;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};white-space:nowrap;
+  &:hover{box-shadow:${t.sh.glow};transform:translateY(-1px);}
+`
+const CompareClear = styled.button`
+  display:flex;align-items:center;justify-content:center;width:32px;height:32px;
+  background:transparent;border:1px solid ${t.border};border-radius:${t.r.sm};
+  color:${t.textSec};cursor:pointer;transition:all ${t.tr};flex-shrink:0;
+  &:hover{border-color:${t.err};color:${t.err};background:rgba(239,68,68,0.08);}
+`
+
 // ── URL ↔ Filters sync helpers ──
 const FILTER_PARAMS: (keyof Filters)[] = ['city', 'priceMin', 'priceMax', 'sizeMin', 'sizeMax', 'ripeness', 'minRoi', 'zoning', 'search']
 
@@ -102,6 +140,8 @@ export default function Explore() {
   const [sortOpen, setSortOpen] = useState(false)
   const [listOpen, setListOpen] = useState(false)
   const { isFav, toggle, ids: favIds } = useFavorites()
+  const { ids: compareIds, toggle: toggleCompare, clear: clearCompare, has: isCompared } = useCompare()
+  const navigate = useNavigate()
   const sortRef = useRef<HTMLDivElement>(null)
 
   // Sync filters → URL params (debounced to avoid spam)
@@ -185,6 +225,7 @@ export default function Explore() {
           plots={sorted} pois={pois} selected={selected} darkMode
           onSelect={setSelected} onLead={setLeadPlot}
           favorites={{ isFav, toggle }}
+          compare={{ has: isCompared, toggle: toggleCompare }}
         />
         <FilterBar filters={filters} onChange={setFilters} resultCount={filtered.length} />
 
@@ -215,18 +256,39 @@ export default function Explore() {
           />
         </Suspense>
         <Suspense fallback={null}>
-          {selected && <Sidebar plot={selected} open={!!selected} onClose={() => setSelected(null)} onLead={() => setLeadPlot(selected)} plots={sorted} onNavigate={setSelected} />}
+          {selected && <Sidebar plot={selected} open={!!selected} onClose={() => setSelected(null)} onLead={() => setLeadPlot(selected)} plots={sorted} onNavigate={setSelected} isCompared={isCompared(selected.id)} onToggleCompare={toggleCompare} />}
         </Suspense>
         <Suspense fallback={null}>
           <LeadModal plot={leadPlot} open={!!leadPlot} onClose={() => setLeadPlot(null)} />
         </Suspense>
         <Suspense fallback={null}><Chat plotId={selected?.id ?? null} /></Suspense>
 
+        {/* Floating Compare Bar */}
+        {compareIds.length > 0 && (
+          <CompareBar>
+            <GitCompareArrows size={16} color={t.gold} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>השוואה ({compareIds.length})</span>
+            {sorted.filter(pl => compareIds.includes(pl.id)).slice(0, 3).map(pl => (
+              <CompareChip key={pl.id}>
+                {pl.city} · {pl.number}
+                <CompareChipX onClick={() => toggleCompare(pl.id)}><X size={10} /></CompareChipX>
+              </CompareChip>
+            ))}
+            {compareIds.length >= 2 && (
+              <CompareAction onClick={() => navigate('/compare')}>
+                <GitCompareArrows size={14} /> השווה
+              </CompareAction>
+            )}
+            <CompareClear onClick={clearCompare} aria-label="נקה השוואה"><Trash2 size={14} /></CompareClear>
+          </CompareBar>
+        )}
+
         <Stats>
           <Stat><Val>{filtered.length}</Val> חלקות</Stat>
           <Stat>ממוצע <Val>{fmt.compact(avg)}</Val></Stat>
           {avgPps > 0 && <Stat>₪/מ״ר <Val>{fmt.num(avgPps)}</Val></Stat>}
           {favIds.length > 0 && <Stat><Heart size={12} color={t.gold} /><Val>{favIds.length}</Val> מועדפים</Stat>}
+          {compareIds.length > 0 && <Stat><GitCompareArrows size={12} color={t.gold} /><Val>{compareIds.length}</Val> להשוואה</Stat>}
           <Demo>DEMO</Demo>
         </Stats>
 

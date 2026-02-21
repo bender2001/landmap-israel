@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import styled, { keyframes, css } from 'styled-components'
-import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink } from 'lucide-react'
+import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm } from '../utils'
 import type { Plot } from '../types'
-import { GoldButton, Badge } from './UI'
+import { GoldButton, GhostButton, Badge } from './UI'
 
 /* ── Animations ── */
 const slideIn = keyframes`from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}`
@@ -109,13 +110,25 @@ function Section({ icon: Icon, title, idx, children }: { icon: React.ElementType
   )
 }
 
+/* ── Compare Button ── */
+const CompareBtn = styled.button<{ $active?: boolean }>`
+  display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 16px;
+  background:${pr => pr.$active ? t.goldDim : 'transparent'};
+  color:${pr => pr.$active ? t.gold : t.textSec};
+  border:1px solid ${pr => pr.$active ? t.gold : t.border};border-radius:${t.r.md};
+  font-weight:600;font-size:13px;font-family:${t.font};cursor:pointer;transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
+`
+
 /* ── Main Component ── */
 interface Props {
-  plot: Plot | null; open: boolean; onClose: () => void; onLead?: () => void; onFullPage?: () => void
+  plot: Plot | null; open: boolean; onClose: () => void; onLead?: () => void
   plots?: Plot[]; onNavigate?: (plot: Plot) => void
+  isCompared?: boolean; onToggleCompare?: (id: string) => void
 }
 
-export default function Sidebar({ plot, open, onClose, onLead, onFullPage, plots, onNavigate }: Props) {
+export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate, isCompared, onToggleCompare }: Props) {
+  const navigate = useNavigate()
   if (!plot) return null
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
   const cagr = calcCAGR(r, d.readiness), tl = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot)
@@ -222,7 +235,12 @@ export default function Sidebar({ plot, open, onClose, onLead, onFullPage, plots
 
         <Footer>
           <GoldButton style={{ flex: 1 }} onClick={onLead}><Phone size={16} />קבל פרטים</GoldButton>
-          <FullPageLink onClick={onFullPage}><ExternalLink size={14} />עמוד מלא</FullPageLink>
+          {onToggleCompare && (
+            <CompareBtn $active={isCompared} onClick={() => onToggleCompare(plot.id)} aria-label={isCompared ? 'הסר מהשוואה' : 'הוסף להשוואה'}>
+              <GitCompareArrows size={15} />
+            </CompareBtn>
+          )}
+          <FullPageLink onClick={() => navigate(`/plot/${plot.id}`)}><ExternalLink size={14} />עמוד מלא</FullPageLink>
         </Footer>
       </Panel>
     </>

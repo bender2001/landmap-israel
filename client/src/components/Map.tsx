@@ -1,7 +1,7 @@
 import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, useMap, WMSTileLayer } from 'react-leaflet'
 import L from 'leaflet'
-import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain } from 'lucide-react'
+import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows } from 'lucide-react'
 import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
@@ -24,6 +24,7 @@ interface MapProps {
   onSelect: (plot: Plot) => void
   onLead: (plot: Plot) => void
   favorites: { isFav: (id: string) => boolean; toggle: (id: string) => void }
+  compare?: { has: (id: string) => boolean; toggle: (id: string) => void }
   darkMode?: boolean
 }
 
@@ -178,7 +179,7 @@ function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCada
 }
 
 // ── Main Component ──
-function MapArea({ plots, pois, selected, onSelect, onLead, favorites, darkMode = false }: MapProps) {
+function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, darkMode = false }: MapProps) {
   const [tileIdx, setTileIdx] = useState(0)
   const [showCadastral, setShowCadastral] = useState(false)
   const [showAreas, setShowAreas] = useState(true)
@@ -193,6 +194,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, darkMode 
 
   const renderPopup = useCallback((plot: Plot) => {
     const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score), fav = favorites.isFav(plot.id), pps = pricePerSqm(plot)
+    const comp = compare?.has(plot.id)
     return (
       <div className="plot-popup">
         <div className="plot-popup-header">
@@ -217,10 +219,19 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, darkMode 
           >
             <Heart size={16} fill={fav ? t.gold : 'none'} color={fav ? t.gold : t.textDim} />
           </button>
+          {compare && (
+            <button
+              onClick={() => compare.toggle(plot.id)}
+              style={{ width: 36, height: 36, border: `1px solid ${comp ? t.gold : t.border}`, borderRadius: t.r.sm, background: comp ? t.goldDim : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: `all ${t.tr}` }}
+              title={comp ? 'הסר מהשוואה' : 'הוסף להשוואה'}
+            >
+              <GitCompareArrows size={15} color={comp ? t.gold : t.textDim} />
+            </button>
+          )}
         </div>
       </div>
     )
-  }, [favorites, onLead])
+  }, [favorites, compare, onLead])
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }} className={darkMode ? 'dark' : ''}>
