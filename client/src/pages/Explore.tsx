@@ -69,16 +69,56 @@ const SortOption = styled.button<{$active?:boolean}>`
   &:hover{background:${t.hover};color:${t.gold};}
 `
 
+// ── URL ↔ Filters sync helpers ──
+const FILTER_PARAMS: (keyof Filters)[] = ['city', 'priceMin', 'priceMax', 'sizeMin', 'sizeMax', 'ripeness', 'minRoi', 'zoning', 'search']
+
+function filtersFromParams(sp: URLSearchParams): Filters {
+  const f = { ...DEFAULTS }
+  for (const key of FILTER_PARAMS) {
+    const v = sp.get(key)
+    if (v) f[key] = v
+  }
+  return f
+}
+
+function filtersToParams(f: Filters): URLSearchParams {
+  const sp = new URLSearchParams()
+  for (const key of FILTER_PARAMS) {
+    if (f[key] && f[key] !== DEFAULTS[key]) sp.set(key, f[key])
+  }
+  return sp
+}
+
 export default function Explore() {
-  const [filters, setFilters] = useState<Filters>(DEFAULTS)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [filters, setFiltersRaw] = useState<Filters>(() => filtersFromParams(searchParams))
   const [selected, setSelected] = useState<Plot | null>(null)
   const [leadPlot, setLeadPlot] = useState<Plot | null>(null)
   const [tab, setTab] = useState<'map'|'fav'|'calc'|'areas'>('map')
-  const [sortKey, setSortKey] = useState<SortKey>('recommended')
+  const [sortKey, setSortKey] = useState<SortKey>(() => {
+    const s = searchParams.get('sort')
+    return (s && SORT_OPTIONS.some(o => o.key === s) ? s : 'recommended') as SortKey
+  })
   const [sortOpen, setSortOpen] = useState(false)
   const [listOpen, setListOpen] = useState(false)
   const { isFav, toggle, ids: favIds } = useFavorites()
   const sortRef = useRef<HTMLDivElement>(null)
+
+  // Sync filters → URL params (debounced to avoid spam)
+  const setFilters = useCallback((f: Filters) => {
+    setFiltersRaw(f)
+    const sp = filtersToParams(f)
+    if (sortKey !== 'recommended') sp.set('sort', sortKey)
+    setSearchParams(sp, { replace: true })
+  }, [sortKey, setSearchParams])
+
+  // Sync sort → URL params
+  const setSortWithUrl = useCallback((key: SortKey) => {
+    setSortKey(key)
+    const sp = filtersToParams(filters)
+    if (key !== 'recommended') sp.set('sort', key)
+    setSearchParams(sp, { replace: true })
+  }, [filters, setSearchParams])
 
   const apiFilters = useMemo(() => {
     const f: Record<string, string> = {}
@@ -157,7 +197,7 @@ export default function Explore() {
           {sortOpen && (
             <SortDrop>
               {SORT_OPTIONS.map(o => (
-                <SortOption key={o.key} $active={o.key === sortKey} onClick={() => { setSortKey(o.key); setSortOpen(false) }}>
+                <SortOption key={o.key} $active={o.key === sortKey} onClick={() => { setSortWithUrl(o.key); setSortOpen(false) }}>
                   {o.label}
                 </SortOption>
               ))}

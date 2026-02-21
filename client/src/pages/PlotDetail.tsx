@@ -13,6 +13,88 @@ const LeadModal = lazy(() => import('../components/LeadModal'))
 
 /* ── styled ── */
 const Back = styled(Link)`display:inline-flex;align-items:center;gap:6px;color:${t.lTextSec};font-size:13px;font-weight:500;margin-bottom:16px;text-decoration:none!important;transition:color ${t.tr};&:hover{color:${t.gold};}`
+
+/* ── Breadcrumbs ── */
+const BreadcrumbNav = styled.nav`
+  display:flex;align-items:center;gap:6px;margin-bottom:20px;direction:rtl;
+  font-size:13px;font-family:${t.font};flex-wrap:wrap;
+`
+const BreadcrumbLink = styled(Link)`
+  color:${t.lTextSec};text-decoration:none!important;transition:color ${t.tr};font-weight:500;
+  &:hover{color:${t.gold};}
+`
+const BreadcrumbSep = styled.span`color:${t.lBorder};font-size:11px;`
+const BreadcrumbCurrent = styled.span`color:${t.lText};font-weight:600;`
+
+function Breadcrumbs({ plot }: { plot: Plot }) {
+  const d = p(plot)
+  return (
+    <BreadcrumbNav aria-label="ניווט">
+      <BreadcrumbLink to="/">ראשי</BreadcrumbLink>
+      <BreadcrumbSep>/</BreadcrumbSep>
+      <BreadcrumbLink to="/explore">חלקות</BreadcrumbLink>
+      <BreadcrumbSep>/</BreadcrumbSep>
+      <BreadcrumbLink to={`/explore?city=${encodeURIComponent(plot.city)}`}>{plot.city}</BreadcrumbLink>
+      <BreadcrumbSep>/</BreadcrumbSep>
+      <BreadcrumbCurrent>גוש {d.block} חלקה {plot.number}</BreadcrumbCurrent>
+    </BreadcrumbNav>
+  )
+}
+
+/* ── JSON-LD Structured Data ── */
+function PlotJsonLd({ plot }: { plot: Plot }) {
+  const d = p(plot), center = plotCenter(plot.coordinates)
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'RealEstateListing',
+    name: `גוש ${d.block} חלקה ${plot.number} - ${plot.city}`,
+    description: plot.description || `חלקת קרקע להשקעה ב${plot.city}, גוש ${d.block} חלקה ${plot.number}`,
+    url: window.location.href,
+    ...(d.price > 0 && {
+      offers: {
+        '@type': 'Offer',
+        price: d.price,
+        priceCurrency: 'ILS',
+        availability: plot.status === 'SOLD' ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
+      },
+    }),
+    ...(center && {
+      geo: {
+        '@type': 'GeoCoordinates',
+        latitude: center.lat,
+        longitude: center.lng,
+      },
+    }),
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: plot.city,
+      addressCountry: 'IL',
+    },
+    ...(d.size > 0 && {
+      floorSize: {
+        '@type': 'QuantitativeValue',
+        value: d.size,
+        unitCode: 'MTK',
+        unitText: 'מ״ר',
+      },
+    }),
+    breadcrumb: {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'ראשי', item: `${window.location.origin}/` },
+        { '@type': 'ListItem', position: 2, name: 'חלקות', item: `${window.location.origin}/explore` },
+        { '@type': 'ListItem', position: 3, name: plot.city, item: `${window.location.origin}/explore?city=${encodeURIComponent(plot.city)}` },
+        { '@type': 'ListItem', position: 4, name: `גוש ${d.block} חלקה ${plot.number}` },
+      ],
+    },
+  }
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+    />
+  )
+}
 const Page = styled.div`max-width:1120px;margin:0 auto;padding:24px;direction:rtl;`
 const TitleRow = styled.div`display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px;`
 const TitleLeft = styled.div`display:flex;flex-direction:column;gap:8px;`
@@ -232,6 +314,14 @@ export default function PlotDetail() {
   // Track recently viewed
   useEffect(() => { if (id) trackRecentlyViewed(id) }, [id])
 
+  // Dynamic document title
+  useEffect(() => {
+    if (!plot) return
+    const d = p(plot)
+    document.title = `גוש ${d.block} חלקה ${plot.number} - ${plot.city} | LandMap Israel`
+    return () => { document.title = 'LandMap Israel' }
+  }, [plot])
+
   const { data: similarPlots = [] } = useSimilarPlots(id)
 
   if (isLoading) return <PublicLayout><PlotDetailSkeleton /></PublicLayout>
@@ -244,8 +334,9 @@ export default function PlotDetail() {
   return (
     <PublicLayout>
       <ErrorBoundary>
+        <PlotJsonLd plot={plot} />
         <Page>
-          <Back to="/explore"><ArrowRight size={16} /> חזרה למפה</Back>
+          <Breadcrumbs plot={plot} />
 
           <TitleRow>
             <TitleLeft>
