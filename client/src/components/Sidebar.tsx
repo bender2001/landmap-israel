@@ -119,14 +119,26 @@ const NavBtn = styled.button<{ $disabled?: boolean }>`
 const NavCounter = styled.span`font-size:11px;color:${t.textDim};font-weight:600;`
 
 /* ── Section helper ── */
+let sectionIdCounter = 0
 function Section({ icon: Icon, title, idx, children }: { icon: React.ElementType; title: string; idx: number; children: React.ReactNode }) {
   const [open, setOpen] = useState(idx < 2)
+  const [id] = useState(() => `sidebar-section-${++sectionIdCounter}`)
   return (
     <SectionWrap $i={idx}>
-      <SectionHead $open={open} onClick={() => setOpen(o => !o)}>
+      <SectionHead
+        $open={open}
+        onClick={() => setOpen(o => !o)}
+        role="button"
+        aria-expanded={open}
+        aria-controls={id}
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o) } }}
+      >
         <Icon size={16} color={t.gold} />{title}<span style={{ flex: 1 }} /><ChevronDown size={16} />
       </SectionHead>
-      <SectionBody $open={open}>{children}</SectionBody>
+      <SectionBody id={id} $open={open} role="region" aria-hidden={!open}>
+        {children}
+      </SectionBody>
     </SectionWrap>
   )
 }

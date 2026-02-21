@@ -534,6 +534,20 @@ export function findSimilarPlots(plot: Plot, allPlots: Plot[], limit = 3): Plot[
   return candidates.map(c => c.plot)
 }
 
+// ── Percentile Rank ──
+/** Calculate what percentile a plot falls in by investment score (e.g. "Top 10%") */
+export function calcPercentileRank(plot: Plot, allPlots: Plot[]): { rank: number; label: string; color: string; icon: string } | null {
+  if (allPlots.length < 3) return null
+  const score = calcScore(plot)
+  const betterCount = allPlots.filter(pl => calcScore(pl) > score).length
+  const rank = Math.round((betterCount / allPlots.length) * 100)
+  if (rank <= 5) return { rank, label: 'Top 5%', color: '#10B981', icon: '🏆' }
+  if (rank <= 10) return { rank, label: 'Top 10%', color: '#10B981', icon: '🥇' }
+  if (rank <= 25) return { rank, label: 'Top 25%', color: '#84CC16', icon: '⭐' }
+  if (rank <= 50) return { rank, label: 'Top 50%', color: '#F59E0B', icon: '📊' }
+  return null // Don't show for bottom half
+}
+
 // ── Normalize ──
 export function normalizePlot(plot: Plot): Plot {
   return { ...plot, total_price: plot.totalPrice ?? plot.total_price, projected_value: plot.projectedValue ?? plot.projected_value,

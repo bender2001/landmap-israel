@@ -1,9 +1,9 @@
 import { memo, useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download, Share2 } from 'lucide-react'
+import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download, Share2, MessageCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, SITE_CONFIG } from '../utils'
 import { Skeleton } from './UI'
 import type { Plot } from '../types'
 
@@ -281,6 +281,22 @@ const LocTag = styled.span<{ $c: string }>`
   white-space:nowrap;
 `
 
+/* ── Percentile Rank Badge ── */
+const PercentileBadge = styled.span<{ $c: string }>`
+  display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;
+  padding:2px 7px;border-radius:${t.r.full};color:${pr => pr.$c};
+  background:${pr => pr.$c}12;border:1px solid ${pr => pr.$c}28;
+  white-space:nowrap;letter-spacing:0.3px;
+`
+
+/* ── WhatsApp Quick CTA ── */
+const WaCta = styled.a`
+  display:flex;align-items:center;justify-content:center;width:28px;height:28px;
+  border-radius:${t.r.sm};border:1px solid rgba(37,211,102,0.25);background:rgba(37,211,102,0.08);
+  color:#25D366;cursor:pointer;transition:all ${t.tr};flex-shrink:0;text-decoration:none !important;
+  &:hover{border-color:rgba(37,211,102,0.5);background:rgba(37,211,102,0.15);transform:scale(1.08);}
+`
+
 /* ── Zoning Pipeline Mini Bar ── */
 const ZoningBar = styled.div`
   display:flex;align-items:center;gap:2px;margin-top:6px;width:100%;
@@ -456,6 +472,7 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userL
   const ppd = pricePerDunam(plot)
   const isNew = dom && dom.days <= 7
   const isHot = score >= 9
+  const percentile = calcPercentileRank(plot, allPlots)
 
   // Zoning pipeline stage
   const zoningIdx = zoningPipeline.findIndex(z => z.key === d.zoning)
@@ -469,6 +486,7 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userL
           <ItemBadge $c={sColor}>{statusLabels[status] || status}</ItemBadge>
           {isNew && <NewBadge>✨ חדש</NewBadge>}
           {isHot && <HotBadge>🔥 HOT</HotBadge>}
+          {percentile && <PercentileBadge $c={percentile.color}>{percentile.icon} {percentile.label}</PercentileBadge>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           {distance != null && <DistanceBadge>📍 {fmtDistance(distance)}</DistanceBadge>}
@@ -522,6 +540,15 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userL
         >
           <Share2 size={12} />
         </DetailLink>
+        <WaCta
+          href={`${SITE_CONFIG.waLink}?text=${encodeURIComponent(`היי, מתעניין/ת בחלקה ${plot.number} גוש ${d.block} ב${plot.city} (${fmt.compact(d.price)}). אשמח לפרטים.`)}`}
+          target="_blank" rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          title="שלח הודעה בוואטסאפ"
+          aria-label={`שלח הודעה בוואטסאפ על חלקה ${plot.number}`}
+        >
+          <MessageCircle size={12} />
+        </WaCta>
         <DetailLink
           onClick={(e) => { e.stopPropagation(); onDetailClick(plot.id) }}
           title="עמוד מלא"
