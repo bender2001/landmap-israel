@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { MapPin, Zap, TrendingUp, ChevronLeft, Phone, Bell, Smartphone, Briefcase, Star, Shield, FileText, Building2, MessageCircle } from 'lucide-react'
+import { MapPin, Zap, TrendingUp, ChevronLeft, ChevronDown, Phone, Bell, Smartphone, Briefcase, Star, Shield, FileText, Building2, MessageCircle, HelpCircle, AlertTriangle } from 'lucide-react'
 import { t, fadeInUp, fadeInScale, shimmer, float, gradientShift, sm, md, lg, mobile } from '../theme'
 import { PublicLayout } from '../components/Layout'
 import { GoldButton, GhostButton, AnimatedCard, CountUpNumber, ScrollToTop } from '../components/UI'
@@ -275,6 +275,56 @@ const CtaGhost = styled(GhostButton).attrs({as:Link})`
   padding:16px 36px;font-size:16px;border-radius:${t.r.full};text-decoration:none !important;
 ` as any
 
+/* ══════ FAQ ══════ */
+const FaqSection = styled.section`
+  padding:80px 24px;direction:rtl;position:relative;
+  background:${t.bg};
+`
+const FaqGrid = styled.div`
+  max-width:780px;margin:0 auto;display:flex;flex-direction:column;gap:12px;
+`
+const FaqItem = styled.div<{$open:boolean}>`
+  background:${t.surface};border:1px solid ${pr=>pr.$open?t.goldBorder:t.border};
+  border-radius:${t.r.lg};overflow:hidden;transition:all 0.35s cubic-bezier(0.32,0.72,0,1);
+  &:hover{border-color:${t.goldBorder};}
+`
+const FaqQ = styled.button`
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  width:100%;padding:18px 22px;background:none;border:none;cursor:pointer;
+  font-family:${t.font};font-size:15px;font-weight:700;color:${t.text};
+  text-align:right;direction:rtl;transition:color ${t.tr};
+  &:hover{color:${t.gold};}
+`
+const FaqChevron = styled.span<{$open:boolean}>`
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  width:28px;height:28px;border-radius:${t.r.sm};
+  background:${pr=>pr.$open?t.goldDim:'transparent'};
+  color:${pr=>pr.$open?t.gold:t.textDim};
+  transition:all 0.35s cubic-bezier(0.32,0.72,0,1);
+  transform:rotate(${pr=>pr.$open?'180deg':'0'});
+`
+const FaqA = styled.div<{$open:boolean}>`
+  max-height:${pr=>pr.$open?'300px':'0'};opacity:${pr=>pr.$open?1:0};
+  overflow:hidden;transition:max-height 0.4s cubic-bezier(0.32,0.72,0,1),opacity 0.3s,padding 0.3s;
+  padding:${pr=>pr.$open?'0 22px 20px':'0 22px'};
+  font-size:14px;color:${t.textSec};line-height:1.8;
+`
+
+/* ══════ DISCLAIMER ══════ */
+const DisclaimerBanner = styled.div`
+  padding:20px 24px;direction:rtl;text-align:center;
+  background:linear-gradient(135deg,rgba(245,158,11,0.06),rgba(245,158,11,0.02));
+  border-top:1px solid rgba(245,158,11,0.15);
+`
+const DisclaimerInner = styled.div`
+  max-width:800px;margin:0 auto;display:flex;align-items:flex-start;gap:10px;
+  justify-content:center;
+  ${mobile}{flex-direction:column;align-items:center;text-align:center;}
+`
+const DisclaimerText = styled.p`
+  font-size:11px;color:${t.textDim};line-height:1.7;margin:0;
+`
+
 /* ── data ── */
 const PARTICLES = Array.from({length:8},(_,i)=>({x:Math.random()*100,size:3+Math.random()*4,dur:8+Math.random()*7,delay:i*1.5}))
 const STATS = [
@@ -302,6 +352,46 @@ const TESTIMONIALS = [
   {name:'אבי ברק',city:'ירושלים',hue:150,initials:'אב',quote:'מצאתי חלקה עם פוטנציאל ענק דרך הפלטפורמה. תוך 18 חודשים הכפלתי את ההשקעה. תודה LandMap!',stars:5},
 ]
 const AVATARS = [{initials:'דכ',hue:220},{initials:'רמ',hue:330},{initials:'אל',hue:160},{initials:'שב',hue:30}]
+
+const FAQ_ITEMS = [
+  { q: 'מה זה קרקע חקלאית להשקעה ואיך מרוויחים ממנה?', a: 'קרקע חקלאית היא קרקע שטרם שונה ייעודה לבנייה. הרווח נוצר כאשר מתקדמות תוכניות סטטוטוריות (תב"ע) שמשנות את ייעוד הקרקע מחקלאית לבנייה — מה שמעלה את ערכה משמעותית. משקיעים שנכנסים בשלבים מוקדמים נהנים מתשואות גבוהות.' },
+  { q: 'מהם השלבים התכנוניים של קרקע בישראל?', a: 'התהליך כולל: קרקע חקלאית → הפקדת תוכנית מתאר → אישור תוכנית מתאר → הכנת תוכנית מפורטת → הפקדת תוכנית מפורטת → אישור תוכנית מפורטת → מכרז יזמים → היתר בנייה. כל שלב שמתקדם מעלה את ערך הקרקע.' },
+  { q: 'מה זה תקן 22 ולמה הוא חשוב?', a: 'תקן 22 הוא תקן שמאי מקרקעין שקובע כיצד לחשב את שווי הקרקע בכל שלב תכנוני. הנתונים ב-LandMap מבוססים על מתודולוגיה זו, מה שמאפשר הערכת שווי מדויקת ומקצועית של כל חלקה.' },
+  { q: 'איך LandMap שונה מ-Madlan או Yad2?', a: 'LandMap מתמחה בקרקעות להשקעה — לא דירות. אנחנו מציעים מפה אינטראקטיבית עם שכבות גוש/חלקה, ניתוח AI לכל חלקה, ציון השקעה מותאם אישית, תחזיות תשואה, ומעקב אחרי התקדמות סטטוטורית — כלים שלא קיימים בפלטפורמות דירות.' },
+  { q: 'האם השימוש בפלטפורמה חינמי?', a: 'כן! צפייה במפה, סינון חלקות וקבלת מידע בסיסי הם חינמיים לחלוטין. משתמשים רשומים נהנים מכלים נוספים כמו שמירת מועדפים, השוואת חלקות ודוחות מפורטים.' },
+  { q: 'כמה זמן לוקח עד שקרקע מניבה רווח?', a: 'תלוי בשלב התכנוני. קרקע בשלב מתקדם (תוכנית מפורטת מאושרת) יכולה להניב תוך 1-3 שנים. קרקע חקלאית בשלבים מוקדמים — 5-10 שנים ומעלה. ככל שנכנסים מוקדם יותר, הסיכון גבוה יותר אך גם פוטנציאל התשואה.' },
+]
+
+/* ── FAQ Accordion ── */
+function FaqAccordion() {
+  const [openIdx, setOpenIdx] = useState<number | null>(null)
+  const toggle = useCallback((i: number) => setOpenIdx(prev => prev === i ? null : i), [])
+  return (
+    <>
+      <FaqGrid>
+        {FAQ_ITEMS.map((item, i) => (
+          <FaqItem key={i} $open={openIdx === i}>
+            <FaqQ onClick={() => toggle(i)} aria-expanded={openIdx === i} aria-controls={`faq-a-${i}`}>
+              {item.q}
+              <FaqChevron $open={openIdx === i}><ChevronDown size={16} /></FaqChevron>
+            </FaqQ>
+            <FaqA id={`faq-a-${i}`} $open={openIdx === i} role="region">{item.a}</FaqA>
+          </FaqItem>
+        ))}
+      </FaqGrid>
+      {/* FAQPage Schema.org JSON-LD for SEO */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: FAQ_ITEMS.map(item => ({
+          '@type': 'Question',
+          name: item.q,
+          acceptedAnswer: { '@type': 'Answer', text: item.a },
+        })),
+      }) }} />
+    </>
+  )
+}
 
 /* ══════ PAGE ══════ */
 export default function Landing(){
@@ -415,6 +505,12 @@ export default function Landing(){
           </TestGrid>
         </TestSection>
 
+        {/* ── FAQ ── */}
+        <FaqSection id="faq">
+          <SectionHead>שאלות נפוצות</SectionHead>
+          <FaqAccordion />
+        </FaqSection>
+
         {/* ── WhatsApp ── */}
         <WaSection>
           <SectionHead style={{marginBottom:24}}>רוצים לדבר עם מומחה?</SectionHead>
@@ -435,6 +531,20 @@ export default function Landing(){
             <CtaGhost to="/login">כניסה למערכת</CtaGhost>
           </FinalBtns>
         </FinalCTA>
+
+        {/* ── Investment Disclaimer ── */}
+        <DisclaimerBanner>
+          <DisclaimerInner>
+            <AlertTriangle size={14} color={t.warn} style={{flexShrink:0,marginTop:2}} />
+            <DisclaimerText>
+              המידע באתר הינו לצרכי מידע כללי בלבד ואינו מהווה ייעוץ השקעות, ייעוץ משפטי או ייעוץ פיננסי.
+              השקעה בקרקעות כרוכה בסיכון, כולל אובדן הקרן. תשואות עבר אינן מעידות על תשואות עתידיות.
+              מומלץ להתייעץ עם אנשי מקצוע מוסמכים לפני קבלת החלטות השקעה. LandMap אינה משמשת כיועצת השקעות
+              ואינה אחראית לנזקים הנובעים מהסתמכות על המידע באתר.
+            </DisclaimerText>
+          </DisclaimerInner>
+        </DisclaimerBanner>
+
         <ScrollToTop />
       </Dark>
     </PublicLayout>

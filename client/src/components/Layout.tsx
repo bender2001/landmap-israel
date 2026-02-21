@@ -118,24 +118,66 @@ const FooterLink = styled(Link)`color: ${t.textSec}; font-size: 13px; text-decor
 const FooterDivider = styled.div`width: 100%; height: 1px; background: ${t.border}; margin: 32px auto 16px;`
 const Copyright = styled.p`text-align: center; font-size: 12px; color: ${t.textDim}; max-width: 1200px; margin: 0 auto;`
 
+const FooterColTitle = styled.span`font-weight:700;color:${t.text};font-size:13px;margin-bottom:4px;`
+const FooterDesc = styled.span`font-size:12px;color:${t.textDim};line-height:1.7;max-width:260px;`
+const FooterSocials = styled.div`display:flex;align-items:center;gap:8px;margin-top:8px;`
+const FooterSocialLink = styled.a`
+  display:flex;align-items:center;justify-content:center;width:34px;height:34px;
+  border-radius:${t.r.sm};border:1px solid ${t.border};color:${t.textSec};
+  text-decoration:none!important;transition:all ${tr};
+  &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
+`
+const FooterBadges = styled.div`
+  display:flex;align-items:center;gap:12px;justify-content:center;margin-top:8px;
+  flex-wrap:wrap;
+`
+const FooterTrustBadge = styled.div`
+  display:flex;align-items:center;gap:5px;padding:4px 10px;
+  border-radius:${t.r.full};background:rgba(255,255,255,0.03);
+  border:1px solid ${t.border};font-size:10px;color:${t.textDim};
+`
+
 export function PublicFooter() {
+  const year = new Date().getFullYear()
   return (
     <FooterWrap>
       <FooterInner>
-        <FooterCol><FooterLogo>LandMap</FooterLogo><span style={{ fontSize: 13 }}>פלטפורמת השקעות קרקע מובילה בישראל</span></FooterCol>
         <FooterCol>
-          <span style={{ fontWeight: 700, color: t.text, fontSize: 13 }}>ניווט</span>
-          {NAV_ITEMS.map(n => <FooterLink key={n.to} to={n.to}>{n.label}</FooterLink>)}
+          <FooterLogo>LandMap</FooterLogo>
+          <FooterDesc>פלטפורמת השקעות קרקע מובילה בישראל — מפה אינטראקטיבית, ניתוח AI ונתוני שוק בזמן אמת.</FooterDesc>
+          <FooterSocials>
+            <FooterSocialLink href="https://wa.me/9720521234567" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" title="WhatsApp">💬</FooterSocialLink>
+            <FooterSocialLink href="mailto:info@landmap.co.il" aria-label="אימייל" title="אימייל">📧</FooterSocialLink>
+            <FooterSocialLink href="tel:052-1234567" aria-label="טלפון" title="טלפון">📞</FooterSocialLink>
+          </FooterSocials>
         </FooterCol>
         <FooterCol>
-          <span style={{ fontWeight: 700, color: t.text, fontSize: 13 }}>משפטי</span>
+          <FooterColTitle>ניווט</FooterColTitle>
+          {NAV_ITEMS.map(n => <FooterLink key={n.to} to={n.to}>{n.label}</FooterLink>)}
+          <FooterLink to="/explore">חיפוש חלקות</FooterLink>
+          <FooterLink to="/login">הרשמה / התחברות</FooterLink>
+        </FooterCol>
+        <FooterCol>
+          <FooterColTitle>משאבים</FooterColTitle>
+          <FooterLink to="/#faq">שאלות נפוצות</FooterLink>
+          <FooterLink to="/about">אודות LandMap</FooterLink>
+          <FooterLink to="/contact">צור קשר</FooterLink>
+        </FooterCol>
+        <FooterCol>
+          <FooterColTitle>משפטי</FooterColTitle>
           <FooterLink to="/terms">תנאי שימוש</FooterLink>
           <FooterLink to="/privacy">מדיניות פרטיות</FooterLink>
-          <FooterLink to="/contact">צור קשר</FooterLink>
+          <FooterLink to="/accessibility">הצהרת נגישות</FooterLink>
         </FooterCol>
       </FooterInner>
       <FooterDivider />
-      <Copyright>&copy; {new Date().getFullYear()} LandMap. כל הזכויות שמורות.</Copyright>
+      <FooterBadges>
+        <FooterTrustBadge>🔒 SSL מאובטח</FooterTrustBadge>
+        <FooterTrustBadge>📋 נתוני תקן 22</FooterTrustBadge>
+        <FooterTrustBadge>🤖 מונע AI</FooterTrustBadge>
+        <FooterTrustBadge>🇮🇱 תוצרת ישראל</FooterTrustBadge>
+      </FooterBadges>
+      <Copyright style={{marginTop:12}}>&copy; {year} LandMap Israel. כל הזכויות שמורות. המידע באתר אינו מהווה ייעוץ השקעות.</Copyright>
     </FooterWrap>
   )
 }
