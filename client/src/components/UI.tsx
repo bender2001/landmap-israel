@@ -455,6 +455,42 @@ const PCFavBtn = styled.button`
   &:hover{transform:scale(1.2);} &:active{transform:scale(0.95);}
 `
 
+/* ── Skeleton Shimmer ── */
+const shimmerSk = keyframes`0%{background-position:-200% 0}100%{background-position:200% 0}`
+
+export const Skeleton = styled.div<{ $w?: string; $h?: string; $r?: string }>`
+  width:${pr => pr.$w || '100%'};height:${pr => pr.$h || '14px'};
+  border-radius:${pr => pr.$r || t.r.sm};
+  background:linear-gradient(90deg,${t.surfaceLight} 25%,rgba(30,41,59,0.6) 50%,${t.surfaceLight} 75%);
+  background-size:200% 100%;animation:${shimmerSk} 1.5s ease-in-out infinite;
+`
+
+export const SkeletonCircle = styled(Skeleton)<{ $size?: number }>`
+  width:${pr => pr.$size || 40}px;height:${pr => pr.$size || 40}px;border-radius:50%;
+`
+
+/* ── Radial Score Ring ── */
+export const RadialScore = ({ score, size = 56, strokeWidth = 4, grade, color }: {
+  score: number; size?: number; strokeWidth?: number; grade: string; color: string
+}) => {
+  const r = (size - strokeWidth) / 2
+  const circ = 2 * Math.PI * r
+  const pct = Math.max(0, Math.min(100, score * 10))
+  const offset = circ - (pct / 100) * circ
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)', flexShrink: 0 }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={t.surfaceLight} strokeWidth={strokeWidth} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={strokeWidth}
+        strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset}
+        style={{ transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1)' }} />
+      <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central"
+        style={{ transform: 'rotate(90deg)', transformOrigin: 'center', fontSize: size * 0.3, fontWeight: 900, fill: color, fontFamily: t.font }}>
+        {grade}
+      </text>
+    </svg>
+  )
+}
+
 /* ── 7. Stat ── */
 export const Stat = ({ icon, label, value, trend, color = t.gold }: {
   icon: ReactNode; label: string; value: string | number; trend?: number; color?: string

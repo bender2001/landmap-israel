@@ -489,6 +489,7 @@ export default function Explore() {
             onSelect={(pl) => { selectPlot(pl); setListOpen(false) }}
             open={listOpen}
             onToggle={() => setListOpen(o => !o)}
+            isLoading={isLoading}
           />
         </Suspense>
         <Suspense fallback={null}>

@@ -1,9 +1,10 @@
-import { memo, useCallback, useMemo, useRef, useEffect } from 'react'
+import { memo, useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, pricePerSqm, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats } from '../utils'
+import { Skeleton } from './UI'
 import type { Plot } from '../types'
 
 /* ── Animations ── */
@@ -155,6 +156,33 @@ const ToggleBtn = styled.button<{ $open: boolean }>`
   }
 `
 
+/* ── City Quick-Filter Chips ── */
+const CityChipRow = styled.div`
+  display:flex;align-items:center;gap:6px;padding:8px 12px;overflow-x:auto;direction:rtl;
+  border-bottom:1px solid ${t.border};flex-shrink:0;
+  scrollbar-width:none;&::-webkit-scrollbar{display:none;}
+`
+const CityChip = styled.button<{ $active: boolean }>`
+  display:inline-flex;align-items:center;gap:4px;padding:4px 12px;white-space:nowrap;
+  border:1px solid ${pr => pr.$active ? t.gold : t.border};
+  border-radius:${t.r.full};font-size:11px;font-weight:600;font-family:${t.font};
+  background:${pr => pr.$active ? t.goldDim : 'transparent'};
+  color:${pr => pr.$active ? t.gold : t.textSec};cursor:pointer;transition:all ${t.tr};flex-shrink:0;
+  &:hover{border-color:${t.goldBorder};color:${t.gold};}
+`
+const CityChipCount = styled.span`
+  font-size:9px;font-weight:800;padding:1px 5px;border-radius:${t.r.full};
+  background:${t.surfaceLight};color:${t.textDim};
+`
+
+/* ── Skeleton Card ── */
+const SkeletonCard = styled.div<{ $i: number }>`
+  display:flex;flex-direction:column;gap:10px;padding:14px;margin-bottom:6px;
+  background:${t.bg};border:1px solid ${t.border};border-radius:${t.r.md};
+  animation:${fadeIn} 0.3s ease-out both;animation-delay:${pr => pr.$i * 0.08}s;
+`
+const SkeletonRow = styled.div`display:flex;align-items:center;gap:8px;`
+
 /* ── Component ── */
 interface Props {
   plots: Plot[]
@@ -162,6 +190,7 @@ interface Props {
   onSelect: (plot: Plot) => void
   open: boolean
   onToggle: () => void
+  isLoading?: boolean
 }
 
 function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick }: {
@@ -219,20 +248,40 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick }: {
   )
 }
 
-function PlotListPanel({ plots, selected, onSelect, open, onToggle }: Props) {
+function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
+  const [cityFilter, setCityFilter] = useState<string | null>(null)
   const stats = useMemo(() => calcAggregateStats(plots), [plots])
   const goToDetail = useCallback((id: string) => navigate(`/plot/${id}`), [navigate])
+
+  // City counts for chips
+  const cityCounts = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const pl of plots) {
+      if (pl.city) map.set(pl.city, (map.get(pl.city) || 0) + 1)
+    }
+    return [...map.entries()].sort((a, b) => b[1] - a[1])
+  }, [plots])
+
+  // Filtered plots by city
+  const visiblePlots = useMemo(() =>
+    cityFilter ? plots.filter(pl => pl.city === cityFilter) : plots
+  , [plots, cityFilter])
+
+  // Reset city filter when plots change substantially
+  useEffect(() => {
+    if (cityFilter && !plots.some(pl => pl.city === cityFilter)) setCityFilter(null)
+  }, [plots, cityFilter])
 
   // Scroll to active item
   useEffect(() => {
     if (!selected || !open || !bodyRef.current) return
-    const idx = plots.findIndex(pl => pl.id === selected.id)
+    const idx = visiblePlots.findIndex(pl => pl.id === selected.id)
     if (idx < 0) return
     const item = bodyRef.current.children[idx] as HTMLElement
     if (item) item.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }, [selected, open, plots])
+  }, [selected, open, visiblePlots])
 
   return (
     <>
@@ -246,7 +295,7 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle }: Props) {
           <Title>
             <List size={16} color={t.gold} />
             חלקות
-            <Count>{plots.length}</Count>
+            <Count>{cityFilter ? visiblePlots.length : plots.length}</Count>
           </Title>
           <CloseBtn onClick={onToggle} aria-label="סגור"><X size={16} /></CloseBtn>
         </Header>
@@ -267,15 +316,51 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle }: Props) {
             </SummaryStat>
           </SummaryBar>
         )}
+        {/* City quick-filter chips */}
+        {cityCounts.length > 1 && (
+          <CityChipRow>
+            <CityChip $active={!cityFilter} onClick={() => setCityFilter(null)}>
+              הכל <CityChipCount>{plots.length}</CityChipCount>
+            </CityChip>
+            {cityCounts.map(([city, count]) => (
+              <CityChip key={city} $active={cityFilter === city} onClick={() => setCityFilter(prev => prev === city ? null : city)}>
+                {city} <CityChipCount>{count}</CityChipCount>
+              </CityChip>
+            ))}
+          </CityChipRow>
+        )}
         <Body ref={bodyRef}>
-          {plots.length === 0 ? (
+          {isLoading ? (
+            /* Skeleton loading cards */
+            Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonCard key={i} $i={i}>
+                <SkeletonRow>
+                  <Skeleton $w="80px" $h="12px" />
+                  <div style={{ flex: 1 }} />
+                  <Skeleton $w="36px" $h="20px" $r={t.r.sm} />
+                </SkeletonRow>
+                <Skeleton $w="140px" $h="10px" />
+                <SkeletonRow>
+                  <Skeleton $w="60px" $h="14px" />
+                  <Skeleton $w="60px" $h="14px" />
+                  <Skeleton $w="40px" $h="14px" />
+                </SkeletonRow>
+              </SkeletonCard>
+            ))
+          ) : visiblePlots.length === 0 ? (
             <EmptyState>
               <MapPin size={32} />
-              <span style={{ fontSize: 14 }}>לא נמצאו חלקות</span>
+              <span style={{ fontSize: 14 }}>{cityFilter ? `לא נמצאו חלקות ב${cityFilter}` : 'לא נמצאו חלקות'}</span>
               <span style={{ fontSize: 12 }}>נסו לשנות את הסינון</span>
+              {cityFilter && (
+                <button onClick={() => setCityFilter(null)} style={{
+                  marginTop: 8, padding: '6px 16px', background: t.goldDim, border: `1px solid ${t.goldBorder}`,
+                  borderRadius: t.r.full, color: t.gold, fontSize: 12, fontWeight: 600, fontFamily: t.font, cursor: 'pointer',
+                }}>הצג את כל הערים</button>
+              )}
             </EmptyState>
           ) : (
-            plots.map((plot, i) => (
+            visiblePlots.map((plot, i) => (
               <PlotItem
                 key={plot.id}
                 plot={plot}

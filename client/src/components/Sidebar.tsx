@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePosition, calcRisk } from '../utils'
 import type { Plot } from '../types'
-import { GoldButton, GhostButton, Badge } from './UI'
+import { GoldButton, GhostButton, Badge, RadialScore } from './UI'
 
 /* ── Animations ── */
 const slideIn = keyframes`from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}`
@@ -315,13 +315,20 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
           <TopRow>
             <Badges>
               <Badge $color={statusColors[plot.status || 'AVAILABLE']}>{statusLabels[plot.status || 'AVAILABLE']}</Badge>
-              <Badge $color={grade.color}>{grade.grade}</Badge>
               {dom && <Badge $color={dom.color}>{dom.label}</Badge>}
             </Badges>
             <CloseBtn onClick={onClose} aria-label="סגור"><X size={18} /></CloseBtn>
           </TopRow>
-          <Title>חלקה {plot.number} · גוש {d.block}</Title>
-          <City>{plot.city}</City>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 4 }}>
+            <RadialScore score={score} grade={grade.grade} color={grade.color} size={52} strokeWidth={4} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Title>חלקה {plot.number} · גוש {d.block}</Title>
+              <City>{plot.city}</City>
+              <div style={{ fontSize: 11, color: grade.color, fontWeight: 700, marginTop: 2 }}>
+                {score}/10 · {grade.grade === 'A+' ? 'מצוין+' : grade.grade === 'A' ? 'מצוין' : grade.grade === 'A-' ? 'טוב מאוד' : grade.grade === 'B+' ? 'טוב' : grade.grade === 'B' ? 'סביר' : grade.grade === 'B-' ? 'מתחת לממוצע' : 'חלש'}
+              </div>
+            </div>
+          </div>
         </Header>
 
         <Body ref={bodyRef}>
