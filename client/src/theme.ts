@@ -131,6 +131,9 @@ export const GlobalStyles = createGlobalStyle`
   .plot-popup-cta{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:12px;width:100%;padding:8px;background:linear-gradient(135deg,${t.gold},${t.goldBright});border:none;border-radius:${t.r.sm};color:${t.bg};font-weight:700;font-size:12px;cursor:pointer;font-family:${t.font};transition:all ${t.tr}}
   .plot-popup-cta:hover{transform:translateY(-1px);box-shadow:${t.sh.glow}}
 
+  /* Ruler / Distance measurement markers */
+  .ruler-point-marker,.ruler-dist-label,.ruler-total-label{background:none!important;border:none!important;pointer-events:none!important}
+
   /* POI / Cluster markers */
   .poi-marker,.city-cluster-marker,.user-location-marker{background:none!important;border:none!important}
   .poi-marker-inner{display:flex;flex-direction:column;align-items:center;gap:2px}

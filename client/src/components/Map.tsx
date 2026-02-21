@@ -1,7 +1,7 @@
 import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker, useMap, WMSTileLayer } from 'react-leaflet'
+import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker, Polyline, useMap, useMapEvents, WMSTileLayer } from 'react-leaflet'
 import L from 'leaflet'
-import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette } from 'lucide-react'
+import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette, Ruler, Undo2, Trash2 } from 'lucide-react'
 import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
@@ -212,6 +212,161 @@ function PlotBoundsTracker({ plots }: { plots: Plot[] }) {
   return null
 }
 
+// ── Distance helpers ──
+function haversineDistance(a: L.LatLng, b: L.LatLng): number {
+  const R = 6371000 // Earth radius in meters
+  const dLat = (b.lat - a.lat) * (Math.PI / 180)
+  const dLng = (b.lng - a.lng) * (Math.PI / 180)
+  const sinDLat = Math.sin(dLat / 2)
+  const sinDLng = Math.sin(dLng / 2)
+  const h = sinDLat * sinDLat + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * sinDLng * sinDLng
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
+}
+
+function formatDistance(meters: number): string {
+  if (meters < 1000) return `${Math.round(meters)} מ׳`
+  return `${(meters / 1000).toFixed(2)} ק״מ`
+}
+
+// ── Ruler / Distance Measurement Tool (inside MapContainer) ──
+function RulerTool({ active, darkMode, onPointsChange }: { active: boolean; darkMode: boolean; onPointsChange?: (count: number) => void }) {
+  const map = useMap()
+  const [points, setPoints] = useState<L.LatLng[]>([])
+  const prevActive = useRef(active)
+
+  // Clear points when deactivated
+  useEffect(() => {
+    if (prevActive.current && !active) { setPoints([]); onPointsChange?.(0) }
+    prevActive.current = active
+  }, [active, onPointsChange])
+
+  // Change cursor when ruler is active
+  useEffect(() => {
+    const container = map.getContainer()
+    if (active) {
+      container.style.cursor = 'crosshair'
+    } else {
+      container.style.cursor = ''
+    }
+    return () => { container.style.cursor = '' }
+  }, [active, map])
+
+  // Handle map clicks in ruler mode
+  useMapEvents({
+    click(e) {
+      if (!active) return
+      setPoints(prev => {
+        const next = [...prev, e.latlng]
+        onPointsChange?.(next.length)
+        return next
+      })
+    },
+  })
+
+  if (!active || points.length === 0) return null
+
+  // Calculate segment and total distances
+  const segments: { from: L.LatLng; to: L.LatLng; distance: number; midpoint: L.LatLng }[] = []
+  let totalDistance = 0
+  for (let i = 1; i < points.length; i++) {
+    const d = haversineDistance(points[i - 1], points[i])
+    totalDistance += d
+    segments.push({
+      from: points[i - 1],
+      to: points[i],
+      distance: d,
+      midpoint: L.latLng(
+        (points[i - 1].lat + points[i].lat) / 2,
+        (points[i - 1].lng + points[i].lng) / 2,
+      ),
+    })
+  }
+
+  // Point markers
+  const pointIcon = (idx: number, total: number) => L.divIcon({
+    className: 'ruler-point-marker',
+    html: `<div style="
+      width:${idx === 0 ? 14 : 12}px;height:${idx === 0 ? 14 : 12}px;border-radius:50%;
+      background:${idx === 0 ? '#D4A84B' : idx === total - 1 ? '#EF4444' : '#3B82F6'};
+      border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.35);
+      transform:translate(-50%,-50%);
+    "></div>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  })
+
+  // Distance label icon for segment midpoints
+  const distLabelIcon = (text: string) => L.divIcon({
+    className: 'ruler-dist-label',
+    html: `<div style="
+      display:inline-flex;align-items:center;padding:3px 8px;
+      background:${darkMode ? 'rgba(11,17,32,0.92)' : 'rgba(255,255,255,0.95)'};
+      backdrop-filter:blur(8px);
+      border:1px solid ${darkMode ? 'rgba(212,168,75,0.35)' : 'rgba(0,0,0,0.12)'};
+      border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.25);
+      font-size:11px;font-weight:700;color:${darkMode ? '#F0C75E' : '#1a1a2e'};
+      font-family:'Heebo',sans-serif;white-space:nowrap;
+      transform:translate(-50%,-50%);pointer-events:none;
+    ">${text}</div>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  })
+
+  // Total label icon (at last point)
+  const totalLabelIcon = (text: string) => L.divIcon({
+    className: 'ruler-total-label',
+    html: `<div style="
+      display:inline-flex;align-items:center;gap:4px;padding:4px 10px;
+      background:linear-gradient(135deg,#D4A84B,#F0C75E);
+      border-radius:8px;box-shadow:0 3px 12px rgba(212,168,75,0.4);
+      font-size:12px;font-weight:800;color:#0B1120;
+      font-family:'Heebo',sans-serif;white-space:nowrap;
+      transform:translate(-50%,8px);pointer-events:none;
+    ">📏 ${text}</div>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  })
+
+  return (
+    <>
+      {/* Measurement polyline */}
+      <Polyline
+        positions={points.map(p => [p.lat, p.lng] as [number, number])}
+        pathOptions={{
+          color: '#D4A84B',
+          weight: 3,
+          dashArray: '8 6',
+          opacity: 0.9,
+        }}
+      />
+
+      {/* Point markers */}
+      {points.map((pt, i) => (
+        <Marker key={`ruler-pt-${i}`} position={pt} icon={pointIcon(i, points.length)} interactive={false} />
+      ))}
+
+      {/* Segment distance labels */}
+      {segments.map((seg, i) => (
+        <Marker
+          key={`ruler-seg-${i}`}
+          position={seg.midpoint}
+          icon={distLabelIcon(formatDistance(seg.distance))}
+          interactive={false}
+        />
+      ))}
+
+      {/* Total distance label at last point */}
+      {points.length >= 2 && (
+        <Marker
+          position={points[points.length - 1]}
+          icon={totalLabelIcon(`סה״כ: ${formatDistance(totalDistance)}`)}
+          interactive={false}
+        />
+      )}
+    </>
+  )
+}
+
 // ── Map Legend ──
 function MapLegend({ colorMode, darkMode }: { colorMode: ColorMode; darkMode: boolean }) {
   if (colorMode === 'status') {
@@ -316,13 +471,14 @@ function MapLegend({ colorMode, darkMode }: { colorMode: ColorMode; darkMode: bo
 }
 
 // ── Map Controls Column (Zoom + Layers) ──
-function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCadastral, showAreas, setShowAreas, switcherOpen, setSwitcherOpen, colorMode, setColorMode, fullscreen, onToggleFullscreen }: {
+function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCadastral, showAreas, setShowAreas, switcherOpen, setSwitcherOpen, colorMode, setColorMode, fullscreen, onToggleFullscreen, rulerActive, onToggleRuler, onClearRuler, rulerPoints }: {
   darkMode: boolean; tileIdx: number; setTileIdx: (i: number) => void
   showCadastral: boolean; setShowCadastral: (fn: (v: boolean) => boolean) => void
   showAreas: boolean; setShowAreas: (fn: (v: boolean) => boolean) => void
   switcherOpen: boolean; setSwitcherOpen: (v: boolean) => void
   colorMode: ColorMode; setColorMode: (mode: ColorMode) => void
   fullscreen?: boolean; onToggleFullscreen?: () => void
+  rulerActive?: boolean; onToggleRuler?: () => void; onClearRuler?: () => void; rulerPoints?: number
 }) {
   const btnStyle = (darkMode: boolean): React.CSSProperties => ({
     width: 40, height: 40, border: `1px solid ${darkMode ? t.goldBorder : t.lBorder}`,
@@ -372,6 +528,45 @@ function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCada
       >
         <MapIcon size={16} />
       </button>
+
+      {/* Ruler / Distance measurement */}
+      {onToggleRuler && (
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={onToggleRuler}
+            style={{
+              ...mobileBtnStyle(darkMode), boxShadow: t.sh.md,
+              background: rulerActive
+                ? `linear-gradient(135deg,${t.gold},${t.goldBright})`
+                : (darkMode ? 'rgba(11,17,32,0.88)' : 'rgba(255,255,255,0.92)'),
+              color: rulerActive ? t.bg : (darkMode ? t.gold : t.lText),
+              border: rulerActive ? `1px solid ${t.gold}` : `1px solid ${darkMode ? t.goldBorder : t.lBorder}`,
+            }}
+            aria-label={rulerActive ? 'סגור מדידת מרחק' : 'מדידת מרחק'}
+            title={rulerActive ? 'סגור מדידה (ESC)' : 'מדידת מרחק — לחץ על נקודות במפה'}
+          >
+            <Ruler size={16} />
+          </button>
+          {/* Clear measurement button (shows when ruler has points) */}
+          {rulerActive && (rulerPoints ?? 0) > 0 && onClearRuler && (
+            <button
+              onClick={onClearRuler}
+              style={{
+                position: 'absolute', top: -6, right: -6,
+                width: 20, height: 20, borderRadius: '50%',
+                background: '#EF4444', border: '2px solid ' + (darkMode ? t.bg : '#fff'),
+                color: '#fff', cursor: 'pointer', display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 2px 6px rgba(239,68,68,0.4)',
+              }}
+              aria-label="נקה מדידה"
+              title="נקה מדידה"
+            >
+              <Trash2 size={10} />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Zoom buttons */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0, borderRadius: t.r.md, overflow: 'hidden', boxShadow: t.sh.md }}>
@@ -480,6 +675,25 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
   const prefetch = usePrefetchPlot()
   const [zoom, setZoom] = useState(13)
   const handleZoomChange = useCallback((z: number) => setZoom(z), [])
+  const [rulerActive, setRulerActive] = useState(false)
+  const [rulerPoints, setRulerPoints] = useState(0)
+  const toggleRuler = useCallback(() => {
+    setRulerActive(prev => {
+      if (prev) setRulerPoints(0)
+      return !prev
+    })
+  }, [])
+  const clearRuler = useCallback(() => setRulerPoints(0), [])
+
+  // ESC to exit ruler mode
+  useEffect(() => {
+    if (!rulerActive) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setRulerActive(false); setRulerPoints(0) }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [rulerActive])
 
   const tile = TILES[tileIdx]
   const center = useMemo<[number, number]>(() => {
@@ -509,6 +723,12 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
     const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score), fav = favorites.isFav(plot.id), pps = pricePerSqm(plot), ppd = pricePerDunam(plot)
     const comp = compare?.has(plot.id)
     const zoningStage = zoningPipeline.find(z => z.key === d.zoning)
+    const center = plotCenter(plot.coordinates)
+    const navLinks = center ? {
+      gmaps: `https://www.google.com/maps/@${center.lat},${center.lng},17z`,
+      streetView: `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${center.lat},${center.lng}`,
+      waze: `https://waze.com/ul?ll=${center.lat},${center.lng}&z=17&navigate=yes`,
+    } : null
     return (
       <div className="plot-popup" style={{ padding: 0 }}>
         {/* Premium gradient header */}
@@ -548,6 +768,41 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
           <div className="plot-popup-row"><span className="plot-popup-label">שטח</span><span className="plot-popup-value">{fmt.dunam(d.size)} דונם ({fmt.num(d.size)} מ״ר)</span></div>
           {ppd > 0 && <div className="plot-popup-row"><span className="plot-popup-label">₪/דונם</span><span className="plot-popup-value">{fmt.num(ppd)}</span></div>}
           <div className="plot-popup-row"><span className="plot-popup-label">תשואה צפויה</span><span className="plot-popup-value gold">+{fmt.pct(r)}</span></div>
+
+          {/* Navigation quick links row */}
+          {navLinks && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: t.textDim, whiteSpace: 'nowrap' }}>ניווט:</span>
+              <a href={navLinks.gmaps} target="_blank" rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 8px',
+                  background: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.2)',
+                  borderRadius: t.r.full, fontSize: 10, fontWeight: 700, color: '#4285F4',
+                  textDecoration: 'none', whiteSpace: 'nowrap', transition: `all ${t.tr}`,
+                }}
+                title="פתח בגוגל מפות"
+              >🗺️ Google</a>
+              <a href={navLinks.streetView} target="_blank" rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 8px',
+                  background: 'rgba(251,188,5,0.1)', border: '1px solid rgba(251,188,5,0.2)',
+                  borderRadius: t.r.full, fontSize: 10, fontWeight: 700, color: '#FBBC05',
+                  textDecoration: 'none', whiteSpace: 'nowrap', transition: `all ${t.tr}`,
+                }}
+                title="צפה ברחוב"
+              >👁️ Street View</a>
+              <a href={navLinks.waze} target="_blank" rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 8px',
+                  background: 'rgba(51,181,229,0.1)', border: '1px solid rgba(51,181,229,0.2)',
+                  borderRadius: t.r.full, fontSize: 10, fontWeight: 700, color: '#33B5E5',
+                  textDecoration: 'none', whiteSpace: 'nowrap', transition: `all ${t.tr}`,
+                }}
+                title="נווט עם Waze"
+              >🚗 Waze</a>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button className="plot-popup-cta" style={{ flex: 1 }} onClick={() => onLead(plot)}>
               <Phone size={13} /> קבל פרטים
@@ -600,6 +855,9 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         <UserLocation />
         <PlotBoundsTracker plots={plots} />
         <ZoomTracker onChange={handleZoomChange} />
+
+        {/* Distance ruler tool */}
+        <RulerTool active={rulerActive} darkMode={darkMode} onPointsChange={setRulerPoints} />
 
         {/* Area divisions with price stats */}
         {showAreas && israelAreas.map(area => {
@@ -737,13 +995,40 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
       {/* Map Legend */}
       <MapLegend colorMode={colorMode} darkMode={darkMode} />
 
+      {/* Ruler active indicator bar */}
+      {rulerActive && (
+        <div style={{
+          position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+          zIndex: t.z.controls + 1, display: 'flex', alignItems: 'center', gap: 10,
+          padding: '8px 16px', direction: 'rtl',
+          background: darkMode ? 'rgba(11,17,32,0.92)' : 'rgba(255,255,255,0.95)',
+          backdropFilter: 'blur(16px)', borderRadius: t.r.full,
+          border: `1px solid ${t.gold}`, boxShadow: `0 4px 16px rgba(212,168,75,0.25)`,
+          fontSize: 12, fontWeight: 700, color: t.gold, fontFamily: t.font,
+        }}>
+          <Ruler size={14} />
+          <span>📏 מצב מדידה — לחץ על נקודות במפה</span>
+          <button
+            onClick={toggleRuler}
+            style={{
+              background: 'none', border: `1px solid ${t.goldBorder}`, borderRadius: t.r.sm,
+              color: t.gold, cursor: 'pointer', padding: '2px 8px', fontSize: 11,
+              fontWeight: 700, fontFamily: t.font,
+            }}
+          >ESC</button>
+        </div>
+      )}
+
       {/* Map Controls Column: Zoom + Layers */}
       <MapControls darkMode={darkMode} tileIdx={tileIdx} setTileIdx={setTileIdx}
         showCadastral={showCadastral} setShowCadastral={setShowCadastral}
         showAreas={showAreas} setShowAreas={setShowAreas}
         switcherOpen={switcherOpen} setSwitcherOpen={setSwitcherOpen}
         colorMode={colorMode} setColorMode={setColorMode}
-        fullscreen={fullscreen} onToggleFullscreen={onToggleFullscreen} />
+        fullscreen={fullscreen} onToggleFullscreen={onToggleFullscreen}
+        rulerActive={rulerActive} onToggleRuler={toggleRuler}
+        onClearRuler={() => { setRulerActive(false); setRulerPoints(0) }}
+        rulerPoints={rulerPoints} />
     </div>
   )
 }
