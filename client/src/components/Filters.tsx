@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import styled, { keyframes, css } from 'styled-components'
-import { Search, SlidersHorizontal, X, Sparkles } from 'lucide-react'
+import { Search, SlidersHorizontal, X, Sparkles, MapPin } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { Select, RangeInput } from './UI'
-import type { Filters } from '../types'
+import { p, fmt } from '../utils'
+import type { Filters, Plot } from '../types'
 
 const EMPTY: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '' }
 
@@ -132,14 +133,46 @@ const Chip = styled.span`
   &:hover{background:${t.gold};color:${t.bg};transform:scale(1.05);}
 `
 
-/* ── Component ── */
-interface Props { filters: Filters; onChange: (f: Filters) => void; resultCount?: number }
+/* ── Search Suggestions ── */
+const SuggestWrap = styled.div`
+  position:absolute;top:calc(100% + 6px);left:0;right:0;
+  background:${t.glass};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid ${t.glassBorder};border-radius:${t.r.md};
+  box-shadow:${t.sh.lg};overflow:hidden;max-height:320px;overflow-y:auto;
+  direction:rtl;z-index:${t.z.filter + 2};animation:${fadeIn} 0.15s ease-out;
+`
+const SuggestGroup = styled.div`
+  padding:6px 14px 4px;font-size:10px;font-weight:700;color:${t.textDim};
+  letter-spacing:0.3px;display:flex;align-items:center;gap:5px;
+  border-bottom:1px solid ${t.border};
+`
+const SuggestItem = styled.button<{$focused?:boolean}>`
+  display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;
+  background:${pr=>pr.$focused?t.goldDim:'transparent'};border:none;
+  color:${pr=>pr.$focused?t.gold:t.text};font-size:13px;font-family:${t.font};cursor:pointer;
+  text-align:right;direction:rtl;transition:background 0.12s,color 0.12s;
+  &:hover{background:${t.hover};color:${t.gold};}
+`
+const SuggestIconWrap = styled.span<{$c?:string}>`
+  width:30px;height:30px;border-radius:${t.r.sm};flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:${pr=>pr.$c?`${pr.$c}12`:t.goldDim};border:1px solid ${pr=>pr.$c?`${pr.$c}30`:t.goldBorder};
+  color:${pr=>pr.$c||t.gold};
+`
+const SuggestLabel = styled.span`flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;`
+const SuggestMeta = styled.span`font-size:11px;color:${t.textDim};white-space:nowrap;`
 
-export default function FiltersBar({ filters, onChange, resultCount }: Props) {
+/* ── Component ── */
+interface Props { filters: Filters; onChange: (f: Filters) => void; resultCount?: number; plots?: Plot[]; onSelectPlot?: (id: string) => void }
+
+export default function FiltersBar({ filters, onChange, resultCount, plots, onSelectPlot }: Props) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Filters>(filters)
   const [phIdx, setPhIdx] = useState(0)
   const [activeQuick, setActiveQuick] = useState<Set<string>>(new Set())
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [suggestIdx, setSuggestIdx] = useState(-1)
+  const suggestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Cycle animated placeholder
   useEffect(() => { const id = setInterval(() => setPhIdx(i => (i + 1) % PLACEHOLDERS.length), 3000); return () => clearInterval(id) }, [])
@@ -168,6 +201,70 @@ export default function FiltersBar({ filters, onChange, resultCount }: Props) {
     return c
   }, [filters])
 
+  // ── Search Suggestions ──
+  const suggestions = useMemo(() => {
+    const q = filters.search?.trim().toLowerCase()
+    if (!q || q.length < 1 || !plots?.length) return { cities: [] as { label: string; count: number }[], matchedPlots: [] as { id: string; label: string; sublabel: string }[] }
+
+    const cities: { label: string; count: number }[] = []
+    const matchedPlots: { id: string; label: string; sublabel: string }[] = []
+    const seenCities = new Set<string>()
+
+    for (const pl of plots) {
+      if (pl.city?.toLowerCase().includes(q) && !seenCities.has(pl.city)) {
+        seenCities.add(pl.city)
+        cities.push({ label: pl.city, count: plots.filter(pp => pp.city === pl.city).length })
+      }
+      const d = p(pl)
+      if (pl.number?.includes(q) || String(d.block).includes(q)) {
+        matchedPlots.push({
+          id: pl.id,
+          label: `גוש ${d.block} · חלקה ${pl.number}`,
+          sublabel: `${pl.city} · ${fmt.compact(d.price)}`,
+        })
+      }
+    }
+
+    return { cities: cities.slice(0, 4), matchedPlots: matchedPlots.slice(0, 5) }
+  }, [filters.search, plots])
+
+  const allSuggestions = useMemo(() => [
+    ...suggestions.cities.map(c => ({ type: 'city' as const, ...c })),
+    ...suggestions.matchedPlots.map(pl => ({ type: 'plot' as const, ...pl })),
+  ], [suggestions])
+
+  const hasSuggestions = allSuggestions.length > 0 && (filters.search?.trim().length ?? 0) > 0
+
+  const selectSuggestion = useCallback((idx: number) => {
+    const item = allSuggestions[idx]
+    if (!item) return
+    if (item.type === 'city') {
+      onChange({ ...filters, city: item.label, search: '' })
+    } else if (item.type === 'plot' && 'id' in item) {
+      onSelectPlot?.(item.id)
+      onChange({ ...filters, search: '' })
+    }
+    setShowSuggestions(false)
+    setSuggestIdx(-1)
+  }, [allSuggestions, onChange, filters, onSelectPlot])
+
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!hasSuggestions || !showSuggestions) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSuggestIdx(i => Math.min(i + 1, allSuggestions.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSuggestIdx(i => Math.max(i - 1, -1))
+    } else if (e.key === 'Enter' && suggestIdx >= 0) {
+      e.preventDefault()
+      selectSuggestion(suggestIdx)
+    }
+  }, [hasSuggestions, showSuggestions, suggestIdx, allSuggestions.length, selectSuggestion])
+
+  // Reset suggestion index when search changes
+  useEffect(() => { setSuggestIdx(-1) }, [filters.search])
+
   const set = useCallback((key: keyof Filters, val: string) => setDraft(d => ({ ...d, [key]: val })), [])
   const apply = () => { onChange(draft); setOpen(false) }
   const clear = () => { const c = { ...EMPTY, search: filters.search }; setDraft(c); onChange(c); setOpen(false); setActiveQuick(new Set()) }
@@ -188,14 +285,62 @@ export default function FiltersBar({ filters, onChange, resultCount }: Props) {
     <>
       <Backdrop $open={open} onClick={() => setOpen(false)} />
       <Wrap>
-        <Bar>
+        <Bar style={{ position: 'relative' }}>
           <SIcon size={18} />
           <Input placeholder={PLACEHOLDERS[phIdx]} value={filters.search}
-            onChange={e => onChange({ ...filters, search: e.target.value })} />
+            onChange={e => { onChange({ ...filters, search: e.target.value }); setShowSuggestions(true) }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => { suggestTimeoutRef.current = setTimeout(() => setShowSuggestions(false), 150) }}
+            onKeyDown={handleSearchKeyDown}
+            autoComplete="off"
+            role="combobox"
+            aria-expanded={showSuggestions && hasSuggestions}
+            aria-autocomplete="list"
+          />
+          {resultCount != null && filters.search && (
+            <span style={{ fontSize: 11, color: t.textDim, fontWeight: 600, whiteSpace: 'nowrap', padding: '0 4px' }}>{resultCount}</span>
+          )}
           <FilterBtn $active={activeCount > 0} onClick={() => { setDraft(filters); setOpen(o => !o) }} aria-label="סננים">
             <SlidersHorizontal size={18} />
             {activeCount > 0 && <CountBadge>{activeCount}</CountBadge>}
           </FilterBtn>
+
+          {/* Search autocomplete dropdown */}
+          {showSuggestions && hasSuggestions && (
+            <SuggestWrap role="listbox" onMouseDown={() => { if (suggestTimeoutRef.current) clearTimeout(suggestTimeoutRef.current) }}>
+              {suggestions.cities.length > 0 && (
+                <>
+                  <SuggestGroup>📍 ערים</SuggestGroup>
+                  {suggestions.cities.map((c, i) => (
+                    <SuggestItem key={c.label} $focused={suggestIdx === i}
+                      role="option" aria-selected={suggestIdx === i}
+                      onMouseDown={() => selectSuggestion(i)}>
+                      <SuggestIconWrap $c="#3B82F6"><MapPin size={14} /></SuggestIconWrap>
+                      <SuggestLabel>{c.label}</SuggestLabel>
+                      <SuggestMeta>{c.count} חלקות</SuggestMeta>
+                    </SuggestItem>
+                  ))}
+                </>
+              )}
+              {suggestions.matchedPlots.length > 0 && (
+                <>
+                  <SuggestGroup>📋 חלקות</SuggestGroup>
+                  {suggestions.matchedPlots.map((pl, i) => {
+                    const idx = suggestions.cities.length + i
+                    return (
+                      <SuggestItem key={pl.id} $focused={suggestIdx === idx}
+                        role="option" aria-selected={suggestIdx === idx}
+                        onMouseDown={() => selectSuggestion(idx)}>
+                        <SuggestIconWrap><span style={{ fontSize: 13 }}>📋</span></SuggestIconWrap>
+                        <SuggestLabel>{pl.label}</SuggestLabel>
+                        <SuggestMeta>{pl.sublabel}</SuggestMeta>
+                      </SuggestItem>
+                    )
+                  })}
+                </>
+              )}
+            </SuggestWrap>
+          )}
         </Bar>
 
         {/* Quick Filters */}

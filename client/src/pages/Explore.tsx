@@ -444,7 +444,8 @@ export default function Explore() {
           favorites={{ isFav, toggle }}
           compare={{ has: isCompared, toggle: toggleCompare }}
         />
-        <FilterBar filters={filters} onChange={setFilters} resultCount={filtered.length} />
+        <FilterBar filters={filters} onChange={setFilters} resultCount={filtered.length}
+          plots={plots} onSelectPlot={(id) => { const pl = plots.find(pp => pp.id === id); if (pl) selectPlot(pl) }} />
 
         {/* Empty state when no plots match filters */}
         {!isLoading && filtered.length === 0 && hasActiveFilters && (

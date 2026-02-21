@@ -258,14 +258,35 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         <AutoFitBounds plots={plots} />
         <UserLocation />
 
-        {/* Area divisions */}
-        {showAreas && israelAreas.map(area => (
-          <Polygon key={area.name} positions={area.bounds} pathOptions={{ color: area.color, weight: 1.5, fillColor: area.color, fillOpacity: 0.06, dashArray: '6 4' }}>
-            <Tooltip permanent direction="center" className="price-tooltip">
-              <span style={{ fontSize: 11, fontWeight: 700, color: area.color }}>{area.name}</span>
-            </Tooltip>
-          </Polygon>
-        ))}
+        {/* Area divisions with price stats */}
+        {showAreas && israelAreas.map(area => {
+          const areaPlots = plots.filter(pl => {
+            const c = plotCenter(pl.coordinates)
+            if (!c) return false
+            const [minLat, minLng] = area.bounds[0]
+            const [maxLat, maxLng] = area.bounds[2]
+            return c.lat >= minLat && c.lat <= maxLat && c.lng >= minLng && c.lng <= maxLng
+          })
+          const ppsList = areaPlots.map(pl => pricePerSqm(pl)).filter(v => v > 0)
+          const avgPps = ppsList.length ? Math.round(ppsList.reduce((s, v) => s + v, 0) / ppsList.length) : 0
+          return (
+            <Polygon key={area.name} positions={area.bounds} pathOptions={{ color: area.color, weight: 1.5, fillColor: area.color, fillOpacity: 0.06, dashArray: '6 4' }}>
+              <Tooltip permanent direction="center" className="price-tooltip">
+                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: area.color }}>{area.name}</span>
+                  {avgPps > 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.75 }}>
+                      ₪{avgPps.toLocaleString()}/מ״ר
+                    </span>
+                  )}
+                  {areaPlots.length > 0 && (
+                    <span style={{ fontSize: 9, opacity: 0.45 }}>{areaPlots.length} חלקות</span>
+                  )}
+                </span>
+              </Tooltip>
+            </Polygon>
+          )
+        })}
 
         {/* Plot polygons */}
         {plots.map(plot => {
