@@ -135,6 +135,14 @@ const PRICE_PRESETS = [
   { label: '₪2M+', min: 2000000, max: 0 },
 ] as const
 
+const SIZE_PRESETS = [
+  { label: 'עד 500 מ״ר', min: 0, max: 500 },
+  { label: '500–1,000', min: 500, max: 1000 },
+  { label: '1–2 דונם', min: 1000, max: 2000 },
+  { label: '2–5 דונם', min: 2000, max: 5000 },
+  { label: '5+ דונם', min: 5000, max: 0 },
+] as const
+
 const Actions = styled.div`display:flex;align-items:center;gap:10px;padding:14px 20px;border-top:1px solid ${t.border};
   background:linear-gradient(0deg,rgba(212,168,75,0.04),transparent);`
 const ApplyBtn = styled.button`
@@ -531,6 +539,22 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
               valueMin={Number(draft.sizeMin) || 0} valueMax={Number(draft.sizeMax) || 5000}
               onChange={(lo: number, hi: number) => setDraft(d => ({ ...d, sizeMin: lo ? String(lo) : '', sizeMax: hi < 5000 ? String(hi) : '' }))}
               formatValue={(v: number) => `${v.toLocaleString()} מ״ר`} />
+            <PresetRow>
+              {SIZE_PRESETS.map(preset => {
+                const isActive = (Number(draft.sizeMin) || 0) === preset.min && (preset.max === 0 ? !draft.sizeMax : (Number(draft.sizeMax) || 0) === preset.max)
+                return (
+                  <PresetChip key={preset.label} $active={isActive} onClick={() => {
+                    setDraft(d => ({
+                      ...d,
+                      sizeMin: preset.min ? String(preset.min) : '',
+                      sizeMax: preset.max ? String(preset.max) : '',
+                    }))
+                  }}>
+                    {preset.label}
+                  </PresetChip>
+                )
+              })}
+            </PresetRow>
           </Section>
 
           <Actions>

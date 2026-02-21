@@ -903,24 +903,49 @@ export default function Explore() {
     return () => clearInterval(id)
   }, [insights.length])
 
-  // Dynamic document title based on active filters
+  // Dynamic document title + meta + OG tags based on active filters
   useEffect(() => {
+    const cityLabel = filters.city && filters.city !== 'all' ? filters.city : ''
     const parts = ['חלקות להשקעה']
-    if (filters.city && filters.city !== 'all') parts.push(`ב${filters.city}`)
+    if (cityLabel) parts.push(`ב${cityLabel}`)
     if (filtered.length > 0) parts.push(`(${filtered.length})`)
     parts.push('| LandMap Israel')
-    document.title = parts.join(' ')
-    // Update meta description
-    const meta = document.querySelector('meta[name="description"]')
-    const desc = `${filtered.length} חלקות קרקע להשקעה${filters.city ? ` ב${filters.city}` : ' בישראל'} — מפה אינטראקטיבית, ניתוח AI, נתוני ועדות ותקן 22`
-    if (meta) meta.setAttribute('content', desc)
-    else {
-      const el = document.createElement('meta')
-      el.name = 'description'
-      el.content = desc
-      document.head.appendChild(el)
+    const title = parts.join(' ')
+    document.title = title
+    const desc = `${filtered.length} חלקות קרקע להשקעה${cityLabel ? ` ב${cityLabel}` : ' בישראל'} — מפה אינטראקטיבית, ניתוח AI, נתוני ועדות ותקן 22`
+
+    // Helper to upsert meta tag
+    const setMeta = (attr: string, key: string, content: string) => {
+      let el = document.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null
+      if (!el) { el = document.createElement('meta'); el.setAttribute(attr, key); document.head.appendChild(el) }
+      el.content = content
     }
-    return () => { document.title = 'LandMap Israel' }
+
+    setMeta('name', 'description', desc)
+
+    // Open Graph tags for social sharing
+    setMeta('property', 'og:title', title)
+    setMeta('property', 'og:description', desc)
+    setMeta('property', 'og:type', 'website')
+    setMeta('property', 'og:url', window.location.href)
+    setMeta('property', 'og:site_name', 'LandMap Israel')
+    setMeta('property', 'og:locale', 'he_IL')
+
+    // Twitter Card meta
+    setMeta('name', 'twitter:card', 'summary_large_image')
+    setMeta('name', 'twitter:title', title)
+    setMeta('name', 'twitter:description', desc)
+
+    // Canonical URL (clean — avoids duplicate content from various filter combos)
+    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null
+    const canonicalUrl = `${window.location.origin}/explore${cityLabel ? `?city=${encodeURIComponent(cityLabel)}` : ''}`
+    if (!canonical) { canonical = document.createElement('link'); canonical.rel = 'canonical'; document.head.appendChild(canonical) }
+    canonical.href = canonicalUrl
+
+    return () => {
+      document.title = 'LandMap Israel'
+      canonical?.remove()
+    }
   }, [filters.city, filtered.length])
 
   // JSON-LD structured data for SEO (RealEstateListing + ItemList)

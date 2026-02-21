@@ -693,12 +693,29 @@ function ZoomTracker({ onChange }: { onChange: (z: number) => void }) {
 }
 
 // ── Main Component ──
+// ── Persisted Map Preferences ──
+const MAP_PREFS_KEY = 'landmap_map_prefs'
+interface MapPrefs { tileIdx: number; colorMode: ColorMode; showCadastral: boolean; showAreas: boolean }
+function loadMapPrefs(): Partial<MapPrefs> {
+  try { const raw = localStorage.getItem(MAP_PREFS_KEY); return raw ? JSON.parse(raw) : {} } catch { return {} }
+}
+function saveMapPrefs(prefs: MapPrefs) {
+  try { localStorage.setItem(MAP_PREFS_KEY, JSON.stringify(prefs)) } catch {}
+}
+
 function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, darkMode = false, filterCity, fullscreen, onToggleFullscreen }: MapProps) {
-  const [tileIdx, setTileIdx] = useState(2) // default to dark tiles for cohesive dark UI
-  const [showCadastral, setShowCadastral] = useState(false)
-  const [showAreas, setShowAreas] = useState(true)
+  const savedPrefs = useMemo(() => loadMapPrefs(), [])
+  const [tileIdx, setTileIdxRaw] = useState(savedPrefs.tileIdx ?? 2)
+  const [showCadastral, setShowCadastralRaw] = useState(savedPrefs.showCadastral ?? false)
+  const [showAreas, setShowAreasRaw] = useState(savedPrefs.showAreas ?? true)
   const [switcherOpen, setSwitcherOpen] = useState(false)
-  const [colorMode, setColorMode] = useState<ColorMode>('grade')
+  const [colorMode, setColorModeRaw] = useState<ColorMode>(savedPrefs.colorMode ?? 'grade')
+
+  // Wrap setters to persist preferences
+  const setTileIdx = useCallback((i: number) => { setTileIdxRaw(i); saveMapPrefs({ tileIdx: i, colorMode, showCadastral, showAreas }) }, [colorMode, showCadastral, showAreas])
+  const setColorMode = useCallback((m: ColorMode) => { setColorModeRaw(m); saveMapPrefs({ tileIdx, colorMode: m, showCadastral, showAreas }) }, [tileIdx, showCadastral, showAreas])
+  const setShowCadastral = useCallback((fn: (v: boolean) => boolean) => { setShowCadastralRaw(prev => { const next = fn(prev); saveMapPrefs({ tileIdx, colorMode, showCadastral: next, showAreas }); return next }) }, [tileIdx, colorMode, showAreas])
+  const setShowAreas = useCallback((fn: (v: boolean) => boolean) => { setShowAreasRaw(prev => { const next = fn(prev); saveMapPrefs({ tileIdx, colorMode, showCadastral, showAreas: next }); return next }) }, [tileIdx, colorMode, showCadastral])
   const prefetch = usePrefetchPlot()
   const [zoom, setZoom] = useState(13)
   const handleZoomChange = useCallback((z: number) => setZoom(z), [])
