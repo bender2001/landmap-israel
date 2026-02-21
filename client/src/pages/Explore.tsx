@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink, MessageCircle, Clock, Building2, BarChart3, ArrowUpRight, ArrowDownRight, Zap, Target, PieChart } from 'lucide-react'
+import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink, MessageCircle, Clock, Building2, BarChart3, ArrowUpRight, ArrowDownRight, Zap, Target, PieChart, Share2, Check, Filter } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation, useOnlineStatus, useIsMobile } from '../hooks'
 import MapArea from '../components/Map'
@@ -85,6 +85,38 @@ const SortOption = styled.button<{$active?:boolean}>`
   font-family:${t.font};cursor:pointer;transition:all ${t.tr};
   &:hover{background:${t.hover};color:${t.gold};}
 `
+
+/* ── Share View Button ── */
+const shareSuccess = keyframes`0%{transform:scale(0.8);opacity:0}50%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}`
+const ShareBtn = styled.button<{$copied?:boolean}>`
+  display:inline-flex;align-items:center;gap:6px;padding:8px 14px;
+  background:${pr=>pr.$copied?'rgba(16,185,129,0.15)':t.glass};backdrop-filter:blur(16px);
+  border:1px solid ${pr=>pr.$copied?'rgba(16,185,129,0.3)':t.glassBorder};border-radius:${t.r.full};
+  color:${pr=>pr.$copied?t.ok:t.textSec};font-size:12px;font-weight:600;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};box-shadow:${t.sh.sm};white-space:nowrap;
+  &:hover{border-color:${t.goldBorder};color:${t.gold};}
+  svg{${pr=>pr.$copied?`animation:${shareSuccess} 0.3s ease-out`:''}}
+  ${mobile}{padding:7px 10px;font-size:11px;gap:4px;
+    span{display:none;}}
+`
+
+/* ── Active Filter Count Badge ── */
+const FilterBadge = styled.span`
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:18px;height:18px;padding:0 5px;
+  background:linear-gradient(135deg,${t.gold},${t.goldBright});color:${t.bg};
+  border-radius:${t.r.full};font-size:10px;font-weight:800;line-height:1;
+  ${mobile}{min-width:16px;height:16px;font-size:9px;}
+`
+const NavBadge = styled.span`
+  position:absolute;top:-2px;right:-4px;
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:16px;height:16px;padding:0 4px;
+  background:${t.gold};color:${t.bg};
+  border-radius:${t.r.full};font-size:9px;font-weight:800;line-height:1;
+  box-shadow:0 1px 4px rgba(212,168,75,0.4);
+`
+const NavBtnWrap = styled.div`position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;`
 
 /* ── Compare Bar (floating bottom tray) ── */
 const CompareBar = styled.div`
@@ -506,6 +538,23 @@ export default function Explore() {
   const [mobileExpanded, setMobileExpanded] = useState(false)
   const [mapFullscreen, setMapFullscreen] = useState(false)
   const toggleFullscreen = useCallback(() => setMapFullscreen(f => !f), [])
+  const [shareCopied, setShareCopied] = useState(false)
+
+  // Active filter count for badge
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filters.city && filters.city !== 'all') count++
+    if (filters.priceMin) count++
+    if (filters.priceMax) count++
+    if (filters.sizeMin) count++
+    if (filters.sizeMax) count++
+    if (filters.ripeness) count++
+    if (filters.minRoi) count++
+    if (filters.zoning) count++
+    if (filters.search) count++
+    if (filters.belowAvg === 'true') count++
+    return count
+  }, [filters])
 
   // Mobile calculator state
   const [calcPrice, setCalcPrice] = useState(500000)
@@ -595,6 +644,34 @@ export default function Explore() {
   }, [plots, filters.sizeMin, filters.sizeMax, filters.belowAvg, dSearch])
 
   const sorted = useMemo(() => sortPlots(filtered, sortKey, userGeo.location), [filtered, sortKey, userGeo.location])
+
+  // Share current view URL (must be after filtered is declared)
+  const shareView = useCallback(async () => {
+    const url = window.location.href
+    try {
+      if (navigator.share && isMobile) {
+        await navigator.share({
+          title: `חלקות להשקעה${filters.city && filters.city !== 'all' ? ` ב${filters.city}` : ''} | LandMap Israel`,
+          text: `${filtered.length} חלקות קרקע להשקעה — מפה אינטראקטיבית עם ניתוח AI`,
+          url,
+        })
+        toast('🔗 קישור שותף בהצלחה', 'success')
+      } else {
+        await navigator.clipboard.writeText(url)
+        setShareCopied(true)
+        toast('🔗 הקישור הועתק ללוח', 'success')
+        setTimeout(() => setShareCopied(false), 2000)
+      }
+    } catch {
+      // User cancelled share or clipboard failed — try fallback
+      try {
+        await navigator.clipboard.writeText(url)
+        setShareCopied(true)
+        toast('🔗 הקישור הועתק ללוח', 'success')
+        setTimeout(() => setShareCopied(false), 2000)
+      } catch { /* silently fail */ }
+    }
+  }, [filters.city, filtered.length, isMobile, toast])
 
   const avg = filtered.length ? filtered.reduce((s, pl) => s + p(pl).price, 0) / filtered.length : 0
   const avgPps = filtered.length ? Math.round(filtered.reduce((s, pl) => s + pricePerSqm(pl), 0) / filtered.length) : 0
@@ -776,6 +853,43 @@ export default function Explore() {
     return () => { document.title = 'LandMap Israel' }
   }, [filters.city, filtered.length])
 
+  // JSON-LD structured data for SEO (RealEstateListing + ItemList)
+  useEffect(() => {
+    const scriptId = 'landmap-jsonld'
+    let el = document.getElementById(scriptId) as HTMLScriptElement | null
+    if (!el) {
+      el = document.createElement('script')
+      el.id = scriptId
+      el.type = 'application/ld+json'
+      document.head.appendChild(el)
+    }
+    const cityLabel = filters.city && filters.city !== 'all' ? filters.city : 'ישראל'
+    const listings = filtered.slice(0, 10).map((pl, i) => {
+      const d = p(pl)
+      return {
+        '@type': 'ListItem',
+        position: i + 1,
+        item: {
+          '@type': 'RealEstateListing',
+          name: `חלקה ${pl.number} גוש ${d.block} — ${pl.city}`,
+          description: `קרקע להשקעה ב${pl.city}, ${fmt.dunam(d.size)} דונם, ציון השקעה ${calcScore(pl)}/10`,
+          url: `${window.location.origin}/plot/${pl.id}`,
+          ...(d.price > 0 ? { offers: { '@type': 'Offer', price: d.price, priceCurrency: 'ILS', availability: 'https://schema.org/InStock' } } : {}),
+        },
+      }
+    })
+    const jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: `חלקות קרקע להשקעה ב${cityLabel}`,
+      description: `${filtered.length} חלקות קרקע להשקעה ב${cityLabel} — ניתוח AI, מפה אינטראקטיבית, נתוני שוק`,
+      numberOfItems: filtered.length,
+      itemListElement: listings,
+    }
+    el.textContent = JSON.stringify(jsonLd)
+    return () => { el?.remove() }
+  }, [filtered, filters.city])
+
   // Close sort dropdown on click outside
   useEffect(() => {
     if (!sortOpen) return
@@ -857,12 +971,25 @@ export default function Explore() {
           </EmptyWrap>
         )}
 
-        {/* Sort dropdown */}
+        {/* Sort dropdown + Share + Filter badge */}
         {!mapFullscreen && <SortWrap ref={sortRef}>
-          <SortBtn onClick={() => setSortOpen(o => !o)} $active={sortKey !== 'recommended'}>
-            <ArrowUpDown size={14} />
-            {SORT_OPTIONS.find(o => o.key === sortKey)?.label || 'מיון'}
-          </SortBtn>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {activeFilterCount > 0 && (
+              <SortBtn as="div" $active style={{ cursor: 'default', gap: 4 }}>
+                <Filter size={12} />
+                <FilterBadge>{activeFilterCount}</FilterBadge>
+                <button onClick={resetFilters} style={{ background: 'none', border: 'none', color: t.goldBright, cursor: 'pointer', display: 'flex', padding: 0, marginInlineStart: 2 }} aria-label="אפס סינון"><X size={12} /></button>
+              </SortBtn>
+            )}
+            <ShareBtn onClick={shareView} $copied={shareCopied} aria-label="שתף תצוגה">
+              {shareCopied ? <Check size={14} /> : <Share2 size={14} />}
+              <span>{shareCopied ? 'הועתק!' : 'שתף'}</span>
+            </ShareBtn>
+            <SortBtn onClick={() => setSortOpen(o => !o)} $active={sortKey !== 'recommended'}>
+              <ArrowUpDown size={14} />
+              {SORT_OPTIONS.find(o => o.key === sortKey)?.label || 'מיון'}
+            </SortBtn>
+          </div>
           {sortOpen && (
             <SortDrop>
               {SORT_OPTIONS.map(o => (
@@ -1221,10 +1348,28 @@ export default function Explore() {
         </KbdBackdrop>
 
         {!mapFullscreen && <MobileNav role="navigation" aria-label="ניווט ראשי">
-          <NavBtn $active={tab==='map'} onClick={()=>setTab('map')} aria-label="מפה" aria-current={tab==='map'?'page':undefined}><MapIcon size={20}/>מפה</NavBtn>
-          <NavBtn $active={tab==='fav'} onClick={()=>setTab('fav')} aria-label={`מועדפים${favIds.length>0?` (${favIds.length})`:''}`} aria-current={tab==='fav'?'page':undefined}><Heart size={20}/>מועדפים{favIds.length > 0 && <span style={{fontSize:9,color:t.gold,fontWeight:700}}>({favIds.length})</span>}</NavBtn>
+          <NavBtn $active={tab==='map'} onClick={()=>setTab('map')} aria-label="מפה" aria-current={tab==='map'?'page':undefined}>
+            <NavBtnWrap>
+              <MapIcon size={20}/>
+              {activeFilterCount > 0 && <NavBadge>{activeFilterCount}</NavBadge>}
+            </NavBtnWrap>
+            מפה
+          </NavBtn>
+          <NavBtn $active={tab==='fav'} onClick={()=>setTab('fav')} aria-label={`מועדפים${favIds.length>0?` (${favIds.length})`:''}`} aria-current={tab==='fav'?'page':undefined}>
+            <NavBtnWrap>
+              <Heart size={20}/>
+              {favIds.length > 0 && <NavBadge>{favIds.length}</NavBadge>}
+            </NavBtnWrap>
+            מועדפים
+          </NavBtn>
           <NavBtn $active={tab==='calc'} onClick={()=>setTab('calc')} aria-label="מחשבון מימון" aria-current={tab==='calc'?'page':undefined}><Calculator size={20}/>מחשבון</NavBtn>
-          <NavBtn $active={tab==='areas'} onClick={()=>{ setTab('map'); setListOpen(o => !o) }} aria-label="רשימת חלקות" aria-current={listOpen?'page':undefined}><Layers size={20}/>רשימה</NavBtn>
+          <NavBtn $active={tab==='areas'} onClick={()=>{ setTab('map'); setListOpen(o => !o) }} aria-label="רשימת חלקות" aria-current={listOpen?'page':undefined}>
+            <NavBtnWrap>
+              <Layers size={20}/>
+              {sorted.length > 0 && <NavBadge>{sorted.length > 99 ? '99+' : sorted.length}</NavBadge>}
+            </NavBtnWrap>
+            רשימה
+          </NavBtn>
         </MobileNav>}
       </ErrorBoundary>
     </Wrap>
