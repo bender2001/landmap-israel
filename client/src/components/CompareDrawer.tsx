@@ -71,6 +71,16 @@ const ValueCell = styled.div<{ $best?: boolean; $highlight?: string }>`
   background:${pr => pr.$best ? t.goldDim : 'transparent'};
   ${mobile}{padding:8px 10px;font-size:12px;}
 `
+/* ── Visual Comparison Bar ── */
+const BarWrap = styled.div`
+  width:100%;height:6px;background:${t.surfaceLight};border-radius:3px;
+  overflow:hidden;margin-top:6px;
+`
+const BarFill = styled.div<{ $pct: number; $color: string }>`
+  height:100%;width:${pr => pr.$pct}%;background:${pr => pr.$color};
+  border-radius:3px;transition:width 0.8s cubic-bezier(0.32,0.72,0,1);
+  min-width:${pr => pr.$pct > 0 ? '4px' : '0'};
+`
 const WinnerBadge = styled.span`
   display:inline-flex;align-items:center;gap:4px;
   padding:2px 8px;border-radius:${t.r.full};
@@ -92,6 +102,20 @@ const EmptyCompare = styled.div`
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:16px;padding:60px 24px;text-align:center;
 `
+/* ── Winner Summary ── */
+const SummaryBar = styled.div`
+  display:flex;align-items:center;gap:16px;padding:14px 24px;direction:rtl;
+  background:linear-gradient(135deg,rgba(212,168,75,0.08),rgba(212,168,75,0.02));
+  border-bottom:1px solid ${t.goldBorder};flex-wrap:wrap;
+  ${mobile}{gap:10px;padding:10px 16px;}
+`
+const SummaryItem = styled.div`
+  display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:${t.textSec};
+`
+const SummaryWinner = styled.span`
+  font-weight:800;color:${t.gold};
+`
+const SummaryIcon = styled.span`font-size:14px;`
 
 interface CompareDrawerProps {
   open: boolean
@@ -154,7 +178,13 @@ function CompareDrawer({ open, onClose, plots, allPlots }: CompareDrawerProps) {
     const bestScore = findBest(plots, calcScore)
     const bestSize = findBest(plots, pl => p(pl).size)
 
-    return { data, bestPrice, bestPps, bestRoi, bestScore, bestSize }
+    // Calculate max values for bar visualization
+    const maxPrice = Math.max(...data.map(d => d.d.price)) || 1
+    const maxSize = Math.max(...data.map(d => d.d.size)) || 1
+    const maxPps = Math.max(...data.map(d => d.pps)) || 1
+    const maxRoi = Math.max(...data.map(d => d.r)) || 1
+
+    return { data, bestPrice, bestPps, bestRoi, bestScore, bestSize, maxPrice, maxSize, maxPps, maxRoi }
   }, [plots, allPlots])
 
   if (!plots.length) return null
@@ -172,6 +202,37 @@ function CompareDrawer({ open, onClose, plots, allPlots }: CompareDrawerProps) {
 
         {metrics ? (
           <>
+            {/* Winner Summary Bar */}
+            <SummaryBar>
+              {metrics.bestScore && (() => {
+                const winner = metrics.data.find(d => d.pl.id === metrics.bestScore)
+                return winner ? (
+                  <SummaryItem>
+                    <SummaryIcon>🏆</SummaryIcon>
+                    מומלץ: <SummaryWinner>חלקה {winner.pl.number} ({winner.pl.city})</SummaryWinner>
+                    — ציון {winner.score}/10
+                  </SummaryItem>
+                ) : null
+              })()}
+              {metrics.bestPrice && (() => {
+                const cheapest = metrics.data.find(d => d.pl.id === metrics.bestPrice)
+                return cheapest ? (
+                  <SummaryItem>
+                    <SummaryIcon>💰</SummaryIcon>
+                    מחיר נמוך: <SummaryWinner>{fmt.compact(cheapest.d.price)}</SummaryWinner>
+                  </SummaryItem>
+                ) : null
+              })()}
+              {metrics.bestRoi && (() => {
+                const topRoi = metrics.data.find(d => d.pl.id === metrics.bestRoi)
+                return topRoi ? (
+                  <SummaryItem>
+                    <SummaryIcon>📈</SummaryIcon>
+                    תשואה גבוהה: <SummaryWinner>+{fmt.pct(topRoi.r)}</SummaryWinner>
+                  </SummaryItem>
+                ) : null
+              })()}
+            </SummaryBar>
             <Grid $cols={cols}>
               {/* Header row */}
               <LabelCell style={{ background: t.bg, borderBottom: `2px solid ${t.border}` }}>
@@ -201,6 +262,7 @@ function CompareDrawer({ open, onClose, plots, allPlots }: CompareDrawerProps) {
               {metrics.data.map(({ pl, d }) => (
                 <ValueCell key={pl.id} $best={pl.id === metrics.bestPrice} $highlight={pl.id === metrics.bestPrice ? t.ok : undefined}>
                   {fmt.compact(d.price)}
+                  <BarWrap><BarFill $pct={d.price > 0 ? (d.price / metrics.maxPrice) * 100 : 0} $color={pl.id === metrics.bestPrice ? t.ok : t.gold} /></BarWrap>
                 </ValueCell>
               ))}
 
@@ -209,6 +271,7 @@ function CompareDrawer({ open, onClose, plots, allPlots }: CompareDrawerProps) {
               {metrics.data.map(({ pl, d }) => (
                 <ValueCell key={pl.id} $best={pl.id === metrics.bestSize}>
                   {fmt.num(d.size)}
+                  <BarWrap><BarFill $pct={d.size > 0 ? (d.size / metrics.maxSize) * 100 : 0} $color={pl.id === metrics.bestSize ? t.gold : t.textDim} /></BarWrap>
                 </ValueCell>
               ))}
 
@@ -217,6 +280,7 @@ function CompareDrawer({ open, onClose, plots, allPlots }: CompareDrawerProps) {
               {metrics.data.map(({ pl, pps }) => (
                 <ValueCell key={pl.id} $best={pl.id === metrics.bestPps} $highlight={pl.id === metrics.bestPps ? t.ok : undefined}>
                   {pps > 0 ? fmt.num(pps) : '—'}
+                  {pps > 0 && <BarWrap><BarFill $pct={(pps / metrics.maxPps) * 100} $color={pl.id === metrics.bestPps ? t.ok : t.warn} /></BarWrap>}
                 </ValueCell>
               ))}
 
@@ -225,6 +289,7 @@ function CompareDrawer({ open, onClose, plots, allPlots }: CompareDrawerProps) {
               {metrics.data.map(({ pl, r }) => (
                 <ValueCell key={pl.id} $best={pl.id === metrics.bestRoi} $highlight={pl.id === metrics.bestRoi ? t.ok : r > 0 ? t.gold : t.err}>
                   {r > 0 ? `+${fmt.pct(r)}` : fmt.pct(r)}
+                  {r > 0 && <BarWrap><BarFill $pct={metrics.maxRoi > 0 ? (r / metrics.maxRoi) * 100 : 0} $color={pl.id === metrics.bestRoi ? t.ok : t.gold} /></BarWrap>}
                 </ValueCell>
               ))}
 
@@ -233,6 +298,7 @@ function CompareDrawer({ open, onClose, plots, allPlots }: CompareDrawerProps) {
               {metrics.data.map(({ pl, score, grade }) => (
                 <ValueCell key={pl.id} $best={pl.id === metrics.bestScore} $highlight={grade.color}>
                   {score}/10 ({grade.grade})
+                  <BarWrap><BarFill $pct={score * 10} $color={grade.color} /></BarWrap>
                 </ValueCell>
               ))}
 

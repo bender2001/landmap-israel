@@ -361,6 +361,13 @@ export default function Explore() {
 
   const avg = filtered.length ? filtered.reduce((s, pl) => s + p(pl).price, 0) / filtered.length : 0
   const avgPps = filtered.length ? Math.round(filtered.reduce((s, pl) => s + pricePerSqm(pl), 0) / filtered.length) : 0
+  const medianPrice = useMemo(() => {
+    if (!filtered.length) return 0
+    const prices = filtered.map(pl => p(pl).price).filter(v => v > 0).sort((a, b) => a - b)
+    if (!prices.length) return 0
+    const mid = Math.floor(prices.length / 2)
+    return prices.length % 2 === 0 ? (prices[mid - 1] + prices[mid]) / 2 : prices[mid]
+  }, [filtered])
 
   const hasActiveFilters = useMemo(() =>
     Object.entries(filters).some(([, v]) => v && v !== 'all'), [filters])
@@ -530,6 +537,7 @@ export default function Explore() {
         <Stats>
           <Stat><Val>{filtered.length}</Val> חלקות</Stat>
           <Stat>ממוצע <Val>{fmt.compact(avg)}</Val></Stat>
+          {medianPrice > 0 && <Stat>חציון <Val>{fmt.compact(medianPrice)}</Val></Stat>}
           {avgPps > 0 && <Stat>₪/מ״ר <Val>{fmt.num(avgPps)}</Val></Stat>}
           {favIds.length > 0 && <Stat><Heart size={12} color={t.gold} /><Val>{favIds.length}</Val> מועדפים</Stat>}
           {compareIds.length > 0 && <Stat><GitCompareArrows size={12} color={t.gold} /><Val>{compareIds.length}</Val> להשוואה</Stat>}

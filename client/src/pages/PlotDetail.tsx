@@ -169,6 +169,84 @@ const SimilarMetrics = styled.div`display:flex;align-items:center;gap:10px;flex-
 const SimilarMetric = styled.span`font-size:12px;color:${t.lTextSec};display:flex;align-items:center;gap:3px;`
 const SimilarVal = styled.span<{$gold?:boolean}>`font-weight:700;color:${pr => pr.$gold ? t.gold : t.lText};`
 
+/* ── Investment Projection Chart ── */
+const ChartWrap = styled.div`
+  width:100%;height:180px;position:relative;margin:16px 0 8px;
+`
+const ChartLabel = styled.div`
+  position:absolute;font-size:10px;font-weight:700;color:${t.lTextSec};
+  font-family:${t.font};pointer-events:none;
+`
+const ChartValueLabel = styled.div<{$gold?:boolean}>`
+  font-size:11px;font-weight:800;color:${pr=>pr.$gold?t.gold:t.lText};font-family:${t.font};
+  display:flex;align-items:center;gap:3px;
+`
+function InvestmentProjectionChart({ price, projected, years }: { price: number; projected: number; years: number }) {
+  if (price <= 0 || projected <= 0 || years <= 0) return null
+  const w = 320, h = 140, padL = 8, padR = 8, padT = 20, padB = 30
+  const cagr = Math.pow(projected / price, 1 / years) - 1
+  // Generate data points for each year
+  const points: { x: number; y: number; value: number; year: number }[] = []
+  const maxVal = projected * 1.05
+  const minVal = price * 0.95
+  const range = maxVal - minVal
+  for (let yr = 0; yr <= years; yr++) {
+    const value = price * Math.pow(1 + cagr, yr)
+    const x = padL + (yr / years) * (w - padL - padR)
+    const y = padT + (1 - (value - minVal) / range) * (h - padT - padB)
+    points.push({ x, y, value, year: yr })
+  }
+  const linePath = points.map((pt, i) => `${i === 0 ? 'M' : 'L'}${pt.x},${pt.y}`).join(' ')
+  const areaPath = `${linePath} L${points[points.length - 1].x},${h - padB} L${points[0].x},${h - padB} Z`
+  return (
+    <ChartWrap>
+      <svg width="100%" height="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" style={{ overflow: 'visible' }}>
+        <defs>
+          <linearGradient id="projGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={t.gold} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={t.gold} stopOpacity="0.02" />
+          </linearGradient>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={t.gold} />
+            <stop offset="100%" stopColor={t.goldBright} />
+          </linearGradient>
+        </defs>
+        {/* Grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map(pct => {
+          const y = padT + pct * (h - padT - padB)
+          return <line key={pct} x1={padL} y1={y} x2={w - padR} y2={y} stroke={t.lBorder} strokeWidth="0.5" strokeDasharray="3 3" />
+        })}
+        {/* Year labels on X axis */}
+        {points.filter((_, i) => i === 0 || i === points.length - 1 || i === Math.floor(points.length / 2)).map(pt => (
+          <text key={pt.year} x={pt.x} y={h - 10} textAnchor="middle" fontSize="9" fontWeight="600" fill={t.lTextSec} fontFamily={t.font}>
+            שנה {pt.year}
+          </text>
+        ))}
+        {/* Area fill */}
+        <path d={areaPath} fill="url(#projGrad)" />
+        {/* Line */}
+        <path d={linePath} fill="none" stroke="url(#lineGrad)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Start dot */}
+        <circle cx={points[0].x} cy={points[0].y} r="4" fill={t.lBg} stroke={t.gold} strokeWidth="2" />
+        {/* End dot */}
+        <circle cx={points[points.length - 1].x} cy={points[points.length - 1].y} r="5" fill={t.gold} stroke={t.lBg} strokeWidth="2" />
+        {/* Start label */}
+        <text x={points[0].x + 4} y={points[0].y - 10} fontSize="10" fontWeight="700" fill={t.lTextSec} fontFamily={t.font}>
+          {fmt.compact(price)}
+        </text>
+        {/* End label */}
+        <text x={points[points.length - 1].x - 4} y={points[points.length - 1].y - 10} textAnchor="end" fontSize="11" fontWeight="800" fill={t.gold} fontFamily={t.font}>
+          {fmt.compact(projected)}
+        </text>
+      </svg>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+        <ChartValueLabel>📈 צמיחה שנתית: <span style={{ color: t.gold, fontWeight: 800 }}>{(cagr * 100).toFixed(1)}%</span></ChartValueLabel>
+        <ChartValueLabel $gold>+{fmt.compact(projected - price)} רווח צפוי</ChartValueLabel>
+      </div>
+    </ChartWrap>
+  )
+}
+
 /* ── Mini Map ── */
 const MiniMapWrap = styled.div`
   width:100%;height:260px;border-radius:${t.r.lg};overflow:hidden;border:1px solid ${t.lBorder};
@@ -182,6 +260,16 @@ const MiniMapBtn = styled.a`
   background:rgba(255,255,255,0.95);backdrop-filter:blur(8px);border:1px solid ${t.lBorder};
   border-radius:${t.r.sm};font-size:11px;font-weight:600;color:${t.lText};
   text-decoration:none!important;cursor:pointer;transition:all ${t.tr};
+  &:hover{border-color:${t.gold};color:${t.gold};box-shadow:${t.sh.sm};}
+`
+const MiniMapToggle = styled.button<{$active?:boolean}>`
+  display:inline-flex;align-items:center;gap:5px;padding:6px 12px;
+  background:${pr=>pr.$active?'rgba(212,168,75,0.15)':'rgba(255,255,255,0.95)'};
+  backdrop-filter:blur(8px);
+  border:1px solid ${pr=>pr.$active?t.goldBorder:t.lBorder};
+  border-radius:${t.r.sm};font-size:11px;font-weight:600;
+  color:${pr=>pr.$active?t.gold:t.lText};
+  cursor:pointer;transition:all ${t.tr};
   &:hover{border-color:${t.gold};color:${t.gold};box-shadow:${t.sh.sm};}
 `
 
@@ -278,10 +366,15 @@ const PrintBtn = styled.button`
 
 /* ── Mini Map (lazy loaded) ── */
 const MiniMapLazy = lazy(() => import('react-leaflet').then(mod => {
-  // Build inline component from react-leaflet
   const { MapContainer, TileLayer, Polygon } = mod
+  const { useState: useStateLocal } = require('react')
+  const TILES_MINI = [
+    { id: 'street', label: 'מפה', url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png' },
+    { id: 'satellite', label: 'לוויין', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
+  ]
   const MiniMap = ({ plot }: { plot: Plot }) => {
     const center = plotCenter(plot.coordinates)
+    const [tileIdx, setTileIdx] = useStateLocal(0)
     if (!center || !plot.coordinates?.length) return null
     const color = statusColors[plot.status || 'AVAILABLE'] || '#10B981'
     return (
@@ -292,12 +385,20 @@ const MiniMapLazy = lazy(() => import('react-leaflet').then(mod => {
           attributionControl={false}
           style={{ width: '100%', height: '100%', zIndex: 1 }}
         >
-          <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png" />
+          <TileLayer key={TILES_MINI[tileIdx].id} url={TILES_MINI[tileIdx].url} maxZoom={19} />
           <Polygon
             positions={plot.coordinates}
             pathOptions={{ color, weight: 3, fillColor: color, fillOpacity: 0.25 }}
           />
         </MapContainer>
+        {/* Top-right: tile toggle */}
+        <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 400, display: 'flex', gap: 4 }}>
+          {TILES_MINI.map((tl, i) => (
+            <MiniMapToggle key={tl.id} $active={i === tileIdx} onClick={() => setTileIdx(i)}>
+              {tl.label}
+            </MiniMapToggle>
+          ))}
+        </div>
         <MiniMapOverlay>
           <MiniMapBtn
             href={`https://waze.com/ul?ll=${center.lat},${center.lng}&navigate=yes`}
@@ -310,6 +411,12 @@ const MiniMapLazy = lazy(() => import('react-leaflet').then(mod => {
             target="_blank" rel="noopener noreferrer"
           >
             <MapPin size={12} /> Google Maps
+          </MiniMapBtn>
+          <MiniMapBtn
+            href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${center.lat},${center.lng}`}
+            target="_blank" rel="noopener noreferrer"
+          >
+            👁️ Street View
           </MiniMapBtn>
         </MiniMapOverlay>
       </MiniMapWrap>
@@ -444,6 +551,10 @@ export default function PlotDetail() {
                 {pps > 0 && <Row><Label>מחיר למ״ר</Label><Value style={{color:t.gold}}>₪{fmt.num(pps)}</Value></Row>}
                 <Row><Label>צפיפות</Label><Value>{d.density} יח"ד/דונם</Value></Row>
                 <Row><Label>אומדן מוכנות</Label><Value>{d.readiness || '--'}</Value></Row>
+                {/* Investment Growth Projection Chart */}
+                {d.price > 0 && d.projected > 0 && cagr && (
+                  <InvestmentProjectionChart price={d.price} projected={d.projected} years={cagr.years} />
+                )}
               </Card>
 
               {/* Risk Assessment — like Madlan's risk meter */}
