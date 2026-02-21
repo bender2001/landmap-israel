@@ -1,6 +1,7 @@
 import { memo, useCallback, useMemo, useRef, useEffect } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus } from 'lucide-react'
+import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, pricePerSqm, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats } from '../utils'
 import type { Plot } from '../types'
@@ -106,6 +107,14 @@ const ItemDom = styled.span<{ $c: string }>`
   font-size:10px;font-weight:600;color:${pr => pr.$c};margin-inline-start:auto;
 `
 
+const DetailLink = styled.button`
+  display:flex;align-items:center;justify-content:center;width:28px;height:28px;
+  border-radius:${t.r.sm};border:1px solid ${t.border};background:transparent;
+  color:${t.textDim};cursor:pointer;transition:all ${t.tr};flex-shrink:0;
+  margin-inline-start:auto;
+  &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
+`
+
 /* ── Price Position Badge ── */
 const PricePosTag = styled.span<{ $c: string }>`
   display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;
@@ -155,8 +164,8 @@ interface Props {
   onToggle: () => void
 }
 
-function PlotItem({ plot, active, index, onClick, allPlots }: {
-  plot: Plot; active: boolean; index: number; onClick: () => void; allPlots: Plot[]
+function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick }: {
+  plot: Plot; active: boolean; index: number; onClick: () => void; allPlots: Plot[]; onDetailClick: (id: string) => void
 }) {
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
   const status = (plot.status || 'AVAILABLE') as string
@@ -198,6 +207,13 @@ function PlotItem({ plot, active, index, onClick, allPlots }: {
           </Metric>
         )}
         {dom && <ItemDom $c={dom.color}>{dom.label}</ItemDom>}
+        <DetailLink
+          onClick={(e) => { e.stopPropagation(); onDetailClick(plot.id) }}
+          title="עמוד מלא"
+          aria-label={`פתח עמוד מלא עבור חלקה ${plot.number}`}
+        >
+          <ExternalLink size={13} />
+        </DetailLink>
       </Metrics>
     </ItemWrap>
   )
@@ -205,7 +221,9 @@ function PlotItem({ plot, active, index, onClick, allPlots }: {
 
 function PlotListPanel({ plots, selected, onSelect, open, onToggle }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
   const stats = useMemo(() => calcAggregateStats(plots), [plots])
+  const goToDetail = useCallback((id: string) => navigate(`/plot/${id}`), [navigate])
 
   // Scroll to active item
   useEffect(() => {
@@ -265,6 +283,7 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle }: Props) {
                 index={i}
                 onClick={() => onSelect(plot)}
                 allPlots={plots}
+                onDetailClick={goToDetail}
               />
             ))
           )}

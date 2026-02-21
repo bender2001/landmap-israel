@@ -375,6 +375,21 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
             {d.seaDist != null && <Row><Label>מרחק מהים</Label><Val>{fmt.num(d.seaDist)} מ׳</Val></Row>}
             {d.parkDist != null && <Row><Label>מרחק מפארק</Label><Val>{fmt.num(d.parkDist)} מ׳</Val></Row>}
             {d.density > 0 && <Row><Label>צפיפות</Label><Val>{d.density} יח׳/דונם</Val></Row>}
+            {d.block && (
+              <Row>
+                <Label>גוש / חלקה</Label>
+                <Val>
+                  <a
+                    href={`https://www.govmap.gov.il/?q=${encodeURIComponent(`גוש ${d.block} חלקה ${plot.number}`)}&z=8`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ color: t.gold, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, transition: `color ${t.tr}` }}
+                    title="הצג ב-GovMap"
+                  >
+                    {d.block}/{plot.number} <ExternalLink size={11} />
+                  </a>
+                </Val>
+              </Row>
+            )}
           </Section>
 
           <Section icon={FileText} title="מסמכים" idx={4}>

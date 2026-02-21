@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink } from 'lucide-react'
+import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink, MessageCircle, Clock } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed } from '../hooks'
 import MapArea from '../components/Map'
@@ -204,6 +204,51 @@ const CalcInput = styled.input`
   &::placeholder{color:${t.textDim};}
 `
 
+/* ── WhatsApp Floating CTA ── */
+const waPulse = keyframes`0%{box-shadow:0 0 0 0 rgba(37,211,102,0.45)}70%{box-shadow:0 0 0 14px rgba(37,211,102,0)}100%{box-shadow:0 0 0 0 rgba(37,211,102,0)}`
+const WhatsAppFab = styled.a`
+  position:fixed;bottom:100px;right:20px;z-index:${t.z.filter};
+  width:56px;height:56px;border-radius:${t.r.full};
+  background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 16px rgba(37,211,102,0.4);cursor:pointer;
+  transition:all ${t.tr};animation:${waPulse} 2.5s ease-in-out infinite;
+  text-decoration:none !important;
+  &:hover{transform:scale(1.1) translateY(-2px);box-shadow:0 8px 28px rgba(37,211,102,0.5);}
+  ${mobile}{bottom:120px;right:14px;width:48px;height:48px;}
+`
+const WhatsAppTooltip = styled.div`
+  position:fixed;bottom:108px;right:82px;z-index:${t.z.filter};
+  padding:8px 14px;background:${t.glass};backdrop-filter:blur(16px);
+  border:1px solid ${t.glassBorder};border-radius:${t.r.md};
+  font-size:12px;font-weight:600;color:${t.text};white-space:nowrap;direction:rtl;
+  box-shadow:${t.sh.md};pointer-events:none;
+  &::after{content:'';position:absolute;top:50%;right:-6px;transform:translateY(-50%);
+    border:6px solid transparent;border-left-color:${t.glass};}
+  ${mobile}{display:none;}
+`
+
+/* ── Recently Viewed Strip ── */
+const RecentStrip = styled.div`
+  position:absolute;top:80px;left:50%;transform:translateX(-50%);z-index:${t.z.filter - 1};
+  display:flex;align-items:center;gap:8px;padding:6px 14px;direction:rtl;
+  background:${t.glass};backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid ${t.glassBorder};border-radius:${t.r.full};box-shadow:${t.sh.md};
+  max-width:calc(100vw - 32px);overflow-x:auto;
+  scrollbar-width:none;&::-webkit-scrollbar{display:none;}
+  ${mobile}{top:100px;left:8px;right:8px;transform:none;}
+`
+const RecentLabel = styled.span`
+  font-size:11px;font-weight:600;color:${t.textDim};white-space:nowrap;
+  display:flex;align-items:center;gap:4px;flex-shrink:0;
+`
+const RecentChip = styled.button`
+  display:inline-flex;align-items:center;gap:4px;padding:4px 12px;
+  background:${t.surfaceLight};border:1px solid ${t.border};border-radius:${t.r.full};
+  font-size:11px;font-weight:600;color:${t.textSec};font-family:${t.font};
+  cursor:pointer;white-space:nowrap;transition:all ${t.tr};flex-shrink:0;
+  &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
+`
+
 // ── URL ↔ Filters sync helpers ──
 const FILTER_PARAMS: (keyof Filters)[] = ['city', 'priceMin', 'priceMax', 'sizeMin', 'sizeMax', 'ripeness', 'minRoi', 'zoning', 'search', 'belowAvg']
 
@@ -238,7 +283,7 @@ export default function Explore() {
   const [listOpen, setListOpen] = useState(false)
   const { isFav, toggle: rawToggleFav, ids: favIds } = useFavorites()
   const { ids: compareIds, toggle: rawToggleCompare, clear: clearCompare, has: isCompared } = useCompare()
-  const { add: addRecentlyViewed } = useRecentlyViewed()
+  const { ids: recentIds, add: addRecentlyViewed } = useRecentlyViewed()
   const { toast } = useToast()
   const navigate = useNavigate()
   const sortRef = useRef<HTMLDivElement>(null)
@@ -328,6 +373,18 @@ export default function Explore() {
     setSelected(pl)
     if (pl) addRecentlyViewed(pl.id)
   }, [addRecentlyViewed])
+
+  // WhatsApp tooltip hover state
+  const [waHover, setWaHover] = useState(false)
+
+  // Recently viewed plots (resolve IDs to actual plot objects)
+  const recentPlots = useMemo(() => {
+    if (!recentIds.length || !plots.length) return []
+    return recentIds
+      .map(id => plots.find(pl => pl.id === id))
+      .filter((pl): pl is Plot => !!pl)
+      .slice(0, 5)
+  }, [recentIds, plots])
 
   // Dynamic document title based on active filters
   useEffect(() => {
@@ -557,6 +614,30 @@ export default function Explore() {
             </CalcCard>
           )}
         </MobileOverlay>
+
+        {/* Recently Viewed Strip (show only when user has viewed plots and no sidebar is open) */}
+        {recentPlots.length > 0 && !selected && !listOpen && (
+          <RecentStrip>
+            <RecentLabel><Clock size={12} /> ראיתם לאחרונה</RecentLabel>
+            {recentPlots.map(pl => (
+              <RecentChip key={pl.id} onClick={() => selectPlot(pl)}>
+                {pl.city} · {pl.number}
+              </RecentChip>
+            ))}
+          </RecentStrip>
+        )}
+
+        {/* WhatsApp Floating CTA */}
+        <WhatsAppFab
+          href="https://wa.me/9720521234567?text=%D7%94%D7%99%D7%99%2C+%D7%90%D7%A9%D7%9E%D7%97+%D7%9C%D7%A9%D7%9E%D7%95%D7%A2+%D7%A2%D7%9C+%D7%94%D7%96%D7%93%D7%9E%D7%A0%D7%95%D7%99%D7%95%D7%AA+%D7%A7%D7%A8%D7%A7%D7%A2"
+          target="_blank" rel="noopener noreferrer"
+          aria-label="שלח הודעה בוואטסאפ"
+          onMouseEnter={() => setWaHover(true)}
+          onMouseLeave={() => setWaHover(false)}
+        >
+          <MessageCircle size={26} />
+        </WhatsAppFab>
+        {waHover && <WhatsAppTooltip>דברו עם מומחה קרקע</WhatsAppTooltip>}
 
         <MobileNav role="navigation" aria-label="ניווט ראשי">
           <NavBtn $active={tab==='map'} onClick={()=>setTab('map')} aria-label="מפה" aria-current={tab==='map'?'page':undefined}><MapIcon size={20}/>מפה</NavBtn>
