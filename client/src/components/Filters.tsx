@@ -113,6 +113,28 @@ const FieldLabel = styled.label`font-size:11px;font-weight:600;color:${t.textDim
 const Divider = styled.div`height:1px;background:${t.border};margin:0;`
 
 /* ── Actions ── */
+/* ── Price Quick Presets ── */
+const PresetRow = styled.div`
+  display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;
+`
+const PresetChip = styled.button<{ $active: boolean }>`
+  display:inline-flex;align-items:center;gap:3px;padding:5px 12px;
+  border:1px solid ${pr => pr.$active ? t.gold : t.border};
+  border-radius:${t.r.full};font-size:11px;font-weight:600;font-family:${t.font};cursor:pointer;
+  background:${pr => pr.$active ? t.goldDim : 'transparent'};
+  color:${pr => pr.$active ? t.gold : t.textSec};
+  transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};transform:translateY(-1px);}
+`
+
+const PRICE_PRESETS = [
+  { label: 'עד ₪300K', min: 0, max: 300000 },
+  { label: '₪300K–500K', min: 300000, max: 500000 },
+  { label: '₪500K–1M', min: 500000, max: 1000000 },
+  { label: '₪1M–2M', min: 1000000, max: 2000000 },
+  { label: '₪2M+', min: 2000000, max: 0 },
+] as const
+
 const Actions = styled.div`display:flex;align-items:center;gap:10px;padding:14px 20px;border-top:1px solid ${t.border};
   background:linear-gradient(0deg,rgba(212,168,75,0.04),transparent);`
 const ApplyBtn = styled.button`
@@ -483,6 +505,22 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
               valueMin={Number(draft.priceMin) || 0} valueMax={Number(draft.priceMax) || 2000000}
               onChange={(lo: number, hi: number) => setDraft(d => ({ ...d, priceMin: lo ? String(lo) : '', priceMax: hi < 2000000 ? String(hi) : '' }))}
               formatValue={fmtPrice} />
+            <PresetRow>
+              {PRICE_PRESETS.map(preset => {
+                const isActive = (Number(draft.priceMin) || 0) === preset.min && (preset.max === 0 ? !draft.priceMax : (Number(draft.priceMax) || 0) === preset.max)
+                return (
+                  <PresetChip key={preset.label} $active={isActive} onClick={() => {
+                    setDraft(d => ({
+                      ...d,
+                      priceMin: preset.min ? String(preset.min) : '',
+                      priceMax: preset.max ? String(preset.max) : '',
+                    }))
+                  }}>
+                    {preset.label}
+                  </PresetChip>
+                )
+              })}
+            </PresetRow>
           </Section>
 
           <Divider />

@@ -100,6 +100,22 @@ const ItemBadge = styled.span<{ $c: string }>`
   color:${pr => pr.$c};background:${pr => pr.$c}18;
 `
 
+/* ── New / Hot Listing Badges ── */
+const newPulse = keyframes`0%,100%{box-shadow:0 0 0 0 rgba(59,130,246,0.3)}50%{box-shadow:0 0 0 4px rgba(59,130,246,0)}`
+const hotPulse = keyframes`0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.3)}50%{box-shadow:0 0 0 4px rgba(239,68,68,0)}`
+const NewBadge = styled.span`
+  display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;
+  padding:2px 8px;border-radius:${t.r.full};color:#3B82F6;
+  background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);
+  animation:${newPulse} 2.5s ease-in-out infinite;white-space:nowrap;
+`
+const HotBadge = styled.span`
+  display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;
+  padding:2px 8px;border-radius:${t.r.full};color:#EF4444;
+  background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);
+  animation:${hotPulse} 2s ease-in-out infinite;white-space:nowrap;
+`
+
 const ItemGrade = styled.span<{ $c: string }>`
   font-size:11px;font-weight:800;padding:2px 6px;border-radius:${t.r.sm};
   color:${pr => pr.$c};border:1px solid ${pr => pr.$c}44;background:${t.bg};
@@ -156,6 +172,32 @@ const SummaryStat = styled.div`
 `
 const SummaryStatVal = styled.div`font-size:14px;font-weight:800;color:${t.gold};font-family:${t.font};`
 const SummaryStatLabel = styled.div`font-size:9px;font-weight:600;color:${t.textDim};text-transform:uppercase;letter-spacing:0.3px;`
+
+/* ── Grade Distribution Bar ── */
+const GradeDistWrap = styled.div`
+  padding:8px 14px;border-bottom:1px solid ${t.border};flex-shrink:0;direction:rtl;
+`
+const GradeDistTitle = styled.div`
+  display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:${t.textDim};
+  margin-bottom:6px;letter-spacing:0.3px;
+`
+const GradeDistBar = styled.div`
+  display:flex;align-items:center;gap:0;height:8px;border-radius:4px;overflow:hidden;
+  background:${t.surfaceLight};
+`
+const GradeDistSegment = styled.div<{ $w: number; $c: string }>`
+  height:100%;width:${pr => pr.$w}%;min-width:${pr => pr.$w > 0 ? '2px' : '0'};
+  background:${pr => pr.$c};transition:width 0.5s cubic-bezier(0.32,0.72,0,1);
+`
+const GradeDistLegend = styled.div`
+  display:flex;align-items:center;gap:10px;margin-top:5px;flex-wrap:wrap;
+`
+const GradeDistItem = styled.div`
+  display:flex;align-items:center;gap:3px;font-size:9px;color:${t.textSec};font-weight:600;
+`
+const GradeDistDot = styled.span<{ $c: string }>`
+  width:6px;height:6px;border-radius:50%;background:${pr => pr.$c};flex-shrink:0;
+`
 
 /* ── Toggle Button (always visible) ── */
 const ToggleBtn = styled.button<{ $open: boolean }>`
@@ -270,6 +312,51 @@ const ScrollTopBtn = styled.button<{ $visible: boolean }>`
   &:hover{transform:translateY(-2px);box-shadow:${t.sh.lg};}
 `
 
+const GRADE_TIERS = [
+  { min: 9, label: 'A/A+', color: '#10B981' },
+  { min: 7, label: 'A-/B+', color: '#84CC16' },
+  { min: 5, label: 'B/B-', color: '#F59E0B' },
+  { min: 0, label: 'C', color: '#EF4444' },
+] as const
+
+function GradeDistribution({ plots }: { plots: Plot[] }) {
+  const data = useMemo(() => {
+    if (plots.length < 2) return null
+    const counts = GRADE_TIERS.map(tier => ({
+      ...tier,
+      count: plots.filter(pl => {
+        const s = calcScore(pl)
+        const tierIdx = GRADE_TIERS.findIndex(t => t.min === tier.min)
+        const nextMin = tierIdx > 0 ? GRADE_TIERS[tierIdx - 1].min : Infinity
+        return s >= tier.min && s < nextMin
+      }).length,
+    }))
+    const total = plots.length
+    return counts.map(c => ({ ...c, pct: total > 0 ? (c.count / total) * 100 : 0 }))
+  }, [plots])
+
+  if (!data) return null
+
+  return (
+    <GradeDistWrap>
+      <GradeDistTitle>📊 התפלגות ציוני השקעה</GradeDistTitle>
+      <GradeDistBar>
+        {data.map(d => (
+          <GradeDistSegment key={d.label} $w={d.pct} $c={d.color} title={`${d.label}: ${d.count} (${Math.round(d.pct)}%)`} />
+        ))}
+      </GradeDistBar>
+      <GradeDistLegend>
+        {data.filter(d => d.count > 0).map(d => (
+          <GradeDistItem key={d.label}>
+            <GradeDistDot $c={d.color} />
+            {d.label} ({d.count})
+          </GradeDistItem>
+        ))}
+      </GradeDistLegend>
+    </GradeDistWrap>
+  )
+}
+
 function PriceDistribution({ plots, selectedPlot }: { plots: Plot[]; selectedPlot: Plot | null }) {
   const data = useMemo(() => {
     const prices = plots.map(pl => p(pl).price).filter(v => v > 0)
@@ -356,6 +443,8 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userL
   const distance = userLocation ? plotDistanceFromUser(plot, userLocation.lat, userLocation.lng) : null
   const pps = pricePerSqm(plot)
   const ppd = pricePerDunam(plot)
+  const isNew = dom && dom.days <= 7
+  const isHot = score >= 9
 
   // Zoning pipeline stage
   const zoningIdx = zoningPipeline.findIndex(z => z.key === d.zoning)
@@ -367,6 +456,8 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userL
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <ItemCity>{plot.city}</ItemCity>
           <ItemBadge $c={sColor}>{statusLabels[status] || status}</ItemBadge>
+          {isNew && <NewBadge>✨ חדש</NewBadge>}
+          {isHot && <HotBadge>🔥 HOT</HotBadge>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           {distance != null && <DistanceBadge>📍 {fmtDistance(distance)}</DistanceBadge>}
@@ -569,6 +660,8 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, u
             ))}
           </CityChipRow>
         )}
+        {/* Grade distribution bar */}
+        <GradeDistribution plots={allVisiblePlots} />
         {/* Price distribution histogram */}
         <PriceDistribution plots={visiblePlots} selectedPlot={selected} />
         <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
