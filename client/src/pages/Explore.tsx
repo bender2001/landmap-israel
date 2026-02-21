@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, lazy, Suspense } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown } from 'lucide-react'
@@ -78,6 +78,7 @@ export default function Explore() {
   const [sortOpen, setSortOpen] = useState(false)
   const [listOpen, setListOpen] = useState(false)
   const { isFav, toggle, ids: favIds } = useFavorites()
+  const sortRef = useRef<HTMLDivElement>(null)
 
   const apiFilters = useMemo(() => {
     const f: Record<string, string> = {}
@@ -107,6 +108,16 @@ export default function Explore() {
 
   const avg = filtered.length ? filtered.reduce((s, pl) => s + p(pl).price, 0) / filtered.length : 0
   const avgPps = filtered.length ? Math.round(filtered.reduce((s, pl) => s + pricePerSqm(pl), 0) / filtered.length) : 0
+
+  // Close sort dropdown on click outside
+  useEffect(() => {
+    if (!sortOpen) return
+    const handler = (e: MouseEvent) => {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) setSortOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [sortOpen])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -138,7 +149,7 @@ export default function Explore() {
         <FilterBar filters={filters} onChange={setFilters} resultCount={filtered.length} />
 
         {/* Sort dropdown */}
-        <SortWrap>
+        <SortWrap ref={sortRef}>
           <SortBtn onClick={() => setSortOpen(o => !o)} $active={sortKey !== 'recommended'}>
             <ArrowUpDown size={14} />
             {SORT_OPTIONS.find(o => o.key === sortKey)?.label || 'מיון'}
@@ -175,6 +186,7 @@ export default function Explore() {
           <Stat><Val>{filtered.length}</Val> חלקות</Stat>
           <Stat>ממוצע <Val>{fmt.compact(avg)}</Val></Stat>
           {avgPps > 0 && <Stat>₪/מ״ר <Val>{fmt.num(avgPps)}</Val></Stat>}
+          {favIds.length > 0 && <Stat><Heart size={12} color={t.gold} /><Val>{favIds.length}</Val> מועדפים</Stat>}
           <Demo>DEMO</Demo>
         </Stats>
 
