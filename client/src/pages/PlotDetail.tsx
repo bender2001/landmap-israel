@@ -109,7 +109,7 @@ const Metric = styled(AnimatedCard)`padding:20px;background:#fff;border:1px soli
 const MetricVal = styled.div`font-size:24px;font-weight:800;color:${t.lText};font-family:${t.font};`
 const MetricLabel = styled.div`font-size:12px;color:${t.lTextSec};margin-top:4px;`
 
-const Grid = styled.div`display:grid;grid-template-columns:1fr 360px;gap:24px;${md}{grid-template-columns:1fr;}`
+const Grid = styled.div`display:grid;grid-template-columns:1fr;gap:24px;${lg}{grid-template-columns:1fr 360px;}`
 const Card = styled(AnimatedCard)`background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};padding:24px;`
 const CardTitle = styled.h3`font-size:16px;font-weight:700;color:${t.lText};display:flex;align-items:center;gap:8px;margin-bottom:16px;font-family:${t.font};`
 const Row = styled.div`display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid ${t.lBorder};&:last-child{border:none;}`
@@ -185,7 +185,7 @@ const CalcResultVal = styled.div<{$gold?:boolean}>`font-size:18px;font-weight:80
 const CalcResultLabel = styled.div`font-size:11px;color:${t.lTextSec};margin-top:2px;`
 
 /* ── Similar Plots ── */
-const SimilarGrid = styled.div`display:grid;grid-template-columns:repeat(2,1fr);gap:12px;${sm}{grid-template-columns:1fr;}`
+const SimilarGrid = styled.div`display:grid;grid-template-columns:1fr;gap:12px;${sm}{grid-template-columns:repeat(2,1fr);}`
 const SimilarCard = styled(Link)`
   display:flex;flex-direction:column;gap:8px;padding:14px;
   background:${t.lBg};border:1px solid ${t.lBorder};border-radius:${t.r.md};
@@ -304,7 +304,7 @@ const MiniMapToggle = styled.button<{$active?:boolean}>`
 `
 
 /* ── Nearby Amenities ── */
-const AmenitiesGrid = styled.div`display:grid;grid-template-columns:repeat(3,1fr);gap:10px;${sm}{grid-template-columns:1fr;}`
+const AmenitiesGrid = styled.div`display:grid;grid-template-columns:1fr;gap:10px;${sm}{grid-template-columns:repeat(2,1fr);}${md}{grid-template-columns:repeat(3,1fr);}`
 const AmenityItem = styled.div`
   display:flex;align-items:center;gap:10px;padding:12px;border-radius:${t.r.md};
   background:${t.lBg};border:1px solid ${t.lBorder};transition:all ${t.tr};
@@ -376,7 +376,7 @@ const SkeletonPulse = styled.div<{$w?:string;$h?:string}>`
   background:linear-gradient(90deg,${t.lBorder} 25%,#e8e8e8 50%,${t.lBorder} 75%);
   background-size:200% 100%;animation:${shimmer} 1.5s ease infinite;
 `
-const SkeletonMetrics = styled.div`display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:32px;${md}{grid-template-columns:repeat(3,1fr);}${sm}{grid-template-columns:repeat(2,1fr);}`
+const SkeletonMetrics = styled.div`display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:32px;${md}{grid-template-columns:repeat(3,1fr);}${lg}{grid-template-columns:repeat(5,1fr);}`
 const SkeletonCard = styled.div`padding:20px;background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};`
 
 function PlotDetailSkeleton() {
@@ -442,6 +442,25 @@ const PrintBtn = styled.button`
   color:${t.lTextSec};cursor:pointer;transition:all ${t.tr};
   &:hover{border-color:${t.gold};color:${t.gold};}
   @media print{display:none;}
+`
+
+/* ── Print Report Header (only visible when printing) ── */
+const PrintHeader = styled.div`
+  display:none;
+  @media print{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 0 16px;margin-bottom:20px;
+    border-bottom:2px solid ${t.gold};
+    page-break-after:avoid;
+  }
+`
+const PrintLogo = styled.div`
+  font-size:20px;font-weight:900;color:${t.gold};font-family:${t.font};
+  display:flex;align-items:center;gap:8px;
+  @media print{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+`
+const PrintMeta = styled.div`
+  text-align:left;font-size:9px;color:#666;line-height:1.5;
 `
 
 /* ── View on Map Button ── */
@@ -617,6 +636,14 @@ export default function PlotDetail() {
         <ReadingProgress $pct={readingProgress} />
         <PlotJsonLd plot={plot} />
         <Page>
+          <PrintHeader>
+            <PrintLogo>🗺️ LandMap Israel</PrintLogo>
+            <PrintMeta>
+              Investment Report<br/>
+              Generated: {new Date().toLocaleDateString('he-IL')}<br/>
+              landmap.co.il
+            </PrintMeta>
+          </PrintHeader>
           <Breadcrumbs plot={plot} />
 
           <TitleRow>

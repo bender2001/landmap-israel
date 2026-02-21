@@ -1,7 +1,7 @@
 import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker, Polyline, useMap, useMapEvents, WMSTileLayer } from 'react-leaflet'
 import L from 'leaflet'
-import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette, Ruler, Undo2, Trash2 } from 'lucide-react'
+import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette, Ruler, Undo2, Trash2, LocateFixed } from 'lucide-react'
 import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
@@ -170,13 +170,15 @@ function AutoFitBounds({ plots }: { plots: Plot[] }) {
   return null
 }
 
-// ── User Location ──
+// ── User Location (shared state for locate-me) ──
+const userPosRef = { current: null as [number, number] | null }
+
 function UserLocation() {
   const map = useMap()
   const [pos, setPos] = useState<[number, number] | null>(null)
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(
-      p => setPos([p.coords.latitude, p.coords.longitude]),
+      p => { const loc: [number, number] = [p.coords.latitude, p.coords.longitude]; setPos(loc); userPosRef.current = loc },
       () => {}, { enableHighAccuracy: false, timeout: 8000 }
     )
   }, [])
@@ -529,6 +531,31 @@ function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCada
         <MapIcon size={16} />
       </button>
 
+      {/* Locate Me — fly to user's current position */}
+      <button
+        onClick={() => {
+          if (userPosRef.current && mapRef.current) {
+            mapRef.current.flyTo(userPosRef.current, 15, { duration: 0.8 })
+          } else {
+            // Request geolocation if not yet available
+            navigator.geolocation?.getCurrentPosition(
+              pos => {
+                const loc: [number, number] = [pos.coords.latitude, pos.coords.longitude]
+                userPosRef.current = loc
+                mapRef.current?.flyTo(loc, 15, { duration: 0.8 })
+              },
+              () => {},
+              { enableHighAccuracy: true, timeout: 10000 }
+            )
+          }
+        }}
+        style={{ ...mobileBtnStyle(darkMode), boxShadow: t.sh.md }}
+        aria-label="המיקום שלי"
+        title="המיקום שלי — עבור למיקומך הנוכחי"
+      >
+        <LocateFixed size={16} />
+      </button>
+
       {/* Ruler / Distance measurement */}
       {onToggleRuler && (
         <div style={{ position: 'relative' }}>
@@ -859,7 +886,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         {/* Distance ruler tool */}
         <RulerTool active={rulerActive} darkMode={darkMode} onPointsChange={setRulerPoints} />
 
-        {/* Area divisions with price stats */}
+        {/* Area divisions with price stats + click for detailed area analytics */}
         {showAreas && israelAreas.map(area => {
           const areaPlots = plots.filter(pl => {
             const c = plotCenter(pl.coordinates)
@@ -870,6 +897,16 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
           })
           const ppsList = areaPlots.map(pl => pricePerSqm(pl)).filter(v => v > 0)
           const avgPps = ppsList.length ? Math.round(ppsList.reduce((s, v) => s + v, 0) / ppsList.length) : 0
+          const ppdList = areaPlots.map(pl => pricePerDunam(pl)).filter(v => v > 0)
+          const avgPpd = ppdList.length ? Math.round(ppdList.reduce((s, v) => s + v, 0) / ppdList.length) : 0
+          const prices = areaPlots.map(pl => p(pl).price).filter(v => v > 0)
+          const rois = areaPlots.map(pl => roi(pl)).filter(v => v > 0)
+          const avgRoi = rois.length ? Math.round(rois.reduce((s, v) => s + v, 0) / rois.length) : 0
+          const minPrice = prices.length ? Math.min(...prices) : 0
+          const maxPrice = prices.length ? Math.max(...prices) : 0
+          const scores = areaPlots.map(calcScore)
+          const avgScore = scores.length ? (scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(1) : '—'
+          const totalArea = areaPlots.reduce((s, pl) => s + p(pl).size, 0)
           return (
             <Polygon key={area.name} positions={area.bounds} pathOptions={{ color: area.color, weight: 1.5, fillColor: area.color, fillOpacity: 0.06, dashArray: '6 4' }}>
               <Tooltip permanent direction="center" className="price-tooltip">
@@ -885,6 +922,53 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
                   )}
                 </span>
               </Tooltip>
+              {areaPlots.length > 0 && (
+                <Popup maxWidth={300} minWidth={260}>
+                  <div style={{ padding: 0, direction: 'rtl' }}>
+                    <div style={{
+                      padding: '12px 16px 8px',
+                      background: `linear-gradient(135deg, ${area.color}18, ${area.color}08)`,
+                      borderBottom: `1px solid ${area.color}25`,
+                    }}>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: area.color, marginBottom: 2 }}>{area.name}</div>
+                      <div style={{ fontSize: 11, opacity: 0.7 }}>
+                        {areaPlots.length} חלקות · {(totalArea / 1000).toFixed(1)} דונם
+                      </div>
+                    </div>
+                    <div style={{ padding: '10px 16px 14px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+                        <div style={{ textAlign: 'center', padding: 8, background: 'rgba(0,0,0,0.04)', borderRadius: 8 }}>
+                          <div style={{ fontSize: 14, fontWeight: 800 }}>₪{avgPps.toLocaleString()}</div>
+                          <div style={{ fontSize: 9, opacity: 0.6, marginTop: 2 }}>ממוצע ₪/מ״ר</div>
+                        </div>
+                        <div style={{ textAlign: 'center', padding: 8, background: 'rgba(0,0,0,0.04)', borderRadius: 8 }}>
+                          <div style={{ fontSize: 14, fontWeight: 800 }}>₪{avgPpd.toLocaleString()}</div>
+                          <div style={{ fontSize: 9, opacity: 0.6, marginTop: 2 }}>ממוצע ₪/דונם</div>
+                        </div>
+                        <div style={{ textAlign: 'center', padding: 8, background: 'rgba(0,0,0,0.04)', borderRadius: 8 }}>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: avgRoi > 0 ? '#10B981' : undefined }}>
+                            {avgRoi > 0 ? `+${avgRoi}%` : '—'}
+                          </div>
+                          <div style={{ fontSize: 9, opacity: 0.6, marginTop: 2 }}>תשואה ממוצעת</div>
+                        </div>
+                        <div style={{ textAlign: 'center', padding: 8, background: 'rgba(0,0,0,0.04)', borderRadius: 8 }}>
+                          <div style={{ fontSize: 14, fontWeight: 800 }}>{avgScore}</div>
+                          <div style={{ fontSize: 9, opacity: 0.6, marginTop: 2 }}>ציון ממוצע</div>
+                        </div>
+                      </div>
+                      {prices.length > 0 && (
+                        <div style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '6px 10px', background: 'rgba(0,0,0,0.03)', borderRadius: 6,
+                          fontSize: 11, fontWeight: 600, opacity: 0.8,
+                        }}>
+                          <span>טווח: {fmt.compact(minPrice)} — {fmt.compact(maxPrice)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Popup>
+              )}
             </Polygon>
           )
         })}

@@ -184,6 +184,21 @@ export const GlobalStyles = createGlobalStyle`
     input[type="range"],input[type="checkbox"]{display:none!important;}
     /* Print watermark */
     body::after{content:"LandMap Israel — Investment Report";position:fixed;bottom:5mm;right:10mm;font-size:8pt;color:#aaa;font-family:${t.font};}
+    /* Page breaks for report sections */
+    section,article,[class*="Card"]{page-break-inside:avoid!important;break-inside:avoid!important;}
+    /* Plot detail print improvements */
+    [class*="BottomBar"]{display:none!important;}
+    [class*="WhatsAppFab"]{display:none!important;}
+    [class*="ReadingProgress"]{display:none!important;}
+    /* Investment projection chart: preserve colors */
+    svg{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+    svg text{fill:#333!important;}
+    /* Metrics grid: force readable sizing */
+    [class*="Metrics"]{grid-template-columns:repeat(3,1fr)!important;gap:12px!important;}
+    /* Main grid: force stacked layout */
+    [class*="Grid"]{grid-template-columns:1fr!important;}
+    /* Keep badges colorful */
+    [class*="Badge"]{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
     /* Sidebar print layout — show content inline */
     aside[role="complementary"]{position:static!important;width:100%!important;max-width:100%!important;transform:none!important;
       border:none!important;height:auto!important;overflow:visible!important;}
