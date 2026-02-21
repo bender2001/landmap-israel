@@ -270,6 +270,63 @@ function useProjectionChart(plot: Plot | null) {
   }, [plot])
 }
 
+/* ── AI Insight Badge ── */
+const InsightWrap = styled.div`
+  padding:12px 14px;margin-bottom:16px;
+  background:linear-gradient(135deg,rgba(59,130,246,0.06),rgba(139,92,246,0.04));
+  border:1px solid rgba(99,102,241,0.2);border-radius:${t.r.md};
+  animation:${fadeSection} 0.4s 0.08s both;direction:rtl;
+`
+const InsightHeader = styled.div`
+  display:flex;align-items:center;gap:6px;margin-bottom:6px;
+`
+const InsightBadge = styled.span`
+  font-size:9px;font-weight:800;padding:2px 8px;border-radius:${t.r.full};
+  background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;
+  text-transform:uppercase;letter-spacing:0.5px;
+`
+const InsightText = styled.p`
+  font-size:13px;color:${t.textSec};line-height:1.7;margin:0;
+`
+
+/** Generate a deterministic AI insight based on plot metrics */
+function useAIInsight(plot: Plot | null, allPlots?: Plot[]) {
+  return useMemo(() => {
+    if (!plot) return null
+    const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
+    const pps = pricePerSqm(plot)
+    const insights: string[] = []
+
+    // Grade-based lead
+    if (score >= 8) insights.push(`חלקה מדורגת ${grade.grade} — בין ה-10% המובילות`)
+    else if (score >= 6) insights.push(`דירוג ${grade.grade} — השקעה סולידית`)
+    else insights.push(`דירוג ${grade.grade} — נדרשת בדיקה נוספת`)
+
+    // ROI insight
+    if (r > 100) insights.push(`פוטנציאל תשואה חריג של +${Math.round(r)}%`)
+    else if (r > 50) insights.push(`תשואה צפויה +${Math.round(r)}%`)
+
+    // Price position
+    if (allPlots && allPlots.length > 2 && pps > 0) {
+      const allPps = allPlots.map(pricePerSqm).filter(v => v > 0)
+      const avg = allPps.reduce((s, v) => s + v, 0) / allPps.length
+      const diff = ((pps - avg) / avg) * 100
+      if (diff < -15) insights.push(`מחיר ${Math.abs(Math.round(diff))}% מתחת לממוצע — הזדמנות`)
+      else if (diff > 20) insights.push(`מחיר מעל הממוצע — בדקו סיבה`)
+    }
+
+    // Zoning stage
+    const zi = ['AGRICULTURAL','MASTER_PLAN_DEPOSIT','MASTER_PLAN_APPROVED','DETAILED_PLAN_PREP','DETAILED_PLAN_DEPOSIT','DETAILED_PLAN_APPROVED','DEVELOPER_TENDER','BUILDING_PERMIT'].indexOf(d.zoning)
+    if (zi >= 5) insights.push('שלב תכנוני מתקדם — סיכון מופחת')
+    else if (zi <= 1) insights.push('שלב תכנוני מוקדם — אופק ארוך')
+
+    // Sea distance
+    if (d.seaDist != null && d.seaDist <= 500) insights.push(`קו חוף — ${d.seaDist}מ׳ מהים`)
+
+    return insights.slice(0, 3).join('. ') + '.'
+  }, [plot, allPlots])
+}
+
 /* ── Market Trend Card ── */
 const TrendCard = styled.div`
   display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:16px;
@@ -400,6 +457,7 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
   const projection = useProjectionChart(plot)
   const pricePos = useMemo(() => plot && plots ? pricePosition(plot, plots) : null, [plot, plots])
   const risk = useMemo(() => plot ? calcRisk(plot, plots) : null, [plot, plots])
+  const aiInsight = useAIInsight(plot, plots)
 
   if (!plot) return null
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
@@ -467,6 +525,16 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
         </Header>
 
         <Body ref={bodyRef}>
+          {/* AI Investment Insight */}
+          {aiInsight && (
+            <InsightWrap>
+              <InsightHeader>
+                <InsightBadge>✨ AI INSIGHT</InsightBadge>
+              </InsightHeader>
+              <InsightText>{aiInsight}</InsightText>
+            </InsightWrap>
+          )}
+
           <MetricsGrid>
             <MetricCard><MetricLabel>מחיר</MetricLabel><MetricVal $gold>{fmt.compact(d.price)}</MetricVal></MetricCard>
             <MetricCard><MetricLabel>שטח</MetricLabel><MetricVal>{fmt.num(d.size)} מ״ר</MetricVal></MetricCard>

@@ -1,5 +1,5 @@
 import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, useMap, WMSTileLayer } from 'react-leaflet'
+import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker, useMap, WMSTileLayer } from 'react-leaflet'
 import L from 'leaflet'
 import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Palette } from 'lucide-react'
 import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, zoningLabels, zoningPipeline } from '../utils'
@@ -9,7 +9,7 @@ import { israelAreas } from '../data'
 import { t } from '../theme'
 
 // ── Color Modes ──
-type ColorMode = 'status' | 'grade' | 'pps'
+type ColorMode = 'status' | 'grade' | 'pps' | 'heatmap'
 
 const GRADE_COLORS = [
   { grade: 'A+', color: '#10B981', label: 'מצוין+' },
@@ -30,6 +30,30 @@ const PPS_COLORS = [
   { min: 8000, max: Infinity, color: '#EF4444', label: '₪8K+' },
 ]
 
+// ── Heatmap Gradient (low→high: green→yellow→red) ──
+const HEATMAP_STOPS = [
+  { pct: 0, r: 16, g: 185, b: 129 },   // #10B981 green
+  { pct: 0.25, r: 74, g: 222, b: 128 }, // #4ADE80
+  { pct: 0.5, r: 245, g: 158, b: 11 },  // #F59E0B yellow
+  { pct: 0.75, r: 249, g: 115, b: 22 }, // #F97316 orange
+  { pct: 1, r: 239, g: 68, b: 68 },     // #EF4444 red
+]
+
+function heatmapColor(ratio: number): string {
+  const t = Math.max(0, Math.min(1, ratio))
+  let lo = HEATMAP_STOPS[0], hi = HEATMAP_STOPS[HEATMAP_STOPS.length - 1]
+  for (let i = 0; i < HEATMAP_STOPS.length - 1; i++) {
+    if (t >= HEATMAP_STOPS[i].pct && t <= HEATMAP_STOPS[i + 1].pct) {
+      lo = HEATMAP_STOPS[i]; hi = HEATMAP_STOPS[i + 1]; break
+    }
+  }
+  const f = lo.pct === hi.pct ? 0 : (t - lo.pct) / (hi.pct - lo.pct)
+  const r = Math.round(lo.r + (hi.r - lo.r) * f)
+  const g = Math.round(lo.g + (hi.g - lo.g) * f)
+  const b = Math.round(lo.b + (hi.b - lo.b) * f)
+  return `rgb(${r},${g},${b})`
+}
+
 function getPolygonColor(plot: Plot, mode: ColorMode): string {
   if (mode === 'grade') {
     const score = calcScore(plot)
@@ -41,6 +65,9 @@ function getPolygonColor(plot: Plot, mode: ColorMode): string {
     const tier = PPS_COLORS.find(t => pps >= t.min && pps < t.max)
     return tier?.color || '#EF4444'
   }
+  if (mode === 'heatmap') {
+    return '#64748B' // polygon border only, circles handle color
+  }
   return statusColors[plot.status || ''] || '#10B981'
 }
 
@@ -48,6 +75,7 @@ const COLOR_MODE_LABELS: Record<ColorMode, string> = {
   status: 'סטטוס',
   grade: 'ציון השקעה',
   pps: '₪/מ״ר',
+  heatmap: 'מפת חום',
 }
 
 // ── Tile Configs ──
@@ -210,6 +238,29 @@ function MapLegend({ colorMode, darkMode }: { colorMode: ColorMode; darkMode: bo
   }
 
   // pps mode
+  if (colorMode === 'pps') {
+    return (
+      <div style={{
+        position: 'absolute', bottom: 48, right: 16, zIndex: t.z.controls,
+        background: darkMode ? 'rgba(11,17,32,0.92)' : 'rgba(255,255,255,0.95)',
+        backdropFilter: 'blur(12px)', borderRadius: t.r.md,
+        border: `1px solid ${darkMode ? t.border : t.lBorder}`,
+        padding: '8px 12px', direction: 'rtl', boxShadow: t.sh.md,
+      }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: darkMode ? t.textDim : t.lTextSec, marginBottom: 6 }}>
+          ₪/מ״ר
+        </div>
+        {PPS_COLORS.map(item => (
+          <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: item.color, flexShrink: 0 }} />
+            <span style={{ fontSize: 10, color: darkMode ? t.textSec : t.lTextSec }}>{item.label}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // heatmap mode
   return (
     <div style={{
       position: 'absolute', bottom: 48, right: 16, zIndex: t.z.controls,
@@ -219,14 +270,19 @@ function MapLegend({ colorMode, darkMode }: { colorMode: ColorMode; darkMode: bo
       padding: '8px 12px', direction: 'rtl', boxShadow: t.sh.md,
     }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: darkMode ? t.textDim : t.lTextSec, marginBottom: 6 }}>
-        ₪/מ״ר
+        🔥 מפת חום — מחיר/מ״ר
       </div>
-      {PPS_COLORS.map(item => (
-        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 2, background: item.color, flexShrink: 0 }} />
-          <span style={{ fontSize: 10, color: darkMode ? t.textSec : t.lTextSec }}>{item.label}</span>
-        </div>
-      ))}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+        <span style={{ fontSize: 9, color: darkMode ? t.textDim : t.lTextSec }}>נמוך</span>
+        <div style={{
+          flex: 1, height: 8, borderRadius: 4,
+          background: 'linear-gradient(to left, #EF4444, #F97316, #F59E0B, #4ADE80, #10B981)',
+        }} />
+        <span style={{ fontSize: 9, color: darkMode ? t.textDim : t.lTextSec }}>גבוה</span>
+      </div>
+      <div style={{ fontSize: 9, color: darkMode ? t.textDim : t.lTextSec, textAlign: 'center' }}>
+        גודל העיגול = שטח החלקה
+      </div>
     </div>
   )
 }
@@ -274,7 +330,7 @@ function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCada
       {/* Color mode toggle */}
       <button
         onClick={() => {
-          const modes: ColorMode[] = ['status', 'grade', 'pps']
+          const modes: ColorMode[] = ['status', 'grade', 'pps', 'heatmap']
           const idx = modes.indexOf(colorMode)
           setColorMode(modes[(idx + 1) % modes.length])
         }}
@@ -292,7 +348,7 @@ function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCada
           borderRadius: t.r.full, background: `linear-gradient(135deg,${t.gold},${t.goldBright})`,
           color: t.bg, lineHeight: '14px', whiteSpace: 'nowrap',
         }}>
-          {colorMode === 'status' ? 'S' : colorMode === 'grade' ? 'A' : '₪'}
+          {colorMode === 'status' ? 'S' : colorMode === 'grade' ? 'A' : colorMode === 'pps' ? '₪' : '🔥'}
         </span>
       </button>
 
@@ -362,6 +418,24 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
     if (selected) { const c = plotCenter(selected.coordinates); if (c) return [c.lat, c.lng] }
     return [32.44, 34.88]
   }, [selected])
+
+  // Heatmap data: compute PPS range across all plots for color normalization
+  const heatmapData = useMemo(() => {
+    if (colorMode !== 'heatmap') return null
+    const ppsList = plots.map(pl => ({ plot: pl, pps: pricePerSqm(pl), size: p(pl).size, center: plotCenter(pl.coordinates) }))
+      .filter(d => d.pps > 0 && d.center)
+    if (!ppsList.length) return null
+    const minPps = Math.min(...ppsList.map(d => d.pps))
+    const maxPps = Math.max(...ppsList.map(d => d.pps))
+    const range = maxPps - minPps || 1
+    const maxSize = Math.max(...ppsList.map(d => d.size))
+    return ppsList.map(d => ({
+      ...d,
+      ratio: (d.pps - minPps) / range,
+      // Radius: proportional to sqrt(area) for visual fairness, range 15-60
+      radius: Math.max(15, Math.min(60, 15 + (Math.sqrt(d.size) / Math.sqrt(maxSize || 1)) * 45)),
+    }))
+  }, [plots, colorMode])
 
   const renderPopup = useCallback((plot: Plot) => {
     const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score), fav = favorites.isFav(plot.id), pps = pricePerSqm(plot)
@@ -491,6 +565,31 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
             </Polygon>
           )
         })}
+
+        {/* Heatmap circle overlay */}
+        {colorMode === 'heatmap' && heatmapData && heatmapData.map(d => (
+          <CircleMarker
+            key={`heat-${d.plot.id}`}
+            center={[d.center!.lat, d.center!.lng]}
+            radius={d.radius}
+            pathOptions={{
+              color: heatmapColor(d.ratio),
+              weight: 1,
+              fillColor: heatmapColor(d.ratio),
+              fillOpacity: 0.45,
+              opacity: 0.7,
+            }}
+            eventHandlers={{ click: () => onSelect(d.plot) }}
+          >
+            <Tooltip className="price-tooltip" direction="top" offset={[0, -8]} opacity={1}>
+              <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <span style={{ fontWeight: 700 }}>₪{d.pps.toLocaleString()}/מ״ר</span>
+                <span style={{ fontSize: 10, opacity: 0.7 }}>{d.plot.city} · {fmt.dunam(d.size)} ד׳</span>
+                <span style={{ fontSize: 10, opacity: 0.7 }}>{fmt.short(p(d.plot).price)}</span>
+              </span>
+            </Tooltip>
+          </CircleMarker>
+        ))}
 
         {/* POI markers */}
         {pois.map(poi => (

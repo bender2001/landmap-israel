@@ -1,13 +1,13 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink, MessageCircle, Clock } from 'lucide-react'
+import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink, MessageCircle, Clock, Building2, BarChart3, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation } from '../hooks'
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, Spinner, useToast, Badge } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance, zoningLabels, calcAggregateStats } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -250,6 +250,56 @@ const RecentChip = styled.button`
   &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
 `
 
+/* ── City Statistics Card ── */
+const cityCardSlide = keyframes`from{opacity:0;transform:translateY(-16px) translateX(-50%)}to{opacity:1;transform:translateY(0) translateX(-50%)}`
+const cityCardSlideMobile = keyframes`from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}`
+const CityStatsCard = styled.div`
+  position:absolute;top:80px;left:50%;transform:translateX(-50%);z-index:${t.z.filter - 1};
+  display:flex;align-items:stretch;gap:0;direction:rtl;
+  background:${t.glass};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid ${t.goldBorder};border-radius:${t.r.lg};box-shadow:${t.sh.lg};
+  overflow:hidden;min-width:480px;max-width:min(680px,calc(100vw - 32px));
+  animation:${cityCardSlide} 0.35s cubic-bezier(0.32,0.72,0,1);
+  ${mobile}{
+    top:56px;left:8px;right:8px;transform:none;min-width:0;
+    flex-wrap:wrap;animation:${cityCardSlideMobile} 0.35s cubic-bezier(0.32,0.72,0,1);
+  }
+`
+const CityStatsHeader = styled.div`
+  display:flex;align-items:center;gap:8px;padding:10px 16px;
+  background:linear-gradient(135deg,rgba(212,168,75,0.12),rgba(212,168,75,0.04));
+  border-left:1px solid ${t.border};min-width:120px;
+  ${mobile}{width:100%;border-left:none;border-bottom:1px solid ${t.border};padding:8px 12px;}
+`
+const CityStatsName = styled.div`font-size:14px;font-weight:800;color:${t.text};white-space:nowrap;`
+const CityStatsCount = styled.div`font-size:11px;color:${t.textSec};font-weight:600;`
+const CityStatsCells = styled.div`
+  display:flex;align-items:stretch;gap:0;flex:1;
+  ${mobile}{width:100%;}
+`
+const CityStatCell = styled.div`
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  padding:10px 12px;border-left:1px solid ${t.border};
+  &:last-child{border-left:none;}
+  ${mobile}{padding:8px 6px;}
+`
+const CityStatVal = styled.div<{$c?:string}>`
+  font-size:13px;font-weight:800;color:${pr => pr.$c || t.gold};
+  white-space:nowrap;font-family:${t.font};
+  ${mobile}{font-size:12px;}
+`
+const CityStatLabel = styled.div`
+  font-size:9px;font-weight:600;color:${t.textDim};text-transform:uppercase;
+  white-space:nowrap;letter-spacing:0.3px;
+`
+const CityStatsClose = styled.button`
+  display:flex;align-items:center;justify-content:center;
+  width:24px;height:24px;border-radius:${t.r.sm};
+  background:transparent;border:1px solid ${t.border};
+  color:${t.textDim};cursor:pointer;flex-shrink:0;transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};color:${t.gold};}
+`
+
 /* ── Keyboard Shortcuts Dialog ── */
 const KbdBackdrop = styled.div<{$open:boolean}>`
   position:fixed;inset:0;z-index:${t.z.modal};
@@ -345,6 +395,7 @@ export default function Explore() {
   const { toast } = useToast()
   const sortRef = useRef<HTMLDivElement>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [cityStatsDismissed, setCityStatsDismissed] = useState(false)
   const userGeo = useUserLocation()
 
   // Mobile calculator state
@@ -445,6 +496,36 @@ export default function Explore() {
     const mid = Math.floor(prices.length / 2)
     return prices.length % 2 === 0 ? (prices[mid - 1] + prices[mid]) / 2 : prices[mid]
   }, [filtered])
+
+  // City-level statistics (for city stats card)
+  const cityStats = useMemo(() => {
+    if (!filters.city || filters.city === 'all' || !filtered.length) return null
+    const cityPlots = filtered
+    const prices = cityPlots.map(pl => p(pl).price).filter(v => v > 0)
+    const rois = cityPlots.map(roi).filter(v => v > 0)
+    const ppsList = cityPlots.map(pricePerSqm).filter(v => v > 0)
+    const sizes = cityPlots.map(pl => p(pl).size).filter(v => v > 0)
+    // Dominant zoning stage
+    const zoningMap = new Map<string, number>()
+    for (const pl of cityPlots) {
+      const z = p(pl).zoning
+      zoningMap.set(z, (zoningMap.get(z) || 0) + 1)
+    }
+    const dominantZoning = [...zoningMap.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || ''
+    return {
+      count: cityPlots.length,
+      avgPrice: prices.length ? Math.round(prices.reduce((s, v) => s + v, 0) / prices.length) : 0,
+      minPrice: prices.length ? Math.min(...prices) : 0,
+      maxPrice: prices.length ? Math.max(...prices) : 0,
+      avgPps: ppsList.length ? Math.round(ppsList.reduce((s, v) => s + v, 0) / ppsList.length) : 0,
+      avgRoi: rois.length ? Math.round(rois.reduce((s, v) => s + v, 0) / rois.length * 10) / 10 : 0,
+      totalArea: sizes.length ? Math.round(sizes.reduce((s, v) => s + v, 0)) : 0,
+      dominantZoning: zoningLabels[dominantZoning] || dominantZoning,
+    }
+  }, [filtered, filters.city])
+
+  // Reset city stats dismissed state when city changes
+  useEffect(() => { setCityStatsDismissed(false) }, [filters.city])
 
   const hasActiveFilters = useMemo(() =>
     Object.entries(filters).some(([, v]) => v && v !== 'all'), [filters])
@@ -722,8 +803,42 @@ export default function Explore() {
           )}
         </MobileOverlay>
 
+        {/* City Statistics Card (appears when filtering by city) */}
+        {cityStats && !cityStatsDismissed && !selected && (
+          <CityStatsCard>
+            <CityStatsHeader>
+              <Building2 size={16} color={t.gold} />
+              <div>
+                <CityStatsName>{filters.city}</CityStatsName>
+                <CityStatsCount>{cityStats.count} חלקות</CityStatsCount>
+              </div>
+              <CityStatsClose onClick={() => setCityStatsDismissed(true)} aria-label="סגור"><X size={12} /></CityStatsClose>
+            </CityStatsHeader>
+            <CityStatsCells>
+              <CityStatCell>
+                <CityStatVal>{fmt.compact(cityStats.avgPrice)}</CityStatVal>
+                <CityStatLabel>מחיר ממוצע</CityStatLabel>
+              </CityStatCell>
+              <CityStatCell>
+                <CityStatVal>{fmt.num(cityStats.avgPps)}</CityStatVal>
+                <CityStatLabel>₪/מ״ר</CityStatLabel>
+              </CityStatCell>
+              <CityStatCell>
+                <CityStatVal $c={cityStats.avgRoi > 0 ? t.ok : t.textSec}>
+                  {cityStats.avgRoi > 0 ? <>+{cityStats.avgRoi}%</> : '—'}
+                </CityStatVal>
+                <CityStatLabel>תשואה ממוצעת</CityStatLabel>
+              </CityStatCell>
+              <CityStatCell>
+                <CityStatVal $c={t.text}>{fmt.compact(cityStats.minPrice)}–{fmt.compact(cityStats.maxPrice)}</CityStatVal>
+                <CityStatLabel>טווח מחירים</CityStatLabel>
+              </CityStatCell>
+            </CityStatsCells>
+          </CityStatsCard>
+        )}
+
         {/* Recently Viewed Strip (show only when user has viewed plots and no sidebar is open) */}
-        {recentPlots.length > 0 && !selected && !listOpen && (
+        {recentPlots.length > 0 && !selected && !listOpen && !cityStats && (
           <RecentStrip>
             <RecentLabel><Clock size={12} /> ראיתם לאחרונה</RecentLabel>
             {recentPlots.map(pl => (
