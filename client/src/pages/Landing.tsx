@@ -87,6 +87,50 @@ const TrustBadge = styled.div`
   background:rgba(255,255,255,0.04);border:1px solid ${t.border};font-size:12px;color:${t.textSec};
 `
 
+/* ══════ POPULAR CITIES ══════ */
+const CitiesSection = styled.section`
+  padding:56px 24px;direction:rtl;position:relative;overflow:hidden;
+  background:${t.bg};
+`
+const CitiesGrid = styled.div`
+  max-width:1060px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;
+  ${md}{grid-template-columns:repeat(3,1fr);}
+  ${sm}{grid-template-columns:repeat(2,1fr);}
+  @media(max-width:380px){grid-template-columns:1fr;}
+`
+const CityCard = styled(Link)<{$hue:number;$delay:number}>`
+  position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:28px 16px;border-radius:${t.r.xl};text-decoration:none!important;
+  background:linear-gradient(135deg,hsl(${p=>p.$hue},25%,12%),hsl(${p=>p.$hue},30%,8%));
+  border:1px solid hsl(${p=>p.$hue},35%,20%);transition:all 0.35s cubic-bezier(0.32,0.72,0,1);
+  overflow:hidden;animation:${fadeInUp} 0.5s ease-out ${p=>p.$delay}s both;
+  &::before{content:'';position:absolute;inset:0;
+    background:radial-gradient(ellipse at 50% 0%,hsl(${p=>p.$hue},50%,40%,0.15),transparent 70%);
+    transition:opacity 0.35s;opacity:0;}
+  &:hover{transform:translateY(-6px);border-color:hsl(${p=>p.$hue},50%,35%);
+    box-shadow:0 16px 48px hsl(${p=>p.$hue},50%,20%,0.3);}
+  &:hover::before{opacity:1;}
+`
+const CityEmoji = styled.span`font-size:32px;position:relative;z-index:1;`
+const CityName = styled.span`font-size:16px;font-weight:700;color:${t.text};position:relative;z-index:1;`
+const CityCount = styled.span`font-size:12px;color:${t.textSec};position:relative;z-index:1;`
+const CitiesSectionHead = styled.h2`
+  text-align:center;font-size:clamp(22px,3.5vw,32px);font-weight:800;color:${t.text};
+  margin-bottom:32px;font-family:${t.font};
+  & span{color:${t.gold};}
+`
+
+const POPULAR_CITIES = [
+  { name: 'חדרה', emoji: '🏗️', hue: 35, count: 'אזור ביקוש' },
+  { name: 'נתניה', emoji: '🌊', hue: 200, count: 'קו חוף' },
+  { name: 'קיסריה', emoji: '🏛️', hue: 280, count: 'פרימיום' },
+  { name: 'הרצליה', emoji: '💎', hue: 340, count: 'השקעה חמה' },
+  { name: 'כפר סבא', emoji: '🌳', hue: 140, count: 'שרון' },
+  { name: 'רעננה', emoji: '🏠', hue: 45, count: 'ביקוש גבוה' },
+  { name: 'תל אביב', emoji: '🌆', hue: 220, count: 'מרכז' },
+  { name: 'ירושלים', emoji: '✡️', hue: 50, count: 'בירה' },
+]
+
 /* ══════ STATS ══════ */
 const StatsStrip = styled.section`
   padding:48px 24px;direction:rtl;position:relative;
@@ -292,6 +336,20 @@ export default function Landing(){
             </TrustRow>
           </HeroContent>
         </Hero>
+
+        {/* ── Popular Cities ── */}
+        <CitiesSection>
+          <CitiesSectionHead>חפשו קרקע לפי <span>עיר</span></CitiesSectionHead>
+          <CitiesGrid>
+            {POPULAR_CITIES.map((c,i)=>(
+              <CityCard key={c.name} to={`/explore?city=${encodeURIComponent(c.name)}`} $hue={c.hue} $delay={i*0.06}>
+                <CityEmoji>{c.emoji}</CityEmoji>
+                <CityName>{c.name}</CityName>
+                <CityCount>{c.count}</CityCount>
+              </CityCard>
+            ))}
+          </CitiesGrid>
+        </CitiesSection>
 
         {/* ── Stats ── */}
         <StatsStrip>

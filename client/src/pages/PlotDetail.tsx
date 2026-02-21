@@ -95,7 +95,7 @@ function PlotJsonLd({ plot }: { plot: Plot }) {
     />
   )
 }
-const Page = styled.div`max-width:1120px;margin:0 auto;padding:24px;direction:rtl;`
+const Page = styled.div`max-width:1120px;margin:0 auto;padding:24px 24px 80px;direction:rtl;`
 const TitleRow = styled.div`display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px;`
 const TitleLeft = styled.div`display:flex;flex-direction:column;gap:8px;`
 const Badges = styled.div`display:flex;align-items:center;gap:8px;flex-wrap:wrap;`
@@ -316,7 +316,27 @@ export default function PlotDetail() {
   const { data: similarPlots = [] } = useSimilarPlots(id)
 
   if (isLoading) return <PublicLayout><PlotDetailSkeleton /></PublicLayout>
-  if (error || !plot) return <PublicLayout><Center><p style={{color:t.lTextSec}}>Plot not found</p></Center></PublicLayout>
+  if (error || !plot) return (
+    <PublicLayout>
+      <Center>
+        <div style={{ textAlign:'center', direction:'rtl', padding:40 }}>
+          <div style={{ fontSize:56, marginBottom:16 }}>🔍</div>
+          <h2 style={{ fontSize:24, fontWeight:800, color:t.lText, marginBottom:8, fontFamily:t.font }}>החלקה לא נמצאה</h2>
+          <p style={{ fontSize:14, color:t.lTextSec, marginBottom:24, lineHeight:1.6 }}>
+            ייתכן שהחלקה הוסרה או שהקישור שגוי.<br/>נסו לחפש חלקה אחרת במפה.
+          </p>
+          <Link to="/explore" style={{
+            display:'inline-flex', alignItems:'center', gap:8, padding:'12px 28px',
+            background:`linear-gradient(135deg,${t.gold},${t.goldBright})`, color:t.bg,
+            borderRadius:t.r.full, fontWeight:700, fontSize:15, fontFamily:t.font,
+            textDecoration:'none', transition:`all ${t.tr}`,
+          }}>
+            <MapPin size={16} /> חזרה למפה
+          </Link>
+        </div>
+      </Center>
+    </PublicLayout>
+  )
 
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
   const cagr = calcCAGR(r, d.readiness), timeline = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot)

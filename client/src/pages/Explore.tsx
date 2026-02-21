@@ -321,6 +321,26 @@ export default function Explore() {
     if (pl) addRecentlyViewed(pl.id)
   }, [addRecentlyViewed])
 
+  // Dynamic document title based on active filters
+  useEffect(() => {
+    const parts = ['חלקות להשקעה']
+    if (filters.city && filters.city !== 'all') parts.push(`ב${filters.city}`)
+    if (filtered.length > 0) parts.push(`(${filtered.length})`)
+    parts.push('| LandMap Israel')
+    document.title = parts.join(' ')
+    // Update meta description
+    const meta = document.querySelector('meta[name="description"]')
+    const desc = `${filtered.length} חלקות קרקע להשקעה${filters.city ? ` ב${filters.city}` : ' בישראל'} — מפה אינטראקטיבית, ניתוח AI, נתוני ועדות ותקן 22`
+    if (meta) meta.setAttribute('content', desc)
+    else {
+      const el = document.createElement('meta')
+      el.name = 'description'
+      el.content = desc
+      document.head.appendChild(el)
+    }
+    return () => { document.title = 'LandMap Israel' }
+  }, [filters.city, filtered.length])
+
   // Close sort dropdown on click outside
   useEffect(() => {
     if (!sortOpen) return
@@ -530,11 +550,11 @@ export default function Explore() {
           )}
         </MobileOverlay>
 
-        <MobileNav>
-          <NavBtn $active={tab==='map'} onClick={()=>setTab('map')}><MapIcon size={20}/>מפה</NavBtn>
-          <NavBtn $active={tab==='fav'} onClick={()=>setTab('fav')}><Heart size={20}/>מועדפים{favIds.length > 0 && <span style={{fontSize:9,color:t.gold,fontWeight:700}}>({favIds.length})</span>}</NavBtn>
-          <NavBtn $active={tab==='calc'} onClick={()=>setTab('calc')}><Calculator size={20}/>מחשבון</NavBtn>
-          <NavBtn $active={tab==='areas'} onClick={()=>{ setTab('map'); setListOpen(o => !o) }}><Layers size={20}/>רשימה</NavBtn>
+        <MobileNav role="navigation" aria-label="ניווט ראשי">
+          <NavBtn $active={tab==='map'} onClick={()=>setTab('map')} aria-label="מפה" aria-current={tab==='map'?'page':undefined}><MapIcon size={20}/>מפה</NavBtn>
+          <NavBtn $active={tab==='fav'} onClick={()=>setTab('fav')} aria-label={`מועדפים${favIds.length>0?` (${favIds.length})`:''}`} aria-current={tab==='fav'?'page':undefined}><Heart size={20}/>מועדפים{favIds.length > 0 && <span style={{fontSize:9,color:t.gold,fontWeight:700}}>({favIds.length})</span>}</NavBtn>
+          <NavBtn $active={tab==='calc'} onClick={()=>setTab('calc')} aria-label="מחשבון מימון" aria-current={tab==='calc'?'page':undefined}><Calculator size={20}/>מחשבון</NavBtn>
+          <NavBtn $active={tab==='areas'} onClick={()=>{ setTab('map'); setListOpen(o => !o) }} aria-label="רשימת חלקות" aria-current={listOpen?'page':undefined}><Layers size={20}/>רשימה</NavBtn>
         </MobileNav>
       </ErrorBoundary>
     </Wrap>
