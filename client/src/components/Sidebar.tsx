@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import styled, { keyframes, css } from 'styled-components'
-import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3 } from 'lucide-react'
+import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePosition, calcRisk } from '../utils'
@@ -415,13 +415,54 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
             )}
           </Section>
 
-          <Section icon={FileText} title="מסמכים" idx={4}>
+          {/* Area Context — neighborhood intelligence like Madlan */}
+          {(plot.area_context || plot.areaContext) && (
+            <Section icon={Globe} title="הקשר אזורי" idx={4}>
+              <p style={{ fontSize: 13, color: t.textSec, lineHeight: 1.7 }}>
+                {(plot.area_context || plot.areaContext) as string}
+              </p>
+            </Section>
+          )}
+
+          {/* Nearby Development — future development intelligence */}
+          {(plot.nearby_development || plot.nearbyDevelopment) && (
+            <Section icon={Construction} title="פיתוח בסביבה" idx={5}>
+              <p style={{ fontSize: 13, color: t.textSec, lineHeight: 1.7 }}>
+                {(plot.nearby_development || plot.nearbyDevelopment) as string}
+              </p>
+            </Section>
+          )}
+
+          {/* Neighborhood Stats — aggregate area statistics */}
+          {plots && plots.length > 1 && (() => {
+            const cityPlots = plots.filter(pl => pl.city === plot.city)
+            if (cityPlots.length < 2) return null
+            const prices = cityPlots.map(pl => p(pl).price).filter(v => v > 0)
+            const ppsList = cityPlots.map(pl => pricePerSqm(pl)).filter(v => v > 0)
+            const rois = cityPlots.map(r => roi(r)).filter(v => v > 0)
+            const avgPrice = prices.length ? Math.round(prices.reduce((s, v) => s + v, 0) / prices.length) : 0
+            const avgPps = ppsList.length ? Math.round(ppsList.reduce((s, v) => s + v, 0) / ppsList.length) : 0
+            const avgRoi = rois.length ? Math.round(rois.reduce((s, v) => s + v, 0) / rois.length * 10) / 10 : 0
+            const minPrice = prices.length ? Math.min(...prices) : 0
+            const maxPrice = prices.length ? Math.max(...prices) : 0
+            return (
+              <Section icon={Building2} title={`סטטיסטיקות · ${plot.city}`} idx={6}>
+                <Row><Label>חלקות באזור</Label><Val $c={t.gold}>{cityPlots.length}</Val></Row>
+                <Row><Label>מחיר ממוצע</Label><Val>{fmt.compact(avgPrice)}</Val></Row>
+                <Row><Label>טווח מחירים</Label><Val>{fmt.compact(minPrice)} – {fmt.compact(maxPrice)}</Val></Row>
+                {avgPps > 0 && <Row><Label>ממוצע ₪/מ״ר</Label><Val>{fmt.num(avgPps)}</Val></Row>}
+                {avgRoi > 0 && <Row><Label>תשואה ממוצעת</Label><Val $c={t.ok}>{avgRoi}%</Val></Row>}
+              </Section>
+            )
+          })()}
+
+          <Section icon={FileText} title="מסמכים" idx={7}>
             {plot.documents?.length ? plot.documents.map((doc, i) => (
               <Row key={i}><Val $c={t.gold} style={{ cursor: 'pointer' }}>{doc}</Val></Row>
             )) : <Label>אין מסמכים זמינים</Label>}
           </Section>
 
-          <Section icon={Info} title="תיאור" idx={5}>
+          <Section icon={Info} title="תיאור" idx={8}>
             <p style={{ fontSize: 13, color: t.textSec, lineHeight: 1.7 }}>{plot.description || 'אין תיאור זמין לחלקה זו.'}</p>
           </Section>
         </Body>

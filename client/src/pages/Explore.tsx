@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink, MessageCircle, Clock } from 'lucide-react'
 import { t, mobile } from '../theme'
@@ -16,6 +16,7 @@ const Sidebar = lazy(() => import('../components/Sidebar'))
 const LeadModal = lazy(() => import('../components/LeadModal'))
 const Chat = lazy(() => import('../components/Chat'))
 const PlotListPanel = lazy(() => import('../components/PlotListPanel'))
+const CompareDrawer = lazy(() => import('../components/CompareDrawer'))
 
 const DEFAULTS: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '', belowAvg: '' }
 
@@ -281,11 +282,11 @@ export default function Explore() {
   })
   const [sortOpen, setSortOpen] = useState(false)
   const [listOpen, setListOpen] = useState(false)
+  const [compareOpen, setCompareOpen] = useState(false)
   const { isFav, toggle: rawToggleFav, ids: favIds } = useFavorites()
   const { ids: compareIds, toggle: rawToggleCompare, clear: clearCompare, has: isCompared } = useCompare()
   const { ids: recentIds, add: addRecentlyViewed } = useRecentlyViewed()
   const { toast } = useToast()
-  const navigate = useNavigate()
   const sortRef = useRef<HTMLDivElement>(null)
 
   // Mobile calculator state
@@ -503,13 +504,23 @@ export default function Explore() {
               </CompareChip>
             ))}
             {compareIds.length >= 2 && (
-              <CompareAction onClick={() => navigate('/compare')}>
+              <CompareAction onClick={() => setCompareOpen(true)}>
                 <GitCompareArrows size={14} /> השווה
               </CompareAction>
             )}
             <CompareClear onClick={clearCompare} aria-label="נקה השוואה"><Trash2 size={14} /></CompareClear>
           </CompareBar>
         )}
+
+        {/* Inline Compare Drawer — no auth needed, works for everyone */}
+        <Suspense fallback={null}>
+          <CompareDrawer
+            open={compareOpen}
+            onClose={() => setCompareOpen(false)}
+            plots={sorted.filter(pl => compareIds.includes(pl.id))}
+            allPlots={plots}
+          />
+        </Suspense>
 
         {/* Accessible live region for filter result count */}
         <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
