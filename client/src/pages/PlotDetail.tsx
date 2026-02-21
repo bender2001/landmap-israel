@@ -376,16 +376,18 @@ const ViewOnMapBtn = styled(Link)`
 /* ── Recently Viewed: now uses shared useRecentlyViewed hook ── */
 
 /* ── Mini Map (lazy loaded) ── */
-const MiniMapLazy = lazy(() => import('react-leaflet').then(mod => {
-  const { MapContainer, TileLayer, Polygon } = mod
-  const { useState: useStateLocal } = require('react')
+const MiniMapLazy = lazy(() => Promise.all([
+  import('react-leaflet'),
+  import('react'),
+]).then(([leafletMod, reactMod]) => {
+  const { MapContainer, TileLayer, Polygon } = leafletMod
   const TILES_MINI = [
     { id: 'street', label: 'מפה', url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png' },
     { id: 'satellite', label: 'לוויין', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
   ]
   const MiniMap = ({ plot }: { plot: Plot }) => {
     const center = plotCenter(plot.coordinates)
-    const [tileIdx, setTileIdx] = useStateLocal(0)
+    const [tileIdx, setTileIdx] = reactMod.useState(0)
     if (!center || !plot.coordinates?.length) return null
     const color = statusColors[plot.status || 'AVAILABLE'] || '#10B981'
     return (

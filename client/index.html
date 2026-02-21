@@ -25,7 +25,15 @@
 
     <!-- Preconnect to data sources -->
     <link rel="preconnect" href="https://fivphcrtquxkxyxknzqc.supabase.co" crossorigin />
+
+    <!-- Preconnect to all tile servers for faster map rendering -->
     <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin />
+    <link rel="preconnect" href="https://b.basemaps.cartocdn.com" crossorigin />
+    <link rel="preconnect" href="https://c.basemaps.cartocdn.com" crossorigin />
+    <link rel="dns-prefetch" href="https://server.arcgisonline.com" />
+    <link rel="dns-prefetch" href="https://israelhiking.osm.org.il" />
+    <link rel="dns-prefetch" href="https://unpkg.com" />
+
     <link rel="preload" href="/api/plots" as="fetch" crossorigin="anonymous" fetchpriority="high" />
 
     <!-- Structured data -->

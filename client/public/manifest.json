@@ -1,7 +1,7 @@
-{
+﻿{
   "name": "LandMap Israel — מפת קרקעות להשקעה",
   "short_name": "LandMap",
-  "description": "מפת קרקעות להשקעה בישראל — חדרה, נתניה, קיסריה. מחירים, תשואות, ייעודי קרקע.",
+  "description": "פלטפורמת השקעות קרקעות בישראל על בסיס מפה, נתוני תכנון, ועדות תכנון ושמאויות. אינטראקטיבי, מעודכן, מבוסס נתונים.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -34,28 +34,28 @@
     {
       "name": "מפת קרקעות",
       "short_name": "מפה",
-      "description": "פתח את המפה האינטראקטיבית",
-      "url": "/",
+      "description": "עבור ישר למפה האינטראקטיבית",
+      "url": "/explore",
       "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192"}]
     },
     {
       "name": "מועדפים",
       "short_name": "מועדפים",
-      "description": "החלקות שסימנת למעקב",
+      "description": "הצג חלקות שמורות במועדפים",
       "url": "/favorites",
       "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192"}]
     },
     {
-      "name": "מחשבון השקעות",
+      "name": "מחשבון מימון",
       "short_name": "מחשבון",
-      "description": "חשב תשואה ועלויות",
+      "description": "חשב החזר משכנתא חודשי",
       "url": "/calculator",
       "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192"}]
     },
     {
       "name": "השוואת חלקות",
       "short_name": "השוואה",
-      "description": "השווה בין חלקות",
+      "description": "השווה בין חלקות שונות",
       "url": "/compare",
       "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192"}]
     }
