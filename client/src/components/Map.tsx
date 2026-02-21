@@ -86,6 +86,31 @@ const TILES = [
   { id: 'israel', label: 'ישראל', icon: Layers, url: 'https://israelhiking.osm.org.il/Hebrew/Tiles/{z}/{x}/{y}.png', attr: '&copy; Israel Hiking' },
 ] as const
 
+// ── City-Aware Fit Bounds ──
+function CityFitBounds({ plots, filterCity }: { plots: Plot[]; filterCity?: string }) {
+  const map = useMap()
+  const prevCity = useRef<string | undefined>(undefined)
+
+  useEffect(() => {
+    // Only re-fit when filterCity actually changes (not on initial mount)
+    if (filterCity === prevCity.current) return
+    prevCity.current = filterCity
+    if (!filterCity || filterCity === 'all') return
+    if (!plots.length) return
+
+    const pts = plots.flatMap(pl =>
+      (pl.coordinates || []).filter(c => c.length >= 2 && isFinite(c[0]) && isFinite(c[1]))
+    )
+    if (!pts.length) return
+    const bounds = L.latLngBounds(pts.map(c => [c[0], c[1]] as [number, number]))
+    if (bounds.isValid()) {
+      map.flyToBounds(bounds, { padding: [60, 60], maxZoom: 15, duration: 0.8 })
+    }
+  }, [plots, filterCity, map])
+
+  return null
+}
+
 // ── Props ──
 interface MapProps {
   plots: Plot[]
@@ -96,6 +121,7 @@ interface MapProps {
   favorites: { isFav: (id: string) => boolean; toggle: (id: string) => void }
   compare?: { has: (id: string) => boolean; toggle: (id: string) => void }
   darkMode?: boolean
+  filterCity?: string
 }
 
 // ── URL Sync ──
@@ -417,7 +443,7 @@ function ZoomTracker({ onChange }: { onChange: (z: number) => void }) {
 }
 
 // ── Main Component ──
-function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, darkMode = false }: MapProps) {
+function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, darkMode = false, filterCity }: MapProps) {
   const [tileIdx, setTileIdx] = useState(2) // default to dark tiles for cohesive dark UI
   const [showCadastral, setShowCadastral] = useState(false)
   const [showAreas, setShowAreas] = useState(true)
@@ -521,6 +547,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         <MapUrlSync />
         <FlyToSelected plot={selected} />
         <AutoFitBounds plots={plots} />
+        <CityFitBounds plots={plots} filterCity={filterCity} />
         <UserLocation />
         <PlotBoundsTracker plots={plots} />
         <ZoomTracker onChange={handleZoomChange} />

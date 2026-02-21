@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef as useRefHook } from 'react'
 import styled, { keyframes, css } from 'styled-components'
-import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe, Sparkles, Printer, Navigation, Map as MapIcon2, Eye } from 'lucide-react'
+import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe, Sparkles, Printer, Navigation, Map as MapIcon2, Eye, Calculator } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter } from '../utils'
@@ -374,6 +374,219 @@ function useAreaQuality(plot: Plot | null, allPlots?: Plot[]): RadarDimension[] 
       { label: 'מיקום', value: Math.round(locationScore), color: scoreColor(locationScore) },
     ]
   }, [plot, allPlots])
+}
+
+/* ── Satellite Preview ── */
+const SatPreviewWrap = styled.div`
+  position:relative;width:100%;height:140px;border-radius:${t.r.md};overflow:hidden;
+  margin-bottom:16px;border:1px solid ${t.border};
+  animation:${fadeSection} 0.4s 0.05s both;
+  cursor:pointer;transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};box-shadow:${t.sh.md};}
+`
+const SatImage = styled.img`
+  width:100%;height:100%;object-fit:cover;display:block;
+  transition:transform 0.4s ease;&:hover{transform:scale(1.05);}
+`
+const SatOverlay = styled.div`
+  position:absolute;inset:0;
+  background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,0.6) 100%);
+  pointer-events:none;
+`
+const SatBadge = styled.span`
+  position:absolute;top:8px;left:8px;
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 8px;border-radius:${t.r.full};
+  background:rgba(0,0,0,0.65);backdrop-filter:blur(8px);
+  font-size:9px;font-weight:700;color:#fff;
+  letter-spacing:0.3px;
+`
+const SatCoords = styled.span`
+  position:absolute;bottom:8px;right:8px;
+  padding:3px 8px;border-radius:${t.r.full};
+  background:rgba(0,0,0,0.55);backdrop-filter:blur(8px);
+  font-size:10px;font-weight:600;color:rgba(255,255,255,0.85);
+  direction:ltr;
+`
+const SatPin = styled.div`
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-100%);
+  width:24px;height:24px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+  pointer-events:none;z-index:1;
+`
+
+/** Compute ESRI satellite tile URL from lat/lng */
+function getSatelliteTileUrl(lat: number, lng: number, zoom: number = 17): string {
+  const n = Math.pow(2, zoom)
+  const x = Math.floor((lng + 180) / 360 * n)
+  const latRad = lat * Math.PI / 180
+  const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n)
+  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${y}/${x}`
+}
+
+function SatellitePreview({ plot }: { plot: Plot }) {
+  const center = plotCenter(plot.coordinates)
+  if (!center) return null
+  const { lat, lng } = center
+  const tileUrl = getSatelliteTileUrl(lat, lng, 17)
+  const mapsUrl = `https://www.google.com/maps/@${lat},${lng},18z/data=!1m1!1e1`
+  return (
+    <SatPreviewWrap onClick={() => window.open(mapsUrl, '_blank')}>
+      <SatImage src={tileUrl} alt={`תצלום לוויין — ${plot.city}`} loading="lazy" />
+      <SatOverlay />
+      <SatPin>
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#D4A84B" stroke="#fff" strokeWidth="1.5"/>
+          <circle cx="12" cy="9" r="2.5" fill="#fff"/>
+        </svg>
+      </SatPin>
+      <SatBadge>🛰️ לוויין</SatBadge>
+      <SatCoords>{lat.toFixed(4)}, {lng.toFixed(4)}</SatCoords>
+    </SatPreviewWrap>
+  )
+}
+
+/* ── Views / Popularity Badge ── */
+const ViewsBadge = styled.div<{$hot?:boolean}>`
+  display:inline-flex;align-items:center;gap:5px;padding:4px 10px;
+  border-radius:${t.r.full};font-size:11px;font-weight:600;direction:rtl;
+  background:${pr => pr.$hot ? 'rgba(239,68,68,0.08)' : 'rgba(99,102,241,0.06)'};
+  border:1px solid ${pr => pr.$hot ? 'rgba(239,68,68,0.2)' : 'rgba(99,102,241,0.15)'};
+  color:${pr => pr.$hot ? '#EF4444' : '#818CF8'};
+  animation:${fadeSection} 0.4s 0.1s both;
+`
+
+function PlotViewsBadge({ views }: { views?: number }) {
+  if (!views || views <= 0) return null
+  const isHot = views >= 50
+  return (
+    <ViewsBadge $hot={isHot}>
+      <Eye size={12} />
+      {views} צפיות
+      {isHot && <span style={{ fontSize: 10 }}>🔥</span>}
+    </ViewsBadge>
+  )
+}
+
+/* ── Total Acquisition Cost Breakdown ── */
+const CostBreakdownWrap = styled.div`
+  padding:14px;margin-bottom:16px;
+  background:${t.surfaceLight};border:1px solid ${t.border};border-radius:${t.r.md};
+  animation:${fadeSection} 0.5s 0.16s both;direction:rtl;
+`
+const CostTitle = styled.div`
+  font-size:11px;font-weight:700;color:${t.textDim};margin-bottom:10px;
+  display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:0.3px;
+`
+const CostRow = styled.div`
+  display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:12px;
+  border-bottom:1px dashed rgba(255,255,255,0.05);
+  &:last-child{border-bottom:none;}
+`
+const CostLabel = styled.span<{$dim?:boolean}>`color:${pr=>pr.$dim?t.textDim:t.textSec};`
+const CostVal = styled.span<{$c?:string;$bold?:boolean}>`
+  font-weight:${pr=>pr.$bold?800:600};
+  color:${pr=>pr.$c||t.text};font-family:${t.font};
+`
+const CostDivider = styled.div`
+  height:1px;background:linear-gradient(90deg,transparent,${t.goldBorder},transparent);margin:8px 0;
+`
+const CostTotal = styled.div`
+  display:flex;justify-content:space-between;align-items:center;padding:8px 12px;
+  background:${t.goldDim};border:1px solid ${t.goldBorder};border-radius:${t.r.sm};margin-top:8px;
+`
+const CostTotalLabel = styled.span`font-size:13px;font-weight:700;color:${t.text};`
+const CostTotalVal = styled.span`font-size:16px;font-weight:800;color:${t.gold};`
+
+/** Calculate Israeli land acquisition costs */
+function useAcquisitionCost(price: number) {
+  return useMemo(() => {
+    if (!price || price <= 0) return null
+    // Purchase tax (מס רכישה) for investment property (not primary residence):
+    // Up to ~6,055,070: 8%, above: 10% (2025-2026 brackets, simplified)
+    const BRACKET_1 = 6_055_070
+    let purchaseTax = 0
+    if (price <= BRACKET_1) {
+      purchaseTax = price * 0.08
+    } else {
+      purchaseTax = BRACKET_1 * 0.08 + (price - BRACKET_1) * 0.10
+    }
+    // Lawyer fees: ~0.5% + VAT (17%), min ~5,000
+    const lawyerFees = Math.max(5000, price * 0.005 * 1.17)
+    // Appraiser (שמאי): ~3,000-8,000 depending on plot size
+    const appraiser = price > 2_000_000 ? 8000 : price > 500_000 ? 5000 : 3000
+    // Broker fee: ~2% + VAT if applicable
+    const brokerFee = price * 0.02 * 1.17
+    const total = price + purchaseTax + lawyerFees + appraiser + brokerFee
+    return {
+      price,
+      purchaseTax: Math.round(purchaseTax),
+      purchaseTaxPct: ((purchaseTax / price) * 100).toFixed(1),
+      lawyerFees: Math.round(lawyerFees),
+      appraiser,
+      brokerFee: Math.round(brokerFee),
+      total: Math.round(total),
+      overhead: Math.round(total - price),
+      overheadPct: (((total - price) / price) * 100).toFixed(1),
+    }
+  }, [price])
+}
+
+function AcquisitionCostBreakdown({ price }: { price: number }) {
+  const cost = useAcquisitionCost(price)
+  const [expanded, setExpanded] = useState(false)
+  if (!cost) return null
+  return (
+    <CostBreakdownWrap>
+      <CostTitle>
+        <Calculator size={12} color={t.gold} />
+        עלות רכישה כוללת (הערכה)
+        <InfoTooltip text="הערכה בלבד. מס רכישה לנכס שאינו דירה יחידה (8%/10%). שכ״ט עו״ד, שמאי ותיווך — אומדן שוק. התייעצו עם בעלי מקצוע." pos="bottom" />
+      </CostTitle>
+      <CostRow>
+        <CostLabel>מחיר החלקה</CostLabel>
+        <CostVal $bold>{fmt.compact(cost.price)}</CostVal>
+      </CostRow>
+      <CostRow>
+        <CostLabel>מס רכישה ({cost.purchaseTaxPct}%)</CostLabel>
+        <CostVal $c="#F59E0B">{fmt.compact(cost.purchaseTax)}</CostVal>
+      </CostRow>
+      {expanded && (
+        <>
+          <CostRow>
+            <CostLabel $dim>שכ״ט עו״ד</CostLabel>
+            <CostVal>{fmt.compact(cost.lawyerFees)}</CostVal>
+          </CostRow>
+          <CostRow>
+            <CostLabel $dim>שמאי מקרקעין</CostLabel>
+            <CostVal>{fmt.compact(cost.appraiser)}</CostVal>
+          </CostRow>
+          <CostRow>
+            <CostLabel $dim>תיווך (2%+מע״מ)</CostLabel>
+            <CostVal>{fmt.compact(cost.brokerFee)}</CostVal>
+          </CostRow>
+        </>
+      )}
+      <button
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          background: 'none', border: 'none', color: t.textDim, fontSize: 10,
+          fontWeight: 600, cursor: 'pointer', padding: '4px 0', fontFamily: t.font,
+          display: 'flex', alignItems: 'center', gap: 4, transition: `color ${t.tr}`,
+        }}
+      >
+        <ChevronDown size={10} style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+        {expanded ? 'הסתר פירוט' : 'הצג פירוט מלא'}
+      </button>
+      <CostDivider />
+      <CostTotal>
+        <CostTotalLabel>סה״כ עלות רכישה</CostTotalLabel>
+        <CostTotalVal>{fmt.compact(cost.total)}</CostTotalVal>
+      </CostTotal>
+      <div style={{ fontSize: 10, color: t.textDim, marginTop: 6, textAlign: 'center' }}>
+        +{cost.overheadPct}% מעל המחיר ({fmt.compact(cost.overhead)} עלויות נלוות)
+      </div>
+    </CostBreakdownWrap>
+  )
 }
 
 /* ── AI Insight Badge ── */
@@ -811,6 +1024,16 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
             {onLead && <StickyCta onClick={onLead}><Phone size={12} /> פרטים</StickyCta>}
           </StickyHeader>
         <Body ref={bodyRef}>
+          {/* Satellite Preview — visual context like Madlan */}
+          <SatellitePreview plot={plot} />
+
+          {/* Views / Popularity Social Proof */}
+          {(plot.views ?? 0) > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <PlotViewsBadge views={plot.views} />
+            </div>
+          )}
+
           {/* AI Investment Insight */}
           {aiInsight && (
             <InsightWrap>
@@ -827,6 +1050,9 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
             {ppd > 0 && <MetricCard><MetricLabel>₪ / דונם <InfoTooltip text="מחיר לדונם — מאפשר השוואה בין חלקות בגדלים שונים. ככל שנמוך יותר, כך המחיר אטרקטיבי יותר." pos="bottom" /></MetricLabel><MetricVal>{fmt.num(ppd)}</MetricVal></MetricCard>}
             <MetricCard><MetricLabel>תשואה <InfoTooltip text="תשואה צפויה (ROI) — אחוז הרווח הנקי מהשקעה עד למימוש. מבוססת על שווי חזוי ושלב תכנוני." pos="bottom" /></MetricLabel><MetricVal $gold={r > 0}>{fmt.pct(r)}</MetricVal></MetricCard>
           </MetricsGrid>
+
+          {/* Total Acquisition Cost Breakdown — critical for investors */}
+          {d.price > 0 && <AcquisitionCostBreakdown price={d.price} />}
 
           {/* Area Quality Radar — visual pentagon score chart */}
           {areaQuality && (

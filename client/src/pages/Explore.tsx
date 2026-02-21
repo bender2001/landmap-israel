@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink, MessageCircle, Clock, Building2, BarChart3, ArrowUpRight, ArrowDownRight, Zap, Target, PieChart } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation, useOnlineStatus } from '../hooks'
+import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation, useOnlineStatus, useIsMobile } from '../hooks'
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, Spinner, useToast, Badge, NetworkBanner } from '../components/UI'
@@ -186,6 +186,57 @@ const MobileEmptyIcon = styled.div`
 `
 const MobileEmptyTitle = styled.div`font-size:16px;font-weight:700;color:${t.text};`
 const MobileEmptyDesc = styled.div`font-size:13px;color:${t.textSec};line-height:1.6;`
+
+/* ── Mobile Plot Preview Bottom Card ── */
+const previewSlide = keyframes`from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}`
+const MobilePreview = styled.div<{$show:boolean}>`
+  display:none;position:fixed;bottom:56px;left:0;right:0;z-index:${t.z.sidebar - 1};
+  background:${t.surface};border-top:1px solid ${t.goldBorder};border-radius:${t.r.xl} ${t.r.xl} 0 0;
+  box-shadow:0 -8px 32px rgba(0,0,0,0.35);direction:rtl;overflow:hidden;
+  animation:${previewSlide} 0.3s cubic-bezier(0.32,0.72,0,1);
+  ${mobile}{display:${pr=>pr.$show?'block':'none'};}
+`
+const PreviewHandle = styled.div`
+  width:36px;height:4px;border-radius:2px;background:${t.textDim};margin:8px auto 4px;opacity:0.4;
+`
+const PreviewBody = styled.div`
+  padding:12px 20px 16px;display:flex;flex-direction:column;gap:10px;
+`
+const PreviewTopRow = styled.div`
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+`
+const PreviewInfo = styled.div`flex:1;min-width:0;`
+const PreviewTitle = styled.div`font-size:16px;font-weight:800;color:${t.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`
+const PreviewCity = styled.div`font-size:12px;color:${t.textSec};margin-top:2px;display:flex;align-items:center;gap:6px;`
+const PreviewPrice = styled.div`font-size:22px;font-weight:900;color:${t.gold};white-space:nowrap;`
+const PreviewMetrics = styled.div`
+  display:flex;align-items:center;gap:12px;overflow-x:auto;scrollbar-width:none;
+  &::-webkit-scrollbar{display:none;}
+`
+const PreviewMetric = styled.div`
+  display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 12px;
+  background:${t.surfaceLight};border:1px solid ${t.border};border-radius:${t.r.md};min-width:72px;flex-shrink:0;
+`
+const PreviewMetricVal = styled.span<{$c?:string}>`font-size:13px;font-weight:800;color:${pr=>pr.$c||t.text};`
+const PreviewMetricLabel = styled.span`font-size:9px;font-weight:600;color:${t.textDim};white-space:nowrap;`
+const PreviewActions = styled.div`
+  display:flex;align-items:center;gap:8px;
+`
+const PreviewDetailBtn = styled.button`
+  flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px;
+  background:linear-gradient(135deg,${t.gold},${t.goldBright});color:${t.bg};
+  border:none;border-radius:${t.r.md};font-weight:700;font-size:14px;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};
+  &:hover{box-shadow:${t.sh.glow};transform:translateY(-1px);}
+`
+const PreviewActionBtn = styled.button<{$active?:boolean}>`
+  width:44px;height:44px;border-radius:${t.r.md};
+  border:1px solid ${pr=>pr.$active?t.gold:t.border};
+  background:${pr=>pr.$active?t.goldDim:'transparent'};
+  color:${pr=>pr.$active?t.gold:t.textSec};cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all ${t.tr};flex-shrink:0;
+  &:hover{border-color:${t.goldBorder};color:${t.gold};}
+`
 
 /* ── Mobile Calculator ── */
 const CalcCard = styled.div`
@@ -432,6 +483,8 @@ export default function Explore() {
   const [cityStatsDismissed, setCityStatsDismissed] = useState(false)
   const userGeo = useUserLocation()
   const { online, wasOffline } = useOnlineStatus()
+  const isMobile = useIsMobile()
+  const [mobileExpanded, setMobileExpanded] = useState(false)
 
   // Mobile calculator state
   const [calcPrice, setCalcPrice] = useState(500000)
@@ -591,6 +644,7 @@ export default function Explore() {
   // Track recently viewed plots
   const selectPlot = useCallback((pl: Plot | null) => {
     setSelected(pl)
+    setMobileExpanded(false) // Reset to preview mode on new selection
     if (pl) addRecentlyViewed(pl.id)
   }, [addRecentlyViewed])
 
@@ -711,6 +765,7 @@ export default function Explore() {
           onSelect={selectPlot} onLead={setLeadPlot}
           favorites={{ isFav, toggle }}
           compare={{ has: isCompared, toggle: toggleCompare }}
+          filterCity={filters.city}
         />
         <FilterBar filters={filters} onChange={setFilters} resultCount={filtered.length}
           plots={plots} onSelectPlot={(id) => { const pl = plots.find(pp => pp.id === id); if (pl) selectPlot(pl) }} />
@@ -754,8 +809,70 @@ export default function Explore() {
           />
         </Suspense>
         <Suspense fallback={null}>
-          {selected && <Sidebar plot={selected} open={!!selected} onClose={() => setSelected(null)} onLead={() => setLeadPlot(selected)} plots={sorted} onNavigate={selectPlot} isCompared={isCompared(selected.id)} onToggleCompare={toggleCompare} />}
+          {selected && <Sidebar plot={selected} open={isMobile ? mobileExpanded : true} onClose={() => { setSelected(null); setMobileExpanded(false) }} onLead={() => setLeadPlot(selected)} plots={sorted} onNavigate={selectPlot} isCompared={isCompared(selected.id)} onToggleCompare={toggleCompare} />}
         </Suspense>
+        {/* Mobile Plot Preview Bottom Card */}
+        {selected && !mobileExpanded && (() => {
+          const d = p(selected), score = calcScore(selected), grade = getGrade(score)
+          const r = roi(selected), ppd = pricePerDunam(selected)
+          return (
+            <MobilePreview $show={true}>
+              <PreviewHandle />
+              <PreviewBody>
+                <PreviewTopRow>
+                  <PreviewInfo>
+                    <PreviewTitle>גוש {d.block} · חלקה {selected.number}</PreviewTitle>
+                    <PreviewCity>
+                      <MapIcon size={12} /> {selected.city}
+                      <span style={{ color: grade.color, fontWeight: 800 }}>{grade.grade}</span>
+                      <span>{fmt.dunam(d.size)} דונם</span>
+                    </PreviewCity>
+                  </PreviewInfo>
+                  <PreviewPrice>{fmt.compact(d.price)}</PreviewPrice>
+                </PreviewTopRow>
+                <PreviewMetrics>
+                  {r > 0 && (
+                    <PreviewMetric>
+                      <PreviewMetricVal $c={r > 30 ? t.ok : t.warn}>+{fmt.pct(r)}</PreviewMetricVal>
+                      <PreviewMetricLabel>תשואה</PreviewMetricLabel>
+                    </PreviewMetric>
+                  )}
+                  {ppd > 0 && (
+                    <PreviewMetric>
+                      <PreviewMetricVal>₪{fmt.num(ppd)}</PreviewMetricVal>
+                      <PreviewMetricLabel>לדונם</PreviewMetricLabel>
+                    </PreviewMetric>
+                  )}
+                  <PreviewMetric>
+                    <PreviewMetricVal $c={grade.color}>{score}/10</PreviewMetricVal>
+                    <PreviewMetricLabel>ציון</PreviewMetricLabel>
+                  </PreviewMetric>
+                  {d.size > 0 && (
+                    <PreviewMetric>
+                      <PreviewMetricVal>{fmt.num(d.size)}</PreviewMetricVal>
+                      <PreviewMetricLabel>מ״ר</PreviewMetricLabel>
+                    </PreviewMetric>
+                  )}
+                </PreviewMetrics>
+                <PreviewActions>
+                  <PreviewDetailBtn onClick={() => setMobileExpanded(true)}>
+                    <ChevronLeft size={16} /> פרטים מלאים
+                  </PreviewDetailBtn>
+                  <PreviewActionBtn $active={isFav(selected.id)} onClick={() => toggle(selected.id)} aria-label="מועדפים">
+                    <Heart size={18} fill={isFav(selected.id) ? t.gold : 'none'} />
+                  </PreviewActionBtn>
+                  <PreviewActionBtn $active={isCompared(selected.id)} onClick={() => toggleCompare(selected.id)} aria-label="השוואה">
+                    <GitCompareArrows size={18} />
+                  </PreviewActionBtn>
+                  <PreviewActionBtn onClick={() => setSelected(null)} aria-label="סגור">
+                    <X size={18} />
+                  </PreviewActionBtn>
+                </PreviewActions>
+              </PreviewBody>
+            </MobilePreview>
+          )
+        })()}
+
         <Suspense fallback={null}>
           <LeadModal plot={leadPlot} open={!!leadPlot} onClose={() => setLeadPlot(null)} />
         </Suspense>
