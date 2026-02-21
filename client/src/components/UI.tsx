@@ -950,3 +950,75 @@ export function PriceAlertButton({ plotId, onToggle }: { plotId: string; onToggl
     </div>
   )
 }
+
+/* ── Cookie Consent Banner ── */
+const cookieSlideUp = keyframes`from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}`
+const CookieBanner = styled.div<{$show:boolean}>`
+  position:fixed;bottom:0;left:0;right:0;z-index:9999;
+  display:${pr=>pr.$show?'flex':'none'};align-items:center;justify-content:center;
+  gap:16px;padding:14px 24px;direction:rtl;
+  background:rgba(17,24,39,0.97);backdrop-filter:blur(16px);
+  border-top:1px solid rgba(212,168,75,0.2);
+  box-shadow:0 -8px 32px rgba(0,0,0,0.3);
+  animation:${cookieSlideUp} 0.4s cubic-bezier(0.32,0.72,0,1);
+  @media(max-width:640px){flex-direction:column;gap:10px;padding:14px 16px;text-align:center;}
+`
+const CookieText = styled.p`
+  font-size:13px;color:rgba(255,255,255,0.8);margin:0;line-height:1.6;flex:1;
+  a{color:#D4A84B;text-decoration:underline;text-underline-offset:2px;&:hover{color:#E6C06A;}}
+`
+const CookieActions = styled.div`display:flex;align-items:center;gap:8px;flex-shrink:0;`
+const CookieAcceptBtn = styled.button`
+  padding:8px 24px;background:linear-gradient(135deg,#D4A84B,#E6C06A);color:#050D1A;
+  border:none;border-radius:20px;font-weight:700;font-size:13px;cursor:pointer;
+  transition:all 0.2s;white-space:nowrap;
+  &:hover{box-shadow:0 0 16px rgba(212,168,75,0.35);transform:translateY(-1px);}
+`
+const CookieDeclineBtn = styled.button`
+  padding:8px 16px;background:transparent;color:rgba(255,255,255,0.5);
+  border:1px solid rgba(255,255,255,0.15);border-radius:20px;font-weight:600;font-size:12px;
+  cursor:pointer;transition:all 0.2s;white-space:nowrap;
+  &:hover{border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.7);}
+`
+
+const COOKIE_KEY = 'landmap_cookie_consent'
+
+export function CookieConsent() {
+  const [show, setShow] = useState(false)
+
+  useEffect(() => {
+    // Small delay to avoid layout shift on initial load
+    const timer = setTimeout(() => {
+      try {
+        const consent = localStorage.getItem(COOKIE_KEY)
+        if (!consent) setShow(true)
+      } catch {
+        setShow(true)
+      }
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const accept = useCallback(() => {
+    try { localStorage.setItem(COOKIE_KEY, 'accepted') } catch {}
+    setShow(false)
+  }, [])
+
+  const decline = useCallback(() => {
+    try { localStorage.setItem(COOKIE_KEY, 'declined') } catch {}
+    setShow(false)
+  }, [])
+
+  return (
+    <CookieBanner $show={show} role="dialog" aria-label="הסכמה לעוגיות">
+      <CookieText>
+        🍪 אתר זה משתמש בעוגיות (Cookies) ואחסון מקומי כדי לשפר את חווית השימוש, לשמור העדפות ולספק ניתוח נתונים.
+        בהמשך השימוש באתר אתם מסכימים ל<a href="/privacy">מדיניות הפרטיות</a> שלנו.
+      </CookieText>
+      <CookieActions>
+        <CookieAcceptBtn onClick={accept}>אישור</CookieAcceptBtn>
+        <CookieDeclineBtn onClick={decline}>דחה</CookieDeclineBtn>
+      </CookieActions>
+    </CookieBanner>
+  )
+}

@@ -476,7 +476,7 @@ interface Props {
   userLocation?: { lat: number; lng: number } | null
 }
 
-function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userLocation, isBestValue }: {
+const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userLocation, isBestValue }: {
   plot: Plot; active: boolean; index: number; onClick: () => void; allPlots: Plot[]; onDetailClick: (id: string) => void
   userLocation?: { lat: number; lng: number } | null; isBestValue?: boolean
 }) {
@@ -604,7 +604,7 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userL
       })()}
     </ItemWrap>
   )
-}
+})
 
 function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, userLocation }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null)

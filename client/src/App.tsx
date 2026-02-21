@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { Routes, Route, useLocation, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { ErrorBoundary, PageLoader } from './components/UI'
+import { ErrorBoundary, PageLoader, CookieConsent } from './components/UI'
 import { RoleGuard } from './components/Layout'
 import { t } from './theme'
 import { MapPin, Home, Search } from 'lucide-react'
@@ -121,6 +121,7 @@ export default function App() {
         </Routes>
         </main>
       </Suspense>
+      <CookieConsent />
     </ErrorBoundary>
   )
 }

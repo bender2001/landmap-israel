@@ -140,7 +140,7 @@ export function fmtDistance(meters: number): string {
 }
 
 // ── Sort ──
-export type SortKey = 'recommended' | 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc' | 'roi-desc' | 'price-sqm-asc' | 'price-dunam-asc' | 'score-desc' | 'nearest'
+export type SortKey = 'recommended' | 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc' | 'roi-desc' | 'price-sqm-asc' | 'price-dunam-asc' | 'score-desc' | 'nearest' | 'date-desc'
 export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'recommended', label: 'מומלץ' },
   { key: 'nearest', label: '📍 קרוב אלי' },
@@ -151,6 +151,7 @@ export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'size-desc', label: 'שטח ↓' },
   { key: 'roi-desc', label: 'תשואה ↓' },
   { key: 'score-desc', label: 'ציון ↓' },
+  { key: 'date-desc', label: '✨ חדש ביותר' },
 ]
 /** Composite recommendation score: investment score (40%), ROI (30%), zoning progress (20%), below-avg price bonus (10%) */
 function recommendationScore(plot: Plot, avgPps: number): number {
@@ -196,6 +197,11 @@ export function sortPlots(plots: Plot[], key: SortKey, userLocation?: { lat: num
     case 'size-desc': return sorted.sort((a, b) => p(b).size - p(a).size)
     case 'roi-desc': return sorted.sort((a, b) => roi(b) - roi(a))
     case 'score-desc': return sorted.sort((a, b) => calcScore(b) - calcScore(a))
+    case 'date-desc': return sorted.sort((a, b) => {
+      const aDate = p(a).created ? new Date(p(a).created).getTime() : 0
+      const bDate = p(b).created ? new Date(p(b).created).getTime() : 0
+      return bDate - aDate
+    })
     default: return sorted
   }
 }
