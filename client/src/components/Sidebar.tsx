@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import styled, { keyframes, css } from 'styled-components'
 import { X, Phone, ChevronDown, TrendingUp, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink } from 'lucide-react'
 import { t, fadeInUp, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm } from '../utils'
 import type { Plot } from '../types'
 import { GoldButton, Badge } from './UI'
 
@@ -36,7 +36,7 @@ const CloseBtn = styled.button`
 const Body = styled.div`flex:1;overflow-y:auto;padding:16px 20px;direction:rtl;`
 
 /* ── Metrics ── */
-const MetricsGrid = styled.div`display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;animation:${fadeSection} 0.5s 0.1s both;`
+const MetricsGrid = styled.div`display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px;animation:${fadeSection} 0.5s 0.1s both;`
 const MetricCard = styled.div`
   background:${t.surfaceLight};border:1px solid ${t.border};border-radius:${t.r.md};padding:12px;text-align:center;
   transition:all ${t.tr};&:hover{border-color:${t.goldBorder};transform:translateY(-2px);box-shadow:${t.sh.sm};}
@@ -99,7 +99,7 @@ interface Props { plot: Plot | null; open: boolean; onClose: () => void; onLead?
 export default function Sidebar({ plot, open, onClose, onLead, onFullPage }: Props) {
   if (!plot) return null
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
-  const cagr = calcCAGR(r, d.readiness), tl = calcTimeline(plot), dom = daysOnMarket(d.created)
+  const cagr = calcCAGR(r, d.readiness), tl = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot)
 
   return (
     <>
@@ -123,6 +123,7 @@ export default function Sidebar({ plot, open, onClose, onLead, onFullPage }: Pro
           <MetricsGrid>
             <MetricCard><MetricLabel>מחיר</MetricLabel><MetricVal $gold>{fmt.compact(d.price)}</MetricVal></MetricCard>
             <MetricCard><MetricLabel>שטח</MetricLabel><MetricVal>{fmt.num(d.size)} מ״ר</MetricVal></MetricCard>
+            {pps > 0 && <MetricCard><MetricLabel>₪ / מ״ר</MetricLabel><MetricVal>{fmt.num(pps)}</MetricVal></MetricCard>}
             <MetricCard><MetricLabel>תשואה</MetricLabel><MetricVal $gold={r > 0}>{fmt.pct(r)}</MetricVal></MetricCard>
           </MetricsGrid>
 

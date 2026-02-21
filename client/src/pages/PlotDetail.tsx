@@ -1,12 +1,12 @@
 import { useState, lazy, Suspense } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import styled from 'styled-components'
-import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, Shield } from 'lucide-react'
+import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, Shield, Share2, Copy, Check } from 'lucide-react'
 import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard } from '../components/UI'
 import { PublicLayout } from '../components/Layout'
-import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm } from '../utils'
 import type { Plot } from '../types'
 
 const LeadModal = lazy(() => import('../components/LeadModal'))
@@ -21,7 +21,7 @@ const Title = styled.h1`font-size:clamp(22px,3vw,30px);font-weight:800;color:${t
 const Actions = styled.div`display:flex;gap:8px;`
 const IconBtn = styled.button<{$active?:boolean}>`display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:${t.r.md};border:1px solid ${t.lBorder};background:${pr=>pr.$active?t.goldDim:'#fff'};color:${pr=>pr.$active?t.gold:t.lTextSec};cursor:pointer;transition:all ${t.tr};&:hover{border-color:${t.gold};color:${t.gold};}`
 
-const Metrics = styled.div`display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;${sm}{grid-template-columns:repeat(2,1fr);}`
+const Metrics = styled.div`display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:32px;${md}{grid-template-columns:repeat(3,1fr);}${sm}{grid-template-columns:repeat(2,1fr);}`
 const Metric = styled(AnimatedCard)`padding:20px;background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};text-align:center;transition:all ${t.tr};&:hover{border-color:${t.goldBorder};box-shadow:${t.sh.glow};}`
 const MetricVal = styled.div`font-size:24px;font-weight:800;color:${t.lText};font-family:${t.font};`
 const MetricLabel = styled.div`font-size:12px;color:${t.lTextSec};margin-top:4px;`
@@ -51,12 +51,25 @@ export default function PlotDetail() {
   const { data: plot, isLoading, error } = usePlot(id)
   const { isFav, toggle } = useFavorites()
   const [leadOpen, setLeadOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const handleShare = async () => {
+    const url = window.location.href
+    const title = plot ? `גוש ${p(plot).block} חלקה ${plot.number} - ${plot.city} | LandMap` : 'LandMap'
+    if (navigator.share) {
+      try { await navigator.share({ title, url }) } catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
 
   if (isLoading) return <PublicLayout><Center><Spinner size={36} /></Center></PublicLayout>
   if (error || !plot) return <PublicLayout><Center><p style={{color:t.lTextSec}}>Plot not found</p></Center></PublicLayout>
 
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
-  const cagr = calcCAGR(r, d.readiness), timeline = calcTimeline(plot), dom = daysOnMarket(d.created)
+  const cagr = calcCAGR(r, d.readiness), timeline = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot)
 
   return (
     <PublicLayout>
@@ -74,15 +87,17 @@ export default function PlotDetail() {
               <Title>גוש {d.block} חלקה {plot.number} - {plot.city}</Title>
             </TitleLeft>
             <Actions>
-              <IconBtn $active={isFav(plot.id)} onClick={() => toggle(plot.id)} aria-label="מועדפים"><Heart size={20} /></IconBtn>
-              <IconBtn aria-label="ניווט"><Navigation size={20} /></IconBtn>
+              <IconBtn $active={isFav(plot.id)} onClick={() => toggle(plot.id)} aria-label="מועדפים"><Heart size={20} fill={isFav(plot.id) ? t.gold : 'none'} /></IconBtn>
+              <IconBtn onClick={handleShare} aria-label="שיתוף">{copied ? <Check size={20} color={t.ok} /> : <Share2 size={20} />}</IconBtn>
+              <IconBtn aria-label="ניווט" onClick={() => window.open(`https://waze.com/ul?ll=${plot.coordinates?.[0]?.[0]},${plot.coordinates?.[0]?.[1]}&navigate=yes`, '_blank')}><Navigation size={20} /></IconBtn>
             </Actions>
           </TitleRow>
 
           <Metrics>
             <Metric $delay={0}><MetricVal>{fmt.compact(d.price)}</MetricVal><MetricLabel>מחיר</MetricLabel></Metric>
-            <Metric $delay={0.08}><MetricVal>{fmt.dunam(d.size)} דונם</MetricVal><MetricLabel>שטח</MetricLabel></Metric>
-            <Metric $delay={0.16}><MetricVal style={{color:t.ok}}>{fmt.pct(r)}</MetricVal><MetricLabel>ROI צפוי</MetricLabel></Metric>
+            <Metric $delay={0.06}><MetricVal>{fmt.dunam(d.size)} דונם</MetricVal><MetricLabel>שטח</MetricLabel></Metric>
+            {pps > 0 && <Metric $delay={0.12}><MetricVal>{fmt.num(pps)}</MetricVal><MetricLabel>₪ / מ״ר</MetricLabel></Metric>}
+            <Metric $delay={0.18}><MetricVal style={{color:t.ok}}>{fmt.pct(r)}</MetricVal><MetricLabel>ROI צפוי</MetricLabel></Metric>
             <Metric $delay={0.24}><MetricVal style={{color:t.gold}}>{cagr ? `${cagr.cagr}%` : '--'}</MetricVal><MetricLabel>CAGR ({cagr?.years || '-'} שנים)</MetricLabel></Metric>
           </Metrics>
 
@@ -94,6 +109,7 @@ export default function PlotDetail() {
                 <Row><Label>מחיר שמאי</Label><Value>{fmt.price(plot.standard22?.value || 0)}</Value></Row>
                 <Row><Label>שווי חזוי</Label><Value style={{color:t.ok}}>{fmt.price(d.projected)}</Value></Row>
                 <Row><Label>ציון השקעה</Label><Value style={{color:grade.color}}>{score}/10 ({grade.grade})</Value></Row>
+                {pps > 0 && <Row><Label>מחיר למ״ר</Label><Value style={{color:t.gold}}>₪{fmt.num(pps)}</Value></Row>}
                 <Row><Label>צפיפות</Label><Value>{d.density} יח"ד/דונם</Value></Row>
                 <Row><Label>אומדן מוכנות</Label><Value>{d.readiness || '--'}</Value></Row>
               </Card>

@@ -2,7 +2,7 @@ import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, useMap, WMSTileLayer } from 'react-leaflet'
 import L from 'leaflet'
 import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain } from 'lucide-react'
-import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter } from '../utils'
+import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
 import { israelAreas } from '../data'
@@ -192,7 +192,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, darkMode 
   }, [selected])
 
   const renderPopup = useCallback((plot: Plot) => {
-    const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score), fav = favorites.isFav(plot.id)
+    const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score), fav = favorites.isFav(plot.id), pps = pricePerSqm(plot)
     return (
       <div className="plot-popup">
         <div className="plot-popup-header">
@@ -204,6 +204,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, darkMode 
         </div>
         <div className="plot-popup-row"><span className="plot-popup-label">מחיר</span><span className="plot-popup-value">{fmt.compact(d.price)}</span></div>
         <div className="plot-popup-row"><span className="plot-popup-label">שטח</span><span className="plot-popup-value">{fmt.dunam(d.size)} דונם</span></div>
+        {pps > 0 && <div className="plot-popup-row"><span className="plot-popup-label">₪/מ״ר</span><span className="plot-popup-value">{fmt.num(pps)}</span></div>}
         <div className="plot-popup-row"><span className="plot-popup-label">תשואה צפויה</span><span className="plot-popup-value gold">+{fmt.pct(r)}</span></div>
         <div className="plot-popup-row"><span className="plot-popup-label">ציון השקעה</span><span className="plot-popup-value" style={{ color: grade.color }}>{grade.grade}</span></div>
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>

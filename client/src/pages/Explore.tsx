@@ -1,13 +1,14 @@
-import { useState, useMemo, lazy, Suspense } from 'react'
+import { useState, useMemo, useEffect, useCallback, lazy, Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
-import { Map as MapIcon, Heart, Calculator, Layers } from 'lucide-react'
+import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useDebounce } from '../hooks'
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, Spinner } from '../components/UI'
-import { p, roi, fmt } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm } from '../utils'
+import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
 
@@ -41,11 +42,39 @@ const NavBtn = styled.button<{$active?:boolean}>`
 `
 const Loader = styled.div`position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;`
 
+/* ── Sort ── */
+const SortWrap = styled.div`
+  position:absolute;top:16px;right:16px;z-index:${t.z.filter};direction:rtl;
+  ${mobile}{top:8px;right:8px;}
+`
+const SortBtn = styled.button<{$active?:boolean}>`
+  display:inline-flex;align-items:center;gap:6px;padding:8px 14px;
+  background:${pr=>pr.$active?t.goldDim:t.glass};backdrop-filter:blur(16px);
+  border:1px solid ${pr=>pr.$active?t.goldBorder:t.glassBorder};border-radius:${t.r.full};
+  color:${pr=>pr.$active?t.gold:t.textSec};font-size:12px;font-weight:600;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};box-shadow:${t.sh.sm};
+  &:hover{border-color:${t.goldBorder};color:${t.gold};}
+`
+const SortDrop = styled.div`
+  position:absolute;top:calc(100% + 6px);right:0;min-width:140px;
+  background:${t.glass};backdrop-filter:blur(24px);border:1px solid ${t.glassBorder};
+  border-radius:${t.r.md};box-shadow:${t.sh.lg};overflow:hidden;
+`
+const SortOption = styled.button<{$active?:boolean}>`
+  display:block;width:100%;padding:8px 14px;text-align:right;
+  background:${pr=>pr.$active?t.goldDim:'transparent'};border:none;
+  color:${pr=>pr.$active?t.gold:t.textSec};font-size:12px;font-weight:${pr=>pr.$active?700:500};
+  font-family:${t.font};cursor:pointer;transition:all ${t.tr};
+  &:hover{background:${t.hover};color:${t.gold};}
+`
+
 export default function Explore() {
   const [filters, setFilters] = useState<Filters>(DEFAULTS)
   const [selected, setSelected] = useState<Plot | null>(null)
   const [leadPlot, setLeadPlot] = useState<Plot | null>(null)
   const [tab, setTab] = useState<'map'|'fav'|'calc'|'areas'>('map')
+  const [sortKey, setSortKey] = useState<SortKey>('recommended')
+  const [sortOpen, setSortOpen] = useState(false)
   const { isFav, toggle, ids: favIds } = useFavorites()
 
   const apiFilters = useMemo(() => {
@@ -72,18 +101,50 @@ export default function Explore() {
     return list
   }, [plots, filters.sizeMin, filters.sizeMax, dSearch])
 
+  const sorted = useMemo(() => sortPlots(filtered, sortKey), [filtered, sortKey])
+
   const avg = filtered.length ? filtered.reduce((s, pl) => s + p(pl).price, 0) / filtered.length : 0
+  const avgPps = filtered.length ? Math.round(filtered.reduce((s, pl) => s + pricePerSqm(pl), 0) / filtered.length) : 0
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (sortOpen) setSortOpen(false)
+        else if (selected) setSelected(null)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [selected, sortOpen])
 
   return (
     <Wrap className="dark">
       <ErrorBoundary>
         {isLoading && <Loader><Spinner size={36} /></Loader>}
         <MapArea
-          plots={filtered} pois={pois} selected={selected} darkMode
+          plots={sorted} pois={pois} selected={selected} darkMode
           onSelect={setSelected} onLead={setLeadPlot}
           favorites={{ isFav, toggle }}
         />
         <FilterBar filters={filters} onChange={setFilters} resultCount={filtered.length} />
+
+        {/* Sort dropdown */}
+        <SortWrap>
+          <SortBtn onClick={() => setSortOpen(o => !o)} $active={sortKey !== 'recommended'}>
+            <ArrowUpDown size={14} />
+            {SORT_OPTIONS.find(o => o.key === sortKey)?.label || 'מיון'}
+          </SortBtn>
+          {sortOpen && (
+            <SortDrop>
+              {SORT_OPTIONS.map(o => (
+                <SortOption key={o.key} $active={o.key === sortKey} onClick={() => { setSortKey(o.key); setSortOpen(false) }}>
+                  {o.label}
+                </SortOption>
+              ))}
+            </SortDrop>
+          )}
+        </SortWrap>
 
         <Suspense fallback={null}>
           {selected && <Sidebar plot={selected} open={!!selected} onClose={() => setSelected(null)} onLead={() => setLeadPlot(selected)} />}
@@ -96,6 +157,7 @@ export default function Explore() {
         <Stats>
           <Stat><Val>{filtered.length}</Val> חלקות</Stat>
           <Stat>ממוצע <Val>{fmt.compact(avg)}</Val></Stat>
+          {avgPps > 0 && <Stat>₪/מ״ר <Val>{fmt.num(avgPps)}</Val></Stat>}
           <Demo>DEMO</Demo>
         </Stats>
 

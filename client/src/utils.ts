@@ -29,6 +29,12 @@ export const p = (plot: Plot) => ({
 })
 export const roi = (plot: Plot) => { const { price, projected } = p(plot); return price > 0 ? ((projected - price) / price) * 100 : 0 }
 
+// ── Price per sqm ──
+export const pricePerSqm = (plot: Plot) => {
+  const { price, size } = p(plot)
+  return price > 0 && size > 0 ? Math.round(price / size) : 0
+}
+
 // ── Formatting ──
 const cFmt = new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })
 const kFmt = new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', notation: 'compact', maximumFractionDigits: 1 })
@@ -79,6 +85,32 @@ export function daysOnMarket(created: string | null | undefined) {
   if (!created) return null; const d = Math.floor((Date.now() - new Date(created).getTime()) / 864e5)
   if (d <= 7) return { days: d, label: 'חדש', color: '#10B981' }; if (d <= 30) return { days: d, label: `${d} ימים`, color: '#84CC16' }
   if (d <= 90) return { days: d, label: `${Math.floor(d / 7)} שבועות`, color: '#F59E0B' }; return { days: d, label: `${Math.floor(d / 30)} חודשים`, color: '#EF4444' }
+}
+
+// ── Sort ──
+export type SortKey = 'recommended' | 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc' | 'roi-desc' | 'price-sqm-asc' | 'score-desc'
+export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'recommended', label: 'מומלץ' },
+  { key: 'price-asc', label: 'מחיר ↑' },
+  { key: 'price-desc', label: 'מחיר ↓' },
+  { key: 'price-sqm-asc', label: '₪/מ״ר ↑' },
+  { key: 'size-desc', label: 'שטח ↓' },
+  { key: 'roi-desc', label: 'תשואה ↓' },
+  { key: 'score-desc', label: 'ציון ↓' },
+]
+export function sortPlots(plots: Plot[], key: SortKey): Plot[] {
+  if (key === 'recommended') return plots // default order from API
+  const sorted = [...plots]
+  switch (key) {
+    case 'price-asc': return sorted.sort((a, b) => p(a).price - p(b).price)
+    case 'price-desc': return sorted.sort((a, b) => p(b).price - p(a).price)
+    case 'price-sqm-asc': return sorted.sort((a, b) => (pricePerSqm(a) || Infinity) - (pricePerSqm(b) || Infinity))
+    case 'size-asc': return sorted.sort((a, b) => p(a).size - p(b).size)
+    case 'size-desc': return sorted.sort((a, b) => p(b).size - p(a).size)
+    case 'roi-desc': return sorted.sort((a, b) => roi(b) - roi(a))
+    case 'score-desc': return sorted.sort((a, b) => calcScore(b) - calcScore(a))
+    default: return sorted
+  }
 }
 
 // ── Geo ──
