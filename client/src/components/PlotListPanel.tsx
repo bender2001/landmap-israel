@@ -1,6 +1,6 @@
 import { memo, useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download } from 'lucide-react'
+import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download, Share2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv } from '../utils'
@@ -401,6 +401,25 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userL
           </Metric>
         )}
         {dom && <ItemDom $c={dom.color}>{dom.label}</ItemDom>}
+        <DetailLink
+          onClick={(e) => {
+            e.stopPropagation()
+            const url = `${window.location.origin}/plot/${plot.id}`
+            const title = `חלקה ${plot.number} · גוש ${d.block} - ${plot.city}`
+            const text = `${title} | ${fmt.compact(d.price)} | ${fmt.num(d.size)} מ״ר`
+            if (navigator.share) {
+              navigator.share({ title, text, url }).catch(() => {
+                navigator.clipboard?.writeText(url)
+              })
+            } else {
+              navigator.clipboard?.writeText(url)
+            }
+          }}
+          title="שתף חלקה"
+          aria-label={`שתף חלקה ${plot.number}`}
+        >
+          <Share2 size={12} />
+        </DetailLink>
         <DetailLink
           onClick={(e) => { e.stopPropagation(); onDetailClick(plot.id) }}
           title="עמוד מלא"

@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter } from '../utils'
 import type { Plot } from '../types'
-import { GoldButton, GhostButton, Badge, RadialScore } from './UI'
+import { GoldButton, GhostButton, Badge, RadialScore, InfoTooltip } from './UI'
 
 /* ── Animations ── */
 const slideIn = keyframes`from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}`
@@ -596,6 +596,31 @@ const PrintBtn = styled.button`
   &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
 `
 
+/* ── Sticky Mini Header (appears on scroll) ── */
+const stickySlide = keyframes`from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}`
+const StickyHeader = styled.div<{$show:boolean}>`
+  position:absolute;top:0;left:0;right:0;z-index:3;
+  display:${pr=>pr.$show?'flex':'none'};align-items:center;gap:10px;
+  padding:8px 16px;direction:rtl;
+  background:${t.surface};border-bottom:2px solid ${t.goldBorder};
+  box-shadow:0 4px 20px rgba(0,0,0,0.3);
+  animation:${stickySlide} 0.2s ease-out;
+`
+const StickyGrade = styled.span<{$c:string}>`
+  display:inline-flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border-radius:50%;font-size:11px;font-weight:800;
+  border:2px solid ${pr=>pr.$c};color:${pr=>pr.$c};flex-shrink:0;
+`
+const StickyInfo = styled.div`flex:1;min-width:0;`
+const StickyTitle = styled.div`font-size:12px;font-weight:700;color:${t.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`
+const StickyPrice = styled.span`font-size:14px;font-weight:800;color:${t.gold};white-space:nowrap;`
+const StickyCta = styled.button`
+  padding:6px 14px;background:linear-gradient(135deg,${t.gold},${t.goldBright});
+  color:${t.bg};border:none;border-radius:${t.r.full};font-weight:700;font-size:11px;
+  font-family:${t.font};cursor:pointer;transition:all ${t.tr};white-space:nowrap;flex-shrink:0;
+  &:hover{box-shadow:${t.sh.glow};transform:scale(1.03);}
+`
+
 /* ── Main Component ── */
 interface Props {
   plot: Plot | null; open: boolean; onClose: () => void; onLead?: () => void
@@ -609,6 +634,7 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
   const panelRef = useRefHook<HTMLDivElement>(null)
   const closeBtnRef = useRefHook<HTMLButtonElement>(null)
   const [copied, setCopied] = useState(false)
+  const [showStickyHeader, setShowStickyHeader] = useState(false)
 
   // Lock body scroll when sidebar is open
   useEffect(() => {
@@ -666,8 +692,17 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
 
   // Auto-scroll body to top when plot changes
   useEffect(() => {
-    if (plot && bodyRef.current) bodyRef.current.scrollTop = 0
+    if (plot && bodyRef.current) { bodyRef.current.scrollTop = 0; setShowStickyHeader(false) }
   }, [plot?.id])
+
+  // Track scroll position for sticky header
+  useEffect(() => {
+    const body = bodyRef.current
+    if (!body || !open) return
+    const handler = () => setShowStickyHeader(body.scrollTop > 120)
+    body.addEventListener('scroll', handler, { passive: true })
+    return () => body.removeEventListener('scroll', handler)
+  }, [open])
 
   // Reset copied state when plot changes
   useEffect(() => { setCopied(false) }, [plot?.id])
@@ -766,6 +801,15 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
           </div>
         </Header>
 
+        <div style={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <StickyHeader $show={showStickyHeader}>
+            <StickyGrade $c={grade.color}>{grade.grade}</StickyGrade>
+            <StickyInfo>
+              <StickyTitle>חלקה {plot.number} · {plot.city}</StickyTitle>
+            </StickyInfo>
+            <StickyPrice>{fmt.compact(d.price)}</StickyPrice>
+            {onLead && <StickyCta onClick={onLead}><Phone size={12} /> פרטים</StickyCta>}
+          </StickyHeader>
         <Body ref={bodyRef}>
           {/* AI Investment Insight */}
           {aiInsight && (
@@ -778,10 +822,10 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
           )}
 
           <MetricsGrid>
-            <MetricCard><MetricLabel>מחיר</MetricLabel><MetricVal $gold>{fmt.compact(d.price)}</MetricVal></MetricCard>
-            <MetricCard><MetricLabel>שטח</MetricLabel><MetricVal>{d.size >= 1000 ? `${fmt.dunam(d.size)} דונם` : `${fmt.num(d.size)} מ״ר`}</MetricVal></MetricCard>
-            {ppd > 0 && <MetricCard><MetricLabel>₪ / דונם</MetricLabel><MetricVal>{fmt.num(ppd)}</MetricVal></MetricCard>}
-            <MetricCard><MetricLabel>תשואה</MetricLabel><MetricVal $gold={r > 0}>{fmt.pct(r)}</MetricVal></MetricCard>
+            <MetricCard><MetricLabel>מחיר <InfoTooltip text="מחיר הנכס הנוכחי כפי שפורסם. מחיר סופי עשוי להשתנות במו״מ." pos="bottom" /></MetricLabel><MetricVal $gold>{fmt.compact(d.price)}</MetricVal></MetricCard>
+            <MetricCard><MetricLabel>שטח <InfoTooltip text="שטח החלקה ברוטו. דונם = 1,000 מ״ר. שטח בנייה בפועל תלוי בתב״ע." pos="bottom" /></MetricLabel><MetricVal>{d.size >= 1000 ? `${fmt.dunam(d.size)} דונם` : `${fmt.num(d.size)} מ״ר`}</MetricVal></MetricCard>
+            {ppd > 0 && <MetricCard><MetricLabel>₪ / דונם <InfoTooltip text="מחיר לדונם — מאפשר השוואה בין חלקות בגדלים שונים. ככל שנמוך יותר, כך המחיר אטרקטיבי יותר." pos="bottom" /></MetricLabel><MetricVal>{fmt.num(ppd)}</MetricVal></MetricCard>}
+            <MetricCard><MetricLabel>תשואה <InfoTooltip text="תשואה צפויה (ROI) — אחוז הרווח הנקי מהשקעה עד למימוש. מבוססת על שווי חזוי ושלב תכנוני." pos="bottom" /></MetricLabel><MetricVal $gold={r > 0}>{fmt.pct(r)}</MetricVal></MetricCard>
           </MetricsGrid>
 
           {/* Area Quality Radar — visual pentagon score chart */}
@@ -877,10 +921,10 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
           )}
 
           <Section icon={TrendingUp} title="ניתוח השקעה" idx={0}>
-            <Row><Label>ציון</Label><Val $c={grade.color}>{score}/10 ({grade.grade})</Val></Row>
-            <Row><Label>שווי חזוי</Label><Val>{fmt.compact(d.projected)}</Val></Row>
-            {cagr && <Row><Label>CAGR</Label><Val $c={t.ok}>{cagr.cagr}% ({cagr.years} שנים)</Val></Row>}
-            <Row><Label>מוכנות</Label><Val>{d.readiness || '—'}</Val></Row>
+            <Row><Label>ציון <InfoTooltip text="ציון כולל 1-10 המשקלל מחיר, תשואה, שלב תכנוני, מיקום וגודל. A+ = מעולה, C = חלש." /></Label><Val $c={grade.color}>{score}/10 ({grade.grade})</Val></Row>
+            <Row><Label>שווי חזוי <InfoTooltip text="הערכת שווי הנכס לאחר השלמת כל שלבי התכנון והבנייה. מבוסס על עסקאות דומות ומגמות שוק." /></Label><Val>{fmt.compact(d.projected)}</Val></Row>
+            {cagr && <Row><Label>CAGR <InfoTooltip text="שיעור צמיחה שנתי ממוצע (Compound Annual Growth Rate). מודד את קצב עליית הערך בממוצע לשנה." /></Label><Val $c={t.ok}>{cagr.cagr}% ({cagr.years} שנים)</Val></Row>}
+            <Row><Label>מוכנות <InfoTooltip text="רמת המוכנות של החלקה לבנייה. משקף את השלב התכנוני הנוכחי ואת הקרבה לקבלת היתר." /></Label><Val>{d.readiness || '—'}</Val></Row>
           </Section>
 
           <Section icon={Clock} title="ציר זמן תכנון" idx={1}>
@@ -1073,6 +1117,7 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
             </SimilarWrap>
           )}
         </Body>
+        </div>
 
         <Footer>
           <GoldButton style={{ flex: 1 }} onClick={onLead}><Phone size={16} />קבל פרטים</GoldButton>

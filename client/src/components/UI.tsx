@@ -114,6 +114,48 @@ export const Badge = styled.span<{ $color?: string }>`
   background:${({ $color }) => ($color || t.gold) + '18'};
 `
 
+/* ── InfoTooltip — hoverable (i) with explanation ── */
+const ttFadeIn = keyframes`from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}`
+const InfoWrap = styled.span`
+  position:relative;display:inline-flex;align-items:center;justify-content:center;
+  width:16px;height:16px;border-radius:50%;cursor:help;flex-shrink:0;
+  background:rgba(212,168,75,0.1);border:1px solid rgba(212,168,75,0.2);
+  color:${t.gold};font-size:9px;font-weight:800;font-family:${t.font};
+  transition:all 0.2s;vertical-align:middle;margin-inline-start:4px;
+  &:hover{background:rgba(212,168,75,0.2);border-color:rgba(212,168,75,0.4);}
+`
+const InfoBubble = styled.div<{$pos?:'top'|'bottom'}>`
+  position:absolute;${pr=>pr.$pos==='bottom'?'top:calc(100% + 8px)':'bottom:calc(100% + 8px)'};
+  right:50%;transform:translateX(50%);z-index:${t.z.tooltip};
+  min-width:200px;max-width:260px;padding:10px 14px;
+  background:${t.surface};border:1px solid ${t.goldBorder};border-radius:${t.r.md};
+  box-shadow:${t.sh.lg};font-size:12px;font-weight:500;color:${t.textSec};
+  line-height:1.6;direction:rtl;text-align:right;pointer-events:none;
+  animation:${ttFadeIn} 0.15s ease-out;white-space:normal;
+  &::after{content:'';position:absolute;
+    ${pr=>pr.$pos==='bottom'?'top:-5px':'bottom:-5px'};right:calc(50% - 5px);
+    width:10px;height:10px;background:${t.surface};border:1px solid ${t.goldBorder};
+    ${pr=>pr.$pos==='bottom'?'border-bottom:none;border-right:none;transform:rotate(45deg)':'border-top:none;border-left:none;transform:rotate(45deg)'};
+  }
+`
+export function InfoTooltip({ text, pos = 'top' }: { text: string; pos?: 'top' | 'bottom' }) {
+  const [show, setShow] = useState(false)
+  return (
+    <InfoWrap
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+      onFocus={() => setShow(true)}
+      onBlur={() => setShow(false)}
+      tabIndex={0}
+      role="button"
+      aria-label="מידע נוסף"
+    >
+      i
+      {show && <InfoBubble $pos={pos}>{text}</InfoBubble>}
+    </InfoWrap>
+  )
+}
+
 /* ── SectionTitle ── */
 export const SectionTitle = styled.h3`
   font-size:15px;font-weight:700;color:${t.text};margin-bottom:12px;
