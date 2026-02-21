@@ -160,6 +160,8 @@ export const GlobalStyles = createGlobalStyle`
   @media(max-width:639px){
     .leaflet-control-zoom{margin-bottom:100px!important}
     .leaflet-control-zoom a{width:42px!important;height:42px!important;line-height:42px!important;font-size:18px!important}
+    /* Push map legend above mobile nav bar + stats strip */
+    .map-legend-box{bottom:112px!important;right:8px!important;padding:6px 10px!important;font-size:9px!important;max-width:140px!important;}
   }
 
   /* ── Print Styles ── */

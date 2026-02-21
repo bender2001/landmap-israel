@@ -1,6 +1,6 @@
-import { memo, useMemo, useCallback, useEffect } from 'react'
+import { memo, useMemo, useCallback, useEffect, useState } from 'react'
 import styled, { keyframes, css } from 'styled-components'
-import { X, TrendingUp, TrendingDown, MapPin, Ruler, DollarSign, BarChart3, ExternalLink, Star, Shield, Clock, Award } from 'lucide-react'
+import { X, TrendingUp, TrendingDown, MapPin, Ruler, DollarSign, BarChart3, ExternalLink, Star, Shield, Clock, Award, Radar } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusLabels, statusColors, zoningLabels, calcCAGR, calcTimeline, calcRisk, exportPlotsCsv } from '../utils'
 import { GoldButton, Badge } from './UI'
@@ -118,6 +118,183 @@ const SummaryWinner = styled.span`
 `
 const SummaryIcon = styled.span`font-size:14px;`
 
+/* ── View Toggle (Table vs Radar) ── */
+const ViewToggle = styled.div`
+  display:flex;align-items:center;gap:4px;padding:3px;
+  background:${t.surfaceLight};border-radius:${t.r.md};border:1px solid ${t.border};
+`
+const ViewBtn = styled.button<{$active:boolean}>`
+  display:flex;align-items:center;gap:5px;padding:6px 14px;
+  border:none;border-radius:${t.r.sm};font-size:11px;font-weight:700;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};
+  background:${pr=>pr.$active?t.goldDim:'transparent'};
+  color:${pr=>pr.$active?t.gold:t.textDim};
+  &:hover{color:${t.gold};}
+`
+
+/* ── SVG Radar Chart ── */
+const radarFadeIn = keyframes`from{opacity:0;transform:scale(0.85)}to{opacity:1;transform:scale(1)}`
+const RadarWrap = styled.div`
+  padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px;
+  animation:${radarFadeIn} 0.5s cubic-bezier(0.32,0.72,0,1);
+  ${mobile}{padding:16px 8px;}
+`
+const RadarLegend = styled.div`
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center;direction:rtl;
+  ${mobile}{gap:10px;}
+`
+const RadarLegendItem = styled.div`
+  display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:${t.textSec};
+`
+const RadarDot = styled.span<{$c:string}>`
+  width:10px;height:10px;border-radius:50%;background:${pr=>pr.$c};flex-shrink:0;
+`
+
+const RADAR_COLORS = ['#D4A84B', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6']
+const RADAR_DIMS = [
+  { key: 'score', label: 'ציון', icon: '⭐' },
+  { key: 'roi', label: 'תשואה', icon: '📈' },
+  { key: 'size', label: 'שטח', icon: '📐' },
+  { key: 'priceComp', label: 'מחיר', icon: '💰' },
+  { key: 'zoning', label: 'תכנון', icon: '🏗️' },
+  { key: 'risk', label: 'ביטחון', icon: '🛡️' },
+] as const
+
+function RadarChart({ plots, allPlots }: { plots: Plot[]; allPlots: Plot[] }) {
+  const cx = 160, cy = 160, R = 120
+  const dims = RADAR_DIMS
+  const n = dims.length
+  const angles = dims.map((_, i) => (Math.PI * 2 * i) / n - Math.PI / 2)
+
+  // Normalize each dimension to 0-1
+  const zoningOrder = ['AGRICULTURAL', 'MASTER_PLAN_DEPOSIT', 'MASTER_PLAN_APPROVED', 'DETAILED_PLAN_PREP', 'DETAILED_PLAN_DEPOSIT', 'DETAILED_PLAN_APPROVED', 'DEVELOPER_TENDER', 'BUILDING_PERMIT']
+
+  const plotData = useMemo(() => {
+    const maxPrice = Math.max(...plots.map(pl => p(pl).price)) || 1
+    const maxSize = Math.max(...plots.map(pl => p(pl).size)) || 1
+    const maxRoi = Math.max(...plots.map(r => roi(r)), 1)
+
+    return plots.map(pl => {
+      const d = p(pl)
+      const r = roi(pl)
+      const score = calcScore(pl)
+      const risk = calcRisk(pl, allPlots)
+      const zi = zoningOrder.indexOf(d.zoning)
+      const zoningNorm = zi >= 0 ? (zi + 1) / zoningOrder.length : 0.1
+
+      return {
+        score: Math.min(1, score / 10),
+        roi: maxRoi > 0 ? Math.min(1, r / maxRoi) : 0,
+        size: maxSize > 0 ? Math.min(1, d.size / maxSize) : 0,
+        priceComp: maxPrice > 0 ? 1 - (d.price / maxPrice) : 0, // inverted: lower = better
+        zoning: zoningNorm,
+        risk: risk ? Math.min(1, 1 - (risk.score / 10)) : 0.5, // inverted: lower risk = better
+      }
+    })
+  }, [plots, allPlots])
+
+  // Build polygon paths
+  const getPath = (values: Record<string, number>) => {
+    return dims.map((dim, i) => {
+      const val = Math.max(0.05, values[dim.key] || 0) // minimum visible
+      const x = cx + Math.cos(angles[i]) * R * val
+      const y = cy + Math.sin(angles[i]) * R * val
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+    }).join(' ') + ' Z'
+  }
+
+  // Grid rings
+  const rings = [0.25, 0.5, 0.75, 1]
+
+  return (
+    <RadarWrap>
+      <svg viewBox="0 0 320 320" width="100%" style={{ maxWidth: 400, maxHeight: 400 }}>
+        {/* Grid rings */}
+        {rings.map(r => (
+          <polygon key={r}
+            points={angles.map(a => `${cx + Math.cos(a) * R * r},${cy + Math.sin(a) * R * r}`).join(' ')}
+            fill="none" stroke={t.border} strokeWidth={r === 1 ? 1.5 : 0.5}
+            strokeDasharray={r < 1 ? '3 3' : 'none'} opacity={0.6}
+          />
+        ))}
+
+        {/* Axis lines */}
+        {angles.map((a, i) => (
+          <line key={i} x1={cx} y1={cy}
+            x2={cx + Math.cos(a) * R} y2={cy + Math.sin(a) * R}
+            stroke={t.border} strokeWidth={0.5} opacity={0.4}
+          />
+        ))}
+
+        {/* Dimension labels */}
+        {dims.map((dim, i) => {
+          const labelR = R + 24
+          const x = cx + Math.cos(angles[i]) * labelR
+          const y = cy + Math.sin(angles[i]) * labelR
+          return (
+            <text key={dim.key} x={x} y={y}
+              textAnchor="middle" dominantBaseline="central"
+              fill={t.textSec} fontSize={11} fontWeight={700} fontFamily={t.font}
+            >
+              {dim.icon} {dim.label}
+            </text>
+          )
+        })}
+
+        {/* Plot polygons (filled) */}
+        {plotData.map((values, i) => (
+          <path key={`fill-${i}`} d={getPath(values)}
+            fill={RADAR_COLORS[i % RADAR_COLORS.length]} fillOpacity={0.12}
+            stroke="none"
+          />
+        ))}
+
+        {/* Plot polygons (strokes) */}
+        {plotData.map((values, i) => (
+          <path key={`stroke-${i}`} d={getPath(values)}
+            fill="none" stroke={RADAR_COLORS[i % RADAR_COLORS.length]}
+            strokeWidth={2.5} strokeLinejoin="round" opacity={0.85}
+          />
+        ))}
+
+        {/* Data points */}
+        {plotData.map((values, pi) =>
+          dims.map((dim, di) => {
+            const val = Math.max(0.05, values[dim.key] || 0)
+            const x = cx + Math.cos(angles[di]) * R * val
+            const y = cy + Math.sin(angles[di]) * R * val
+            return (
+              <circle key={`pt-${pi}-${di}`} cx={x} cy={y} r={4}
+                fill={RADAR_COLORS[pi % RADAR_COLORS.length]}
+                stroke={t.bg} strokeWidth={2}
+              />
+            )
+          })
+        )}
+
+        {/* Ring labels */}
+        {rings.map(r => (
+          <text key={`rl-${r}`}
+            x={cx + 4} y={cy - R * r + 1}
+            fill={t.textDim} fontSize={8} fontFamily={t.font} opacity={0.5}
+          >
+            {Math.round(r * 100)}%
+          </text>
+        ))}
+      </svg>
+
+      <RadarLegend>
+        {plots.map((pl, i) => (
+          <RadarLegendItem key={pl.id}>
+            <RadarDot $c={RADAR_COLORS[i % RADAR_COLORS.length]} />
+            חלקה {pl.number} · {pl.city}
+          </RadarLegendItem>
+        ))}
+      </RadarLegend>
+    </RadarWrap>
+  )
+}
+
 interface CompareDrawerProps {
   open: boolean
   onClose: () => void
@@ -142,6 +319,7 @@ function findBest(plots: Plot[], getValue: (pl: Plot) => number, lowerIsBetter =
 
 function CompareDrawer({ open, onClose, plots, allPlots }: CompareDrawerProps) {
   const focusTrapRef = useFocusTrap(open)
+  const [view, setView] = useState<'table' | 'radar'>('table')
 
   // Close on Escape
   useEffect(() => {
@@ -201,6 +379,14 @@ function CompareDrawer({ open, onClose, plots, allPlots }: CompareDrawerProps) {
         <Header>
           <Title><BarChart3 size={20} color={t.gold} /> השוואת {plots.length} חלקות</Title>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ViewToggle>
+              <ViewBtn $active={view === 'table'} onClick={() => setView('table')}>
+                <BarChart3 size={13} /> טבלה
+              </ViewBtn>
+              <ViewBtn $active={view === 'radar'} onClick={() => setView('radar')}>
+                <Radar size={13} /> רדאר
+              </ViewBtn>
+            </ViewToggle>
             <button
               onClick={() => exportPlotsCsv(plots, `landmap-compare-${new Date().toISOString().slice(0, 10)}.csv`)}
               style={{
@@ -220,7 +406,7 @@ function CompareDrawer({ open, onClose, plots, allPlots }: CompareDrawerProps) {
         {metrics ? (
           <>
             {/* Winner Summary Bar */}
-            <SummaryBar>
+            <SummaryBar style={{ flexWrap: 'wrap' }}>
               {metrics.bestScore && (() => {
                 const winner = metrics.data.find(d => d.pl.id === metrics.bestScore)
                 return winner ? (
@@ -250,126 +436,133 @@ function CompareDrawer({ open, onClose, plots, allPlots }: CompareDrawerProps) {
                 ) : null
               })()}
             </SummaryBar>
-            <Grid $cols={cols}>
-              {/* Header row */}
-              <LabelCell style={{ background: t.bg, borderBottom: `2px solid ${t.border}` }}>
-                <Award size={14} color={t.gold} /> מדד
-              </LabelCell>
-              {metrics.data.map(({ pl, grade, score }) => (
-                <HeaderCell key={pl.id} $best={pl.id === metrics.bestScore}>
-                  <PlotName>חלקה {pl.number}</PlotName>
-                  <PlotCity>גוש {p(pl).block} · {pl.city}</PlotCity>
-                  <GradeCircle $c={grade.color}>{grade.grade}</GradeCircle>
-                  {pl.id === metrics.bestScore && <WinnerBadge><Star size={10} /> מומלץ</WinnerBadge>}
-                </HeaderCell>
-              ))}
 
-              {/* Status */}
-              <LabelCell><Badge $color={t.info} style={{ fontSize: 10, padding: '1px 6px' }}>סטטוס</Badge></LabelCell>
-              {metrics.data.map(({ pl }) => (
-                <ValueCell key={pl.id}>
-                  <Badge $color={statusColors[pl.status || 'AVAILABLE']} style={{ fontSize: 11 }}>
-                    {statusLabels[pl.status || 'AVAILABLE']}
-                  </Badge>
-                </ValueCell>
-              ))}
+            {/* Radar Chart View */}
+            {view === 'radar' && <RadarChart plots={plots} allPlots={allPlots} />}
 
-              {/* Price */}
-              <LabelCell><DollarSign size={13} color={t.textDim} /> מחיר</LabelCell>
-              {metrics.data.map(({ pl, d }) => (
-                <ValueCell key={pl.id} $best={pl.id === metrics.bestPrice} $highlight={pl.id === metrics.bestPrice ? t.ok : undefined}>
-                  {fmt.compact(d.price)}
-                  <BarWrap><BarFill $pct={d.price > 0 ? (d.price / metrics.maxPrice) * 100 : 0} $color={pl.id === metrics.bestPrice ? t.ok : t.gold} /></BarWrap>
-                </ValueCell>
-              ))}
+            {/* Table View */}
+            {view === 'table' && (
+              <Grid $cols={cols}>
+                {/* Header row */}
+                <LabelCell style={{ background: t.bg, borderBottom: `2px solid ${t.border}` }}>
+                  <Award size={14} color={t.gold} /> מדד
+                </LabelCell>
+                {metrics.data.map(({ pl, grade, score }) => (
+                  <HeaderCell key={pl.id} $best={pl.id === metrics.bestScore}>
+                    <PlotName>חלקה {pl.number}</PlotName>
+                    <PlotCity>גוש {p(pl).block} · {pl.city}</PlotCity>
+                    <GradeCircle $c={grade.color}>{grade.grade}</GradeCircle>
+                    {pl.id === metrics.bestScore && <WinnerBadge><Star size={10} /> מומלץ</WinnerBadge>}
+                  </HeaderCell>
+                ))}
 
-              {/* Size */}
-              <LabelCell><Ruler size={13} color={t.textDim} /> שטח (מ״ר)</LabelCell>
-              {metrics.data.map(({ pl, d }) => (
-                <ValueCell key={pl.id} $best={pl.id === metrics.bestSize}>
-                  {fmt.num(d.size)}
-                  <BarWrap><BarFill $pct={d.size > 0 ? (d.size / metrics.maxSize) * 100 : 0} $color={pl.id === metrics.bestSize ? t.gold : t.textDim} /></BarWrap>
-                </ValueCell>
-              ))}
-
-              {/* Price per sqm */}
-              <LabelCell><DollarSign size={13} color={t.textDim} /> ₪/מ״ר</LabelCell>
-              {metrics.data.map(({ pl, pps }) => (
-                <ValueCell key={pl.id} $best={pl.id === metrics.bestPps} $highlight={pl.id === metrics.bestPps ? t.ok : undefined}>
-                  {pps > 0 ? fmt.num(pps) : '—'}
-                  {pps > 0 && <BarWrap><BarFill $pct={(pps / metrics.maxPps) * 100} $color={pl.id === metrics.bestPps ? t.ok : t.warn} /></BarWrap>}
-                </ValueCell>
-              ))}
-
-              {/* Price per dunam */}
-              <LabelCell><DollarSign size={13} color={t.textDim} /> ₪/דונם</LabelCell>
-              {metrics.data.map(({ pl }) => {
-                const ppd = pricePerDunam(pl)
-                return (
+                {/* Status */}
+                <LabelCell><Badge $color={t.info} style={{ fontSize: 10, padding: '1px 6px' }}>סטטוס</Badge></LabelCell>
+                {metrics.data.map(({ pl }) => (
                   <ValueCell key={pl.id}>
-                    {ppd > 0 ? fmt.num(ppd) : '—'}
+                    <Badge $color={statusColors[pl.status || 'AVAILABLE']} style={{ fontSize: 11 }}>
+                      {statusLabels[pl.status || 'AVAILABLE']}
+                    </Badge>
                   </ValueCell>
-                )
-              })}
+                ))}
 
-              {/* ROI */}
-              <LabelCell><TrendingUp size={13} color={t.textDim} /> תשואה צפויה</LabelCell>
-              {metrics.data.map(({ pl, r }) => (
-                <ValueCell key={pl.id} $best={pl.id === metrics.bestRoi} $highlight={pl.id === metrics.bestRoi ? t.ok : r > 0 ? t.gold : t.err}>
-                  {r > 0 ? `+${fmt.pct(r)}` : fmt.pct(r)}
-                  {r > 0 && <BarWrap><BarFill $pct={metrics.maxRoi > 0 ? (r / metrics.maxRoi) * 100 : 0} $color={pl.id === metrics.bestRoi ? t.ok : t.gold} /></BarWrap>}
-                </ValueCell>
-              ))}
+                {/* Price */}
+                <LabelCell><DollarSign size={13} color={t.textDim} /> מחיר</LabelCell>
+                {metrics.data.map(({ pl, d }) => (
+                  <ValueCell key={pl.id} $best={pl.id === metrics.bestPrice} $highlight={pl.id === metrics.bestPrice ? t.ok : undefined}>
+                    {fmt.compact(d.price)}
+                    <BarWrap><BarFill $pct={d.price > 0 ? (d.price / metrics.maxPrice) * 100 : 0} $color={pl.id === metrics.bestPrice ? t.ok : t.gold} /></BarWrap>
+                  </ValueCell>
+                ))}
 
-              {/* Score */}
-              <LabelCell><Star size={13} color={t.textDim} /> ציון השקעה</LabelCell>
-              {metrics.data.map(({ pl, score, grade }) => (
-                <ValueCell key={pl.id} $best={pl.id === metrics.bestScore} $highlight={grade.color}>
-                  {score}/10 ({grade.grade})
-                  <BarWrap><BarFill $pct={score * 10} $color={grade.color} /></BarWrap>
-                </ValueCell>
-              ))}
+                {/* Size */}
+                <LabelCell><Ruler size={13} color={t.textDim} /> שטח (מ״ר)</LabelCell>
+                {metrics.data.map(({ pl, d }) => (
+                  <ValueCell key={pl.id} $best={pl.id === metrics.bestSize}>
+                    {fmt.num(d.size)}
+                    <BarWrap><BarFill $pct={d.size > 0 ? (d.size / metrics.maxSize) * 100 : 0} $color={pl.id === metrics.bestSize ? t.gold : t.textDim} /></BarWrap>
+                  </ValueCell>
+                ))}
 
-              {/* CAGR */}
-              <LabelCell><TrendingUp size={13} color={t.textDim} /> CAGR</LabelCell>
-              {metrics.data.map(({ pl, cagr }) => (
-                <ValueCell key={pl.id} $highlight={cagr ? t.ok : t.textDim}>
-                  {cagr ? `${cagr.cagr}% (${cagr.years}y)` : '—'}
-                </ValueCell>
-              ))}
+                {/* Price per sqm */}
+                <LabelCell><DollarSign size={13} color={t.textDim} /> ₪/מ״ר</LabelCell>
+                {metrics.data.map(({ pl, pps }) => (
+                  <ValueCell key={pl.id} $best={pl.id === metrics.bestPps} $highlight={pl.id === metrics.bestPps ? t.ok : undefined}>
+                    {pps > 0 ? fmt.num(pps) : '—'}
+                    {pps > 0 && <BarWrap><BarFill $pct={(pps / metrics.maxPps) * 100} $color={pl.id === metrics.bestPps ? t.ok : t.warn} /></BarWrap>}
+                  </ValueCell>
+                ))}
 
-              {/* Zoning Stage */}
-              <LabelCell><Clock size={13} color={t.textDim} /> שלב תכנון</LabelCell>
-              {metrics.data.map(({ pl, d }) => (
-                <ValueCell key={pl.id}>
-                  {zoningLabels[d.zoning] || d.zoning || '—'}
-                </ValueCell>
-              ))}
+                {/* Price per dunam */}
+                <LabelCell><DollarSign size={13} color={t.textDim} /> ₪/דונם</LabelCell>
+                {metrics.data.map(({ pl }) => {
+                  const ppd = pricePerDunam(pl)
+                  return (
+                    <ValueCell key={pl.id}>
+                      {ppd > 0 ? fmt.num(ppd) : '—'}
+                    </ValueCell>
+                  )
+                })}
 
-              {/* Timeline remaining */}
-              <LabelCell><Clock size={13} color={t.textDim} /> נותרו (חודשים)</LabelCell>
-              {metrics.data.map(({ pl, tl }) => (
-                <ValueCell key={pl.id} $highlight={tl && tl.remaining <= 12 ? t.ok : tl && tl.remaining > 36 ? t.warn : undefined}>
-                  {tl ? `${tl.remaining}` : '—'}
-                </ValueCell>
-              ))}
+                {/* ROI */}
+                <LabelCell><TrendingUp size={13} color={t.textDim} /> תשואה צפויה</LabelCell>
+                {metrics.data.map(({ pl, r }) => (
+                  <ValueCell key={pl.id} $best={pl.id === metrics.bestRoi} $highlight={pl.id === metrics.bestRoi ? t.ok : r > 0 ? t.gold : t.err}>
+                    {r > 0 ? `+${fmt.pct(r)}` : fmt.pct(r)}
+                    {r > 0 && <BarWrap><BarFill $pct={metrics.maxRoi > 0 ? (r / metrics.maxRoi) * 100 : 0} $color={pl.id === metrics.bestRoi ? t.ok : t.gold} /></BarWrap>}
+                  </ValueCell>
+                ))}
 
-              {/* Risk */}
-              <LabelCell><Shield size={13} color={t.textDim} /> סיכון</LabelCell>
-              {metrics.data.map(({ pl, risk }) => (
-                <ValueCell key={pl.id} $highlight={risk?.color}>
-                  {risk ? `${risk.label} (${risk.score}/10)` : '—'}
-                </ValueCell>
-              ))}
+                {/* Score */}
+                <LabelCell><Star size={13} color={t.textDim} /> ציון השקעה</LabelCell>
+                {metrics.data.map(({ pl, score, grade }) => (
+                  <ValueCell key={pl.id} $best={pl.id === metrics.bestScore} $highlight={grade.color}>
+                    {score}/10 ({grade.grade})
+                    <BarWrap><BarFill $pct={score * 10} $color={grade.color} /></BarWrap>
+                  </ValueCell>
+                ))}
 
-              {/* Distance to sea */}
-              <LabelCell><MapPin size={13} color={t.textDim} /> מרחק מהים</LabelCell>
-              {metrics.data.map(({ pl, d }) => (
-                <ValueCell key={pl.id}>
-                  {d.seaDist != null ? `${fmt.num(d.seaDist)} מ׳` : '—'}
-                </ValueCell>
-              ))}
-            </Grid>
+                {/* CAGR */}
+                <LabelCell><TrendingUp size={13} color={t.textDim} /> CAGR</LabelCell>
+                {metrics.data.map(({ pl, cagr }) => (
+                  <ValueCell key={pl.id} $highlight={cagr ? t.ok : t.textDim}>
+                    {cagr ? `${cagr.cagr}% (${cagr.years}y)` : '—'}
+                  </ValueCell>
+                ))}
+
+                {/* Zoning Stage */}
+                <LabelCell><Clock size={13} color={t.textDim} /> שלב תכנון</LabelCell>
+                {metrics.data.map(({ pl, d }) => (
+                  <ValueCell key={pl.id}>
+                    {zoningLabels[d.zoning] || d.zoning || '—'}
+                  </ValueCell>
+                ))}
+
+                {/* Timeline remaining */}
+                <LabelCell><Clock size={13} color={t.textDim} /> נותרו (חודשים)</LabelCell>
+                {metrics.data.map(({ pl, tl }) => (
+                  <ValueCell key={pl.id} $highlight={tl && tl.remaining <= 12 ? t.ok : tl && tl.remaining > 36 ? t.warn : undefined}>
+                    {tl ? `${tl.remaining}` : '—'}
+                  </ValueCell>
+                ))}
+
+                {/* Risk */}
+                <LabelCell><Shield size={13} color={t.textDim} /> סיכון</LabelCell>
+                {metrics.data.map(({ pl, risk }) => (
+                  <ValueCell key={pl.id} $highlight={risk?.color}>
+                    {risk ? `${risk.label} (${risk.score}/10)` : '—'}
+                  </ValueCell>
+                ))}
+
+                {/* Distance to sea */}
+                <LabelCell><MapPin size={13} color={t.textDim} /> מרחק מהים</LabelCell>
+                {metrics.data.map(({ pl, d }) => (
+                  <ValueCell key={pl.id}>
+                    {d.seaDist != null ? `${fmt.num(d.seaDist)} מ׳` : '—'}
+                  </ValueCell>
+                ))}
+              </Grid>
+            )}
 
             {/* Footer with links to full pages */}
             <Footer>

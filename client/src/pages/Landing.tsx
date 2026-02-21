@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { MapPin, Zap, TrendingUp, ChevronLeft, ChevronDown, Phone, Bell, Smartphone, Briefcase, Star, Shield, FileText, Building2, MessageCircle, HelpCircle, AlertTriangle } from 'lucide-react'
 import { t, fadeInUp, fadeInScale, shimmer, float, gradientShift, sm, md, lg, mobile } from '../theme'
 import { PublicLayout } from '../components/Layout'
 import { GoldButton, GhostButton, AnimatedCard, CountUpNumber, ScrollToTop } from '../components/UI'
-import { SITE_CONFIG } from '../utils'
+import { SITE_CONFIG, p, roi, fmt } from '../utils'
+import { useAllPlots } from '../hooks'
 
 /* ── extra keyframes ── */
 const glow = keyframes`0%,100%{box-shadow:0 0 20px rgba(212,168,75,0.15)}50%{box-shadow:0 0 50px rgba(212,168,75,0.35)}`
@@ -327,7 +328,7 @@ const DisclaimerText = styled.p`
 
 /* ── data ── */
 const PARTICLES = Array.from({length:8},(_,i)=>({x:Math.random()*100,size:3+Math.random()*4,dur:8+Math.random()*7,delay:i*1.5}))
-const STATS = [
+const FALLBACK_STATS = [
   {value:120,suffix:'+',label:'חלקות זמינות'},
   {value:35,suffix:'+',label:'יישובים מכוסים'},
   {value:32,suffix:'%',label:'תשואה ממוצעת'},
@@ -398,6 +399,22 @@ export default function Landing(){
   const [vis,setVis]=useState(false)
   useEffect(()=>{setVis(true)},[])
 
+  // Fetch live market data for stats
+  const { data: plots } = useAllPlots()
+  const liveStats = useMemo(() => {
+    if (!plots || plots.length === 0) return FALLBACK_STATS
+    const uniqueCities = new Set(plots.map(pl => pl.city).filter(Boolean))
+    const rois = plots.map(roi).filter(v => v > 0)
+    const avgRoi = rois.length > 0 ? Math.round(rois.reduce((s, v) => s + v, 0) / rois.length) : 32
+    const totalValue = plots.reduce((s, pl) => s + p(pl).price, 0)
+    return [
+      { value: plots.length, suffix: '', label: 'חלקות זמינות' },
+      { value: uniqueCities.size, suffix: '', label: 'יישובים מכוסים' },
+      { value: avgRoi, suffix: '%', label: 'תשואה ממוצעת' },
+      { value: Math.round(totalValue / 1e6), suffix: 'M₪', label: 'שווי כולל בפלטפורמה' },
+    ]
+  }, [plots])
+
   return(
     <PublicLayout>
       <Dark>
@@ -444,10 +461,10 @@ export default function Landing(){
           </CitiesGrid>
         </CitiesSection>
 
-        {/* ── Stats ── */}
+        {/* ── Stats (live market data) ── */}
         <StatsStrip>
           <StatsGrid>
-            {STATS.map((s,i)=>(
+            {liveStats.map((s,i)=>(
               <StatItem key={i} $delay={i*0.1}>
                 <StatNum><CountUpNumber value={s.value}/>{s.suffix}</StatNum>
                 <StatLabel>{s.label}</StatLabel>

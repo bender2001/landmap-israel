@@ -370,7 +370,25 @@ function RulerTool({ active, darkMode, onPointsChange }: { active: boolean; dark
 }
 
 // ── Map Legend ──
+// Legend wrapper with responsive bottom positioning
+function LegendBox({ darkMode, children }: { darkMode: boolean; children: React.ReactNode }) {
+  return (
+    <div className="map-legend-box" style={{
+      position: 'absolute', bottom: 48, right: 16, zIndex: t.z.controls,
+      background: darkMode ? 'rgba(11,17,32,0.92)' : 'rgba(255,255,255,0.95)',
+      backdropFilter: 'blur(12px)', borderRadius: t.r.md,
+      border: `1px solid ${darkMode ? t.border : t.lBorder}`,
+      padding: '8px 12px', direction: 'rtl' as const, boxShadow: t.sh.md,
+    }}>
+      {children}
+    </div>
+  )
+}
+
 function MapLegend({ colorMode, darkMode }: { colorMode: ColorMode; darkMode: boolean }) {
+  const labelColor = darkMode ? t.textDim : t.lTextSec
+  const textColor = darkMode ? t.textSec : t.lTextSec
+
   if (colorMode === 'status') {
     const items = [
       { color: statusColors.AVAILABLE, label: 'זמין' },
@@ -379,96 +397,71 @@ function MapLegend({ colorMode, darkMode }: { colorMode: ColorMode; darkMode: bo
       { color: statusColors.SOLD, label: 'נמכר' },
     ]
     return (
-      <div style={{
-        position: 'absolute', bottom: 48, right: 16, zIndex: t.z.controls,
-        background: darkMode ? 'rgba(11,17,32,0.92)' : 'rgba(255,255,255,0.95)',
-        backdropFilter: 'blur(12px)', borderRadius: t.r.md,
-        border: `1px solid ${darkMode ? t.border : t.lBorder}`,
-        padding: '8px 12px', direction: 'rtl', boxShadow: t.sh.md,
-      }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: darkMode ? t.textDim : t.lTextSec, marginBottom: 6 }}>
+      <LegendBox darkMode={darkMode}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: labelColor, marginBottom: 6 }}>
           {COLOR_MODE_LABELS[colorMode]}
         </div>
         {items.map(item => (
           <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
             <span style={{ width: 10, height: 10, borderRadius: 2, background: item.color, flexShrink: 0 }} />
-            <span style={{ fontSize: 10, color: darkMode ? t.textSec : t.lTextSec }}>{item.label}</span>
+            <span style={{ fontSize: 10, color: textColor }}>{item.label}</span>
           </div>
         ))}
-      </div>
+      </LegendBox>
     )
   }
 
   if (colorMode === 'grade') {
     return (
-      <div style={{
-        position: 'absolute', bottom: 48, right: 16, zIndex: t.z.controls,
-        background: darkMode ? 'rgba(11,17,32,0.92)' : 'rgba(255,255,255,0.95)',
-        backdropFilter: 'blur(12px)', borderRadius: t.r.md,
-        border: `1px solid ${darkMode ? t.border : t.lBorder}`,
-        padding: '8px 12px', direction: 'rtl', boxShadow: t.sh.md,
-      }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: darkMode ? t.textDim : t.lTextSec, marginBottom: 6 }}>
+      <LegendBox darkMode={darkMode}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: labelColor, marginBottom: 6 }}>
           ציון השקעה
         </div>
         {GRADE_COLORS.filter((_, i) => i % 2 === 0 || i === GRADE_COLORS.length - 1).map(item => (
           <div key={item.grade} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
             <span style={{ width: 10, height: 10, borderRadius: 2, background: item.color, flexShrink: 0 }} />
             <span style={{ fontSize: 10, fontWeight: 700, color: item.color }}>{item.grade}</span>
-            <span style={{ fontSize: 9, color: darkMode ? t.textDim : t.lTextSec }}>{item.label}</span>
+            <span style={{ fontSize: 9, color: labelColor }}>{item.label}</span>
           </div>
         ))}
-      </div>
+      </LegendBox>
     )
   }
 
-  // pps mode
   if (colorMode === 'pps') {
     return (
-      <div style={{
-        position: 'absolute', bottom: 48, right: 16, zIndex: t.z.controls,
-        background: darkMode ? 'rgba(11,17,32,0.92)' : 'rgba(255,255,255,0.95)',
-        backdropFilter: 'blur(12px)', borderRadius: t.r.md,
-        border: `1px solid ${darkMode ? t.border : t.lBorder}`,
-        padding: '8px 12px', direction: 'rtl', boxShadow: t.sh.md,
-      }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: darkMode ? t.textDim : t.lTextSec, marginBottom: 6 }}>
+      <LegendBox darkMode={darkMode}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: labelColor, marginBottom: 6 }}>
           ₪/מ״ר
         </div>
         {PPS_COLORS.map(item => (
           <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
             <span style={{ width: 10, height: 10, borderRadius: 2, background: item.color, flexShrink: 0 }} />
-            <span style={{ fontSize: 10, color: darkMode ? t.textSec : t.lTextSec }}>{item.label}</span>
+            <span style={{ fontSize: 10, color: textColor }}>{item.label}</span>
           </div>
         ))}
-      </div>
+      </LegendBox>
     )
   }
 
   // heatmap mode
   return (
-    <div style={{
-      position: 'absolute', bottom: 48, right: 16, zIndex: t.z.controls,
-      background: darkMode ? 'rgba(11,17,32,0.92)' : 'rgba(255,255,255,0.95)',
-      backdropFilter: 'blur(12px)', borderRadius: t.r.md,
-      border: `1px solid ${darkMode ? t.border : t.lBorder}`,
-      padding: '8px 12px', direction: 'rtl', boxShadow: t.sh.md,
-    }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: darkMode ? t.textDim : t.lTextSec, marginBottom: 6 }}>
+    <LegendBox darkMode={darkMode}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: labelColor, marginBottom: 6 }}>
         🔥 מפת חום — מחיר/מ״ר
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-        <span style={{ fontSize: 9, color: darkMode ? t.textDim : t.lTextSec }}>נמוך</span>
+        <span style={{ fontSize: 9, color: labelColor }}>נמוך</span>
         <div style={{
           flex: 1, height: 8, borderRadius: 4,
           background: 'linear-gradient(to left, #EF4444, #F97316, #F59E0B, #4ADE80, #10B981)',
         }} />
-        <span style={{ fontSize: 9, color: darkMode ? t.textDim : t.lTextSec }}>גבוה</span>
+        <span style={{ fontSize: 9, color: labelColor }}>גבוה</span>
       </div>
-      <div style={{ fontSize: 9, color: darkMode ? t.textDim : t.lTextSec, textAlign: 'center' }}>
+      <div style={{ fontSize: 9, color: labelColor, textAlign: 'center' }}>
         גודל העיגול = שטח החלקה
       </div>
-    </div>
+    </LegendBox>
   )
 }
 
