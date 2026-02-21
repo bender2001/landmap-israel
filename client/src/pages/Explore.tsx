@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink, MessageCircle, Clock, Building2, BarChart3, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink, MessageCircle, Clock, Building2, BarChart3, ArrowUpRight, ArrowDownRight, Zap, Target, PieChart } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation, useOnlineStatus } from '../hooks'
 import MapArea from '../components/Map'
@@ -32,7 +32,9 @@ const Stats = styled.div`
   display:flex;align-items:center;justify-content:center;gap:24px;padding:8px 16px;
   background:${t.glass};backdrop-filter:blur(12px);border-top:1px solid ${t.border};
   font-size:12px;color:${t.textSec};direction:rtl;
-  ${mobile}{bottom:56px;gap:10px;font-size:10px;padding:6px 12px;}
+  ${mobile}{bottom:56px;gap:10px;font-size:10px;padding:6px 12px;
+    justify-content:flex-start;overflow-x:auto;scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;&::-webkit-scrollbar{display:none;}}
 `
 const Stat = styled.span`display:flex;align-items:center;gap:4px;`
 const Val = styled.span`color:${t.goldBright};font-weight:700;`
@@ -234,6 +236,28 @@ const WhatsAppTooltip = styled.div`
   &::after{content:'';position:absolute;top:50%;right:-6px;transform:translateY(-50%);
     border:6px solid transparent;border-left-color:${t.glass};}
   ${mobile}{display:none;}
+`
+
+/* ── Market Pulse Widget ── */
+const pulseGlow = keyframes`0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0.15)}50%{box-shadow:0 0 0 6px rgba(16,185,129,0.08)}`
+const MarketPulseWrap = styled.div`
+  position:absolute;top:80px;right:80px;z-index:${t.z.filter - 1};direction:rtl;
+  display:flex;align-items:stretch;gap:0;
+  background:${t.glass};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid ${t.glassBorder};border-radius:${t.r.lg};box-shadow:${t.sh.lg};
+  overflow:hidden;animation:${chipPop} 0.35s cubic-bezier(0.32,0.72,0,1);
+  ${mobile}{display:none;}
+`
+const PulseCell = styled.div<{$accent?:string}>`
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  padding:10px 16px;border-left:1px solid ${t.border};
+  &:last-child{border-left:none;}
+`
+const PulseVal = styled.div<{$c?:string}>`font-size:14px;font-weight:800;color:${pr=>pr.$c||t.gold};white-space:nowrap;`
+const PulseLabel = styled.div`font-size:9px;font-weight:600;color:${t.textDim};white-space:nowrap;letter-spacing:0.3px;`
+const PulseDot = styled.span<{$c:string}>`
+  display:inline-block;width:6px;height:6px;border-radius:50%;background:${pr=>pr.$c};
+  animation:${pulseGlow} 2s ease-in-out infinite;flex-shrink:0;
 `
 
 /* ── Recently Viewed Strip ── */
@@ -533,6 +557,24 @@ export default function Explore() {
     }
   }, [filtered, filters.city])
 
+  // Market Pulse data — investment opportunity summary
+  const marketPulse = useMemo(() => {
+    if (!filtered.length) return null
+    const totalValue = filtered.reduce((s, pl) => s + p(pl).price, 0)
+    const hotDeals = filtered.filter(pl => { const score = calcScore(pl); return score >= 8 }).length
+    const belowAvgCount = (() => {
+      const ppsList = filtered.map(pricePerSqm).filter(v => v > 0)
+      if (ppsList.length < 2) return 0
+      const avg = ppsList.reduce((s, v) => s + v, 0) / ppsList.length
+      return filtered.filter(pl => { const pps = pricePerSqm(pl); return pps > 0 && pps < avg * 0.9 }).length
+    })()
+    const avgRoi = (() => {
+      const rois = filtered.map(roi).filter(v => v > 0)
+      return rois.length ? Math.round(rois.reduce((s, v) => s + v, 0) / rois.length) : 0
+    })()
+    return { totalValue, hotDeals, belowAvgCount, avgRoi }
+  }, [filtered])
+
   // Reset city stats dismissed state when city changes
   useEffect(() => { setCityStatsDismissed(false) }, [filters.city])
 
@@ -753,14 +795,16 @@ export default function Explore() {
 
         <Stats>
           <Stat><Val>{filtered.length}</Val> חלקות</Stat>
+          {marketPulse && marketPulse.totalValue > 0 && <Stat>סה״כ <Val>{fmt.compact(marketPulse.totalValue)}</Val></Stat>}
           <Stat>ממוצע <Val>{fmt.compact(avg)}</Val></Stat>
           {medianPrice > 0 && <Stat>חציון <Val>{fmt.compact(medianPrice)}</Val></Stat>}
           {avgPps > 0 && <Stat>₪/מ״ר <Val>{fmt.num(avgPps)}</Val></Stat>}
-          {favIds.length > 0 && <Stat><Heart size={12} color={t.gold} /><Val>{favIds.length}</Val> מועדפים</Stat>}
-          {compareIds.length > 0 && <Stat><GitCompareArrows size={12} color={t.gold} /><Val>{compareIds.length}</Val> להשוואה</Stat>}
-          {sortKey === 'nearest' && userGeo.location && <Stat>📍 <Val>מיון לפי קרבה</Val></Stat>}
-          {sortKey === 'nearest' && userGeo.loading && <Stat>📍 מאתר מיקום...</Stat>}
-          {sortKey === 'nearest' && userGeo.error && <Stat style={{color:t.err}}>⚠️ {userGeo.error}</Stat>}
+          {marketPulse && marketPulse.avgRoi > 0 && <Stat>ROI <Val style={{color: marketPulse.avgRoi > 30 ? t.ok : t.warn}}>+{marketPulse.avgRoi}%</Val></Stat>}
+          {favIds.length > 0 && <Stat><Heart size={12} color={t.gold} /><Val>{favIds.length}</Val></Stat>}
+          {compareIds.length > 0 && <Stat><GitCompareArrows size={12} color={t.gold} /><Val>{compareIds.length}</Val></Stat>}
+          {sortKey === 'nearest' && userGeo.location && <Stat>📍 <Val>לפי קרבה</Val></Stat>}
+          {sortKey === 'nearest' && userGeo.loading && <Stat>📍 מאתר...</Stat>}
+          {sortKey === 'nearest' && userGeo.error && <Stat style={{color:t.err}}>⚠️ שגיאה</Stat>}
           {dataFreshness && <Stat>🕐 <span style={{opacity:0.7}}>{dataFreshness}</span></Stat>}
           <Demo>{dataSource === 'api' ? 'LIVE' : 'DEMO'}</Demo>
         </Stats>
@@ -888,6 +932,34 @@ export default function Explore() {
               </CityStatCell>
             </CityStatsCells>
           </CityStatsCard>
+        )}
+
+        {/* Market Pulse Widget — investment at-a-glance (desktop only, when no plot/city selected) */}
+        {marketPulse && !selected && !cityStats && !listOpen && filtered.length >= 2 && (
+          <MarketPulseWrap>
+            <PulseCell>
+              <PulseVal>{fmt.compact(marketPulse.totalValue)}</PulseVal>
+              <PulseLabel><PieChart size={8} style={{marginLeft:3}} /> שווי כולל</PulseLabel>
+            </PulseCell>
+            {marketPulse.hotDeals > 0 && (
+              <PulseCell>
+                <PulseVal $c={t.ok}><PulseDot $c={t.ok} /> {marketPulse.hotDeals}</PulseVal>
+                <PulseLabel>עסקאות A/A+</PulseLabel>
+              </PulseCell>
+            )}
+            {marketPulse.belowAvgCount > 0 && (
+              <PulseCell>
+                <PulseVal $c="#3B82F6">{marketPulse.belowAvgCount}</PulseVal>
+                <PulseLabel>מתחת לממוצע</PulseLabel>
+              </PulseCell>
+            )}
+            {marketPulse.avgRoi > 0 && (
+              <PulseCell>
+                <PulseVal $c={marketPulse.avgRoi > 30 ? t.ok : t.warn}>+{marketPulse.avgRoi}%</PulseVal>
+                <PulseLabel>תשואה ממוצעת</PulseLabel>
+              </PulseCell>
+            )}
+          </MarketPulseWrap>
         )}
 
         {/* Recently Viewed Strip (show only when user has viewed plots and no sidebar is open) */}

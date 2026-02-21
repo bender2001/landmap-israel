@@ -119,7 +119,7 @@ const ItemDom = styled.span<{ $c: string }>`
   font-size:10px;font-weight:600;color:${pr => pr.$c};margin-inline-start:auto;
 `
 
-const DetailLink = styled.button`
+const DetailLink = styled.div.attrs({ role: 'button', tabIndex: 0 })`
   display:flex;align-items:center;justify-content:center;width:28px;height:28px;
   border-radius:${t.r.sm};border:1px solid ${t.border};background:transparent;
   color:${t.textDim};cursor:pointer;transition:all ${t.tr};flex-shrink:0;

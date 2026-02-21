@@ -606,8 +606,8 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
           </CircleMarker>
         ))}
 
-        {/* Permanent price labels at high zoom */}
-        {zoom >= 15 && plots.map(plot => {
+        {/* Permanent price labels at medium-high zoom */}
+        {zoom >= 14 && plots.map(plot => {
           if (!plot.coordinates?.length) return null
           const c = plotCenter(plot.coordinates)
           if (!c) return null
@@ -621,19 +621,24 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
           return <Marker key={`price-${plot.id}`} position={[c.lat, c.lng]} icon={icon} interactive={false} />
         })}
 
-        {/* New listing badges */}
-        {zoom >= 14 && plots.map(plot => {
+        {/* New listing badges + hot deal badges */}
+        {zoom >= 13 && plots.map(plot => {
           const dom = daysOnMarket(p(plot).created)
-          if (!dom || dom.days > 7) return null
+          const score = calcScore(plot)
+          const isNew = dom && dom.days <= 7
+          const isHot = score >= 9
+          if (!isNew && !isHot) return null
           const c = plotCenter(plot.coordinates)
           if (!c) return null
+          const label = isNew ? 'חדש ✨' : '🔥 HOT'
+          const cls = isNew ? 'pnb-inner' : 'pnb-inner pnb-hot'
           const icon = L.divIcon({
             className: 'plot-new-badge',
-            html: '<div class="pnb-inner">חדש ✨</div>',
-            iconSize: [48, 20],
-            iconAnchor: [24, 32],
+            html: `<div class="${cls}">${label}</div>`,
+            iconSize: [52, 20],
+            iconAnchor: [26, 32],
           })
-          return <Marker key={`new-${plot.id}`} position={[c.lat, c.lng]} icon={icon} interactive={false} />
+          return <Marker key={`badge-${plot.id}`} position={[c.lat, c.lng]} icon={icon} interactive={false} />
         })}
 
         {/* POI markers */}

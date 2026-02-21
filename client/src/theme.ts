@@ -108,6 +108,9 @@ export const GlobalStyles = createGlobalStyle`
     box-shadow:0 2px 8px rgba(16,185,129,0.4);white-space:nowrap;
     animation:newBadgePulse 2.5s ease-in-out infinite;}
   @keyframes newBadgePulse{0%,100%{transform:scale(1);box-shadow:0 2px 8px rgba(16,185,129,0.4)}50%{transform:scale(1.08);box-shadow:0 4px 16px rgba(16,185,129,0.6)}}
+  .pnb-hot{background:linear-gradient(135deg,#F59E0B,#EF4444)!important;box-shadow:0 2px 8px rgba(239,68,68,0.4)!important;
+    animation:hotBadgePulse 2s ease-in-out infinite!important;}
+  @keyframes hotBadgePulse{0%,100%{transform:scale(1);box-shadow:0 2px 8px rgba(239,68,68,0.4)}50%{transform:scale(1.1);box-shadow:0 4px 16px rgba(239,68,68,0.6)}}
 
   /* Popup inner */
   .plot-popup{padding:16px}
