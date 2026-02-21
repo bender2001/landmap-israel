@@ -1,8 +1,8 @@
-import { memo, useCallback, useRef, useEffect } from 'react'
+import { memo, useCallback, useMemo, useRef, useEffect } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { List, X, MapPin, TrendingUp, Ruler, ChevronRight, ChevronLeft } from 'lucide-react'
+import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, pricePerSqm, statusColors, statusLabels, daysOnMarket } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, pricePerSqm, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats } from '../utils'
 import type { Plot } from '../types'
 
 /* ── Animations ── */
@@ -106,6 +106,27 @@ const ItemDom = styled.span<{ $c: string }>`
   font-size:10px;font-weight:600;color:${pr => pr.$c};margin-inline-start:auto;
 `
 
+/* ── Price Position Badge ── */
+const PricePosTag = styled.span<{ $c: string }>`
+  display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;
+  padding:1px 7px;border-radius:${t.r.full};color:${pr => pr.$c};
+  background:${pr => pr.$c}12;border:1px solid ${pr => pr.$c}28;
+  white-space:nowrap;
+`
+
+/* ── Summary Stats Bar ── */
+const SummaryBar = styled.div`
+  display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  padding:0;margin:0;border-bottom:1px solid ${t.border};
+  background:${t.border};flex-shrink:0;
+`
+const SummaryStat = styled.div`
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:10px 8px;background:${t.surface};
+`
+const SummaryStatVal = styled.div`font-size:14px;font-weight:800;color:${t.gold};font-family:${t.font};`
+const SummaryStatLabel = styled.div`font-size:9px;font-weight:600;color:${t.textDim};text-transform:uppercase;letter-spacing:0.3px;`
+
 /* ── Toggle Button (always visible) ── */
 const ToggleBtn = styled.button<{ $open: boolean }>`
   position:fixed;top:50%;left:${pr => pr.$open ? '340px' : '0'};
@@ -134,14 +155,14 @@ interface Props {
   onToggle: () => void
 }
 
-function PlotItem({ plot, active, index, onClick }: {
-  plot: Plot; active: boolean; index: number; onClick: () => void
+function PlotItem({ plot, active, index, onClick, allPlots }: {
+  plot: Plot; active: boolean; index: number; onClick: () => void; allPlots: Plot[]
 }) {
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
   const status = (plot.status || 'AVAILABLE') as string
   const sColor = statusColors[status] || t.gold
   const dom = daysOnMarket(d.created)
-  const pps = pricePerSqm(plot)
+  const pos = pricePosition(plot, allPlots)
 
   return (
     <ItemWrap $active={active} $i={index} onClick={onClick} aria-label={`חלקה ${plot.number} גוש ${d.block}`}>
@@ -150,7 +171,15 @@ function PlotItem({ plot, active, index, onClick }: {
           <ItemCity>{plot.city}</ItemCity>
           <ItemBadge $c={sColor}>{statusLabels[status] || status}</ItemBadge>
         </div>
-        <ItemGrade $c={grade.color}>{grade.grade}</ItemGrade>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {pos && (
+            <PricePosTag $c={pos.color}>
+              {pos.direction === 'below' ? <ArrowDown size={9} /> : pos.direction === 'above' ? <ArrowUp size={9} /> : <Minus size={9} />}
+              {pos.label}
+            </PricePosTag>
+          )}
+          <ItemGrade $c={grade.color}>{grade.grade}</ItemGrade>
+        </div>
       </ItemTop>
       <ItemBlock>גוש {d.block} · חלקה {plot.number}</ItemBlock>
       <Metrics>
@@ -176,6 +205,7 @@ function PlotItem({ plot, active, index, onClick }: {
 
 function PlotListPanel({ plots, selected, onSelect, open, onToggle }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null)
+  const stats = useMemo(() => calcAggregateStats(plots), [plots])
 
   // Scroll to active item
   useEffect(() => {
@@ -202,6 +232,23 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle }: Props) {
           </Title>
           <CloseBtn onClick={onToggle} aria-label="סגור"><X size={16} /></CloseBtn>
         </Header>
+        {/* Summary stats bar */}
+        {stats && plots.length > 0 && (
+          <SummaryBar>
+            <SummaryStat>
+              <SummaryStatVal>{fmt.compact(stats.avgPrice)}</SummaryStatVal>
+              <SummaryStatLabel>מחיר ממוצע</SummaryStatLabel>
+            </SummaryStat>
+            <SummaryStat>
+              <SummaryStatVal>{fmt.num(stats.avgPps)}</SummaryStatVal>
+              <SummaryStatLabel>₪/מ״ר ממוצע</SummaryStatLabel>
+            </SummaryStat>
+            <SummaryStat>
+              <SummaryStatVal style={{ color: stats.avgRoi > 0 ? t.ok : t.textSec }}>{stats.avgRoi}%</SummaryStatVal>
+              <SummaryStatLabel>תשואה ממוצעת</SummaryStatLabel>
+            </SummaryStat>
+          </SummaryBar>
+        )}
         <Body ref={bodyRef}>
           {plots.length === 0 ? (
             <EmptyState>
@@ -217,6 +264,7 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle }: Props) {
                 active={selected?.id === plot.id}
                 index={i}
                 onClick={() => onSelect(plot)}
+                allPlots={plots}
               />
             ))
           )}

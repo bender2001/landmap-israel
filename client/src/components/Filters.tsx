@@ -24,6 +24,7 @@ const ZONING: { value: string; label: string; icon?: string }[] = [
 const QUICK_FILTERS = [
   { key: 'hot', label: '\u{1F525} עסקאות חמות', apply: (f: Filters) => ({ ...f, ripeness: 'high' }) },
   { key: 'cheap', label: '\u{1F48E} מחיר נמוך', apply: (f: Filters) => ({ ...f, priceMax: '500000' }) },
+  { key: 'bargain', label: '📉 מתחת לממוצע', apply: (f: Filters) => ({ ...f, belowAvg: 'true' }) },
   { key: 'score', label: '\u2B50 ציון גבוה', apply: (f: Filters) => ({ ...f, minRoi: '15' }) },
   { key: 'build', label: '\u{1F3D7}\uFE0F בנייה קרובה', apply: (f: Filters) => ({ ...f, zoning: 'BUILDING_PERMIT' }) },
 ]

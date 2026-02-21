@@ -45,7 +45,7 @@ export interface Standard22 { appraiser: string; date: string; value: number; me
 
 export interface Filters {
   city: string; priceMin: string; priceMax: string; sizeMin: string; sizeMax: string
-  ripeness: string; minRoi: string; zoning: string; search: string
+  ripeness: string; minRoi: string; zoning: string; search: string; belowAvg?: string
 }
 
 export interface Lead {

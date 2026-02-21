@@ -113,6 +113,35 @@ export function sortPlots(plots: Plot[], key: SortKey): Plot[] {
   }
 }
 
+// ── Price Position (vs area average) ──
+export function pricePosition(plot: Plot, allPlots: Plot[]): { pct: number; label: string; color: string; direction: 'below' | 'above' | 'avg' } | null {
+  const pps = pricePerSqm(plot)
+  if (pps <= 0) return null
+  const allPps = allPlots.map(pricePerSqm).filter(v => v > 0)
+  if (allPps.length < 2) return null
+  const avg = allPps.reduce((s, v) => s + v, 0) / allPps.length
+  const diff = ((pps - avg) / avg) * 100
+  if (Math.abs(diff) < 5) return { pct: diff, label: 'בממוצע', color: '#F59E0B', direction: 'avg' }
+  if (diff < 0) return { pct: diff, label: `${Math.abs(Math.round(diff))}% מתחת`, color: '#10B981', direction: 'below' }
+  return { pct: diff, label: `${Math.round(diff)}% מעל`, color: '#EF4444', direction: 'above' }
+}
+
+// ── Aggregate Stats ──
+export function calcAggregateStats(plots: Plot[]) {
+  if (!plots.length) return null
+  const prices = plots.map(pl => p(pl).price).filter(v => v > 0)
+  const rois = plots.map(roi).filter(v => v > 0)
+  const ppsList = plots.map(pricePerSqm).filter(v => v > 0)
+  return {
+    count: plots.length,
+    avgPrice: prices.length ? Math.round(prices.reduce((s, v) => s + v, 0) / prices.length) : 0,
+    avgPps: ppsList.length ? Math.round(ppsList.reduce((s, v) => s + v, 0) / ppsList.length) : 0,
+    avgRoi: rois.length ? Math.round(rois.reduce((s, v) => s + v, 0) / rois.length) : 0,
+    minPrice: prices.length ? Math.min(...prices) : 0,
+    maxPrice: prices.length ? Math.max(...prices) : 0,
+  }
+}
+
 // ── Geo ──
 export function plotCenter(coords: [number, number][] | null | undefined) {
   if (!coords?.length) return null

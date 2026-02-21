@@ -7,7 +7,7 @@ import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed }
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, Spinner, useToast, Badge } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade, calcMonthly, statusColors, statusLabels } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -17,7 +17,7 @@ const LeadModal = lazy(() => import('../components/LeadModal'))
 const Chat = lazy(() => import('../components/Chat'))
 const PlotListPanel = lazy(() => import('../components/PlotListPanel'))
 
-const DEFAULTS: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '' }
+const DEFAULTS: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '', belowAvg: '' }
 
 /* ── animations ── */
 const slideUp = keyframes`from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}`
@@ -205,7 +205,7 @@ const CalcInput = styled.input`
 `
 
 // ── URL ↔ Filters sync helpers ──
-const FILTER_PARAMS: (keyof Filters)[] = ['city', 'priceMin', 'priceMax', 'sizeMin', 'sizeMax', 'ripeness', 'minRoi', 'zoning', 'search']
+const FILTER_PARAMS: (keyof Filters)[] = ['city', 'priceMin', 'priceMax', 'sizeMin', 'sizeMax', 'ripeness', 'minRoi', 'zoning', 'search', 'belowAvg']
 
 function filtersFromParams(sp: URLSearchParams): Filters {
   const f = { ...DEFAULTS }
@@ -300,8 +300,16 @@ export default function Explore() {
       const q = dSearch.toLowerCase()
       list = list.filter(pl => pl.city?.toLowerCase().includes(q) || pl.number?.includes(q) || String(p(pl).block).includes(q))
     }
+    // Below average price-per-sqm filter
+    if (filters.belowAvg === 'true' && list.length > 1) {
+      const ppsList = list.map(pricePerSqm).filter(v => v > 0)
+      if (ppsList.length > 0) {
+        const avgPps = ppsList.reduce((s, v) => s + v, 0) / ppsList.length
+        list = list.filter(pl => { const pps = pricePerSqm(pl); return pps > 0 && pps < avgPps })
+      }
+    }
     return list
-  }, [plots, filters.sizeMin, filters.sizeMax, dSearch])
+  }, [plots, filters.sizeMin, filters.sizeMax, filters.belowAvg, dSearch])
 
   const sorted = useMemo(() => sortPlots(filtered, sortKey), [filtered, sortKey])
 

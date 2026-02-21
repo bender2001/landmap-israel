@@ -3,7 +3,7 @@ import styled, { keyframes, css } from 'styled-components'
 import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePosition } from '../utils'
 import type { Plot } from '../types'
 import { GoldButton, GhostButton, Badge } from './UI'
 
@@ -44,6 +44,14 @@ const MetricCard = styled.div`
 `
 const MetricLabel = styled.div`font-size:10px;color:${t.textDim};font-weight:600;text-transform:uppercase;margin-bottom:4px;`
 const MetricVal = styled.div<{ $gold?: boolean }>`font-size:16px;font-weight:800;color:${p => p.$gold ? t.gold : t.text};`
+
+/* ── Price Position ── */
+const PricePosBadge = styled.div<{ $c: string }>`
+  grid-column:1 / -1;display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:8px 14px;background:${pr => pr.$c}0A;border:1px solid ${pr => pr.$c}22;
+  border-radius:${t.r.md};font-size:12px;font-weight:700;color:${pr => pr.$c};
+  animation:${fadeSection} 0.5s 0.15s both;
+`
 
 /* ── Collapsible Section ── */
 const SectionWrap = styled.div<{ $i: number }>`
@@ -244,6 +252,7 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
   }, [plot])
 
   const marketTrend = useMarketTrend(plot)
+  const pricePos = useMemo(() => plot && plots ? pricePosition(plot, plots) : null, [plot, plots])
 
   if (!plot) return null
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
@@ -309,6 +318,14 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
             {pps > 0 && <MetricCard><MetricLabel>₪ / מ״ר</MetricLabel><MetricVal>{fmt.num(pps)}</MetricVal></MetricCard>}
             <MetricCard><MetricLabel>תשואה</MetricLabel><MetricVal $gold={r > 0}>{fmt.pct(r)}</MetricVal></MetricCard>
           </MetricsGrid>
+
+          {/* Price position vs average — like Madlan's value indicator */}
+          {pricePos && (
+            <PricePosBadge $c={pricePos.color}>
+              {pricePos.direction === 'below' ? '📉' : pricePos.direction === 'above' ? '📈' : '➡️'}
+              מחיר למ״ר {pricePos.label} לממוצע באזור
+            </PricePosBadge>
+          )}
 
           {/* Market Trend Card — like Madlan's area trend indicator */}
           {marketTrend && (
