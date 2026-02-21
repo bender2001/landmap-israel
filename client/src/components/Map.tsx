@@ -1,12 +1,54 @@
 import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, useMap, WMSTileLayer } from 'react-leaflet'
 import L from 'leaflet'
-import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2 } from 'lucide-react'
+import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Palette } from 'lucide-react'
 import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, zoningLabels, zoningPipeline } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
 import { israelAreas } from '../data'
 import { t } from '../theme'
+
+// ── Color Modes ──
+type ColorMode = 'status' | 'grade' | 'pps'
+
+const GRADE_COLORS = [
+  { grade: 'A+', color: '#10B981', label: 'מצוין+' },
+  { grade: 'A', color: '#10B981', label: 'מצוין' },
+  { grade: 'A-', color: '#4ADE80', label: 'טוב מאוד' },
+  { grade: 'B+', color: '#84CC16', label: 'טוב' },
+  { grade: 'B', color: '#F59E0B', label: 'סביר' },
+  { grade: 'B-', color: '#F97316', label: 'מתחת לממוצע' },
+  { grade: 'C', color: '#EF4444', label: 'חלש' },
+]
+
+const PPS_COLORS = [
+  { min: 0, max: 500, color: '#10B981', label: 'עד ₪500' },
+  { min: 500, max: 1000, color: '#4ADE80', label: '₪500–1K' },
+  { min: 1000, max: 2000, color: '#84CC16', label: '₪1K–2K' },
+  { min: 2000, max: 4000, color: '#F59E0B', label: '₪2K–4K' },
+  { min: 4000, max: 8000, color: '#F97316', label: '₪4K–8K' },
+  { min: 8000, max: Infinity, color: '#EF4444', label: '₪8K+' },
+]
+
+function getPolygonColor(plot: Plot, mode: ColorMode): string {
+  if (mode === 'grade') {
+    const score = calcScore(plot)
+    return getGrade(score).color
+  }
+  if (mode === 'pps') {
+    const pps = pricePerSqm(plot)
+    if (pps <= 0) return '#64748B'
+    const tier = PPS_COLORS.find(t => pps >= t.min && pps < t.max)
+    return tier?.color || '#EF4444'
+  }
+  return statusColors[plot.status || ''] || '#10B981'
+}
+
+const COLOR_MODE_LABELS: Record<ColorMode, string> = {
+  status: 'סטטוס',
+  grade: 'ציון השקעה',
+  pps: '₪/מ״ר',
+}
 
 // ── Tile Configs ──
 const TILES = [
@@ -114,12 +156,88 @@ function PlotBoundsTracker({ plots }: { plots: Plot[] }) {
   return null
 }
 
+// ── Map Legend ──
+function MapLegend({ colorMode, darkMode }: { colorMode: ColorMode; darkMode: boolean }) {
+  if (colorMode === 'status') {
+    const items = [
+      { color: statusColors.AVAILABLE, label: 'זמין' },
+      { color: statusColors.IN_PLANNING, label: 'בתכנון' },
+      { color: statusColors.RESERVED, label: 'שמור' },
+      { color: statusColors.SOLD, label: 'נמכר' },
+    ]
+    return (
+      <div style={{
+        position: 'absolute', bottom: 48, right: 16, zIndex: t.z.controls,
+        background: darkMode ? 'rgba(11,17,32,0.92)' : 'rgba(255,255,255,0.95)',
+        backdropFilter: 'blur(12px)', borderRadius: t.r.md,
+        border: `1px solid ${darkMode ? t.border : t.lBorder}`,
+        padding: '8px 12px', direction: 'rtl', boxShadow: t.sh.md,
+      }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: darkMode ? t.textDim : t.lTextSec, marginBottom: 6 }}>
+          {COLOR_MODE_LABELS[colorMode]}
+        </div>
+        {items.map(item => (
+          <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: item.color, flexShrink: 0 }} />
+            <span style={{ fontSize: 10, color: darkMode ? t.textSec : t.lTextSec }}>{item.label}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (colorMode === 'grade') {
+    return (
+      <div style={{
+        position: 'absolute', bottom: 48, right: 16, zIndex: t.z.controls,
+        background: darkMode ? 'rgba(11,17,32,0.92)' : 'rgba(255,255,255,0.95)',
+        backdropFilter: 'blur(12px)', borderRadius: t.r.md,
+        border: `1px solid ${darkMode ? t.border : t.lBorder}`,
+        padding: '8px 12px', direction: 'rtl', boxShadow: t.sh.md,
+      }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: darkMode ? t.textDim : t.lTextSec, marginBottom: 6 }}>
+          ציון השקעה
+        </div>
+        {GRADE_COLORS.filter((_, i) => i % 2 === 0 || i === GRADE_COLORS.length - 1).map(item => (
+          <div key={item.grade} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: item.color, flexShrink: 0 }} />
+            <span style={{ fontSize: 10, fontWeight: 700, color: item.color }}>{item.grade}</span>
+            <span style={{ fontSize: 9, color: darkMode ? t.textDim : t.lTextSec }}>{item.label}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // pps mode
+  return (
+    <div style={{
+      position: 'absolute', bottom: 48, right: 16, zIndex: t.z.controls,
+      background: darkMode ? 'rgba(11,17,32,0.92)' : 'rgba(255,255,255,0.95)',
+      backdropFilter: 'blur(12px)', borderRadius: t.r.md,
+      border: `1px solid ${darkMode ? t.border : t.lBorder}`,
+      padding: '8px 12px', direction: 'rtl', boxShadow: t.sh.md,
+    }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: darkMode ? t.textDim : t.lTextSec, marginBottom: 6 }}>
+        ₪/מ״ר
+      </div>
+      {PPS_COLORS.map(item => (
+        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: item.color, flexShrink: 0 }} />
+          <span style={{ fontSize: 10, color: darkMode ? t.textSec : t.lTextSec }}>{item.label}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Map Controls Column (Zoom + Layers) ──
-function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCadastral, showAreas, setShowAreas, switcherOpen, setSwitcherOpen }: {
+function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCadastral, showAreas, setShowAreas, switcherOpen, setSwitcherOpen, colorMode, setColorMode }: {
   darkMode: boolean; tileIdx: number; setTileIdx: (i: number) => void
   showCadastral: boolean; setShowCadastral: (fn: (v: boolean) => boolean) => void
   showAreas: boolean; setShowAreas: (fn: (v: boolean) => boolean) => void
   switcherOpen: boolean; setSwitcherOpen: (v: boolean) => void
+  colorMode: ColorMode; setColorMode: (mode: ColorMode) => void
 }) {
   const btnStyle = (darkMode: boolean): React.CSSProperties => ({
     width: 40, height: 40, border: `1px solid ${darkMode ? t.goldBorder : t.lBorder}`,
@@ -152,6 +270,31 @@ function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCada
         <button onClick={() => mapRef.current?.zoomOut()}
           style={{ ...btnStyle(darkMode), borderRadius: `0 0 ${t.r.md} ${t.r.md}` }} aria-label="הקטן">−</button>
       </div>
+
+      {/* Color mode toggle */}
+      <button
+        onClick={() => {
+          const modes: ColorMode[] = ['status', 'grade', 'pps']
+          const idx = modes.indexOf(colorMode)
+          setColorMode(modes[(idx + 1) % modes.length])
+        }}
+        style={{
+          ...btnStyle(darkMode), boxShadow: t.sh.md,
+          position: 'relative',
+        }}
+        aria-label={`צביעה לפי: ${COLOR_MODE_LABELS[colorMode]}`}
+        title={`צביעה: ${COLOR_MODE_LABELS[colorMode]}`}
+      >
+        <Palette size={16} />
+        <span style={{
+          position: 'absolute', top: -6, right: -6,
+          fontSize: 8, fontWeight: 800, padding: '1px 5px',
+          borderRadius: t.r.full, background: `linear-gradient(135deg,${t.gold},${t.goldBright})`,
+          color: t.bg, lineHeight: '14px', whiteSpace: 'nowrap',
+        }}>
+          {colorMode === 'status' ? 'S' : colorMode === 'grade' ? 'A' : '₪'}
+        </span>
+      </button>
 
       {/* Layer button */}
       <div style={{
@@ -211,6 +354,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
   const [showCadastral, setShowCadastral] = useState(false)
   const [showAreas, setShowAreas] = useState(true)
   const [switcherOpen, setSwitcherOpen] = useState(false)
+  const [colorMode, setColorMode] = useState<ColorMode>('grade')
   const prefetch = usePrefetchPlot()
 
   const tile = TILES[tileIdx]
@@ -319,7 +463,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         {/* Plot polygons */}
         {plots.map(plot => {
           if (!plot.coordinates?.length) return null
-          const d = p(plot), color = statusColors[plot.status || ''] || '#10B981', isSel = selected?.id === plot.id
+          const d = p(plot), color = getPolygonColor(plot, colorMode), isSel = selected?.id === plot.id
           const score = calcScore(plot), grade = getGrade(score)
           const zoningStage = zoningPipeline.find(z => z.key === d.zoning)
           return (
@@ -359,11 +503,15 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
       {/* Vignette overlay */}
       <div className="map-vignette" />
 
+      {/* Map Legend */}
+      <MapLegend colorMode={colorMode} darkMode={darkMode} />
+
       {/* Map Controls Column: Zoom + Layers */}
       <MapControls darkMode={darkMode} tileIdx={tileIdx} setTileIdx={setTileIdx}
         showCadastral={showCadastral} setShowCadastral={setShowCadastral}
         showAreas={showAreas} setShowAreas={setShowAreas}
-        switcherOpen={switcherOpen} setSwitcherOpen={setSwitcherOpen} />
+        switcherOpen={switcherOpen} setSwitcherOpen={setSwitcherOpen}
+        colorMode={colorMode} setColorMode={setColorMode} />
     </div>
   )
 }

@@ -4,7 +4,7 @@ import styled, { keyframes } from 'styled-components'
 import { MapPin, Zap, TrendingUp, ChevronLeft, Phone, Bell, Smartphone, Briefcase, Star, Shield, FileText, Building2, MessageCircle } from 'lucide-react'
 import { t, fadeInUp, fadeInScale, shimmer, float, gradientShift, sm, md, lg, mobile } from '../theme'
 import { PublicLayout } from '../components/Layout'
-import { GoldButton, GhostButton, AnimatedCard, CountUpNumber } from '../components/UI'
+import { GoldButton, GhostButton, AnimatedCard, CountUpNumber, ScrollToTop } from '../components/UI'
 
 /* ── extra keyframes ── */
 const glow = keyframes`0%,100%{box-shadow:0 0 20px rgba(212,168,75,0.15)}50%{box-shadow:0 0 50px rgba(212,168,75,0.35)}`
@@ -432,6 +432,7 @@ export default function Landing(){
             <CtaGhost to="/login">כניסה למערכת</CtaGhost>
           </FinalBtns>
         </FinalCTA>
+        <ScrollToTop />
       </Dark>
     </PublicLayout>
   )

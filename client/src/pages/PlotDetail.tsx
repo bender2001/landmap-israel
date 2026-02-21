@@ -4,7 +4,7 @@ import styled, { keyframes } from 'styled-components'
 import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle } from 'lucide-react'
 import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed } from '../hooks'
-import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard } from '../components/UI'
+import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard, ScrollToTop } from '../components/UI'
 import { PublicLayout } from '../components/Layout'
 import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, plotCenter, calcRisk, setOgMeta, removeOgMeta } from '../utils'
 import type { RiskAssessment } from '../utils'
@@ -671,6 +671,7 @@ export default function PlotDetail() {
         <Suspense fallback={null}>
           <LeadModal plot={plot} open={leadOpen} onClose={() => setLeadOpen(false)} />
         </Suspense>
+        <ScrollToTop threshold={300} />
       </ErrorBoundary>
     </PublicLayout>
   )

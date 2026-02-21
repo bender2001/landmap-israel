@@ -1,7 +1,7 @@
 import { Component, useState, useEffect, useCallback, useRef, useMemo, createContext, useContext, type ReactNode } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { t, fadeInUp, popIn, countUp } from '../theme'
-import { X, AlertTriangle, Check, ChevronDown, Search as SearchIcon, Heart, Eye, TrendingUp, TrendingDown, MessageCircle } from 'lucide-react'
+import { t, fadeInUp, popIn, countUp, mobile } from '../theme'
+import { X, AlertTriangle, Check, ChevronDown, Search as SearchIcon, Heart, Eye, TrendingUp, TrendingDown, MessageCircle, ArrowUp } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Plot } from '../types'
 import { p, roi, calcScore, getGrade, fmt, statusColors, statusLabels, daysOnMarket } from '../utils'
@@ -482,3 +482,42 @@ const StIcon = styled.div`width:40px;height:40px;border-radius:${t.r.md};display
 const StLabel = styled.div`font-size:12px;color:${t.textDim};`
 const StVal = styled.div`font-size:20px;font-weight:800;color:${t.text};margin-top:1px;`
 const StTrend = styled.div<{ $up: boolean }>`display:flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:${({ $up }) => $up ? t.ok : t.err};`
+
+/* ── 8. ScrollToTop ── */
+const scrollFadeIn = keyframes`from{opacity:0;transform:translateY(12px) scale(0.9)}to{opacity:1;transform:translateY(0) scale(1)}`
+
+const STTBtn = styled.button<{ $visible: boolean }>`
+  position:fixed;bottom:24px;left:24px;z-index:${t.z.filter};
+  width:44px;height:44px;border-radius:${t.r.full};
+  background:linear-gradient(135deg,${t.gold},${t.goldBright});color:${t.bg};
+  border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 20px rgba(212,168,75,0.35);
+  transition:all 0.3s cubic-bezier(0.32,0.72,0,1);
+  opacity:${({ $visible }) => $visible ? 1 : 0};
+  pointer-events:${({ $visible }) => $visible ? 'auto' : 'none'};
+  transform:${({ $visible }) => $visible ? 'translateY(0) scale(1)' : 'translateY(12px) scale(0.9)'};
+  &:hover{transform:translateY(-2px) scale(1.08);box-shadow:0 8px 32px rgba(212,168,75,0.45);}
+  &:active{transform:translateY(0) scale(0.95);}
+  ${mobile}{bottom:76px;left:14px;width:40px;height:40px;}
+`
+
+export const ScrollToTop = ({ threshold = 400 }: { threshold?: number }) => {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const handler = () => setVisible(window.scrollY > threshold)
+    window.addEventListener('scroll', handler, { passive: true })
+    handler()
+    return () => window.removeEventListener('scroll', handler)
+  }, [threshold])
+
+  const scrollUp = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
+
+  return (
+    <STTBtn $visible={visible} onClick={scrollUp} aria-label="חזרה למעלה" title="חזרה למעלה">
+      <ArrowUp size={20} />
+    </STTBtn>
+  )
+}
