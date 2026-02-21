@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon, MessageCircle, Compass } from 'lucide-react'
+import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, TrendingDown, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon, MessageCircle, Compass } from 'lucide-react'
 import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard, ScrollToTop } from '../components/UI'
@@ -369,6 +369,133 @@ const WhatsAppFab = styled.a`
   @media(max-width:639px){bottom:72px;left:14px;width:46px;height:46px;}
 `
 
+/* ── Plot vs Area Average Comparison ── */
+const CompVsArea = styled(AnimatedCard)`
+  background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};padding:24px;
+  @media print{break-inside:avoid;border:1px solid #ddd;box-shadow:none;}
+`
+const CompGrid = styled.div`
+  display:grid;grid-template-columns:1fr;gap:12px;margin-top:16px;
+`
+const CompRow = styled.div`
+  display:flex;align-items:center;gap:12px;padding:12px 14px;
+  background:${t.lBg};border:1px solid ${t.lBorder};border-radius:${t.r.md};
+  transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};}
+`
+const CompMetric = styled.div`flex:1;min-width:0;`
+const CompMetricLabel = styled.div`font-size:11px;font-weight:600;color:${t.lTextSec};margin-bottom:2px;`
+const CompMetricVal = styled.div`font-size:15px;font-weight:800;color:${t.lText};font-family:${t.font};`
+const CompBarWrap = styled.div`flex:2;display:flex;flex-direction:column;gap:4px;`
+const CompBarRow = styled.div`display:flex;align-items:center;gap:8px;`
+const CompBarLabel = styled.span`font-size:10px;font-weight:600;color:${t.lTextSec};min-width:42px;text-align:left;`
+const CompBarTrack = styled.div`flex:1;height:8px;background:${t.lBorder};border-radius:4px;overflow:hidden;position:relative;`
+const CompBarFill = styled.div<{$pct:number;$color:string}>`
+  height:100%;width:${pr=>Math.min(100,pr.$pct)}%;background:${pr=>pr.$color};border-radius:4px;
+  transition:width 0.8s cubic-bezier(0.32,0.72,0,1);
+`
+const CompDelta = styled.div<{$positive:boolean}>`
+  display:flex;align-items:center;gap:3px;
+  font-size:12px;font-weight:700;min-width:64px;text-align:left;
+  color:${pr=>pr.$positive?t.ok:t.err};
+`
+
+function PlotVsAreaComparison({ plot, similarPlots }: { plot: Plot; similarPlots: Plot[] }) {
+  const allPlots = [plot, ...similarPlots]
+  if (allPlots.length < 2) return null
+
+  const d = p(plot), thisPrice = d.price, thisSize = d.size, thisRoi = roi(plot)
+  const thisPps = pricePerSqm(plot), thisPpd = pricePerDunam(plot), thisScore = calcScore(plot)
+
+  // Calculate area averages
+  const prices = allPlots.map(pl => p(pl).price).filter(v => v > 0)
+  const rois = allPlots.map(pl => roi(pl)).filter(v => v > 0)
+  const ppsList = allPlots.map(pl => pricePerSqm(pl)).filter(v => v > 0)
+  const ppdList = allPlots.map(pl => pricePerDunam(pl)).filter(v => v > 0)
+  const sizes = allPlots.map(pl => p(pl).size).filter(v => v > 0)
+  const scores = allPlots.map(pl => calcScore(pl))
+
+  const avgPrice = prices.length ? prices.reduce((s, v) => s + v, 0) / prices.length : 0
+  const avgRoi = rois.length ? rois.reduce((s, v) => s + v, 0) / rois.length : 0
+  const avgPps = ppsList.length ? Math.round(ppsList.reduce((s, v) => s + v, 0) / ppsList.length) : 0
+  const avgPpd = ppdList.length ? Math.round(ppdList.reduce((s, v) => s + v, 0) / ppdList.length) : 0
+  const avgSize = sizes.length ? Math.round(sizes.reduce((s, v) => s + v, 0) / sizes.length) : 0
+  const avgScore = scores.length ? Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 10) / 10 : 0
+
+  const metrics = [
+    { label: 'מחיר', thisVal: fmt.compact(thisPrice), avgVal: fmt.compact(avgPrice), thisNum: thisPrice, avgNum: avgPrice, lowerBetter: true },
+    { label: 'מחיר/מ״ר', thisVal: `₪${fmt.num(thisPps)}`, avgVal: `₪${fmt.num(avgPps)}`, thisNum: thisPps, avgNum: avgPps, lowerBetter: true },
+    { label: 'מחיר/דונם', thisVal: `₪${fmt.num(thisPpd)}`, avgVal: `₪${fmt.num(avgPpd)}`, thisNum: thisPpd, avgNum: avgPpd, lowerBetter: true },
+    { label: 'שטח', thisVal: `${fmt.num(thisSize)} מ״ר`, avgVal: `${fmt.num(avgSize)} מ״ר`, thisNum: thisSize, avgNum: avgSize, lowerBetter: false },
+    { label: 'תשואה', thisVal: `${Math.round(thisRoi)}%`, avgVal: `${Math.round(avgRoi)}%`, thisNum: thisRoi, avgNum: avgRoi, lowerBetter: false },
+    { label: 'ציון', thisVal: `${thisScore}/10`, avgVal: `${avgScore}/10`, thisNum: thisScore, avgNum: avgScore, lowerBetter: false },
+  ].filter(m => m.thisNum > 0 && m.avgNum > 0)
+
+  if (metrics.length < 2) return null
+
+  return (
+    <CompVsArea $delay={0.22}>
+      <CardTitle><BarChart3 size={18} color={t.gold} /> השוואה לממוצע האזור</CardTitle>
+      <div style={{ fontSize: 12, color: t.lTextSec, marginTop: -8, marginBottom: 8 }}>
+        בהשוואה ל-{allPlots.length - 1} חלקות דומות ב{plot.city}
+      </div>
+      <CompGrid>
+        {metrics.map(m => {
+          const maxNum = Math.max(m.thisNum, m.avgNum) || 1
+          const thisPct = (m.thisNum / maxNum) * 100
+          const avgPct = (m.avgNum / maxNum) * 100
+          const delta = m.avgNum > 0 ? ((m.thisNum - m.avgNum) / m.avgNum) * 100 : 0
+          const isPositive = m.lowerBetter ? delta < 0 : delta > 0
+          return (
+            <CompRow key={m.label}>
+              <CompMetric>
+                <CompMetricLabel>{m.label}</CompMetricLabel>
+                <CompMetricVal>{m.thisVal}</CompMetricVal>
+              </CompMetric>
+              <CompBarWrap>
+                <CompBarRow>
+                  <CompBarLabel>חלקה</CompBarLabel>
+                  <CompBarTrack>
+                    <CompBarFill $pct={thisPct} $color={t.gold} />
+                  </CompBarTrack>
+                </CompBarRow>
+                <CompBarRow>
+                  <CompBarLabel>ממוצע</CompBarLabel>
+                  <CompBarTrack>
+                    <CompBarFill $pct={avgPct} $color={t.lBorder.replace('0.08', '0.5') || '#94A3B8'} />
+                  </CompBarTrack>
+                </CompBarRow>
+              </CompBarWrap>
+              <CompDelta $positive={isPositive}>
+                {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                {delta > 0 ? '+' : ''}{Math.round(delta)}%
+              </CompDelta>
+            </CompRow>
+          )
+        })}
+      </CompGrid>
+    </CompVsArea>
+  )
+}
+
+/* ── Section Navigation (Table of Contents) ── */
+const SectionNav = styled.nav`
+  display:flex;align-items:center;gap:6px;margin-bottom:24px;
+  overflow-x:auto;scrollbar-width:none;direction:rtl;
+  -webkit-overflow-scrolling:touch;
+  &::-webkit-scrollbar{display:none;}
+  ${sm}{flex-wrap:wrap;}
+  @media print{display:none;}
+`
+const SectionNavBtn = styled.a`
+  display:inline-flex;align-items:center;gap:5px;padding:7px 14px;
+  background:${t.lBg};border:1px solid ${t.lBorder};border-radius:${t.r.full};
+  font-size:12px;font-weight:600;font-family:${t.font};color:${t.lTextSec};
+  cursor:pointer;white-space:nowrap;flex-shrink:0;text-decoration:none !important;
+  transition:all 0.2s;
+  &:hover{border-color:${t.goldBorder};color:${t.gold};background:rgba(212,168,75,0.04);}
+`
+
 /* ── Skeleton Loading ── */
 const shimmer = keyframes`0%{background-position:-200% 0}100%{background-position:200% 0}`
 const SkeletonPulse = styled.div<{$w?:string;$h?:string}>`
@@ -674,10 +801,21 @@ export default function PlotDetail() {
             <Metric $delay={0.24}><MetricVal style={{color:t.gold}}>{cagr ? `${cagr.cagr}%` : '--'}</MetricVal><MetricLabel>CAGR ({cagr?.years || '-'} שנים)</MetricLabel></Metric>
           </Metrics>
 
+          {/* Section Navigation — quick jump to sections */}
+          <SectionNav aria-label="ניווט מהיר לחלקים">
+            <SectionNavBtn href="#investment"><TrendingUp size={12} /> ניתוח השקעה</SectionNavBtn>
+            <SectionNavBtn href="#risk"><AlertTriangle size={12} /> סיכון</SectionNavBtn>
+            {locationScore.factors.length > 0 && <SectionNavBtn href="#location"><Compass size={12} /> מיקום</SectionNavBtn>}
+            {similarPlots.length > 1 && <SectionNavBtn href="#vs-area"><BarChart3 size={12} /> vs ממוצע</SectionNavBtn>}
+            {timeline && <SectionNavBtn href="#timeline"><Clock size={12} /> ציר זמן</SectionNavBtn>}
+            {d.price > 0 && <SectionNavBtn href="#mortgage"><Calculator size={12} /> מחשבון</SectionNavBtn>}
+            {similarPlots.length > 0 && <SectionNavBtn href="#similar"><BarChart3 size={12} /> דומות</SectionNavBtn>}
+          </SectionNav>
+
           <Grid>
             {/* Main column */}
             <div style={{display:'flex',flexDirection:'column',gap:24}}>
-              <Card $delay={0.1}>
+              <Card $delay={0.1} id="investment">
                 <CardTitle><TrendingUp size={18} color={t.gold} /> ניתוח השקעה</CardTitle>
                 <Row><Label>מחיר שמאי</Label><Value>{fmt.price(plot.standard22?.value || 0)}</Value></Row>
                 <Row><Label>שווי חזוי</Label><Value style={{color:t.ok}}>{fmt.price(d.projected)}</Value></Row>
@@ -693,7 +831,7 @@ export default function PlotDetail() {
               </Card>
 
               {/* Risk Assessment — like Madlan's risk meter */}
-              <RiskCard $delay={0.15}>
+              <RiskCard $delay={0.15} id="risk">
                 <CardTitle><AlertTriangle size={18} color={risk.color} /> הערכת סיכון</CardTitle>
                 <RiskHeader>
                   <RiskLabel $color={risk.color}>{risk.icon} {risk.label}</RiskLabel>
@@ -717,7 +855,7 @@ export default function PlotDetail() {
 
               {/* Location Quality Score — Madlan-style location assessment */}
               {locationScore.factors.length > 0 && (
-                <LocationScoreCard $delay={0.17}>
+                <LocationScoreCard $delay={0.17} id="location">
                   <CardTitle><Compass size={18} color={t.gold} /> איכות מיקום</CardTitle>
                   <LocScoreHeader>
                     <LocGauge>
@@ -758,8 +896,15 @@ export default function PlotDetail() {
                 </LocationScoreCard>
               )}
 
+              {/* Plot vs Area Average Comparison — Madlan-style */}
+              {similarPlots.length > 1 && (
+                <div id="vs-area">
+                  <PlotVsAreaComparison plot={plot} similarPlots={similarPlots} />
+                </div>
+              )}
+
               {timeline && (
-                <Card $delay={0.2}>
+                <Card $delay={0.2} id="timeline">
                   <CardTitle><Clock size={18} color={t.gold} /> ציר זמן תכנוני</CardTitle>
                   <ProgressTrack><ProgressFill $pct={timeline.progress} /></ProgressTrack>
                   <Stages>
@@ -864,7 +1009,7 @@ export default function PlotDetail() {
 
               {/* Mortgage Calculator */}
               {d.price > 0 && (
-                <Card $delay={0.35}>
+                <Card $delay={0.35} id="mortgage">
                   <CardTitle><Calculator size={18} color={t.gold} /> מחשבון מימון</CardTitle>
                   <CalcWrap>
                     <CalcSliderRow>
@@ -922,7 +1067,7 @@ export default function PlotDetail() {
 
           {/* Similar Plots */}
           {similarPlots.length > 0 && (
-            <div style={{ marginTop: 32 }}>
+            <div style={{ marginTop: 32 }} id="similar">
               <Card $delay={0.4}>
                 <CardTitle><BarChart3 size={18} color={t.gold} /> חלקות דומות באזור</CardTitle>
                 <SimilarGrid>

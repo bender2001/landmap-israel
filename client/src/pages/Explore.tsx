@@ -511,6 +511,7 @@ const KbdFooter = styled.div`
 `
 
 const SHORTCUTS = [
+  { keys: ['/'], label: 'מיקוד בחיפוש' },
   { keys: ['?'], label: 'פתח/סגור קיצורי מקשים' },
   { keys: ['F'], label: 'מצב מסך מלא (הסתר ממשק)' },
   { keys: ['L'], label: 'פתח/סגור רשימת חלקות' },
@@ -1005,6 +1006,13 @@ export default function Explore() {
         if (sortOpen) setSortOpen(false)
         else if (selected) setSelected(null)
         else if (listOpen) setListOpen(false)
+      }
+      // '/' key to focus search input
+      if (e.key === '/') {
+        e.preventDefault()
+        const searchEl = document.getElementById('landmap-search-input') as HTMLInputElement | null
+        if (searchEl) searchEl.focus()
+        return
       }
       // 'F' key to toggle fullscreen map mode
       if (e.key === 'f' || e.key === 'F') {

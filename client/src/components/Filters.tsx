@@ -369,7 +369,7 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
       <Wrap>
         <Bar style={{ position: 'relative' }}>
           <SIcon size={18} />
-          <Input placeholder={PLACEHOLDERS[phIdx]} value={filters.search}
+          <Input id="landmap-search-input" placeholder={PLACEHOLDERS[phIdx]} value={filters.search}
             onChange={e => { onChange({ ...filters, search: e.target.value }); setShowSuggestions(true) }}
             onFocus={() => setShowSuggestions(true)}
             onBlur={() => { suggestTimeoutRef.current = setTimeout(() => setShowSuggestions(false), 150) }}
@@ -378,6 +378,7 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
             role="combobox"
             aria-expanded={showSuggestions && hasSuggestions}
             aria-autocomplete="list"
+            aria-label="חיפוש חלקות"
           />
           {resultCount != null && filters.search && (
             <span style={{ fontSize: 11, color: t.textDim, fontWeight: 600, whiteSpace: 'nowrap', padding: '0 4px' }}>{resultCount}</span>
