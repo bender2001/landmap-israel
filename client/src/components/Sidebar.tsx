@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import styled, { keyframes, css } from 'styled-components'
-import { X, Phone, ChevronDown, TrendingUp, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink } from 'lucide-react'
+import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink } from 'lucide-react'
 import { t, fadeInUp, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm } from '../utils'
 import type { Plot } from '../types'
@@ -80,6 +80,22 @@ const FullPageLink = styled.a`
   &:hover{color:${t.gold};}
 `
 
+/* ── Prev/Next Navigation ── */
+const NavBar = styled.div`
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 20px;border-bottom:1px solid ${t.border};
+  animation:${fadeSection} 0.3s ease-out;flex-shrink:0;
+`
+const NavBtn = styled.button<{ $disabled?: boolean }>`
+  display:flex;align-items:center;gap:4px;padding:6px 12px;
+  background:transparent;border:1px solid ${p => p.$disabled ? t.border : t.goldBorder};
+  border-radius:${t.r.sm};color:${p => p.$disabled ? t.textDim : t.gold};
+  font-size:12px;font-weight:600;font-family:${t.font};cursor:${p => p.$disabled ? 'default' : 'pointer'};
+  opacity:${p => p.$disabled ? 0.4 : 1};transition:all ${t.tr};
+  &:hover{${p => !p.$disabled && `background:${t.goldDim};transform:translateX(${p.$disabled ? '0' : '-2px'});`}}
+`
+const NavCounter = styled.span`font-size:11px;color:${t.textDim};font-weight:600;`
+
 /* ── Section helper ── */
 function Section({ icon: Icon, title, idx, children }: { icon: React.ElementType; title: string; idx: number; children: React.ReactNode }) {
   const [open, setOpen] = useState(idx < 2)
@@ -94,18 +110,56 @@ function Section({ icon: Icon, title, idx, children }: { icon: React.ElementType
 }
 
 /* ── Main Component ── */
-interface Props { plot: Plot | null; open: boolean; onClose: () => void; onLead?: () => void; onFullPage?: () => void }
+interface Props {
+  plot: Plot | null; open: boolean; onClose: () => void; onLead?: () => void; onFullPage?: () => void
+  plots?: Plot[]; onNavigate?: (plot: Plot) => void
+}
 
-export default function Sidebar({ plot, open, onClose, onLead, onFullPage }: Props) {
+export default function Sidebar({ plot, open, onClose, onLead, onFullPage, plots, onNavigate }: Props) {
   if (!plot) return null
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
   const cagr = calcCAGR(r, d.readiness), tl = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot)
+
+  const currentIdx = plots?.findIndex(pl => pl.id === plot.id) ?? -1
+  const hasPrev = plots && currentIdx > 0
+  const hasNext = plots && currentIdx >= 0 && currentIdx < plots.length - 1
+
+  const goPrev = useCallback(() => {
+    if (hasPrev && plots && onNavigate) onNavigate(plots[currentIdx - 1])
+  }, [hasPrev, plots, currentIdx, onNavigate])
+
+  const goNext = useCallback(() => {
+    if (hasNext && plots && onNavigate) onNavigate(plots[currentIdx + 1])
+  }, [hasNext, plots, currentIdx, onNavigate])
+
+  // Keyboard navigation: left/right arrows for prev/next
+  useEffect(() => {
+    if (!open || !plots?.length) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.key === 'ArrowRight') goPrev()
+      else if (e.key === 'ArrowLeft') goNext()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [open, plots, goPrev, goNext])
 
   return (
     <>
       <Overlay $open={open} onClick={onClose} />
       <Panel $open={open} role="complementary" aria-label="Plot details">
         <GoldBar />
+        {plots && plots.length > 1 && (
+          <NavBar>
+            <NavBtn $disabled={!hasPrev} onClick={goPrev}>
+              <ChevronRight size={14} /> הקודם
+            </NavBtn>
+            <NavCounter>{currentIdx + 1} / {plots.length}</NavCounter>
+            <NavBtn $disabled={!hasNext} onClick={goNext}>
+              הבא <ChevronLeft size={14} />
+            </NavBtn>
+          </NavBar>
+        )}
         <Header>
           <TopRow>
             <Badges>

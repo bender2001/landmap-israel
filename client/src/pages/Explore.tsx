@@ -15,6 +15,7 @@ import type { Plot, Filters } from '../types'
 const Sidebar = lazy(() => import('../components/Sidebar'))
 const LeadModal = lazy(() => import('../components/LeadModal'))
 const Chat = lazy(() => import('../components/Chat'))
+const PlotListPanel = lazy(() => import('../components/PlotListPanel'))
 
 const DEFAULTS: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '' }
 
@@ -75,6 +76,7 @@ export default function Explore() {
   const [tab, setTab] = useState<'map'|'fav'|'calc'|'areas'>('map')
   const [sortKey, setSortKey] = useState<SortKey>('recommended')
   const [sortOpen, setSortOpen] = useState(false)
+  const [listOpen, setListOpen] = useState(false)
   const { isFav, toggle, ids: favIds } = useFavorites()
 
   const apiFilters = useMemo(() => {
@@ -112,11 +114,17 @@ export default function Explore() {
       if (e.key === 'Escape') {
         if (sortOpen) setSortOpen(false)
         else if (selected) setSelected(null)
+        else if (listOpen) setListOpen(false)
+      }
+      // 'L' key to toggle list panel
+      if (e.key === 'l' || e.key === 'L') {
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+        setListOpen(o => !o)
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selected, sortOpen])
+  }, [selected, sortOpen, listOpen])
 
   return (
     <Wrap className="dark">
@@ -147,7 +155,16 @@ export default function Explore() {
         </SortWrap>
 
         <Suspense fallback={null}>
-          {selected && <Sidebar plot={selected} open={!!selected} onClose={() => setSelected(null)} onLead={() => setLeadPlot(selected)} />}
+          <PlotListPanel
+            plots={sorted}
+            selected={selected}
+            onSelect={(pl) => { setSelected(pl); setListOpen(false) }}
+            open={listOpen}
+            onToggle={() => setListOpen(o => !o)}
+          />
+        </Suspense>
+        <Suspense fallback={null}>
+          {selected && <Sidebar plot={selected} open={!!selected} onClose={() => setSelected(null)} onLead={() => setLeadPlot(selected)} plots={sorted} onNavigate={setSelected} />}
         </Suspense>
         <Suspense fallback={null}>
           <LeadModal plot={leadPlot} open={!!leadPlot} onClose={() => setLeadPlot(null)} />
