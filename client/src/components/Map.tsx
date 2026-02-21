@@ -508,53 +508,74 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
   const renderPopup = useCallback((plot: Plot) => {
     const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score), fav = favorites.isFav(plot.id), pps = pricePerSqm(plot), ppd = pricePerDunam(plot)
     const comp = compare?.has(plot.id)
+    const zoningStage = zoningPipeline.find(z => z.key === d.zoning)
     return (
-      <div className="plot-popup">
-        <div className="plot-popup-header">
-          <span className="plot-popup-title">גוש {d.block} | חלקה {plot.number}</span>
+      <div className="plot-popup" style={{ padding: 0 }}>
+        {/* Premium gradient header */}
+        <div style={{
+          padding: '14px 16px 10px', direction: 'rtl',
+          background: `linear-gradient(135deg, ${grade.color}18, ${grade.color}08)`,
+          borderBottom: `1px solid ${grade.color}20`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800 }}>גוש {d.block} · חלקה {plot.number}</div>
+              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                📍 {plot.city}
+                {zoningStage && <span style={{ opacity: 0.6 }}>· {zoningStage.icon} {zoningStage.label}</span>}
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: '50%',
+                border: `2.5px solid ${grade.color}`,
+                background: `${grade.color}15`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 13, fontWeight: 900, color: grade.color,
+              }}>{score}</div>
+              <span style={{ fontSize: 10, fontWeight: 800, color: grade.color }}>{grade.grade}</span>
+            </div>
+          </div>
+          {/* Status badge */}
           <span className="plot-popup-status" style={{ background: (statusColors[plot.status || ''] || '#888') + '20', color: statusColors[plot.status || ''] || '#888' }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
             {statusLabels[plot.status || ''] || plot.status}
           </span>
         </div>
-        <div className="plot-popup-row"><span className="plot-popup-label">מחיר</span><span className="plot-popup-value">{fmt.compact(d.price)}</span></div>
-        <div className="plot-popup-row"><span className="plot-popup-label">שטח</span><span className="plot-popup-value">{fmt.dunam(d.size)} דונם ({fmt.num(d.size)} מ״ר)</span></div>
-        {ppd > 0 && <div className="plot-popup-row"><span className="plot-popup-label">₪/דונם</span><span className="plot-popup-value">{fmt.num(ppd)}</span></div>}
-        <div className="plot-popup-row"><span className="plot-popup-label">תשואה צפויה</span><span className="plot-popup-value gold">+{fmt.pct(r)}</span></div>
-        <div className="plot-popup-row">
-          <span className="plot-popup-label">ציון השקעה</span>
-          <span className="plot-popup-value" style={{ color: grade.color, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', border: `2px solid ${grade.color}`, fontSize: 10, fontWeight: 800 }}>{score}</span>
-            {grade.grade}
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button className="plot-popup-cta" style={{ flex: 1 }} onClick={() => onLead(plot)}>
-            <Phone size={13} /> קבל פרטים
-          </button>
-          <a
-            href={`/plot/${plot.id}`}
-            onClick={(e) => { e.preventDefault(); window.location.href = `/plot/${plot.id}` }}
-            style={{ width: 36, height: 36, border: `1px solid ${t.border}`, borderRadius: t.r.sm, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: `all ${t.tr}`, textDecoration: 'none' }}
-            title="עמוד מלא"
-          >
-            <ExternalLink size={15} color={t.textDim} />
-          </a>
-          <button
-            onClick={() => favorites.toggle(plot.id)}
-            style={{ width: 36, height: 36, border: `1px solid ${fav ? t.gold : t.border}`, borderRadius: t.r.sm, background: fav ? t.goldDim : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: `all ${t.tr}` }}
-          >
-            <Heart size={16} fill={fav ? t.gold : 'none'} color={fav ? t.gold : t.textDim} />
-          </button>
-          {compare && (
-            <button
-              onClick={() => compare.toggle(plot.id)}
-              style={{ width: 36, height: 36, border: `1px solid ${comp ? t.gold : t.border}`, borderRadius: t.r.sm, background: comp ? t.goldDim : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: `all ${t.tr}` }}
-              title={comp ? 'הסר מהשוואה' : 'הוסף להשוואה'}
-            >
-              <GitCompareArrows size={15} color={comp ? t.gold : t.textDim} />
+        {/* Data rows */}
+        <div style={{ padding: '10px 16px 12px' }}>
+          <div className="plot-popup-row"><span className="plot-popup-label">מחיר</span><span className="plot-popup-value" style={{ fontSize: 15, fontWeight: 900 }}>{fmt.compact(d.price)}</span></div>
+          <div className="plot-popup-row"><span className="plot-popup-label">שטח</span><span className="plot-popup-value">{fmt.dunam(d.size)} דונם ({fmt.num(d.size)} מ״ר)</span></div>
+          {ppd > 0 && <div className="plot-popup-row"><span className="plot-popup-label">₪/דונם</span><span className="plot-popup-value">{fmt.num(ppd)}</span></div>}
+          <div className="plot-popup-row"><span className="plot-popup-label">תשואה צפויה</span><span className="plot-popup-value gold">+{fmt.pct(r)}</span></div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button className="plot-popup-cta" style={{ flex: 1 }} onClick={() => onLead(plot)}>
+              <Phone size={13} /> קבל פרטים
             </button>
-          )}
+            <a
+              href={`/plot/${plot.id}`}
+              onClick={(e) => { e.preventDefault(); window.location.href = `/plot/${plot.id}` }}
+              style={{ width: 36, height: 36, border: `1px solid ${t.border}`, borderRadius: t.r.sm, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: `all ${t.tr}`, textDecoration: 'none' }}
+              title="עמוד מלא"
+            >
+              <ExternalLink size={15} color={t.textDim} />
+            </a>
+            <button
+              onClick={() => favorites.toggle(plot.id)}
+              style={{ width: 36, height: 36, border: `1px solid ${fav ? t.gold : t.border}`, borderRadius: t.r.sm, background: fav ? t.goldDim : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: `all ${t.tr}` }}
+            >
+              <Heart size={16} fill={fav ? t.gold : 'none'} color={fav ? t.gold : t.textDim} />
+            </button>
+            {compare && (
+              <button
+                onClick={() => compare.toggle(plot.id)}
+                style={{ width: 36, height: 36, border: `1px solid ${comp ? t.gold : t.border}`, borderRadius: t.r.sm, background: comp ? t.goldDim : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: `all ${t.tr}` }}
+                title={comp ? 'הסר מהשוואה' : 'הוסף להשוואה'}
+              >
+                <GitCompareArrows size={15} color={comp ? t.gold : t.textDim} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     )

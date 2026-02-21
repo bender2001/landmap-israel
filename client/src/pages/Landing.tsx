@@ -276,10 +276,10 @@ const CtaGhost = styled(GhostButton).attrs({as:Link})`
 /* ── data ── */
 const PARTICLES = Array.from({length:8},(_,i)=>({x:Math.random()*100,size:3+Math.random()*4,dur:8+Math.random()*7,delay:i*1.5}))
 const STATS = [
-  {value:500,suffix:'+',label:'משקיעים פעילים'},
-  {value:850,suffix:'M',label:'₪ שווי חלקות'},
-  {value:247,suffix:'%',label:'תשואה ממוצעת'},
-  {value:15,suffix:'+',label:'ערים מכוסות'},
+  {value:120,suffix:'+',label:'חלקות זמינות'},
+  {value:35,suffix:'+',label:'יישובים מכוסים'},
+  {value:32,suffix:'%',label:'תשואה ממוצעת'},
+  {value:12,suffix:'+',label:'שנות ניסיון'},
 ]
 const STEPS = [
   {num:'1',icon:MapPin,title:'בחרו אזור',desc:'סננו לפי עיר, מחיר ופוטנציאל על מפה אינטראקטיבית'},
@@ -324,7 +324,7 @@ export default function Landing(){
               <AvatarStack>
                 {AVATARS.map((a,i)=><Avatar key={i} $i={i} $hue={a.hue}>{a.initials}</Avatar>)}
               </AvatarStack>
-              <ProofText>מעל 500 משקיעים כבר בפלטפורמה</ProofText>
+              <ProofText>מאות משקיעים כבר בפלטפורמה</ProofText>
             </SocialProof>
             <CTAs>
               <HeroGold to="/explore">גלו את ההזדמנויות <ChevronLeft size={18}/></HeroGold>
@@ -427,7 +427,7 @@ export default function Landing(){
         {/* ── Final CTA ── */}
         <FinalCTA>
           <FinalTitle>אל תפספסו את ההזדמנות הבאה</FinalTitle>
-          <FinalSub>הצטרפו ל-500+ משקיעים חכמים שכבר מרוויחים עם LandMap</FinalSub>
+          <FinalSub>הצטרפו למשקיעים חכמים שכבר מרוויחים עם LandMap</FinalSub>
           <FinalBtns>
             <CtaLink to="/login">הרשמה חינם <ChevronLeft size={16}/></CtaLink>
             <CtaGhost to="/login">כניסה למערכת</CtaGhost>

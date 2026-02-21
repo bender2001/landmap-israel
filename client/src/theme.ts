@@ -117,7 +117,7 @@ export const GlobalStyles = createGlobalStyle`
 
   /* Popup inner */
   .plot-popup{padding:16px}
-  .plot-popup::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${t.gold},${t.goldBright},${t.gold},transparent)}
+  .plot-popup::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,${t.gold},${t.goldBright},${t.gold},transparent);border-radius:${t.r.lg} ${t.r.lg} 0 0}
   .plot-popup-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px}
   .plot-popup-title{font-size:14px;font-weight:700}
   .plot-popup-status{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;white-space:nowrap}

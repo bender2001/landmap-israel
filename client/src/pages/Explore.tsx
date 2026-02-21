@@ -313,6 +313,24 @@ const PulseDot = styled.span<{$c:string}>`
   animation:${pulseGlow} 2s ease-in-out infinite;flex-shrink:0;
 `
 
+/* ── Market Insights Ticker ── */
+const tickerFade = keyframes`0%{opacity:0;transform:translateY(6px)}15%{opacity:1;transform:translateY(0)}85%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-6px)}`
+const InsightsTicker = styled.div`
+  position:absolute;top:56px;left:50%;transform:translateX(-50%);z-index:${t.z.filter - 1};
+  display:flex;align-items:center;gap:8px;padding:5px 16px;direction:rtl;
+  background:${t.glass};backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid ${t.glassBorder};border-radius:${t.r.full};box-shadow:${t.sh.sm};
+  font-size:12px;font-weight:600;color:${t.textSec};white-space:nowrap;
+  max-width:min(520px,calc(100vw - 32px));overflow:hidden;
+  ${mobile}{top:46px;left:8px;right:8px;transform:none;font-size:11px;padding:4px 12px;}
+`
+const InsightText = styled.span`
+  animation:${tickerFade} 5s ease-in-out infinite;
+  display:flex;align-items:center;gap:6px;
+`
+const InsightIcon = styled.span`font-size:14px;flex-shrink:0;`
+const InsightVal = styled.span`color:${t.goldBright};font-weight:800;`
+
 /* ── Recently Viewed Strip ── */
 const RecentStrip = styled.div`
   position:absolute;top:80px;left:50%;transform:translateX(-50%);z-index:${t.z.filter - 1};
@@ -688,6 +706,55 @@ export default function Explore() {
       .filter((pl): pl is Plot => !!pl)
       .slice(0, 5)
   }, [recentIds, plots])
+
+  // ── Market Insights (rotating) ──
+  const [insightIdx, setInsightIdx] = useState(0)
+  const insights = useMemo(() => {
+    if (!filtered.length) return []
+    const items: { icon: string; text: string; val: string }[] = []
+    // Best ROI plot
+    const bestRoi = filtered.reduce((best, pl) => roi(pl) > roi(best) ? pl : best, filtered[0])
+    const bestRoiVal = roi(bestRoi)
+    if (bestRoiVal > 0) {
+      items.push({ icon: '🔥', text: `תשואה גבוהה ב${bestRoi.city}`, val: `+${Math.round(bestRoiVal)}%` })
+    }
+    // Below average count
+    const ppsList = filtered.map(pricePerSqm).filter(v => v > 0)
+    if (ppsList.length > 2) {
+      const avgPps = ppsList.reduce((s, v) => s + v, 0) / ppsList.length
+      const below = filtered.filter(pl => { const pps = pricePerSqm(pl); return pps > 0 && pps < avgPps * 0.9 }).length
+      if (below > 0) items.push({ icon: '📉', text: `${below} חלקות מתחת לממוצע`, val: 'הזדמנות' })
+    }
+    // Cheapest plot
+    const cheapest = filtered.filter(pl => p(pl).price > 0).sort((a, b) => p(a).price - p(b).price)[0]
+    if (cheapest) {
+      items.push({ icon: '💎', text: `מחיר נמוך ב${cheapest.city}`, val: fmt.compact(p(cheapest).price) })
+    }
+    // Average score
+    const scores = filtered.map(calcScore)
+    const avgScore = scores.reduce((s, v) => s + v, 0) / scores.length
+    items.push({ icon: '📊', text: 'ציון ממוצע', val: `${avgScore.toFixed(1)}/10` })
+    // New listings (< 7 days)
+    const newCount = filtered.filter(pl => {
+      const created = p(pl).created
+      if (!created) return false
+      const days = Math.floor((Date.now() - new Date(created).getTime()) / 864e5)
+      return days <= 7
+    }).length
+    if (newCount > 0) items.push({ icon: '✨', text: `${newCount} חלקות חדשות השבוע`, val: 'חדש' })
+    // Largest plot
+    const largest = filtered.reduce((best, pl) => p(pl).size > p(best).size ? pl : best, filtered[0])
+    if (p(largest).size > 0) {
+      items.push({ icon: '📐', text: `חלקה גדולה ב${largest.city}`, val: `${fmt.dunam(p(largest).size)} דונם` })
+    }
+    return items
+  }, [filtered])
+
+  useEffect(() => {
+    if (insights.length <= 1) return
+    const id = setInterval(() => setInsightIdx(i => (i + 1) % insights.length), 5000)
+    return () => clearInterval(id)
+  }, [insights.length])
 
   // Dynamic document title based on active filters
   useEffect(() => {
@@ -1090,6 +1157,17 @@ export default function Explore() {
               </PulseCell>
             )}
           </MarketPulseWrap>
+        )}
+
+        {/* Market Insights Ticker (show when no overlays active) */}
+        {!mapFullscreen && insights.length > 0 && !selected && !listOpen && !cityStats && recentPlots.length === 0 && (
+          <InsightsTicker>
+            <InsightText key={insightIdx}>
+              <InsightIcon>{insights[insightIdx]?.icon}</InsightIcon>
+              {insights[insightIdx]?.text}
+              <InsightVal>{insights[insightIdx]?.val}</InsightVal>
+            </InsightText>
+          </InsightsTicker>
         )}
 
         {/* Recently Viewed Strip (show only when user has viewed plots and no sidebar is open) */}
