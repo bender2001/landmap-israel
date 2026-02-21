@@ -3,7 +3,7 @@ import styled, { keyframes } from 'styled-components'
 import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download, Share2, MessageCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, SITE_CONFIG } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, estimatedYear, SITE_CONFIG } from '../utils'
 import { Skeleton } from './UI'
 import type { Plot } from '../types'
 
@@ -289,6 +289,14 @@ const PercentileBadge = styled.span<{ $c: string }>`
   white-space:nowrap;letter-spacing:0.3px;
 `
 
+/* ── Estimated Year Badge ── */
+const EstYearBadge = styled.span`
+  display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;
+  padding:2px 7px;border-radius:${t.r.full};color:${t.gold};
+  background:${t.goldDim};border:1px solid ${t.goldBorder};
+  white-space:nowrap;letter-spacing:0.3px;
+`
+
 /* ── WhatsApp Quick CTA ── */
 const WaCta = styled.a`
   display:flex;align-items:center;justify-content:center;width:28px;height:28px;
@@ -474,6 +482,8 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userL
   const isHot = score >= 9
   const percentile = calcPercentileRank(plot, allPlots)
 
+  const estYear = estimatedYear(plot)
+
   // Zoning pipeline stage
   const zoningIdx = zoningPipeline.findIndex(z => z.key === d.zoning)
   const currentZoning = zoningIdx >= 0 ? zoningPipeline[zoningIdx] : null
@@ -487,6 +497,7 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userL
           {isNew && <NewBadge>✨ חדש</NewBadge>}
           {isHot && <HotBadge>🔥 HOT</HotBadge>}
           {percentile && <PercentileBadge $c={percentile.color}>{percentile.icon} {percentile.label}</PercentileBadge>}
+          {estYear && <EstYearBadge title={`${estYear.monthsLeft} חודשים צפויים`}>🏗️ {estYear.label}</EstYearBadge>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           {distance != null && <DistanceBadge>📍 {fmtDistance(distance)}</DistanceBadge>}

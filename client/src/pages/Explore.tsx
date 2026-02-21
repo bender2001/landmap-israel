@@ -7,7 +7,7 @@ import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, 
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, Spinner, useToast, Badge, NetworkBanner, AnimatedValue, DemoModeBanner } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance, zoningLabels, calcAggregateStats, SITE_CONFIG } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance, zoningLabels, calcAggregateStats, estimatedYear, plotCenter, SITE_CONFIG } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -341,15 +341,26 @@ const MarketPulseWrap = styled.div`
   background:${t.glass};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
   border:1px solid ${t.glassBorder};border-radius:${t.r.lg};box-shadow:${t.sh.lg};
   overflow:hidden;animation:${chipPop} 0.35s cubic-bezier(0.32,0.72,0,1);
-  ${mobile}{display:none;}
+  ${mobile}{
+    position:absolute;top:46px;right:8px;left:8px;
+    overflow-x:auto;scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+    &::-webkit-scrollbar{display:none;}
+    border-radius:${t.r.md};
+  }
 `
 const PulseCell = styled.div<{$accent?:string}>`
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
   padding:10px 16px;border-left:1px solid ${t.border};
   &:last-child{border-left:none;}
+  ${mobile}{padding:8px 12px;min-width:0;flex-shrink:0;}
 `
-const PulseVal = styled.div<{$c?:string}>`font-size:14px;font-weight:800;color:${pr=>pr.$c||t.gold};white-space:nowrap;`
-const PulseLabel = styled.div`font-size:9px;font-weight:600;color:${t.textDim};white-space:nowrap;letter-spacing:0.3px;`
+const PulseVal = styled.div<{$c?:string}>`font-size:14px;font-weight:800;color:${pr=>pr.$c||t.gold};white-space:nowrap;
+  ${mobile}{font-size:12px;}
+`
+const PulseLabel = styled.div`font-size:9px;font-weight:600;color:${t.textDim};white-space:nowrap;letter-spacing:0.3px;
+  ${mobile}{font-size:8px;}
+`
 const PulseDot = styled.span<{$c:string}>`
   display:inline-block;width:6px;height:6px;border-radius:50%;background:${pr=>pr.$c};
   animation:${pulseGlow} 2s ease-in-out infinite;flex-shrink:0;
@@ -1033,6 +1044,12 @@ export default function Explore() {
         {selected && !mobileExpanded && (() => {
           const d = p(selected), score = calcScore(selected), grade = getGrade(score)
           const r = roi(selected), ppd = pricePerDunam(selected)
+          const estYr = estimatedYear(selected)
+          const center = plotCenter(selected.coordinates)
+          const navLinks = center ? {
+            gmaps: `https://www.google.com/maps/@${center.lat},${center.lng},17z`,
+            waze: `https://waze.com/ul?ll=${center.lat},${center.lng}&z=17&navigate=yes`,
+          } : null
           return (
             <MobilePreview $show={true}>
               <PreviewHandle />
@@ -1044,6 +1061,7 @@ export default function Explore() {
                       <MapIcon size={12} /> {selected.city}
                       <span style={{ color: grade.color, fontWeight: 800 }}>{grade.grade}</span>
                       <span>{fmt.dunam(d.size)} דונם</span>
+                      {estYr && <span style={{ color: t.gold, fontWeight: 700, fontSize: 11 }}>🏗️ {estYr.label}</span>}
                     </PreviewCity>
                   </PreviewInfo>
                   <PreviewPrice>{fmt.compact(d.price)}</PreviewPrice>
@@ -1072,6 +1090,39 @@ export default function Explore() {
                     </PreviewMetric>
                   )}
                 </PreviewMetrics>
+                {/* Navigation quick links */}
+                {navLinks && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <a href={navLinks.gmaps} target="_blank" rel="noopener noreferrer"
+                      style={{
+                        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                        padding: '8px 10px', background: 'rgba(66,133,244,0.08)',
+                        border: '1px solid rgba(66,133,244,0.2)', borderRadius: t.r.md,
+                        fontSize: 11, fontWeight: 700, color: '#4285F4',
+                        textDecoration: 'none', whiteSpace: 'nowrap',
+                      }}
+                    >🗺️ Google Maps</a>
+                    <a href={navLinks.waze} target="_blank" rel="noopener noreferrer"
+                      style={{
+                        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                        padding: '8px 10px', background: 'rgba(51,181,229,0.08)',
+                        border: '1px solid rgba(51,181,229,0.2)', borderRadius: t.r.md,
+                        fontSize: 11, fontWeight: 700, color: '#33B5E5',
+                        textDecoration: 'none', whiteSpace: 'nowrap',
+                      }}
+                    >🚗 Waze</a>
+                    <a href={`${SITE_CONFIG.waLink}?text=${encodeURIComponent(`היי, מתעניין/ת בחלקה ${selected.number} גוש ${d.block} ב${selected.city} (${fmt.compact(d.price)}). אשמח לפרטים.`)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      style={{
+                        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                        padding: '8px 10px', background: 'rgba(37,211,102,0.08)',
+                        border: '1px solid rgba(37,211,102,0.2)', borderRadius: t.r.md,
+                        fontSize: 11, fontWeight: 700, color: '#25D366',
+                        textDecoration: 'none', whiteSpace: 'nowrap',
+                      }}
+                    >💬 WhatsApp</a>
+                  </div>
+                )}
                 <PreviewActions>
                   <PreviewDetailBtn onClick={() => setMobileExpanded(true)}>
                     <ChevronLeft size={16} /> פרטים מלאים

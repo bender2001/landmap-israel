@@ -98,6 +98,15 @@ export function calcTimeline(plot: Plot) {
   const elapsed = stages.slice(1, idx + 1).reduce((s, st) => s + st.m, 0), remaining = stages.slice(idx + 1).reduce((s, st) => s + st.m, 0), total = elapsed + remaining
   return { stages, currentIdx: idx, elapsed, remaining, progress: total > 0 ? Math.round((elapsed / total) * 100) : 100 }
 }
+/** Estimated year the plot reaches building permit stage */
+export function estimatedYear(plot: Plot): { year: number; label: string; monthsLeft: number } | null {
+  const tl = calcTimeline(plot)
+  if (!tl || tl.remaining <= 0) return null
+  const now = new Date()
+  const estDate = new Date(now.getFullYear(), now.getMonth() + tl.remaining)
+  return { year: estDate.getFullYear(), label: `~${estDate.getFullYear()}`, monthsLeft: tl.remaining }
+}
+
 export function daysOnMarket(created: string | null | undefined) {
   if (!created) return null; const d = Math.floor((Date.now() - new Date(created).getTime()) / 864e5)
   if (d <= 7) return { days: d, label: 'חדש', color: '#10B981' }; if (d <= 30) return { days: d, label: `${d} ימים`, color: '#84CC16' }
