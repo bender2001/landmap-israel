@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react'
+import React, { useState, useCallback, useEffect, useMemo, useRef as useRefHook } from 'react'
 import styled, { keyframes, css } from 'styled-components'
 import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -24,6 +24,11 @@ const Panel = styled.aside<{ $open: boolean }>`
   box-shadow:${t.sh.xl};${mobile}{width:100vw;}
 `
 const GoldBar = styled.div`height:3px;background:linear-gradient(90deg,transparent,${t.gold},${t.goldBright},${t.gold},transparent);flex-shrink:0;`
+const SwipeHandle = styled.div`
+  display:none;width:36px;height:4px;border-radius:2px;background:${t.textDim};
+  margin:8px auto 4px;opacity:0.4;flex-shrink:0;
+  ${mobile}{display:block;}
+`
 const Header = styled.div`padding:16px 20px;border-bottom:1px solid ${t.border};animation:${fadeSection} 0.4s ease-out;`
 const TopRow = styled.div`display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;`
 const Badges = styled.div`display:flex;align-items:center;gap:6px;flex-wrap:wrap;`
@@ -223,6 +228,7 @@ interface Props {
 export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate, isCompared, onToggleCompare }: Props) {
   const navigate = useNavigate()
   const bodyRef = React.useRef<HTMLDivElement>(null)
+  const panelRef = useRefHook<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
 
   // Lock body scroll when sidebar is open
@@ -233,6 +239,49 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
       return () => { document.body.style.overflow = prev }
     }
   }, [open])
+
+  // Swipe-to-close gesture for mobile
+  useEffect(() => {
+    if (!open || !panelRef.current) return
+    const panel = panelRef.current
+    let startX = 0, startY = 0, isDragging = false
+
+    const onTouchStart = (e: TouchEvent) => {
+      startX = e.touches[0].clientX
+      startY = e.touches[0].clientY
+      isDragging = true
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isDragging) return
+      const dx = e.touches[0].clientX - startX
+      const dy = e.touches[0].clientY - startY
+      // Only track horizontal swipes (to the right, since sidebar opens from right)
+      if (Math.abs(dx) > Math.abs(dy) && dx > 30) {
+        panel.style.transform = `translateX(${Math.min(dx, 200)}px)`
+        panel.style.transition = 'none'
+      }
+    }
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!isDragging) return
+      isDragging = false
+      const dx = e.changedTouches[0].clientX - startX
+      panel.style.transition = ''
+      panel.style.transform = ''
+      // Close if swiped more than 80px to the right
+      if (dx > 80) {
+        onClose()
+      }
+    }
+
+    panel.addEventListener('touchstart', onTouchStart, { passive: true })
+    panel.addEventListener('touchmove', onTouchMove, { passive: true })
+    panel.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      panel.removeEventListener('touchstart', onTouchStart)
+      panel.removeEventListener('touchmove', onTouchMove)
+      panel.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [open, onClose])
 
   // Auto-scroll body to top when plot changes
   useEffect(() => {
@@ -298,8 +347,9 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
   return (
     <>
       <Overlay $open={open} onClick={onClose} />
-      <Panel $open={open} role="complementary" aria-label="Plot details">
+      <Panel ref={panelRef} $open={open} role="complementary" aria-label="Plot details">
         <GoldBar />
+        <SwipeHandle />
         {plots && plots.length > 1 && (
           <NavBar>
             <NavBtn $disabled={!hasPrev} onClick={goPrev}>

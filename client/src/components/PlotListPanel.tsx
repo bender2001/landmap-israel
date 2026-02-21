@@ -1,6 +1,6 @@
 import { memo, useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink } from 'lucide-react'
+import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, pricePerSqm, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats } from '../utils'
@@ -183,6 +183,94 @@ const SkeletonCard = styled.div<{ $i: number }>`
 `
 const SkeletonRow = styled.div`display:flex;align-items:center;gap:8px;`
 
+/* ── Price Distribution Histogram ── */
+const DistWrap = styled.div`
+  padding:10px 14px 6px;border-bottom:1px solid ${t.border};flex-shrink:0;direction:rtl;
+`
+const DistTitle = styled.div`
+  display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:${t.textDim};
+  margin-bottom:8px;letter-spacing:0.3px;
+`
+const DistChart = styled.div`
+  display:flex;align-items:flex-end;gap:2px;height:40px;
+`
+const DistBar = styled.div<{ $h: number; $highlight: boolean; $color: string }>`
+  flex:1;min-width:0;border-radius:2px 2px 0 0;
+  height:${pr => Math.max(2, pr.$h)}%;
+  background:${pr => pr.$highlight ? pr.$color : t.surfaceLight};
+  opacity:${pr => pr.$highlight ? 1 : 0.5};
+  transition:all 0.4s cubic-bezier(0.32,0.72,0,1);
+  cursor:default;position:relative;
+  &:hover{opacity:1;transform:scaleY(1.05);transform-origin:bottom;}
+`
+const DistLabels = styled.div`
+  display:flex;justify-content:space-between;margin-top:4px;
+`
+const DistLabel = styled.span`font-size:9px;color:${t.textDim};`
+
+function PriceDistribution({ plots, selectedPlot }: { plots: Plot[]; selectedPlot: Plot | null }) {
+  const data = useMemo(() => {
+    const prices = plots.map(pl => p(pl).price).filter(v => v > 0)
+    if (prices.length < 3) return null
+
+    const min = Math.min(...prices)
+    const max = Math.max(...prices)
+    const range = max - min
+    if (range <= 0) return null
+
+    const BUCKETS = 10
+    const bucketSize = range / BUCKETS
+    const buckets = Array.from({ length: BUCKETS }, (_, i) => ({
+      min: min + i * bucketSize,
+      max: min + (i + 1) * bucketSize,
+      count: 0,
+      hasSelected: false,
+    }))
+
+    const selectedPrice = selectedPlot ? p(selectedPlot).price : 0
+
+    for (const price of prices) {
+      const idx = Math.min(Math.floor((price - min) / bucketSize), BUCKETS - 1)
+      buckets[idx].count++
+      if (selectedPrice > 0 && price === selectedPrice) {
+        buckets[idx].hasSelected = true
+      }
+    }
+
+    // Also mark the bucket the selected plot falls into
+    if (selectedPrice > 0) {
+      const selIdx = Math.min(Math.floor((selectedPrice - min) / bucketSize), BUCKETS - 1)
+      buckets[selIdx].hasSelected = true
+    }
+
+    const maxCount = Math.max(...buckets.map(b => b.count))
+    return { buckets, maxCount, min, max }
+  }, [plots, selectedPlot])
+
+  if (!data) return null
+
+  return (
+    <DistWrap>
+      <DistTitle><Activity size={12} color={t.gold} /> התפלגות מחירים</DistTitle>
+      <DistChart>
+        {data.buckets.map((bucket, i) => (
+          <DistBar
+            key={i}
+            $h={data.maxCount > 0 ? (bucket.count / data.maxCount) * 100 : 0}
+            $highlight={bucket.count > 0}
+            $color={bucket.hasSelected ? t.gold : t.info}
+            title={`${fmt.compact(bucket.min)} – ${fmt.compact(bucket.max)}: ${bucket.count} חלקות`}
+          />
+        ))}
+      </DistChart>
+      <DistLabels>
+        <DistLabel>{fmt.compact(data.min)}</DistLabel>
+        <DistLabel>{fmt.compact(data.max)}</DistLabel>
+      </DistLabels>
+    </DistWrap>
+  )
+}
+
 /* ── Component ── */
 interface Props {
   plots: Plot[]
@@ -329,6 +417,8 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading }:
             ))}
           </CityChipRow>
         )}
+        {/* Price distribution histogram */}
+        <PriceDistribution plots={visiblePlots} selectedPlot={selected} />
         <Body ref={bodyRef}>
           {isLoading ? (
             /* Skeleton loading cards */

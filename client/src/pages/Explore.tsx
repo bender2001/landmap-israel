@@ -337,6 +337,21 @@ export default function Explore() {
   const { data: plots = [], isLoading } = useAllPlots(apiFilters)
   const dSearch = useDebounce(filters.search, 300)
 
+  // Auto-select plot from URL param (e.g. from PlotDetail "View on Map" button)
+  useEffect(() => {
+    const plotId = searchParams.get('plotId')
+    if (plotId && plots.length > 0 && !selected) {
+      const targetPlot = plots.find(pl => pl.id === plotId)
+      if (targetPlot) {
+        selectPlot(targetPlot)
+        // Remove plotId from URL to avoid re-selecting on filter changes
+        const sp = new URLSearchParams(searchParams)
+        sp.delete('plotId')
+        setSearchParams(sp, { replace: true })
+      }
+    }
+  }, [plots, searchParams])
+
   const filtered = useMemo(() => {
     let list = plots
     const sMin = Number(filters.sizeMin), sMax = Number(filters.sizeMax)

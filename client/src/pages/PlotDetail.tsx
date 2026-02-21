@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle } from 'lucide-react'
+import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon } from 'lucide-react'
 import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard, ScrollToTop } from '../components/UI'
@@ -362,6 +362,17 @@ const PrintBtn = styled.button`
   @media print{display:none;}
 `
 
+/* ── View on Map Button ── */
+const ViewOnMapBtn = styled(Link)`
+  display:inline-flex;align-items:center;gap:6px;padding:8px 16px;
+  background:linear-gradient(135deg,rgba(212,168,75,0.08),rgba(212,168,75,0.03));
+  border:1px solid ${t.goldBorder};border-radius:${t.r.md};
+  font-size:13px;font-weight:600;font-family:${t.font};color:${t.gold};
+  text-decoration:none!important;cursor:pointer;transition:all ${t.tr};
+  &:hover{background:${t.goldDim};border-color:${t.gold};transform:translateY(-1px);box-shadow:${t.sh.sm};}
+  @media print{display:none;}
+`
+
 /* ── Recently Viewed: now uses shared useRecentlyViewed hook ── */
 
 /* ── Mini Map (lazy loaded) ── */
@@ -525,6 +536,9 @@ export default function PlotDetail() {
               <Title>גוש {d.block} חלקה {plot.number} - {plot.city}</Title>
             </TitleLeft>
             <Actions>
+              <ViewOnMapBtn to={`/explore?plotId=${plot.id}`} aria-label="הצג במפה">
+                <MapIcon size={16} /> הצג במפה
+              </ViewOnMapBtn>
               <IconBtn $active={isFav(plot.id)} onClick={() => toggle(plot.id)} aria-label="מועדפים"><Heart size={20} fill={isFav(plot.id) ? t.gold : 'none'} /></IconBtn>
               <IconBtn onClick={handleShare} aria-label="שיתוף">{copied ? <Check size={20} color={t.ok} /> : <Share2 size={20} />}</IconBtn>
               <PrintBtn onClick={() => window.print()} aria-label="הדפס דו״ח"><Printer size={20} /></PrintBtn>
