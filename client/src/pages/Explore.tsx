@@ -1,13 +1,13 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw } from 'lucide-react'
+import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed } from '../hooks'
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
-import { ErrorBoundary, Spinner, useToast } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm } from '../utils'
+import { ErrorBoundary, Spinner, useToast, Badge } from '../components/UI'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade, calcMonthly, statusColors, statusLabels } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -130,6 +130,80 @@ const EmptyResetBtn = styled.button`
   &:hover{box-shadow:${t.sh.glow};transform:translateY(-2px);}
 `
 
+/* ── Mobile Tab Overlay ── */
+const mobileSlide = keyframes`from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}`
+const MobileOverlay = styled.div<{$open:boolean}>`
+  display:none;position:fixed;bottom:56px;left:0;right:0;top:0;z-index:${t.z.filter + 1};
+  background:${t.bg};overflow-y:auto;direction:rtl;
+  animation:${mobileSlide} 0.3s cubic-bezier(0.32,0.72,0,1);
+  ${mobile}{display:${pr=>pr.$open?'block':'none'};}
+`
+const MobileOverlayHeader = styled.div`
+  position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;background:${t.surface};border-bottom:1px solid ${t.border};
+`
+const MobileOverlayTitle = styled.h3`font-size:17px;font-weight:700;color:${t.text};margin:0;display:flex;align-items:center;gap:8px;`
+const MobileOverlayClose = styled.button`
+  width:32px;height:32px;border-radius:${t.r.sm};border:1px solid ${t.border};
+  background:transparent;color:${t.textSec};cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all ${t.tr};&:hover{border-color:${t.goldBorder};color:${t.gold};}
+`
+const MobileFavList = styled.div`display:flex;flex-direction:column;gap:1px;`
+const MobileFavItem = styled.div`
+  display:flex;align-items:center;gap:12px;padding:14px 20px;
+  background:${t.surface};border-bottom:1px solid ${t.border};cursor:pointer;
+  transition:background ${t.tr};&:hover{background:${t.hover};}
+`
+const MobileFavInfo = styled.div`flex:1;min-width:0;`
+const MobileFavTitle = styled.div`font-size:14px;font-weight:700;color:${t.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`
+const MobileFavSub = styled.div`font-size:12px;color:${t.textSec};display:flex;align-items:center;gap:8px;margin-top:2px;`
+const MobileFavPrice = styled.span`font-size:14px;font-weight:800;color:${t.gold};white-space:nowrap;`
+const MobileFavRemove = styled.button`
+  width:32px;height:32px;border-radius:${t.r.sm};border:1px solid ${t.border};
+  background:transparent;color:${t.textDim};cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:all ${t.tr};&:hover{border-color:${t.err};color:${t.err};background:rgba(239,68,68,0.08);}
+`
+const MobileEmptyState = styled.div`
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  padding:60px 24px;text-align:center;
+`
+const MobileEmptyIcon = styled.div`
+  width:64px;height:64px;border-radius:${t.r.full};display:flex;align-items:center;justify-content:center;
+  background:${t.goldDim};border:1px solid ${t.goldBorder};
+`
+const MobileEmptyTitle = styled.div`font-size:16px;font-weight:700;color:${t.text};`
+const MobileEmptyDesc = styled.div`font-size:13px;color:${t.textSec};line-height:1.6;`
+
+/* ── Mobile Calculator ── */
+const CalcCard = styled.div`
+  margin:20px;padding:24px;background:${t.surface};border:1px solid ${t.border};border-radius:${t.r.lg};
+`
+const CalcTitle = styled.h4`font-size:15px;font-weight:700;color:${t.text};margin:0 0 16px;display:flex;align-items:center;gap:8px;`
+const CalcSliderRow = styled.div`display:flex;flex-direction:column;gap:6px;margin-bottom:16px;`
+const CalcSliderLabel = styled.div`display:flex;align-items:center;justify-content:space-between;font-size:12px;`
+const CalcSliderName = styled.span`color:${t.textSec};font-weight:600;`
+const CalcSliderVal = styled.span`color:${t.text};font-weight:700;font-size:13px;`
+const CalcSlider = styled.input.attrs({ type: 'range' })`
+  width:100%;height:6px;-webkit-appearance:none;appearance:none;outline:none;border-radius:3px;
+  background:linear-gradient(90deg,${t.gold} 0%,${t.gold} var(--pct,50%),${t.surfaceLight} var(--pct,50%),${t.surfaceLight} 100%);
+  &::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;
+    background:linear-gradient(135deg,${t.gold},${t.goldBright});cursor:pointer;
+    box-shadow:0 2px 8px rgba(212,168,75,0.35);border:2px solid ${t.bg};}
+`
+const CalcResult = styled.div`
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px;margin-top:12px;
+  background:${t.goldDim};border:1px solid ${t.goldBorder};border-radius:${t.r.md};
+`
+const CalcResultItem = styled.div`text-align:center;`
+const CalcResultVal = styled.div<{$gold?:boolean}>`font-size:18px;font-weight:800;color:${pr=>pr.$gold?t.gold:t.text};`
+const CalcResultLabel = styled.div`font-size:10px;color:${t.textSec};margin-top:2px;`
+const CalcInput = styled.input`
+  width:100%;padding:12px 14px;background:${t.surfaceLight};border:1px solid ${t.border};border-radius:${t.r.md};
+  color:${t.text};font-size:16px;font-weight:700;font-family:${t.font};outline:none;direction:ltr;text-align:center;
+  &:focus{border-color:${t.goldBorder};box-shadow:0 0 0 3px ${t.goldDim};}
+  &::placeholder{color:${t.textDim};}
+`
+
 // ── URL ↔ Filters sync helpers ──
 const FILTER_PARAMS: (keyof Filters)[] = ['city', 'priceMin', 'priceMax', 'sizeMin', 'sizeMax', 'ripeness', 'minRoi', 'zoning', 'search']
 
@@ -168,6 +242,13 @@ export default function Explore() {
   const { toast } = useToast()
   const navigate = useNavigate()
   const sortRef = useRef<HTMLDivElement>(null)
+
+  // Mobile calculator state
+  const [calcPrice, setCalcPrice] = useState(500000)
+  const [calcLtv, setCalcLtv] = useState(50)
+  const [calcRate, setCalcRate] = useState(6)
+  const [calcYears, setCalcYears] = useState(15)
+  const calcMortgage = useMemo(() => calcMonthly(calcPrice, calcLtv / 100, calcRate / 100, calcYears), [calcPrice, calcLtv, calcRate, calcYears])
 
   // Wrap favorites/compare toggles with toast feedback
   const toggle = useCallback((id: string) => {
@@ -358,11 +439,102 @@ export default function Explore() {
           <Demo>DEMO</Demo>
         </Stats>
 
+        {/* Mobile Favorites Overlay */}
+        <MobileOverlay $open={tab === 'fav'}>
+          <MobileOverlayHeader>
+            <MobileOverlayTitle><Heart size={18} color={t.gold} /> מועדפים ({favIds.length})</MobileOverlayTitle>
+            <MobileOverlayClose onClick={() => setTab('map')}><X size={16} /></MobileOverlayClose>
+          </MobileOverlayHeader>
+          {favIds.length === 0 ? (
+            <MobileEmptyState>
+              <MobileEmptyIcon><Heart size={28} color={t.gold} /></MobileEmptyIcon>
+              <MobileEmptyTitle>אין מועדפים עדיין</MobileEmptyTitle>
+              <MobileEmptyDesc>לחצו על ❤️ בחלקה כדי לשמור אותה כאן</MobileEmptyDesc>
+            </MobileEmptyState>
+          ) : (
+            <MobileFavList>
+              {sorted.filter(pl => favIds.includes(pl.id)).map(pl => {
+                const d = p(pl), grade = getGrade(calcScore(pl))
+                return (
+                  <MobileFavItem key={pl.id} onClick={() => { selectPlot(pl); setTab('map') }}>
+                    <MobileFavInfo>
+                      <MobileFavTitle>גוש {d.block} · חלקה {pl.number}</MobileFavTitle>
+                      <MobileFavSub>
+                        <span>{pl.city}</span>
+                        <span style={{ color: grade.color, fontWeight: 700 }}>{grade.grade}</span>
+                        <span>{fmt.num(d.size)} מ״ר</span>
+                      </MobileFavSub>
+                    </MobileFavInfo>
+                    <MobileFavPrice>{fmt.compact(d.price)}</MobileFavPrice>
+                    <MobileFavRemove onClick={(e) => { e.stopPropagation(); toggle(pl.id) }}><X size={14} /></MobileFavRemove>
+                  </MobileFavItem>
+                )
+              })}
+            </MobileFavList>
+          )}
+        </MobileOverlay>
+
+        {/* Mobile Calculator Overlay */}
+        <MobileOverlay $open={tab === 'calc'}>
+          <MobileOverlayHeader>
+            <MobileOverlayTitle><Calculator size={18} color={t.gold} /> מחשבון מימון</MobileOverlayTitle>
+            <MobileOverlayClose onClick={() => setTab('map')}><X size={16} /></MobileOverlayClose>
+          </MobileOverlayHeader>
+          <CalcCard>
+            <CalcTitle><DollarSign size={16} color={t.gold} /> סכום הנכס</CalcTitle>
+            <CalcInput type="number" value={calcPrice} placeholder="הכנס מחיר..." onChange={e => setCalcPrice(Math.max(0, Number(e.target.value)))} />
+          </CalcCard>
+          <CalcCard>
+            <CalcTitle><Calculator size={16} color={t.gold} /> פרמטרים</CalcTitle>
+            <CalcSliderRow>
+              <CalcSliderLabel><CalcSliderName>אחוז מימון (LTV)</CalcSliderName><CalcSliderVal>{calcLtv}%</CalcSliderVal></CalcSliderLabel>
+              <CalcSlider min={10} max={80} step={5} value={calcLtv}
+                style={{ '--pct': `${((calcLtv - 10) / 70) * 100}%` } as React.CSSProperties}
+                onChange={e => setCalcLtv(Number(e.target.value))} />
+            </CalcSliderRow>
+            <CalcSliderRow>
+              <CalcSliderLabel><CalcSliderName>ריבית שנתית</CalcSliderName><CalcSliderVal>{calcRate}%</CalcSliderVal></CalcSliderLabel>
+              <CalcSlider min={2} max={12} step={0.5} value={calcRate}
+                style={{ '--pct': `${((calcRate - 2) / 10) * 100}%` } as React.CSSProperties}
+                onChange={e => setCalcRate(Number(e.target.value))} />
+            </CalcSliderRow>
+            <CalcSliderRow>
+              <CalcSliderLabel><CalcSliderName>תקופה</CalcSliderName><CalcSliderVal>{calcYears} שנים</CalcSliderVal></CalcSliderLabel>
+              <CalcSlider min={5} max={30} step={1} value={calcYears}
+                style={{ '--pct': `${((calcYears - 5) / 25) * 100}%` } as React.CSSProperties}
+                onChange={e => setCalcYears(Number(e.target.value))} />
+            </CalcSliderRow>
+            {calcMortgage && (
+              <CalcResult>
+                <CalcResultItem><CalcResultVal $gold>{fmt.price(calcMortgage.monthly)}</CalcResultVal><CalcResultLabel>החזר חודשי</CalcResultLabel></CalcResultItem>
+                <CalcResultItem><CalcResultVal>{fmt.price(calcMortgage.down)}</CalcResultVal><CalcResultLabel>הון עצמי</CalcResultLabel></CalcResultItem>
+                <CalcResultItem><CalcResultVal>{fmt.price(calcMortgage.loan)}</CalcResultVal><CalcResultLabel>סכום הלוואה</CalcResultLabel></CalcResultItem>
+                <CalcResultItem><CalcResultVal>{fmt.price(calcMortgage.monthly * calcYears * 12)}</CalcResultVal><CalcResultLabel>סה״כ החזר</CalcResultLabel></CalcResultItem>
+              </CalcResult>
+            )}
+          </CalcCard>
+          {selected && (
+            <CalcCard>
+              <CalcTitle>חלקה נבחרת</CalcTitle>
+              <div style={{ fontSize: 14, color: t.textSec }}>
+                {selected.city} · גוש {p(selected).block} · חלקה {selected.number}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: t.gold, marginTop: 8 }}>
+                {fmt.price(p(selected).price)}
+              </div>
+              <button onClick={() => { setCalcPrice(p(selected).price); }} style={{
+                marginTop: 12, padding: '8px 16px', background: t.goldDim, border: `1px solid ${t.goldBorder}`,
+                borderRadius: t.r.md, color: t.gold, fontSize: 13, fontWeight: 600, fontFamily: t.font, cursor: 'pointer',
+              }}>השתמש במחיר הזה</button>
+            </CalcCard>
+          )}
+        </MobileOverlay>
+
         <MobileNav>
           <NavBtn $active={tab==='map'} onClick={()=>setTab('map')}><MapIcon size={20}/>מפה</NavBtn>
-          <NavBtn $active={tab==='fav'} onClick={()=>setTab('fav')}><Heart size={20}/>מועדפים</NavBtn>
+          <NavBtn $active={tab==='fav'} onClick={()=>setTab('fav')}><Heart size={20}/>מועדפים{favIds.length > 0 && <span style={{fontSize:9,color:t.gold,fontWeight:700}}>({favIds.length})</span>}</NavBtn>
           <NavBtn $active={tab==='calc'} onClick={()=>setTab('calc')}><Calculator size={20}/>מחשבון</NavBtn>
-          <NavBtn $active={tab==='areas'} onClick={()=>setTab('areas')}><Layers size={20}/>אזורים</NavBtn>
+          <NavBtn $active={tab==='areas'} onClick={()=>{ setTab('map'); setListOpen(o => !o) }}><Layers size={20}/>רשימה</NavBtn>
         </MobileNav>
       </ErrorBoundary>
     </Wrap>

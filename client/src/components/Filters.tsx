@@ -143,6 +143,16 @@ export default function FiltersBar({ filters, onChange, resultCount }: Props) {
   // Cycle animated placeholder
   useEffect(() => { const id = setInterval(() => setPhIdx(i => (i + 1) % PLACEHOLDERS.length), 3000); return () => clearInterval(id) }, [])
 
+  // ESC to close filter drawer
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setOpen(false); e.stopPropagation() }
+    }
+    window.addEventListener('keydown', handler, true)
+    return () => window.removeEventListener('keydown', handler, true)
+  }, [open])
+
   const activeCount = useMemo(() =>
     Object.entries(filters).filter(([k, v]) => k !== 'search' && k !== 'ripeness' && k !== 'minRoi' && v && v !== 'all').length, [filters])
 
