@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter, getLocationTags } from '../utils'
 import type { Plot } from '../types'
-import { GoldButton, GhostButton, Badge, RadialScore, InfoTooltip } from './UI'
+import { GoldButton, GhostButton, Badge, RadialScore, InfoTooltip, PriceAlertButton } from './UI'
 
 /* ── Animations ── */
 const slideIn = keyframes`from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}`
@@ -1373,6 +1373,9 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
 
         <Footer>
           <GoldButton style={{ flex: 1 }} onClick={onLead}><Phone size={16} />קבל פרטים</GoldButton>
+          <PriceAlertButton plotId={plot.id} onToggle={(active) => {
+            // Toast feedback would be nice but we don't have toast context here
+          }} />
           <ShareBtn $copied={copied} onClick={handleShare} aria-label="שתף חלקה">
             {copied ? <Check size={15} /> : <Share2 size={15} />}
           </ShareBtn>

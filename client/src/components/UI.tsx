@@ -1,7 +1,7 @@
 import { Component, useState, useEffect, useCallback, useRef, useMemo, createContext, useContext, type ReactNode } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { t, fadeInUp, popIn, countUp, mobile } from '../theme'
-import { X, AlertTriangle, Check, ChevronDown, Search as SearchIcon, Heart, Eye, TrendingUp, TrendingDown, MessageCircle, ArrowUp } from 'lucide-react'
+import { X, AlertTriangle, Check, ChevronDown, Search as SearchIcon, Heart, Eye, TrendingUp, TrendingDown, MessageCircle, ArrowUp, Bell, BellOff } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Plot } from '../types'
 import { p, roi, calcScore, getGrade, fmt, statusColors, statusLabels, daysOnMarket } from '../utils'
@@ -737,5 +737,216 @@ export const ScrollToTop = ({ threshold = 400 }: { threshold?: number }) => {
     <STTBtn $visible={visible} onClick={scrollUp} aria-label="חזרה למעלה" title="חזרה למעלה">
       <ArrowUp size={20} />
     </STTBtn>
+  )
+}
+
+/* ── 10. ExploreLoadingSkeleton — Premium shimmer loading state for Explore page ── */
+const skeletonFadeIn = keyframes`from{opacity:0}to{opacity:1}`
+const skeletonPulse = keyframes`0%,100%{opacity:0.6}50%{opacity:0.3}`
+
+const SkWrap = styled.div`
+  position:absolute;inset:0;z-index:2;background:${t.bg};
+  animation:${skeletonFadeIn} 0.3s ease-out;display:flex;flex-direction:column;
+`
+const SkMap = styled.div`
+  flex:1;position:relative;overflow:hidden;
+  background:linear-gradient(180deg,${t.bg} 0%,#0d1526 50%,${t.bg} 100%);
+`
+const SkMapGrid = styled.div`
+  position:absolute;inset:0;opacity:0.04;
+  background-image:
+    linear-gradient(rgba(212,168,75,0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212,168,75,0.3) 1px, transparent 1px);
+  background-size:60px 60px;
+`
+const SkMapPlots = styled.div`
+  position:absolute;inset:40px;display:flex;flex-wrap:wrap;gap:20px;
+  align-items:center;justify-content:center;
+`
+const SkPlot = styled.div<{$w:number;$h:number;$delay:number}>`
+  width:${pr=>pr.$w}px;height:${pr=>pr.$h}px;border-radius:4px;
+  background:linear-gradient(135deg,rgba(212,168,75,0.06),rgba(212,168,75,0.02));
+  border:1px solid rgba(212,168,75,0.08);
+  animation:${skeletonPulse} 2s ease-in-out ${pr=>pr.$delay}s infinite;
+`
+const SkFilter = styled.div`
+  position:absolute;top:16px;left:50%;transform:translateX(-50%);
+  width:min(520px,calc(100% - 32px));height:52px;
+  background:${t.glass};backdrop-filter:blur(16px);
+  border:1px solid ${t.glassBorder};border-radius:${t.r.xl};
+  display:flex;align-items:center;gap:10px;padding:0 16px;
+  ${mobile}{top:8px;left:8px;right:8px;transform:none;width:auto;}
+`
+const SkStats = styled.div`
+  position:absolute;bottom:0;left:0;right:0;height:36px;
+  background:${t.glass};backdrop-filter:blur(12px);
+  border-top:1px solid ${t.border};
+  display:flex;align-items:center;justify-content:center;gap:24px;padding:0 16px;
+  ${mobile}{bottom:56px;gap:10px;}
+`
+const SkControls = styled.div`
+  position:absolute;bottom:24px;left:16px;display:flex;flex-direction:column;gap:10px;
+`
+const SkControlBtn = styled.div`
+  width:40px;height:40px;border-radius:${t.r.md};
+  background:${t.glass};border:1px solid ${t.glassBorder};
+  animation:${skeletonPulse} 2s ease-in-out 0.2s infinite;
+`
+const SkMobileNav = styled.div`
+  display:none;height:56px;
+  background:${t.surface};border-top:1px solid ${t.border};
+  align-items:center;justify-content:space-around;padding:0 16px;
+  ${mobile}{display:flex;}
+`
+const SkMobileNavItem = styled.div`
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+`
+const SkLoadingText = styled.div`
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;gap:12px;
+  z-index:3;
+`
+const SkLoadingDots = styled.div`
+  display:flex;gap:6px;
+`
+const SkDot = styled.div<{$delay:number}>`
+  width:8px;height:8px;border-radius:50%;
+  background:${t.gold};
+  animation:${skeletonPulse} 1.2s ease-in-out ${pr=>pr.$delay}s infinite;
+`
+
+export const ExploreLoadingSkeleton = () => (
+  <SkWrap>
+    <SkMap>
+      <SkMapGrid />
+      <SkMapPlots>
+        <SkPlot $w={80} $h={60} $delay={0} />
+        <SkPlot $w={120} $h={80} $delay={0.15} />
+        <SkPlot $w={60} $h={50} $delay={0.3} />
+        <SkPlot $w={100} $h={70} $delay={0.45} />
+        <SkPlot $w={90} $h={55} $delay={0.6} />
+        <SkPlot $w={70} $h={65} $delay={0.2} />
+        <SkPlot $w={110} $h={75} $delay={0.4} />
+      </SkMapPlots>
+
+      {/* Search bar skeleton */}
+      <SkFilter>
+        <Skeleton $w="16px" $h="16px" $r="50%" />
+        <Skeleton $w="60%" $h="14px" />
+        <div style={{ flex: 1 }} />
+        <Skeleton $w="40px" $h="40px" $r={t.r.md} />
+      </SkFilter>
+
+      {/* Map controls skeleton */}
+      <SkControls>
+        <SkControlBtn />
+        <SkControlBtn />
+        <div style={{ display: 'flex', flexDirection: 'column', borderRadius: t.r.md, overflow: 'hidden' }}>
+          <SkControlBtn style={{ borderRadius: `${t.r.md} ${t.r.md} 0 0` }} />
+          <SkControlBtn style={{ borderRadius: `0 0 ${t.r.md} ${t.r.md}` }} />
+        </div>
+        <SkControlBtn />
+      </SkControls>
+
+      {/* Center loading indicator */}
+      <SkLoadingText>
+        <Spinner size={32} />
+        <span style={{ fontSize: 13, fontWeight: 600, color: t.textDim, letterSpacing: '0.5px' }}>
+          טוען חלקות...
+        </span>
+        <SkLoadingDots>
+          <SkDot $delay={0} />
+          <SkDot $delay={0.2} />
+          <SkDot $delay={0.4} />
+        </SkLoadingDots>
+      </SkLoadingText>
+
+      {/* Stats bar skeleton */}
+      <SkStats>
+        <Skeleton $w="50px" $h="10px" />
+        <Skeleton $w="70px" $h="10px" />
+        <Skeleton $w="60px" $h="10px" />
+        <Skeleton $w="55px" $h="10px" />
+        <Skeleton $w="45px" $h="10px" />
+      </SkStats>
+    </SkMap>
+
+    {/* Mobile nav skeleton */}
+    <SkMobileNav>
+      {[0, 1, 2, 3].map(i => (
+        <SkMobileNavItem key={i}>
+          <Skeleton $w="20px" $h="20px" $r="4px" />
+          <Skeleton $w="28px" $h="8px" />
+        </SkMobileNavItem>
+      ))}
+    </SkMobileNav>
+  </SkWrap>
+)
+
+/* ── 11. PriceAlertButton — Subscribe to price changes for a plot ── */
+const alertPop = keyframes`0%{transform:scale(0.8)}50%{transform:scale(1.1)}100%{transform:scale(1)}`
+
+const AlertBtn = styled.button<{$active:boolean}>`
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  width:40px;height:40px;border-radius:${t.r.md};
+  border:1px solid ${pr=>pr.$active ? '#8B5CF6' : t.border};
+  background:${pr=>pr.$active ? 'rgba(139,92,246,0.12)' : 'transparent'};
+  color:${pr=>pr.$active ? '#8B5CF6' : t.textSec};
+  cursor:pointer;transition:all ${t.tr};flex-shrink:0;
+  &:hover{border-color:${pr=>pr.$active ? '#8B5CF6' : t.goldBorder};
+    color:${pr=>pr.$active ? '#A78BFA' : t.gold};
+    background:${pr=>pr.$active ? 'rgba(139,92,246,0.15)' : t.goldDim};}
+  ${pr=>pr.$active && `svg{animation:${alertPop} 0.3s ease-out;}`}
+`
+
+const AlertTooltip = styled.div<{$show:boolean}>`
+  position:absolute;bottom:calc(100% + 8px);right:0;
+  padding:8px 14px;background:${t.surface};border:1px solid #8B5CF6;
+  border-radius:${t.r.md};box-shadow:${t.sh.lg};
+  font-size:12px;font-weight:600;color:${t.text};white-space:nowrap;direction:rtl;
+  opacity:${pr=>pr.$show?1:0};transform:translateY(${pr=>pr.$show?'0':'4px'});
+  transition:all 0.2s;pointer-events:none;z-index:5;
+  &::after{content:'';position:absolute;bottom:-5px;right:14px;
+    width:10px;height:10px;background:${t.surface};border-right:1px solid #8B5CF6;
+    border-bottom:1px solid #8B5CF6;transform:rotate(45deg);}
+`
+
+function readAlertSet(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem('price_alerts') || '[]')) } catch { return new Set() }
+}
+function writeAlertSet(s: Set<string>) { localStorage.setItem('price_alerts', JSON.stringify([...s])) }
+
+export function PriceAlertButton({ plotId, onToggle }: { plotId: string; onToggle?: (active: boolean) => void }) {
+  const [alerts, setAlerts] = useState<Set<string>>(() => readAlertSet())
+  const [showTooltip, setShowTooltip] = useState(false)
+  const isActive = alerts.has(plotId)
+
+  const toggle = useCallback(() => {
+    setAlerts(prev => {
+      const next = new Set(prev)
+      if (next.has(plotId)) next.delete(plotId)
+      else next.add(plotId)
+      writeAlertSet(next)
+      onToggle?.(!isActive)
+      return next
+    })
+  }, [plotId, isActive, onToggle])
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <AlertBtn
+        $active={isActive}
+        onClick={toggle}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        aria-label={isActive ? 'בטל התראת מחיר' : 'התראה על שינוי מחיר'}
+        title={isActive ? 'בטל התראת מחיר' : 'התראה על שינוי מחיר'}
+      >
+        {isActive ? <BellOff size={15} /> : <Bell size={15} />}
+      </AlertBtn>
+      <AlertTooltip $show={showTooltip}>
+        {isActive ? '🔕 בטל התראת מחיר' : '🔔 הודע לי על שינוי מחיר'}
+      </AlertTooltip>
+    </div>
   )
 }

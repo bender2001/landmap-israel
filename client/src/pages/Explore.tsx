@@ -6,7 +6,7 @@ import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation, useOnlineStatus, useIsMobile } from '../hooks'
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
-import { ErrorBoundary, Spinner, useToast, Badge, NetworkBanner, AnimatedValue, DemoModeBanner } from '../components/UI'
+import { ErrorBoundary, Spinner, useToast, Badge, NetworkBanner, AnimatedValue, DemoModeBanner, ExploreLoadingSkeleton } from '../components/UI'
 import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance, zoningLabels, calcAggregateStats, estimatedYear, plotCenter, SITE_CONFIG } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
@@ -768,6 +768,48 @@ export default function Explore() {
     if (pl) addRecentlyViewed(pl.id)
   }, [addRecentlyViewed])
 
+  // Mobile preview swipe-to-dismiss
+  const previewRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!selected || mobileExpanded || !previewRef.current) return
+    const el = previewRef.current
+    let startY = 0, currentY = 0, isDragging = false
+    const onTouchStart = (e: TouchEvent) => {
+      startY = e.touches[0].clientY; currentY = startY; isDragging = true
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isDragging) return
+      currentY = e.touches[0].clientY
+      const dy = currentY - startY
+      if (dy > 0) { // only allow downward swipe
+        el.style.transform = `translateY(${Math.min(dy, 250)}px)`
+        el.style.opacity = `${Math.max(0.3, 1 - dy / 300)}`
+        el.style.transition = 'none'
+      }
+    }
+    const onTouchEnd = () => {
+      if (!isDragging) return
+      isDragging = false
+      const dy = currentY - startY
+      el.style.transition = ''
+      el.style.opacity = ''
+      if (dy > 100) {
+        el.style.transform = 'translateY(120%)'
+        setTimeout(() => { setSelected(null); if (el) { el.style.transform = '' } }, 200)
+      } else {
+        el.style.transform = ''
+      }
+    }
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: true })
+    el.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [selected, mobileExpanded])
+
   // WhatsApp tooltip hover state
   const [waHover, setWaHover] = useState(false)
 
@@ -973,7 +1015,7 @@ export default function Explore() {
           <DemoModeBanner onRetry={() => window.location.reload()} />
         )}
         <TopProgress $show={isLoading} />
-        {isLoading && <Loader><Spinner size={36} /></Loader>}
+        {isLoading && <ExploreLoadingSkeleton />}
         <MapArea
           plots={sorted} pois={pois} selected={selected} darkMode
           onSelect={selectPlot} onLead={setLeadPlot}
@@ -1051,7 +1093,7 @@ export default function Explore() {
             waze: `https://waze.com/ul?ll=${center.lat},${center.lng}&z=17&navigate=yes`,
           } : null
           return (
-            <MobilePreview $show={true}>
+            <MobilePreview $show={true} ref={previewRef}>
               <PreviewHandle />
               <PreviewBody>
                 <PreviewTopRow>
