@@ -81,6 +81,9 @@ export const GlobalStyles = createGlobalStyle`
   /* Polygon effects */
   .leaflet-overlay-pane path{filter:drop-shadow(0 0 4px currentColor);transition:fill-opacity 0.3s,filter 0.3s,stroke-width 0.3s;cursor:pointer!important}
   .leaflet-overlay-pane path:hover{filter:drop-shadow(0 0 12px currentColor) drop-shadow(0 0 24px currentColor);stroke-width:3.5!important}
+  /* Selected polygon pulsing glow */
+  .leaflet-overlay-pane path.plot-selected{animation:plotSelectedPulse 2s ease-in-out infinite;stroke-width:3.5!important}
+  @keyframes plotSelectedPulse{0%,100%{filter:drop-shadow(0 0 8px currentColor) drop-shadow(0 0 16px rgba(212,168,75,0.3))}50%{filter:drop-shadow(0 0 18px currentColor) drop-shadow(0 0 36px rgba(212,168,75,0.5))}}
 
   .map-vignette{position:absolute;inset:0;pointer-events:none;z-index:10;background:radial-gradient(ellipse 80% 75% at 50% 50%,transparent 60%,rgba(0,0,0,0.15) 100%)}
 

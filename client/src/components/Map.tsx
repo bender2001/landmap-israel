@@ -1,7 +1,7 @@
 import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker, useMap, WMSTileLayer } from 'react-leaflet'
 import L from 'leaflet'
-import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Palette } from 'lucide-react'
+import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette } from 'lucide-react'
 import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
@@ -122,6 +122,8 @@ interface MapProps {
   compare?: { has: (id: string) => boolean; toggle: (id: string) => void }
   darkMode?: boolean
   filterCity?: string
+  fullscreen?: boolean
+  onToggleFullscreen?: () => void
 }
 
 // ── URL Sync ──
@@ -314,12 +316,13 @@ function MapLegend({ colorMode, darkMode }: { colorMode: ColorMode; darkMode: bo
 }
 
 // ── Map Controls Column (Zoom + Layers) ──
-function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCadastral, showAreas, setShowAreas, switcherOpen, setSwitcherOpen, colorMode, setColorMode }: {
+function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCadastral, showAreas, setShowAreas, switcherOpen, setSwitcherOpen, colorMode, setColorMode, fullscreen, onToggleFullscreen }: {
   darkMode: boolean; tileIdx: number; setTileIdx: (i: number) => void
   showCadastral: boolean; setShowCadastral: (fn: (v: boolean) => boolean) => void
   showAreas: boolean; setShowAreas: (fn: (v: boolean) => boolean) => void
   switcherOpen: boolean; setSwitcherOpen: (v: boolean) => void
   colorMode: ColorMode; setColorMode: (mode: ColorMode) => void
+  fullscreen?: boolean; onToggleFullscreen?: () => void
 }) {
   const btnStyle = (darkMode: boolean): React.CSSProperties => ({
     width: 40, height: 40, border: `1px solid ${darkMode ? t.goldBorder : t.lBorder}`,
@@ -328,9 +331,34 @@ function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCada
     backdropFilter: 'blur(12px)', color: darkMode ? t.gold : t.lText,
     fontSize: 18, fontWeight: 700, transition: `all ${t.tr}`, fontFamily: t.font,
   })
+  // Larger touch targets on mobile via CSS media query — inline styles applied conditionally
+  const isMobileTouch = typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches
+  const mobileBtnStyle = (darkMode: boolean): React.CSSProperties => ({
+    ...btnStyle(darkMode),
+    ...(isMobileTouch ? { width: 48, height: 48 } : {}),
+  })
 
   return (
     <div style={{ position: 'absolute', bottom: 24, left: 16, zIndex: t.z.controls, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Fullscreen toggle */}
+      {onToggleFullscreen && (
+        <button
+          onClick={onToggleFullscreen}
+          style={{
+            ...mobileBtnStyle(darkMode), boxShadow: t.sh.md,
+            background: fullscreen
+              ? `linear-gradient(135deg,${t.gold},${t.goldBright})`
+              : (darkMode ? 'rgba(11,17,32,0.88)' : 'rgba(255,255,255,0.92)'),
+            color: fullscreen ? t.bg : (darkMode ? t.gold : t.lText),
+            border: fullscreen ? `1px solid ${t.gold}` : `1px solid ${darkMode ? t.goldBorder : t.lBorder}`,
+          }}
+          aria-label={fullscreen ? 'יציאה ממצב מסך מלא' : 'מסך מלא'}
+          title={fullscreen ? 'יציאה ממצב מסך מלא' : 'מסך מלא — הסתר ממשק'}
+        >
+          {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        </button>
+      )}
+
       {/* Fit all plots */}
       <button
         onClick={() => {
@@ -338,19 +366,19 @@ function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCada
             mapRef.current.flyToBounds(plotBoundsRef.current, { padding: [60, 60], maxZoom: 14, duration: 0.8 })
           }
         }}
-        style={{ ...btnStyle(darkMode), boxShadow: t.sh.md }}
+        style={{ ...mobileBtnStyle(darkMode), boxShadow: t.sh.md }}
         aria-label="הצג את כל החלקות"
         title="הצג הכל"
       >
-        <Maximize2 size={16} />
+        <MapIcon size={16} />
       </button>
 
       {/* Zoom buttons */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0, borderRadius: t.r.md, overflow: 'hidden', boxShadow: t.sh.md }}>
         <button onClick={() => mapRef.current?.zoomIn()}
-          style={{ ...btnStyle(darkMode), borderRadius: `${t.r.md} ${t.r.md} 0 0`, borderBottom: 'none' }} aria-label="הגדל">+</button>
+          style={{ ...mobileBtnStyle(darkMode), borderRadius: `${t.r.md} ${t.r.md} 0 0`, borderBottom: 'none' }} aria-label="הגדל">+</button>
         <button onClick={() => mapRef.current?.zoomOut()}
-          style={{ ...btnStyle(darkMode), borderRadius: `0 0 ${t.r.md} ${t.r.md}` }} aria-label="הקטן">−</button>
+          style={{ ...mobileBtnStyle(darkMode), borderRadius: `0 0 ${t.r.md} ${t.r.md}` }} aria-label="הקטן">−</button>
       </div>
 
       {/* Color mode toggle */}
@@ -361,7 +389,7 @@ function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCada
           setColorMode(modes[(idx + 1) % modes.length])
         }}
         style={{
-          ...btnStyle(darkMode), boxShadow: t.sh.md,
+          ...mobileBtnStyle(darkMode), boxShadow: t.sh.md,
           position: 'relative',
         }}
         aria-label={`צביעה לפי: ${COLOR_MODE_LABELS[colorMode]}`}
@@ -387,7 +415,7 @@ function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCada
       }}>
         {!switcherOpen ? (
           <button onClick={() => setSwitcherOpen(true)} style={{
-            ...btnStyle(darkMode), border: 'none', background: 'transparent',
+            ...mobileBtnStyle(darkMode), border: 'none', background: 'transparent',
           }} aria-label="שכבות מפה">
             <Layers size={18} />
           </button>
@@ -443,7 +471,7 @@ function ZoomTracker({ onChange }: { onChange: (z: number) => void }) {
 }
 
 // ── Main Component ──
-function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, darkMode = false, filterCity }: MapProps) {
+function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, darkMode = false, filterCity, fullscreen, onToggleFullscreen }: MapProps) {
   const [tileIdx, setTileIdx] = useState(2) // default to dark tiles for cohesive dark UI
   const [showCadastral, setShowCadastral] = useState(false)
   const [showAreas, setShowAreas] = useState(true)
@@ -592,7 +620,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
             <Polygon key={plot.id} positions={plot.coordinates} eventHandlers={{
               click: () => onSelect(plot),
               mouseover: () => prefetch(plot.id),
-            }} pathOptions={{ color, weight: isSel ? 3.5 : 2, fillColor: color, fillOpacity: isSel ? 0.35 : 0.18 }}>
+            }} pathOptions={{ color: isSel ? t.gold : color, weight: isSel ? 3.5 : 2, fillColor: isSel ? t.gold : color, fillOpacity: isSel ? 0.4 : 0.18, className: isSel ? 'plot-selected' : undefined }}>
               <Tooltip className="price-tooltip plot-tooltip-rich" direction="top" offset={[0, -8]} opacity={1}>
                 <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -693,7 +721,8 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         showCadastral={showCadastral} setShowCadastral={setShowCadastral}
         showAreas={showAreas} setShowAreas={setShowAreas}
         switcherOpen={switcherOpen} setSwitcherOpen={setSwitcherOpen}
-        colorMode={colorMode} setColorMode={setColorMode} />
+        colorMode={colorMode} setColorMode={setColorMode}
+        fullscreen={fullscreen} onToggleFullscreen={onToggleFullscreen} />
     </div>
   )
 }

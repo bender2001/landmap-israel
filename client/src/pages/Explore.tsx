@@ -435,8 +435,9 @@ const KbdFooter = styled.div`
 
 const SHORTCUTS = [
   { keys: ['?'], label: 'פתח/סגור קיצורי מקשים' },
+  { keys: ['F'], label: 'מצב מסך מלא (הסתר ממשק)' },
   { keys: ['L'], label: 'פתח/סגור רשימת חלקות' },
-  { keys: ['Esc'], label: 'סגור סרגל צד / חלון' },
+  { keys: ['Esc'], label: 'סגור סרגל צד / חלון / מסך מלא' },
   { keys: ['←'], label: 'חלקה הבאה (כשסרגל צד פתוח)' },
   { keys: ['→'], label: 'חלקה קודמת (כשסרגל צד פתוח)' },
 ]
@@ -485,6 +486,8 @@ export default function Explore() {
   const { online, wasOffline } = useOnlineStatus()
   const isMobile = useIsMobile()
   const [mobileExpanded, setMobileExpanded] = useState(false)
+  const [mapFullscreen, setMapFullscreen] = useState(false)
+  const toggleFullscreen = useCallback(() => setMapFullscreen(f => !f), [])
 
   // Mobile calculator state
   const [calcPrice, setCalcPrice] = useState(500000)
@@ -722,9 +725,14 @@ export default function Explore() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (e.key === 'Escape') {
         if (shortcutsOpen) { setShortcutsOpen(false); return }
+        if (mapFullscreen) { setMapFullscreen(false); return }
         if (sortOpen) setSortOpen(false)
         else if (selected) setSelected(null)
         else if (listOpen) setListOpen(false)
+      }
+      // 'F' key to toggle fullscreen map mode
+      if (e.key === 'f' || e.key === 'F') {
+        setMapFullscreen(f => !f)
       }
       // '?' key to toggle shortcuts help
       if (e.key === '?') {
@@ -766,12 +774,14 @@ export default function Explore() {
           favorites={{ isFav, toggle }}
           compare={{ has: isCompared, toggle: toggleCompare }}
           filterCity={filters.city}
+          fullscreen={mapFullscreen}
+          onToggleFullscreen={toggleFullscreen}
         />
-        <FilterBar filters={filters} onChange={setFilters} resultCount={filtered.length}
-          plots={plots} onSelectPlot={(id) => { const pl = plots.find(pp => pp.id === id); if (pl) selectPlot(pl) }} />
+        {!mapFullscreen && <FilterBar filters={filters} onChange={setFilters} resultCount={filtered.length}
+          plots={plots} onSelectPlot={(id) => { const pl = plots.find(pp => pp.id === id); if (pl) selectPlot(pl) }} />}
 
         {/* Empty state when no plots match filters */}
-        {!isLoading && filtered.length === 0 && hasActiveFilters && (
+        {!mapFullscreen && !isLoading && filtered.length === 0 && hasActiveFilters && (
           <EmptyWrap>
             <EmptyIcon><SearchX size={28} color={t.gold} /></EmptyIcon>
             <EmptyTitle>לא נמצאו חלקות</EmptyTitle>
@@ -781,7 +791,7 @@ export default function Explore() {
         )}
 
         {/* Sort dropdown */}
-        <SortWrap ref={sortRef}>
+        {!mapFullscreen && <SortWrap ref={sortRef}>
           <SortBtn onClick={() => setSortOpen(o => !o)} $active={sortKey !== 'recommended'}>
             <ArrowUpDown size={14} />
             {SORT_OPTIONS.find(o => o.key === sortKey)?.label || 'מיון'}
@@ -795,7 +805,7 @@ export default function Explore() {
               ))}
             </SortDrop>
           )}
-        </SortWrap>
+        </SortWrap>}
 
         <Suspense fallback={null}>
           <PlotListPanel
@@ -879,7 +889,7 @@ export default function Explore() {
         <Suspense fallback={null}><Chat plotId={selected?.id ?? null} /></Suspense>
 
         {/* Floating Compare Bar */}
-        {compareIds.length > 0 && (
+        {!mapFullscreen && compareIds.length > 0 && (
           <CompareBar>
             <GitCompareArrows size={16} color={t.gold} />
             <span style={{ fontSize: 13, fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>השוואה ({compareIds.length})</span>
@@ -913,7 +923,7 @@ export default function Explore() {
           {filtered.length > 0 ? `נמצאו ${filtered.length} חלקות` : 'לא נמצאו חלקות התואמות את הסינון'}
         </div>
 
-        <Stats>
+        {!mapFullscreen && <Stats>
           <Stat><Val>{filtered.length}</Val> חלקות</Stat>
           {marketPulse && marketPulse.totalValue > 0 && <Stat>סה״כ <Val>{fmt.compact(marketPulse.totalValue)}</Val></Stat>}
           <Stat>ממוצע <Val>{fmt.compact(avg)}</Val></Stat>
@@ -927,7 +937,7 @@ export default function Explore() {
           {sortKey === 'nearest' && userGeo.error && <Stat style={{color:t.err}}>⚠️ שגיאה</Stat>}
           {dataFreshness && <Stat>🕐 <span style={{opacity:0.7}}>{dataFreshness}</span></Stat>}
           <Demo>{dataSource === 'api' ? 'LIVE' : 'DEMO'}</Demo>
-        </Stats>
+        </Stats>}
 
         {/* Mobile Favorites Overlay */}
         <MobileOverlay $open={tab === 'fav'}>
@@ -1021,7 +1031,7 @@ export default function Explore() {
         </MobileOverlay>
 
         {/* City Statistics Card (appears when filtering by city) */}
-        {cityStats && !cityStatsDismissed && !selected && (
+        {!mapFullscreen && cityStats && !cityStatsDismissed && !selected && (
           <CityStatsCard>
             <CityStatsHeader>
               <Building2 size={16} color={t.gold} />
@@ -1055,7 +1065,7 @@ export default function Explore() {
         )}
 
         {/* Market Pulse Widget — investment at-a-glance (desktop only, when no plot/city selected) */}
-        {marketPulse && !selected && !cityStats && !listOpen && filtered.length >= 2 && (
+        {!mapFullscreen && marketPulse && !selected && !cityStats && !listOpen && filtered.length >= 2 && (
           <MarketPulseWrap>
             <PulseCell>
               <PulseVal>{fmt.compact(marketPulse.totalValue)}</PulseVal>
@@ -1083,7 +1093,7 @@ export default function Explore() {
         )}
 
         {/* Recently Viewed Strip (show only when user has viewed plots and no sidebar is open) */}
-        {recentPlots.length > 0 && !selected && !listOpen && !cityStats && (
+        {!mapFullscreen && recentPlots.length > 0 && !selected && !listOpen && !cityStats && (
           <RecentStrip>
             <RecentLabel><Clock size={12} /> ראיתם לאחרונה</RecentLabel>
             {recentPlots.map(pl => (
@@ -1095,7 +1105,7 @@ export default function Explore() {
         )}
 
         {/* WhatsApp Floating CTA */}
-        <WhatsAppFab
+        {!mapFullscreen && <WhatsAppFab
           href={waLink}
           target="_blank" rel="noopener noreferrer"
           aria-label="שלח הודעה בוואטסאפ"
@@ -1103,8 +1113,8 @@ export default function Explore() {
           onMouseLeave={() => setWaHover(false)}
         >
           <MessageCircle size={26} />
-        </WhatsAppFab>
-        {waHover && <WhatsAppTooltip>{selected ? `שאל על חלקה ${selected.number}` : 'דברו עם מומחה קרקע'}</WhatsAppTooltip>}
+        </WhatsAppFab>}
+        {!mapFullscreen && waHover && <WhatsAppTooltip>{selected ? `שאל על חלקה ${selected.number}` : 'דברו עם מומחה קרקע'}</WhatsAppTooltip>}
 
         {/* Keyboard Shortcuts Help Dialog */}
         <KbdBackdrop $open={shortcutsOpen} onClick={() => setShortcutsOpen(false)}>
@@ -1132,12 +1142,12 @@ export default function Explore() {
           </KbdPanel>
         </KbdBackdrop>
 
-        <MobileNav role="navigation" aria-label="ניווט ראשי">
+        {!mapFullscreen && <MobileNav role="navigation" aria-label="ניווט ראשי">
           <NavBtn $active={tab==='map'} onClick={()=>setTab('map')} aria-label="מפה" aria-current={tab==='map'?'page':undefined}><MapIcon size={20}/>מפה</NavBtn>
           <NavBtn $active={tab==='fav'} onClick={()=>setTab('fav')} aria-label={`מועדפים${favIds.length>0?` (${favIds.length})`:''}`} aria-current={tab==='fav'?'page':undefined}><Heart size={20}/>מועדפים{favIds.length > 0 && <span style={{fontSize:9,color:t.gold,fontWeight:700}}>({favIds.length})</span>}</NavBtn>
           <NavBtn $active={tab==='calc'} onClick={()=>setTab('calc')} aria-label="מחשבון מימון" aria-current={tab==='calc'?'page':undefined}><Calculator size={20}/>מחשבון</NavBtn>
           <NavBtn $active={tab==='areas'} onClick={()=>{ setTab('map'); setListOpen(o => !o) }} aria-label="רשימת חלקות" aria-current={listOpen?'page':undefined}><Layers size={20}/>רשימה</NavBtn>
-        </MobileNav>
+        </MobileNav>}
       </ErrorBoundary>
     </Wrap>
   )
