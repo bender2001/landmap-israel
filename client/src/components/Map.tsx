@@ -2,7 +2,7 @@ import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, useMap, WMSTileLayer } from 'react-leaflet'
 import L from 'leaflet'
 import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink } from 'lucide-react'
-import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm } from '../utils'
+import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, zoningLabels } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
 import { israelAreas } from '../data'
@@ -271,13 +271,19 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         {plots.map(plot => {
           if (!plot.coordinates?.length) return null
           const d = p(plot), color = statusColors[plot.status || ''] || '#10B981', isSel = selected?.id === plot.id
+          const score = calcScore(plot), grade = getGrade(score)
           return (
             <Polygon key={plot.id} positions={plot.coordinates} eventHandlers={{
               click: () => onSelect(plot),
               mouseover: () => prefetch(plot.id),
             }} pathOptions={{ color, weight: isSel ? 3.5 : 2, fillColor: color, fillOpacity: isSel ? 0.35 : 0.18 }}>
-              <Tooltip className="price-tooltip" direction="top" offset={[0, -8]} opacity={1}>
-                {fmt.short(d.price)}
+              <Tooltip className="price-tooltip plot-tooltip-rich" direction="top" offset={[0, -8]} opacity={1}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>{fmt.short(d.price)}</span>
+                  <span style={{ width: 1, height: 10, background: 'currentColor', opacity: 0.2 }} />
+                  <span style={{ fontSize: 10, opacity: 0.7 }}>{fmt.dunam(d.size)} ד׳</span>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: grade.color }}>{grade.grade}</span>
+                </span>
               </Tooltip>
               <Popup maxWidth={280} minWidth={240}>{renderPopup(plot)}</Popup>
             </Polygon>

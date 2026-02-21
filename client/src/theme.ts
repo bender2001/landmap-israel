@@ -88,6 +88,7 @@ export const GlobalStyles = createGlobalStyle`
   .leaflet-tooltip.price-tooltip{background:rgba(255,255,255,0.95)!important;border:1px solid ${t.lBorder}!important;border-radius:${t.r.sm}!important;padding:3px 8px!important;font-family:${t.font}!important;font-size:11px!important;font-weight:700!important;color:${t.black}!important;box-shadow:${t.sh.sm}!important;white-space:nowrap!important;pointer-events:none!important;z-index:15!important}
   .dark .leaflet-tooltip.price-tooltip{background:rgba(11,17,32,0.92)!important;border-color:rgba(212,168,75,0.3)!important;color:${t.goldBright}!important}
   .leaflet-tooltip.price-tooltip::before{display:none!important}
+  .leaflet-tooltip.plot-tooltip-rich{padding:4px 10px!important;border-radius:${t.r.md}!important}
 
   /* Popup inner */
   .plot-popup{padding:16px}

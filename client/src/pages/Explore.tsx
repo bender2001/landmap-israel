@@ -1,12 +1,12 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2 } from 'lucide-react'
+import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed } from '../hooks'
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
-import { ErrorBoundary, Spinner } from '../components/UI'
+import { ErrorBoundary, Spinner, useToast } from '../components/UI'
 import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
@@ -30,7 +30,7 @@ const Stats = styled.div`
   display:flex;align-items:center;justify-content:center;gap:24px;padding:8px 16px;
   background:${t.glass};backdrop-filter:blur(12px);border-top:1px solid ${t.border};
   font-size:12px;color:${t.textSec};direction:rtl;
-  ${mobile}{bottom:56px;gap:12px;font-size:11px;}
+  ${mobile}{bottom:56px;gap:10px;font-size:10px;padding:6px 12px;}
 `
 const Stat = styled.span`display:flex;align-items:center;gap:4px;`
 const Val = styled.span`color:${t.goldBright};font-weight:700;`
@@ -107,6 +107,29 @@ const CompareClear = styled.button`
   &:hover{border-color:${t.err};color:${t.err};background:rgba(239,68,68,0.08);}
 `
 
+/* ── Empty State ── */
+const emptyBounce = keyframes`0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}`
+const EmptyWrap = styled.div`
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:${t.z.filter - 1};
+  display:flex;flex-direction:column;align-items:center;gap:16px;padding:32px 40px;
+  background:${t.glass};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid ${t.glassBorder};border-radius:${t.r.xl};box-shadow:${t.sh.xl};
+  text-align:center;direction:rtl;max-width:380px;width:calc(100vw - 48px);
+`
+const EmptyIcon = styled.div`
+  width:64px;height:64px;border-radius:${t.r.full};display:flex;align-items:center;justify-content:center;
+  background:${t.goldDim};border:1px solid ${t.goldBorder};animation:${emptyBounce} 2.5s ease-in-out infinite;
+`
+const EmptyTitle = styled.h3`font-size:17px;font-weight:700;color:${t.text};margin:0;font-family:${t.font};`
+const EmptyDesc = styled.p`font-size:13px;color:${t.textSec};margin:0;line-height:1.6;`
+const EmptyResetBtn = styled.button`
+  display:inline-flex;align-items:center;gap:6px;padding:10px 24px;
+  background:linear-gradient(135deg,${t.gold},${t.goldBright});color:${t.bg};
+  border:none;border-radius:${t.r.full};font-weight:700;font-size:14px;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};
+  &:hover{box-shadow:${t.sh.glow};transform:translateY(-2px);}
+`
+
 // ── URL ↔ Filters sync helpers ──
 const FILTER_PARAMS: (keyof Filters)[] = ['city', 'priceMin', 'priceMax', 'sizeMin', 'sizeMax', 'ripeness', 'minRoi', 'zoning', 'search']
 
@@ -139,11 +162,25 @@ export default function Explore() {
   })
   const [sortOpen, setSortOpen] = useState(false)
   const [listOpen, setListOpen] = useState(false)
-  const { isFav, toggle, ids: favIds } = useFavorites()
-  const { ids: compareIds, toggle: toggleCompare, clear: clearCompare, has: isCompared } = useCompare()
+  const { isFav, toggle: rawToggleFav, ids: favIds } = useFavorites()
+  const { ids: compareIds, toggle: rawToggleCompare, clear: clearCompare, has: isCompared } = useCompare()
   const { add: addRecentlyViewed } = useRecentlyViewed()
+  const { toast } = useToast()
   const navigate = useNavigate()
   const sortRef = useRef<HTMLDivElement>(null)
+
+  // Wrap favorites/compare toggles with toast feedback
+  const toggle = useCallback((id: string) => {
+    const wasFav = isFav(id)
+    rawToggleFav(id)
+    toast(wasFav ? 'הוסר מהמועדפים' : '❤️ נוסף למועדפים', wasFav ? 'info' : 'success')
+  }, [rawToggleFav, isFav, toast])
+
+  const toggleCompare = useCallback((id: string) => {
+    const wasCompared = isCompared(id)
+    rawToggleCompare(id)
+    toast(wasCompared ? 'הוסר מההשוואה' : '⚖️ נוסף להשוואה', wasCompared ? 'info' : 'success')
+  }, [rawToggleCompare, isCompared, toast])
 
   // Sync filters → URL params (debounced to avoid spam)
   const setFilters = useCallback((f: Filters) => {
@@ -190,6 +227,13 @@ export default function Explore() {
   const avg = filtered.length ? filtered.reduce((s, pl) => s + p(pl).price, 0) / filtered.length : 0
   const avgPps = filtered.length ? Math.round(filtered.reduce((s, pl) => s + pricePerSqm(pl), 0) / filtered.length) : 0
 
+  const hasActiveFilters = useMemo(() =>
+    Object.entries(filters).some(([, v]) => v && v !== 'all'), [filters])
+
+  const resetFilters = useCallback(() => {
+    setFilters(DEFAULTS)
+  }, [setFilters])
+
   // Track recently viewed plots
   const selectPlot = useCallback((pl: Plot | null) => {
     setSelected(pl)
@@ -235,6 +279,16 @@ export default function Explore() {
           compare={{ has: isCompared, toggle: toggleCompare }}
         />
         <FilterBar filters={filters} onChange={setFilters} resultCount={filtered.length} />
+
+        {/* Empty state when no plots match filters */}
+        {!isLoading && filtered.length === 0 && hasActiveFilters && (
+          <EmptyWrap>
+            <EmptyIcon><SearchX size={28} color={t.gold} /></EmptyIcon>
+            <EmptyTitle>לא נמצאו חלקות</EmptyTitle>
+            <EmptyDesc>לא נמצאו חלקות התואמות את הסינון שבחרת. נסו להרחיב את הקריטריונים או לאפס את הסינון.</EmptyDesc>
+            <EmptyResetBtn onClick={resetFilters}><RotateCcw size={14} /> אפס סינון</EmptyResetBtn>
+          </EmptyWrap>
+        )}
 
         {/* Sort dropdown */}
         <SortWrap ref={sortRef}>
@@ -289,6 +343,11 @@ export default function Explore() {
             <CompareClear onClick={clearCompare} aria-label="נקה השוואה"><Trash2 size={14} /></CompareClear>
           </CompareBar>
         )}
+
+        {/* Accessible live region for filter result count */}
+        <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {filtered.length > 0 ? `נמצאו ${filtered.length} חלקות` : 'לא נמצאו חלקות התואמות את הסינון'}
+        </div>
 
         <Stats>
           <Stat><Val>{filtered.length}</Val> חלקות</Stat>
