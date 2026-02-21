@@ -2,7 +2,7 @@ import { memo, useMemo, useCallback, useEffect } from 'react'
 import styled, { keyframes, css } from 'styled-components'
 import { X, TrendingUp, TrendingDown, MapPin, Ruler, DollarSign, BarChart3, ExternalLink, Star, Shield, Clock, Award } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, pricePerSqm, statusLabels, statusColors, zoningLabels, calcCAGR, calcTimeline, calcRisk, exportPlotsCsv } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusLabels, statusColors, zoningLabels, calcCAGR, calcTimeline, calcRisk, exportPlotsCsv } from '../utils'
 import { GoldButton, Badge } from './UI'
 import { useFocusTrap } from '../hooks'
 import type { Plot } from '../types'
@@ -300,6 +300,17 @@ function CompareDrawer({ open, onClose, plots, allPlots }: CompareDrawerProps) {
                   {pps > 0 && <BarWrap><BarFill $pct={(pps / metrics.maxPps) * 100} $color={pl.id === metrics.bestPps ? t.ok : t.warn} /></BarWrap>}
                 </ValueCell>
               ))}
+
+              {/* Price per dunam */}
+              <LabelCell><DollarSign size={13} color={t.textDim} /> ₪/דונם</LabelCell>
+              {metrics.data.map(({ pl }) => {
+                const ppd = pricePerDunam(pl)
+                return (
+                  <ValueCell key={pl.id}>
+                    {ppd > 0 ? fmt.num(ppd) : '—'}
+                  </ValueCell>
+                )
+              })}
 
               {/* ROI */}
               <LabelCell><TrendingUp size={13} color={t.textDim} /> תשואה צפויה</LabelCell>

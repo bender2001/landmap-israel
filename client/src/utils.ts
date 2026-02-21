@@ -44,6 +44,14 @@ export const pricePerSqm = (plot: Plot) => {
   return price > 0 && size > 0 ? Math.round(price / size) : 0
 }
 
+// ── Price per dunam (1000 sqm) — the Israeli land deal standard ──
+export const pricePerDunam = (plot: Plot) => {
+  const { price, size } = p(plot)
+  if (price <= 0 || size <= 0) return 0
+  const dunams = size / 1000
+  return dunams > 0 ? Math.round(price / dunams) : 0
+}
+
 // ── Formatting ──
 const cFmt = new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })
 const kFmt = new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', notation: 'compact', maximumFractionDigits: 1 })
@@ -123,13 +131,14 @@ export function fmtDistance(meters: number): string {
 }
 
 // ── Sort ──
-export type SortKey = 'recommended' | 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc' | 'roi-desc' | 'price-sqm-asc' | 'score-desc' | 'nearest'
+export type SortKey = 'recommended' | 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc' | 'roi-desc' | 'price-sqm-asc' | 'price-dunam-asc' | 'score-desc' | 'nearest'
 export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'recommended', label: 'מומלץ' },
   { key: 'nearest', label: '📍 קרוב אלי' },
   { key: 'price-asc', label: 'מחיר ↑' },
   { key: 'price-desc', label: 'מחיר ↓' },
   { key: 'price-sqm-asc', label: '₪/מ״ר ↑' },
+  { key: 'price-dunam-asc', label: '₪/דונם ↑' },
   { key: 'size-desc', label: 'שטח ↓' },
   { key: 'roi-desc', label: 'תשואה ↓' },
   { key: 'score-desc', label: 'ציון ↓' },
@@ -173,6 +182,7 @@ export function sortPlots(plots: Plot[], key: SortKey, userLocation?: { lat: num
     case 'price-asc': return sorted.sort((a, b) => p(a).price - p(b).price)
     case 'price-desc': return sorted.sort((a, b) => p(b).price - p(a).price)
     case 'price-sqm-asc': return sorted.sort((a, b) => (pricePerSqm(a) || Infinity) - (pricePerSqm(b) || Infinity))
+    case 'price-dunam-asc': return sorted.sort((a, b) => (pricePerDunam(a) || Infinity) - (pricePerDunam(b) || Infinity))
     case 'size-asc': return sorted.sort((a, b) => p(a).size - p(b).size)
     case 'size-desc': return sorted.sort((a, b) => p(b).size - p(a).size)
     case 'roi-desc': return sorted.sort((a, b) => roi(b) - roi(a))
@@ -325,17 +335,19 @@ export function removeOgMeta(properties: string[]) {
 export function exportPlotsCsv(plots: Plot[], filename = 'landmap-plots.csv') {
   if (!plots.length) return
 
-  const headers = ['עיר', 'גוש', 'חלקה', 'מחיר (₪)', 'שטח (מ״ר)', '₪/מ״ר', 'תשואה (%)', 'ציון', 'דירוג', 'שלב תכנוני', 'סטטוס']
+  const headers = ['עיר', 'גוש', 'חלקה', 'מחיר (₪)', 'שטח (מ״ר)', 'דונם', '₪/מ״ר', '₪/דונם', 'תשואה (%)', 'ציון', 'דירוג', 'שלב תכנוני', 'סטטוס']
   const rows = plots.map(plot => {
     const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
-    const pps = pricePerSqm(plot)
+    const pps = pricePerSqm(plot), ppd = pricePerDunam(plot)
     return [
       plot.city || '',
       d.block,
       plot.number || '',
       d.price,
       d.size,
+      fmt.dunam(d.size),
       pps,
+      ppd,
       Math.round(r),
       score,
       grade.grade,
@@ -364,6 +376,50 @@ export function exportPlotsCsv(plots: Plot[], filename = 'landmap-plots.csv') {
   link.download = filename
   link.click()
   URL.revokeObjectURL(url)
+}
+
+// ── Similar Plots ──
+/** Find up to `limit` plots similar to the given plot using a weighted similarity score.
+ *  Considers: price range (40%), size (25%), city (20%), zoning stage (15%) */
+export function findSimilarPlots(plot: Plot, allPlots: Plot[], limit = 3): Plot[] {
+  if (allPlots.length <= 1) return []
+  const d = p(plot), pps = pricePerSqm(plot)
+  const price = d.price, size = d.size, city = plot.city, zoning = d.zoning
+
+  const candidates = allPlots
+    .filter(pl => pl.id !== plot.id)
+    .map(pl => {
+      const pd = p(pl), plPps = pricePerSqm(pl)
+      let score = 0
+
+      // Price similarity (40%) — inverse of relative price difference
+      if (price > 0 && pd.price > 0) {
+        const priceDiff = Math.abs(pd.price - price) / Math.max(price, pd.price)
+        score += (1 - Math.min(1, priceDiff)) * 40
+      }
+
+      // Size similarity (25%)
+      if (size > 0 && pd.size > 0) {
+        const sizeDiff = Math.abs(pd.size - size) / Math.max(size, pd.size)
+        score += (1 - Math.min(1, sizeDiff)) * 25
+      }
+
+      // Same city bonus (20%)
+      if (pl.city === city) score += 20
+
+      // Zoning stage proximity (15%)
+      const zi1 = ZO.indexOf(zoning), zi2 = ZO.indexOf(pd.zoning)
+      if (zi1 >= 0 && zi2 >= 0) {
+        const stageDiff = Math.abs(zi1 - zi2) / (ZO.length - 1)
+        score += (1 - stageDiff) * 15
+      }
+
+      return { plot: pl, score }
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+
+  return candidates.map(c => c.plot)
 }
 
 // ── Normalize ──

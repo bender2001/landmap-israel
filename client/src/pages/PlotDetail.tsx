@@ -6,7 +6,7 @@ import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard, ScrollToTop } from '../components/UI'
 import { PublicLayout } from '../components/Layout'
-import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, plotCenter, calcRisk, setOgMeta, removeOgMeta } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, plotCenter, calcRisk, setOgMeta, removeOgMeta } from '../utils'
 import type { RiskAssessment } from '../utils'
 import type { Plot } from '../types'
 
@@ -515,7 +515,7 @@ export default function PlotDetail() {
   )
 
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
-  const cagr = calcCAGR(r, d.readiness), timeline = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot)
+  const cagr = calcCAGR(r, d.readiness), timeline = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot), ppd = pricePerDunam(plot)
   const mortgage = d.price > 0 ? calcMonthly(d.price, ltvPct / 100, interestRate / 100, loanYears) : null
   const risk = useMemo(() => calcRisk(plot, similarPlots.length > 0 ? [plot, ...similarPlots] : undefined), [plot, similarPlots])
 
@@ -548,8 +548,8 @@ export default function PlotDetail() {
 
           <Metrics>
             <Metric $delay={0}><MetricVal>{fmt.compact(d.price)}</MetricVal><MetricLabel>מחיר</MetricLabel></Metric>
-            <Metric $delay={0.06}><MetricVal>{fmt.dunam(d.size)} דונם</MetricVal><MetricLabel>שטח</MetricLabel></Metric>
-            {pps > 0 && <Metric $delay={0.12}><MetricVal>{fmt.num(pps)}</MetricVal><MetricLabel>₪ / מ״ר</MetricLabel></Metric>}
+            <Metric $delay={0.06}><MetricVal>{fmt.dunam(d.size)} דונם</MetricVal><MetricLabel>שטח ({fmt.num(d.size)} מ״ר)</MetricLabel></Metric>
+            {ppd > 0 && <Metric $delay={0.12}><MetricVal>{fmt.num(ppd)}</MetricVal><MetricLabel>₪ / דונם</MetricLabel></Metric>}
             <Metric $delay={0.18}><MetricVal style={{color:t.ok}}>{fmt.pct(r)}</MetricVal><MetricLabel>ROI צפוי</MetricLabel></Metric>
             <Metric $delay={0.24}><MetricVal style={{color:t.gold}}>{cagr ? `${cagr.cagr}%` : '--'}</MetricVal><MetricLabel>CAGR ({cagr?.years || '-'} שנים)</MetricLabel></Metric>
           </Metrics>
@@ -563,6 +563,7 @@ export default function PlotDetail() {
                 <Row><Label>שווי חזוי</Label><Value style={{color:t.ok}}>{fmt.price(d.projected)}</Value></Row>
                 <Row><Label>ציון השקעה</Label><Value style={{color:grade.color}}>{score}/10 ({grade.grade})</Value></Row>
                 {pps > 0 && <Row><Label>מחיר למ״ר</Label><Value style={{color:t.gold}}>₪{fmt.num(pps)}</Value></Row>}
+                {ppd > 0 && <Row><Label>מחיר לדונם</Label><Value style={{color:t.gold}}>₪{fmt.num(ppd)}</Value></Row>}
                 <Row><Label>צפיפות</Label><Value>{d.density} יח"ד/דונם</Value></Row>
                 <Row><Label>אומדן מוכנות</Label><Value>{d.readiness || '--'}</Value></Row>
                 {/* Investment Growth Projection Chart */}

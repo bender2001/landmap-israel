@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef as useRefHook } from 'react'
 import styled, { keyframes, css } from 'styled-components'
-import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe } from 'lucide-react'
+import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe, Sparkles } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePosition, calcRisk } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots } from '../utils'
 import type { Plot } from '../types'
 import { GoldButton, GhostButton, Badge, RadialScore } from './UI'
 
@@ -465,6 +465,30 @@ function useMarketTrend(plot: Plot | null) {
   }, [plot])
 }
 
+/* ── Similar Plots ── */
+const SimilarWrap = styled.div`
+  margin-top:20px;padding-top:16px;border-top:1px solid ${t.border};
+  animation:${fadeSection} 0.5s 0.25s both;
+`
+const SimilarTitle = styled.div`
+  font-size:13px;font-weight:700;color:${t.text};margin-bottom:12px;
+  display:flex;align-items:center;gap:8px;
+`
+const SimilarCard = styled.div`
+  display:flex;align-items:center;gap:12px;padding:10px 12px;margin-bottom:8px;
+  background:${t.surfaceLight};border:1px solid ${t.border};border-radius:${t.r.md};
+  cursor:pointer;transition:all ${t.tr};direction:rtl;
+  &:hover{border-color:${t.goldBorder};background:${t.goldDim};transform:translateX(-3px);}
+`
+const SimilarInfo = styled.div`flex:1;min-width:0;`
+const SimilarName = styled.div`font-size:13px;font-weight:700;color:${t.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`
+const SimilarMeta = styled.div`font-size:11px;color:${t.textSec};display:flex;align-items:center;gap:6px;margin-top:2px;`
+const SimilarPrice = styled.span`font-size:14px;font-weight:800;color:${t.gold};white-space:nowrap;`
+const SimilarGrade = styled.span<{$c:string}>`
+  font-size:10px;font-weight:800;padding:1px 6px;border-radius:${t.r.sm};
+  color:${pr=>pr.$c};border:1px solid ${pr=>pr.$c}44;background:${t.bg};
+`
+
 /* ── Main Component ── */
 interface Props {
   plot: Plot | null; open: boolean; onClose: () => void; onLead?: () => void
@@ -565,10 +589,11 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
   const risk = useMemo(() => plot ? calcRisk(plot, plots) : null, [plot, plots])
   const aiInsight = useAIInsight(plot, plots)
   const areaQuality = useAreaQuality(plot, plots)
+  const similarPlots = useMemo(() => plot && plots ? findSimilarPlots(plot, plots, 3) : [], [plot, plots])
 
   if (!plot) return null
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
-  const cagr = calcCAGR(r, d.readiness), tl = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot)
+  const cagr = calcCAGR(r, d.readiness), tl = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot), ppd = pricePerDunam(plot)
 
   const currentIdx = plots?.findIndex(pl => pl.id === plot.id) ?? -1
   const hasPrev = plots && currentIdx > 0
@@ -644,8 +669,8 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
 
           <MetricsGrid>
             <MetricCard><MetricLabel>מחיר</MetricLabel><MetricVal $gold>{fmt.compact(d.price)}</MetricVal></MetricCard>
-            <MetricCard><MetricLabel>שטח</MetricLabel><MetricVal>{fmt.num(d.size)} מ״ר</MetricVal></MetricCard>
-            {pps > 0 && <MetricCard><MetricLabel>₪ / מ״ר</MetricLabel><MetricVal>{fmt.num(pps)}</MetricVal></MetricCard>}
+            <MetricCard><MetricLabel>שטח</MetricLabel><MetricVal>{d.size >= 1000 ? `${fmt.dunam(d.size)} דונם` : `${fmt.num(d.size)} מ״ר`}</MetricVal></MetricCard>
+            {ppd > 0 && <MetricCard><MetricLabel>₪ / דונם</MetricLabel><MetricVal>{fmt.num(ppd)}</MetricVal></MetricCard>}
             <MetricCard><MetricLabel>תשואה</MetricLabel><MetricVal $gold={r > 0}>{fmt.pct(r)}</MetricVal></MetricCard>
           </MetricsGrid>
 
@@ -764,8 +789,43 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
           </Section>
 
           <Section icon={MapPin} title="מיקום" idx={3}>
-            {d.seaDist != null && <Row><Label>מרחק מהים</Label><Val>{fmt.num(d.seaDist)} מ׳</Val></Row>}
-            {d.parkDist != null && <Row><Label>מרחק מפארק</Label><Val>{fmt.num(d.parkDist)} מ׳</Val></Row>}
+            {/* Visual Proximity Badges */}
+            {(d.seaDist != null || d.parkDist != null || (plot.distance_to_hospital ?? plot.distanceToHospital) != null) && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                {d.seaDist != null && (
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px',
+                    background: d.seaDist <= 500 ? 'rgba(59,130,246,0.1)' : d.seaDist <= 1500 ? 'rgba(59,130,246,0.06)' : 'transparent',
+                    border: `1px solid ${d.seaDist <= 500 ? 'rgba(59,130,246,0.3)' : d.seaDist <= 1500 ? 'rgba(59,130,246,0.15)' : t.border}`,
+                    borderRadius: t.r.full, fontSize: 11, fontWeight: 600,
+                    color: d.seaDist <= 500 ? '#3B82F6' : d.seaDist <= 1500 ? '#60A5FA' : t.textSec,
+                  }}>
+                    🌊 {fmt.num(d.seaDist)} מ׳
+                    {d.seaDist <= 500 && <span style={{ fontSize: 9, fontWeight: 800, color: '#3B82F6' }}>קרוב!</span>}
+                  </div>
+                )}
+                {d.parkDist != null && (
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px',
+                    background: d.parkDist <= 300 ? 'rgba(16,185,129,0.1)' : 'transparent',
+                    border: `1px solid ${d.parkDist <= 300 ? 'rgba(16,185,129,0.3)' : t.border}`,
+                    borderRadius: t.r.full, fontSize: 11, fontWeight: 600,
+                    color: d.parkDist <= 300 ? '#10B981' : t.textSec,
+                  }}>
+                    🌳 {fmt.num(d.parkDist)} מ׳
+                  </div>
+                )}
+                {(plot.distance_to_hospital ?? plot.distanceToHospital) != null && (
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px',
+                    background: 'transparent', border: `1px solid ${t.border}`,
+                    borderRadius: t.r.full, fontSize: 11, fontWeight: 600, color: t.textSec,
+                  }}>
+                    🏥 {fmt.num((plot.distance_to_hospital ?? plot.distanceToHospital) as number)} מ׳
+                  </div>
+                )}
+              </div>
+            )}
             {d.density > 0 && <Row><Label>צפיפות</Label><Val>{d.density} יח׳/דונם</Val></Row>}
             {d.block && (
               <Row>
@@ -834,6 +894,32 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
           <Section icon={Info} title="תיאור" idx={8}>
             <p style={{ fontSize: 13, color: t.textSec, lineHeight: 1.7 }}>{plot.description || 'אין תיאור זמין לחלקה זו.'}</p>
           </Section>
+
+          {/* Similar Plots — recommendation engine like Madlan */}
+          {similarPlots.length > 0 && (
+            <SimilarWrap>
+              <SimilarTitle>
+                <Sparkles size={14} color={t.gold} /> חלקות דומות
+              </SimilarTitle>
+              {similarPlots.map(sim => {
+                const sd = p(sim), sg = getGrade(calcScore(sim))
+                return (
+                  <SimilarCard key={sim.id} onClick={() => onNavigate?.(sim)}>
+                    <SimilarInfo>
+                      <SimilarName>גוש {sd.block} · חלקה {sim.number}</SimilarName>
+                      <SimilarMeta>
+                        <span>{sim.city}</span>
+                        <span>·</span>
+                        <span>{fmt.num(sd.size)} מ״ר</span>
+                        <SimilarGrade $c={sg.color}>{sg.grade}</SimilarGrade>
+                      </SimilarMeta>
+                    </SimilarInfo>
+                    <SimilarPrice>{fmt.compact(sd.price)}</SimilarPrice>
+                  </SimilarCard>
+                )
+              })}
+            </SimilarWrap>
+          )}
         </Body>
 
         <Footer>

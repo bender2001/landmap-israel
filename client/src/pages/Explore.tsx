@@ -7,7 +7,7 @@ import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, 
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, Spinner, useToast, Badge, NetworkBanner } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance, zoningLabels, calcAggregateStats, SITE_CONFIG } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance, zoningLabels, calcAggregateStats, SITE_CONFIG } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -34,7 +34,9 @@ const Stats = styled.div`
   font-size:12px;color:${t.textSec};direction:rtl;
   ${mobile}{bottom:56px;gap:10px;font-size:10px;padding:6px 12px;
     justify-content:flex-start;overflow-x:auto;scrollbar-width:none;
-    -webkit-overflow-scrolling:touch;&::-webkit-scrollbar{display:none;}}
+    -webkit-overflow-scrolling:touch;&::-webkit-scrollbar{display:none;}
+    mask-image:linear-gradient(to left,transparent 0px,black 20px,black calc(100% - 20px),transparent 100%);
+    -webkit-mask-image:linear-gradient(to left,transparent 0px,black 20px,black calc(100% - 20px),transparent 100%);}
 `
 const Stat = styled.span`display:flex;align-items:center;gap:4px;`
 const Val = styled.span`color:${t.goldBright};font-weight:700;`
@@ -522,6 +524,7 @@ export default function Explore() {
 
   const avg = filtered.length ? filtered.reduce((s, pl) => s + p(pl).price, 0) / filtered.length : 0
   const avgPps = filtered.length ? Math.round(filtered.reduce((s, pl) => s + pricePerSqm(pl), 0) / filtered.length) : 0
+  const avgPpd = filtered.length ? Math.round(filtered.reduce((s, pl) => s + pricePerDunam(pl), 0) / filtered.length) : 0
   const medianPrice = useMemo(() => {
     if (!filtered.length) return 0
     const prices = filtered.map(pl => p(pl).price).filter(v => v > 0).sort((a, b) => a - b)
@@ -536,7 +539,7 @@ export default function Explore() {
     const cityPlots = filtered
     const prices = cityPlots.map(pl => p(pl).price).filter(v => v > 0)
     const rois = cityPlots.map(roi).filter(v => v > 0)
-    const ppsList = cityPlots.map(pricePerSqm).filter(v => v > 0)
+    const ppsList = cityPlots.map(pricePerDunam).filter(v => v > 0)
     const sizes = cityPlots.map(pl => p(pl).size).filter(v => v > 0)
     // Dominant zoning stage
     const zoningMap = new Map<string, number>()
@@ -798,7 +801,7 @@ export default function Explore() {
           {marketPulse && marketPulse.totalValue > 0 && <Stat>סה״כ <Val>{fmt.compact(marketPulse.totalValue)}</Val></Stat>}
           <Stat>ממוצע <Val>{fmt.compact(avg)}</Val></Stat>
           {medianPrice > 0 && <Stat>חציון <Val>{fmt.compact(medianPrice)}</Val></Stat>}
-          {avgPps > 0 && <Stat>₪/מ״ר <Val>{fmt.num(avgPps)}</Val></Stat>}
+          {avgPpd > 0 && <Stat>₪/דונם <Val>{fmt.num(avgPpd)}</Val></Stat>}
           {marketPulse && marketPulse.avgRoi > 0 && <Stat>ROI <Val style={{color: marketPulse.avgRoi > 30 ? t.ok : t.warn}}>+{marketPulse.avgRoi}%</Val></Stat>}
           {favIds.length > 0 && <Stat><Heart size={12} color={t.gold} /><Val>{favIds.length}</Val></Stat>}
           {compareIds.length > 0 && <Stat><GitCompareArrows size={12} color={t.gold} /><Val>{compareIds.length}</Val></Stat>}
@@ -918,7 +921,7 @@ export default function Explore() {
               </CityStatCell>
               <CityStatCell>
                 <CityStatVal>{fmt.num(cityStats.avgPps)}</CityStatVal>
-                <CityStatLabel>₪/מ״ר</CityStatLabel>
+                <CityStatLabel>₪/דונם</CityStatLabel>
               </CityStatCell>
               <CityStatCell>
                 <CityStatVal $c={cityStats.avgRoi > 0 ? t.ok : t.textSec}>

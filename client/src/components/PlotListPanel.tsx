@@ -3,7 +3,7 @@ import styled, { keyframes } from 'styled-components'
 import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, pricePerSqm, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv } from '../utils'
 import { Skeleton } from './UI'
 import type { Plot } from '../types'
 
@@ -78,7 +78,7 @@ const EmptyState = styled.div`
 `
 
 /* ── Plot Item ── */
-const ItemWrap = styled.div<{ $active: boolean; $i: number }>`
+const ItemWrap = styled.div<{ $active: boolean; $i: number; $gradeColor?: string }>`
   display:flex;flex-direction:column;width:100%;padding:12px 14px;margin-bottom:6px;
   background:${pr => pr.$active ? t.goldDim : t.bg};
   border:1px solid ${pr => pr.$active ? t.goldBorder : t.border};
@@ -86,7 +86,8 @@ const ItemWrap = styled.div<{ $active: boolean; $i: number }>`
   text-align:right;transition:all ${t.tr};
   animation:${fadeIn} 0.3s ease-out both;
   animation-delay:${pr => Math.min(pr.$i * 0.03, 0.5)}s;
-  &:hover{background:${t.hover};border-color:${t.goldBorder};transform:translateX(-2px);}
+  border-right:3px solid ${pr => pr.$active ? t.gold : pr.$gradeColor || t.border};
+  &:hover{background:${t.hover};border-color:${t.goldBorder};border-right-color:${pr => pr.$gradeColor || t.goldBorder};transform:translateX(-2px);}
   ${pr => pr.$active && `box-shadow:inset 3px 0 0 ${t.gold};`}
 `
 
@@ -353,13 +354,15 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userL
   const dom = daysOnMarket(d.created)
   const pos = pricePosition(plot, allPlots)
   const distance = userLocation ? plotDistanceFromUser(plot, userLocation.lat, userLocation.lng) : null
+  const pps = pricePerSqm(plot)
+  const ppd = pricePerDunam(plot)
 
   // Zoning pipeline stage
   const zoningIdx = zoningPipeline.findIndex(z => z.key === d.zoning)
   const currentZoning = zoningIdx >= 0 ? zoningPipeline[zoningIdx] : null
 
   return (
-    <ItemWrap $active={active} $i={index} onClick={onClick} aria-label={`חלקה ${plot.number} גוש ${d.block}`}>
+    <ItemWrap $active={active} $i={index} $gradeColor={grade.color} onClick={onClick} aria-label={`חלקה ${plot.number} גוש ${d.block}`}>
       <ItemTop>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <ItemCity>{plot.city}</ItemCity>
@@ -386,6 +389,11 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userL
           <Ruler size={12} />
           <MetricVal>{d.size > 0 ? `${fmt.num(d.size)} מ״ר` : '—'}</MetricVal>
         </Metric>
+        {ppd > 0 && (
+          <Metric title="מחיר לדונם">
+            <MetricVal style={{ fontSize: 10, color: t.textDim }}>{fmt.compact(ppd)}/דונם</MetricVal>
+          </Metric>
+        )}
         {r > 0 && (
           <Metric>
             <TrendingUp size={12} />

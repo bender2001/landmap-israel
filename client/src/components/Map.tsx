@@ -2,7 +2,7 @@ import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker, useMap, WMSTileLayer } from 'react-leaflet'
 import L from 'leaflet'
 import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Palette } from 'lucide-react'
-import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, zoningLabels, zoningPipeline, daysOnMarket } from '../utils'
+import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
 import { israelAreas } from '../data'
@@ -452,7 +452,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
   }, [plots, colorMode])
 
   const renderPopup = useCallback((plot: Plot) => {
-    const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score), fav = favorites.isFav(plot.id), pps = pricePerSqm(plot)
+    const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score), fav = favorites.isFav(plot.id), pps = pricePerSqm(plot), ppd = pricePerDunam(plot)
     const comp = compare?.has(plot.id)
     return (
       <div className="plot-popup">
@@ -464,10 +464,16 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
           </span>
         </div>
         <div className="plot-popup-row"><span className="plot-popup-label">מחיר</span><span className="plot-popup-value">{fmt.compact(d.price)}</span></div>
-        <div className="plot-popup-row"><span className="plot-popup-label">שטח</span><span className="plot-popup-value">{fmt.dunam(d.size)} דונם</span></div>
-        {pps > 0 && <div className="plot-popup-row"><span className="plot-popup-label">₪/מ״ר</span><span className="plot-popup-value">{fmt.num(pps)}</span></div>}
+        <div className="plot-popup-row"><span className="plot-popup-label">שטח</span><span className="plot-popup-value">{fmt.dunam(d.size)} דונם ({fmt.num(d.size)} מ״ר)</span></div>
+        {ppd > 0 && <div className="plot-popup-row"><span className="plot-popup-label">₪/דונם</span><span className="plot-popup-value">{fmt.num(ppd)}</span></div>}
         <div className="plot-popup-row"><span className="plot-popup-label">תשואה צפויה</span><span className="plot-popup-value gold">+{fmt.pct(r)}</span></div>
-        <div className="plot-popup-row"><span className="plot-popup-label">ציון השקעה</span><span className="plot-popup-value" style={{ color: grade.color }}>{grade.grade}</span></div>
+        <div className="plot-popup-row">
+          <span className="plot-popup-label">ציון השקעה</span>
+          <span className="plot-popup-value" style={{ color: grade.color, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', border: `2px solid ${grade.color}`, fontSize: 10, fontWeight: 800 }}>{score}</span>
+            {grade.grade}
+          </span>
+        </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
           <button className="plot-popup-cta" style={{ flex: 1 }} onClick={() => onLead(plot)}>
             <Phone size={13} /> קבל פרטים
