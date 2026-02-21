@@ -70,12 +70,16 @@ const CountBadge = styled.span`
 `
 
 /* ── Quick Filters ── */
-const QuickRow = styled.div`display:flex;flex-wrap:wrap;gap:6px;width:100%;padding:0 4px;direction:rtl;`
+const QuickRow = styled.div`
+  display:flex;flex-wrap:wrap;gap:6px;width:100%;padding:0 4px;direction:rtl;
+  ${mobile}{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+    &::-webkit-scrollbar{display:none;}}
+`
 const QuickChip = styled.button<{ $active: boolean }>`
   display:inline-flex;align-items:center;gap:4px;padding:6px 14px;border:1px solid ${p => p.$active ? t.gold : t.glassBorder};
   border-radius:${t.r.full};font-size:12px;font-weight:600;font-family:${t.font};cursor:pointer;
   background:${p => p.$active ? t.goldDim : t.glass};color:${p => p.$active ? t.gold : t.textSec};
-  backdrop-filter:blur(12px);transition:all ${t.tr};animation:${chipIn} 0.2s ease-out;
+  backdrop-filter:blur(12px);transition:all ${t.tr};animation:${chipIn} 0.2s ease-out;white-space:nowrap;flex-shrink:0;
   &:hover{border-color:${t.gold};color:${t.gold};transform:translateY(-1px);box-shadow:${t.sh.sm};}
 `
 

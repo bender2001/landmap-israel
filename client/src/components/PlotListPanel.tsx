@@ -69,7 +69,7 @@ const EmptyState = styled.div`
 `
 
 /* ── Plot Item ── */
-const ItemWrap = styled.button<{ $active: boolean; $i: number }>`
+const ItemWrap = styled.div<{ $active: boolean; $i: number }>`
   display:flex;flex-direction:column;width:100%;padding:12px 14px;margin-bottom:6px;
   background:${pr => pr.$active ? t.goldDim : t.bg};
   border:1px solid ${pr => pr.$active ? t.goldBorder : t.border};

@@ -543,6 +543,17 @@ export default function Explore() {
   // WhatsApp tooltip hover state
   const [waHover, setWaHover] = useState(false)
 
+  // Dynamic WhatsApp link — contextual when a plot is selected
+  const waLink = useMemo(() => {
+    const base = 'https://wa.me/9720521234567?text='
+    if (selected) {
+      const d = p(selected)
+      const msg = `היי, מתעניין/ת בחלקה ${selected.number} גוש ${d.block} ב${selected.city} (${fmt.compact(d.price)}). אשמח לפרטים נוספים.`
+      return base + encodeURIComponent(msg)
+    }
+    return base + encodeURIComponent('היי, אשמח לשמוע על הזדמנויות קרקע')
+  }, [selected])
+
   // Recently viewed plots (resolve IDs to actual plot objects)
   const recentPlots = useMemo(() => {
     if (!recentIds.length || !plots.length) return []
@@ -600,10 +611,25 @@ export default function Explore() {
       if (e.key === 'l' || e.key === 'L') {
         setListOpen(o => !o)
       }
+      // Arrow keys to navigate between plots when sidebar is open
+      if (selected && sorted.length > 1) {
+        const idx = sorted.findIndex(pl => pl.id === selected.id)
+        if (idx < 0) return
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault()
+          const next = (idx + 1) % sorted.length
+          selectPlot(sorted[next])
+        }
+        if (e.key === 'ArrowRight') {
+          e.preventDefault()
+          const prev = (idx - 1 + sorted.length) % sorted.length
+          selectPlot(sorted[prev])
+        }
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selected, sortOpen, listOpen, shortcutsOpen])
+  }, [selected, sortOpen, listOpen, shortcutsOpen, sorted, selectPlot])
 
   return (
     <Wrap className="dark">
@@ -851,7 +877,7 @@ export default function Explore() {
 
         {/* WhatsApp Floating CTA */}
         <WhatsAppFab
-          href="https://wa.me/9720521234567?text=%D7%94%D7%99%D7%99%2C+%D7%90%D7%A9%D7%9E%D7%97+%D7%9C%D7%A9%D7%9E%D7%95%D7%A2+%D7%A2%D7%9C+%D7%94%D7%96%D7%93%D7%9E%D7%A0%D7%95%D7%99%D7%95%D7%AA+%D7%A7%D7%A8%D7%A7%D7%A2"
+          href={waLink}
           target="_blank" rel="noopener noreferrer"
           aria-label="שלח הודעה בוואטסאפ"
           onMouseEnter={() => setWaHover(true)}
@@ -859,7 +885,7 @@ export default function Explore() {
         >
           <MessageCircle size={26} />
         </WhatsAppFab>
-        {waHover && <WhatsAppTooltip>דברו עם מומחה קרקע</WhatsAppTooltip>}
+        {waHover && <WhatsAppTooltip>{selected ? `שאל על חלקה ${selected.number}` : 'דברו עם מומחה קרקע'}</WhatsAppTooltip>}
 
         {/* Keyboard Shortcuts Help Dialog */}
         <KbdBackdrop $open={shortcutsOpen} onClick={() => setShortcutsOpen(false)}>

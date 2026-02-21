@@ -406,7 +406,7 @@ function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCada
 
 // ── Main Component ──
 function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, darkMode = false }: MapProps) {
-  const [tileIdx, setTileIdx] = useState(0)
+  const [tileIdx, setTileIdx] = useState(2) // default to dark tiles for cohesive dark UI
   const [showCadastral, setShowCadastral] = useState(false)
   const [showAreas, setShowAreas] = useState(true)
   const [switcherOpen, setSwitcherOpen] = useState(false)
