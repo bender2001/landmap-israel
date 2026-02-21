@@ -149,6 +149,26 @@ export function useCompare() {
   return { ids: [...ids], toggle, clear, has }
 }
 
+// ── Recently Viewed (localStorage, max 10) ──
+
+const MAX_RECENT = 10
+
+export function useRecentlyViewed() {
+  const [ids, setIds] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('recently_viewed') || '[]') } catch { return [] }
+  })
+
+  const add = useCallback((id: string) => {
+    setIds(prev => {
+      const next = [id, ...prev.filter(i => i !== id)].slice(0, MAX_RECENT)
+      localStorage.setItem('recently_viewed', JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  return { ids, add, count: ids.length }
+}
+
 // ── Auth ──
 
 interface AuthCtx {

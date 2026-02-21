@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler } from 'lucide-react'
 import { t, sm, md, lg, fadeInUp } from '../theme'
-import { usePlot, useFavorites, useSimilarPlots } from '../hooks'
+import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard } from '../components/UI'
 import { PublicLayout } from '../components/Layout'
 import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, plotCenter } from '../utils'
@@ -235,17 +235,7 @@ function PlotDetailSkeleton() {
   )
 }
 
-/* ── Recently Viewed ── */
-function trackRecentlyViewed(plotId: string) {
-  try {
-    const KEY = 'recently_viewed'
-    const MAX = 20
-    const list: string[] = JSON.parse(localStorage.getItem(KEY) || '[]')
-    const filtered = list.filter(id => id !== plotId)
-    filtered.unshift(plotId)
-    localStorage.setItem(KEY, JSON.stringify(filtered.slice(0, MAX)))
-  } catch { /* ignore */ }
-}
+/* ── Recently Viewed: now uses shared useRecentlyViewed hook ── */
 
 /* ── Mini Map (lazy loaded) ── */
 const MiniMapLazy = lazy(() => import('react-leaflet').then(mod => {
@@ -293,6 +283,7 @@ export default function PlotDetail() {
   const { id } = useParams<{ id: string }>()
   const { data: plot, isLoading, error } = usePlot(id)
   const { isFav, toggle } = useFavorites()
+  const { add: addRecentlyViewed } = useRecentlyViewed()
   const [leadOpen, setLeadOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [ltvPct, setLtvPct] = useState(50)
@@ -312,7 +303,7 @@ export default function PlotDetail() {
   }
 
   // Track recently viewed
-  useEffect(() => { if (id) trackRecentlyViewed(id) }, [id])
+  useEffect(() => { if (id) addRecentlyViewed(id) }, [id, addRecentlyViewed])
 
   // Dynamic document title
   useEffect(() => {

@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2 } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { useAllPlots, useFavorites, useCompare, useDebounce } from '../hooks'
+import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed } from '../hooks'
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, Spinner } from '../components/UI'
@@ -141,6 +141,7 @@ export default function Explore() {
   const [listOpen, setListOpen] = useState(false)
   const { isFav, toggle, ids: favIds } = useFavorites()
   const { ids: compareIds, toggle: toggleCompare, clear: clearCompare, has: isCompared } = useCompare()
+  const { add: addRecentlyViewed } = useRecentlyViewed()
   const navigate = useNavigate()
   const sortRef = useRef<HTMLDivElement>(null)
 
@@ -189,6 +190,12 @@ export default function Explore() {
   const avg = filtered.length ? filtered.reduce((s, pl) => s + p(pl).price, 0) / filtered.length : 0
   const avgPps = filtered.length ? Math.round(filtered.reduce((s, pl) => s + pricePerSqm(pl), 0) / filtered.length) : 0
 
+  // Track recently viewed plots
+  const selectPlot = useCallback((pl: Plot | null) => {
+    setSelected(pl)
+    if (pl) addRecentlyViewed(pl.id)
+  }, [addRecentlyViewed])
+
   // Close sort dropdown on click outside
   useEffect(() => {
     if (!sortOpen) return
@@ -223,7 +230,7 @@ export default function Explore() {
         {isLoading && <Loader><Spinner size={36} /></Loader>}
         <MapArea
           plots={sorted} pois={pois} selected={selected} darkMode
-          onSelect={setSelected} onLead={setLeadPlot}
+          onSelect={selectPlot} onLead={setLeadPlot}
           favorites={{ isFav, toggle }}
           compare={{ has: isCompared, toggle: toggleCompare }}
         />
@@ -250,13 +257,13 @@ export default function Explore() {
           <PlotListPanel
             plots={sorted}
             selected={selected}
-            onSelect={(pl) => { setSelected(pl); setListOpen(false) }}
+            onSelect={(pl) => { selectPlot(pl); setListOpen(false) }}
             open={listOpen}
             onToggle={() => setListOpen(o => !o)}
           />
         </Suspense>
         <Suspense fallback={null}>
-          {selected && <Sidebar plot={selected} open={!!selected} onClose={() => setSelected(null)} onLead={() => setLeadPlot(selected)} plots={sorted} onNavigate={setSelected} isCompared={isCompared(selected.id)} onToggleCompare={toggleCompare} />}
+          {selected && <Sidebar plot={selected} open={!!selected} onClose={() => setSelected(null)} onLead={() => setLeadPlot(selected)} plots={sorted} onNavigate={selectPlot} isCompared={isCompared(selected.id)} onToggleCompare={toggleCompare} />}
         </Suspense>
         <Suspense fallback={null}>
           <LeadModal plot={leadPlot} open={!!leadPlot} onClose={() => setLeadPlot(null)} />

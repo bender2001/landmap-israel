@@ -1,7 +1,7 @@
 import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, useMap, WMSTileLayer } from 'react-leaflet'
 import L from 'leaflet'
-import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows } from 'lucide-react'
+import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink } from 'lucide-react'
 import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
@@ -213,6 +213,14 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
           <button className="plot-popup-cta" style={{ flex: 1 }} onClick={() => onLead(plot)}>
             <Phone size={13} /> קבל פרטים
           </button>
+          <a
+            href={`/plot/${plot.id}`}
+            onClick={(e) => { e.preventDefault(); window.location.href = `/plot/${plot.id}` }}
+            style={{ width: 36, height: 36, border: `1px solid ${t.border}`, borderRadius: t.r.sm, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: `all ${t.tr}`, textDecoration: 'none' }}
+            title="עמוד מלא"
+          >
+            <ExternalLink size={15} color={t.textDim} />
+          </a>
           <button
             onClick={() => favorites.toggle(plot.id)}
             style={{ width: 36, height: 36, border: `1px solid ${fav ? t.gold : t.border}`, borderRadius: t.r.sm, background: fav ? t.goldDim : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: `all ${t.tr}` }}

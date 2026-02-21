@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import styled, { keyframes, css } from 'styled-components'
-import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows } from 'lucide-react'
+import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm } from '../utils'
@@ -110,12 +110,20 @@ function Section({ icon: Icon, title, idx, children }: { icon: React.ElementType
   )
 }
 
-/* ── Compare Button ── */
+/* ── Compare & Share Buttons ── */
 const CompareBtn = styled.button<{ $active?: boolean }>`
   display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 16px;
   background:${pr => pr.$active ? t.goldDim : 'transparent'};
   color:${pr => pr.$active ? t.gold : t.textSec};
   border:1px solid ${pr => pr.$active ? t.gold : t.border};border-radius:${t.r.md};
+  font-weight:600;font-size:13px;font-family:${t.font};cursor:pointer;transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
+`
+const ShareBtn = styled.button<{ $copied?: boolean }>`
+  display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 16px;
+  background:${pr => pr.$copied ? 'rgba(16,185,129,0.1)' : 'transparent'};
+  color:${pr => pr.$copied ? '#10B981' : t.textSec};
+  border:1px solid ${pr => pr.$copied ? '#10B981' : t.border};border-radius:${t.r.md};
   font-weight:600;font-size:13px;font-family:${t.font};cursor:pointer;transition:all ${t.tr};
   &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
 `
@@ -129,6 +137,47 @@ interface Props {
 
 export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate, isCompared, onToggleCompare }: Props) {
   const navigate = useNavigate()
+  const bodyRef = React.useRef<HTMLDivElement>(null)
+  const [copied, setCopied] = useState(false)
+
+  // Lock body scroll when sidebar is open
+  useEffect(() => {
+    if (open) {
+      const prev = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => { document.body.style.overflow = prev }
+    }
+  }, [open])
+
+  // Auto-scroll body to top when plot changes
+  useEffect(() => {
+    if (plot && bodyRef.current) bodyRef.current.scrollTop = 0
+  }, [plot?.id])
+
+  // Reset copied state when plot changes
+  useEffect(() => { setCopied(false) }, [plot?.id])
+
+  const handleShare = useCallback(async () => {
+    if (!plot) return
+    const d = p(plot)
+    const url = `${window.location.origin}/plot/${plot.id}`
+    const title = `חלקה ${plot.number} · גוש ${d.block} - ${plot.city}`
+    const text = `${title} | ${fmt.compact(d.price)} | ${fmt.num(d.size)} מ״ר`
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text, url })
+        return
+      } catch { /* user cancelled or not supported, fall through to clipboard */ }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* clipboard not available */ }
+  }, [plot])
+
   if (!plot) return null
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
   const cagr = calcCAGR(r, d.readiness), tl = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot)
@@ -186,7 +235,7 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
           <City>{plot.city}</City>
         </Header>
 
-        <Body>
+        <Body ref={bodyRef}>
           <MetricsGrid>
             <MetricCard><MetricLabel>מחיר</MetricLabel><MetricVal $gold>{fmt.compact(d.price)}</MetricVal></MetricCard>
             <MetricCard><MetricLabel>שטח</MetricLabel><MetricVal>{fmt.num(d.size)} מ״ר</MetricVal></MetricCard>
@@ -235,6 +284,9 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
 
         <Footer>
           <GoldButton style={{ flex: 1 }} onClick={onLead}><Phone size={16} />קבל פרטים</GoldButton>
+          <ShareBtn $copied={copied} onClick={handleShare} aria-label="שתף חלקה">
+            {copied ? <Check size={15} /> : <Share2 size={15} />}
+          </ShareBtn>
           {onToggleCompare && (
             <CompareBtn $active={isCompared} onClick={() => onToggleCompare(plot.id)} aria-label={isCompared ? 'הסר מהשוואה' : 'הוסף להשוואה'}>
               <GitCompareArrows size={15} />
