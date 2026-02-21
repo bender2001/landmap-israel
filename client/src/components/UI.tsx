@@ -71,15 +71,39 @@ export class ErrorBoundary extends Component<{ children: ReactNode; fallback?: R
   render() {
     if (this.state.err) return this.props.fallback ?? (
       <ErrWrap>
-        <AlertTriangle size={32} color={t.err} />
-        <h3 style={{ color: t.text, margin: '12px 0 4px' }}>Something went wrong</h3>
-        <p style={{ color: t.textSec, fontSize: 13 }}>{this.state.err.message}</p>
+        <ErrIconWrap><AlertTriangle size={32} color={t.err} /></ErrIconWrap>
+        <ErrTitle>משהו השתבש</ErrTitle>
+        <ErrDesc>{this.state.err.message || 'אירעה שגיאה בלתי צפויה. נסו לרענן את הדף.'}</ErrDesc>
+        <ErrRetryBtn onClick={() => window.location.reload()}>🔄 רענן דף</ErrRetryBtn>
       </ErrWrap>
     )
     return this.props.children
   }
 }
-const ErrWrap = styled.div`display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px;text-align:center;`
+const ErrWrap = styled.div`
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:48px 24px;text-align:center;direction:rtl;min-height:320px;gap:12px;
+`
+const ErrIconWrap = styled.div`
+  width:64px;height:64px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);
+  margin-bottom:4px;
+`
+const ErrTitle = styled.h3`
+  font-size:18px;font-weight:700;color:${t.text};margin:0;font-family:${t.font};
+`
+const ErrDesc = styled.p`
+  font-size:13px;color:${t.textSec};margin:0;max-width:360px;line-height:1.6;
+`
+const ErrRetryBtn = styled.button`
+  display:inline-flex;align-items:center;gap:6px;padding:10px 24px;margin-top:8px;
+  background:linear-gradient(135deg,${t.gold},${t.goldBright});color:${t.bg};
+  border:none;border-radius:${t.r.full};font-weight:700;font-size:14px;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};
+  &:hover{box-shadow:0 0 24px rgba(212,168,75,0.2);transform:translateY(-2px);}
+  &:active{transform:translateY(0);}
+`
 
 /* ── Glass Panel ── */
 export const Glass = styled.div`

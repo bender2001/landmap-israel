@@ -1073,6 +1073,12 @@ export default function Explore() {
                       <PreviewMetricLabel>תשואה</PreviewMetricLabel>
                     </PreviewMetric>
                   )}
+                  {d.projected > 0 && d.price > 0 && d.projected > d.price && (
+                    <PreviewMetric>
+                      <PreviewMetricVal $c={t.ok}>+{fmt.compact(d.projected - d.price)}</PreviewMetricVal>
+                      <PreviewMetricLabel>רווח צפוי</PreviewMetricLabel>
+                    </PreviewMetric>
+                  )}
                   {ppd > 0 && (
                     <PreviewMetric>
                       <PreviewMetricVal>₪{fmt.num(ppd)}</PreviewMetricVal>
