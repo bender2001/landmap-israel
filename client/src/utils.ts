@@ -1,5 +1,14 @@
 import type { Plot, InvestmentGrade } from './types'
 
+// ── Site Config (centralized) ──
+export const SITE_CONFIG = {
+  whatsapp: '9720521234567',
+  phone: '052-1234567',
+  siteName: 'LandMap Israel',
+  waBaseUrl: 'https://wa.me/',
+  get waLink() { return `${this.waBaseUrl}${this.whatsapp}` },
+} as const
+
 // ── Constants ──
 export const statusLabels: Record<string, string> = { AVAILABLE: 'זמין', SOLD: 'נמכר', RESERVED: 'שמור', IN_PLANNING: 'בתכנון' }
 export const statusColors: Record<string, string> = { AVAILABLE: '#10B981', SOLD: '#EF4444', RESERVED: '#F59E0B', IN_PLANNING: '#8B5CF6' }

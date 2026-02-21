@@ -7,7 +7,7 @@ import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, 
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, Spinner, useToast, Badge } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance, zoningLabels, calcAggregateStats } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance, zoningLabels, calcAggregateStats, SITE_CONFIG } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -23,6 +23,7 @@ const DEFAULTS: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', s
 /* ── animations ── */
 const slideUp = keyframes`from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}`
 const chipPop = keyframes`from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}`
+const loadingSlide = keyframes`0%{left:-35%;width:35%}50%{left:20%;width:50%}100%{left:100%;width:15%}`
 
 /* ── styled ── */
 const Wrap = styled.div`position:relative;width:100vw;height:100vh;height:100dvh;overflow:hidden;background:${t.bg};`
@@ -47,6 +48,13 @@ const NavBtn = styled.button<{$active?:boolean}>`
   padding:4px 12px;transition:color ${t.tr};
 `
 const Loader = styled.div`position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;`
+const TopProgress = styled.div<{$show:boolean}>`
+  position:absolute;top:0;left:0;right:0;height:3px;z-index:${t.z.filter + 2};overflow:hidden;
+  opacity:${pr=>pr.$show?1:0};transition:opacity 0.4s;pointer-events:none;
+  &::after{content:'';position:absolute;top:0;left:-35%;width:35%;height:100%;
+    background:linear-gradient(90deg,transparent,${t.gold},${t.goldBright},${t.gold},transparent);
+    border-radius:0 2px 2px 0;animation:${loadingSlide} 1.2s cubic-bezier(0.4,0,0.2,1) infinite;}
+`
 
 /* ── Sort ── */
 const SortWrap = styled.div`
@@ -545,7 +553,7 @@ export default function Explore() {
 
   // Dynamic WhatsApp link — contextual when a plot is selected
   const waLink = useMemo(() => {
-    const base = 'https://wa.me/9720521234567?text='
+    const base = `${SITE_CONFIG.waLink}?text=`
     if (selected) {
       const d = p(selected)
       const msg = `היי, מתעניין/ת בחלקה ${selected.number} גוש ${d.block} ב${selected.city} (${fmt.compact(d.price)}). אשמח לפרטים נוספים.`
@@ -553,6 +561,21 @@ export default function Explore() {
     }
     return base + encodeURIComponent('היי, אשמח לשמוע על הזדמנויות קרקע')
   }, [selected])
+
+  // Data freshness
+  const dataSource = useMemo(() => {
+    try { return sessionStorage.getItem('data_source') || 'demo' } catch { return 'demo' }
+  }, [plots])
+  const dataFreshness = useMemo(() => {
+    try {
+      const ts = Number(sessionStorage.getItem('data_last_fetched'))
+      if (!ts) return null
+      const secs = Math.floor((Date.now() - ts) / 1000)
+      if (secs < 60) return 'עכשיו'
+      if (secs < 3600) return `לפני ${Math.floor(secs / 60)} דק׳`
+      return `לפני ${Math.floor(secs / 3600)} שע׳`
+    } catch { return null }
+  }, [plots])
 
   // Recently viewed plots (resolve IDs to actual plot objects)
   const recentPlots = useMemo(() => {
@@ -634,6 +657,7 @@ export default function Explore() {
   return (
     <Wrap className="dark">
       <ErrorBoundary>
+        <TopProgress $show={isLoading} />
         {isLoading && <Loader><Spinner size={36} /></Loader>}
         <MapArea
           plots={sorted} pois={pois} selected={selected} darkMode
@@ -735,7 +759,8 @@ export default function Explore() {
           {sortKey === 'nearest' && userGeo.location && <Stat>📍 <Val>מיון לפי קרבה</Val></Stat>}
           {sortKey === 'nearest' && userGeo.loading && <Stat>📍 מאתר מיקום...</Stat>}
           {sortKey === 'nearest' && userGeo.error && <Stat style={{color:t.err}}>⚠️ {userGeo.error}</Stat>}
-          <Demo>DEMO</Demo>
+          {dataFreshness && <Stat>🕐 <span style={{opacity:0.7}}>{dataFreshness}</span></Stat>}
+          <Demo>{dataSource === 'api' ? 'LIVE' : 'DEMO'}</Demo>
         </Stats>
 
         {/* Mobile Favorites Overlay */}

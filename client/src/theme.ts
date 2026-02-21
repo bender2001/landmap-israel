@@ -90,6 +90,25 @@ export const GlobalStyles = createGlobalStyle`
   .leaflet-tooltip.price-tooltip::before{display:none!important}
   .leaflet-tooltip.plot-tooltip-rich{padding:4px 10px!important;border-radius:${t.r.md}!important}
 
+  /* Plot price labels (permanent at high zoom) */
+  .plot-price-label{background:none!important;border:none!important;pointer-events:none!important}
+  .ppl-inner{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;
+    background:rgba(11,17,32,0.88);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    border:1px solid rgba(212,168,75,0.3);border-radius:6px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.35);white-space:nowrap;line-height:1;
+    transform:translateZ(0);}
+  .ppl-price{font-size:11px;font-weight:800;color:${t.goldBright};font-family:${t.font}}
+  .ppl-sep{font-size:8px;color:${t.textDim};opacity:0.4}
+  .ppl-grade{font-size:10px;font-weight:800;font-family:${t.font}}
+  /* New listing badge */
+  .plot-new-badge{background:none!important;border:none!important;pointer-events:none!important}
+  .pnb-inner{display:inline-flex;align-items:center;gap:2px;padding:2px 8px;
+    background:linear-gradient(135deg,#10B981,#059669);border-radius:9999px;
+    font-size:9px;font-weight:800;color:#fff;font-family:${t.font};
+    box-shadow:0 2px 8px rgba(16,185,129,0.4);white-space:nowrap;
+    animation:newBadgePulse 2.5s ease-in-out infinite;}
+  @keyframes newBadgePulse{0%,100%{transform:scale(1);box-shadow:0 2px 8px rgba(16,185,129,0.4)}50%{transform:scale(1.08);box-shadow:0 4px 16px rgba(16,185,129,0.6)}}
+
   /* Popup inner */
   .plot-popup{padding:16px}
   .plot-popup::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${t.gold},${t.goldBright},${t.gold},transparent)}

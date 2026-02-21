@@ -5,6 +5,7 @@ import { MapPin, Zap, TrendingUp, ChevronLeft, Phone, Bell, Smartphone, Briefcas
 import { t, fadeInUp, fadeInScale, shimmer, float, gradientShift, sm, md, lg, mobile } from '../theme'
 import { PublicLayout } from '../components/Layout'
 import { GoldButton, GhostButton, AnimatedCard, CountUpNumber, ScrollToTop } from '../components/UI'
+import { SITE_CONFIG } from '../utils'
 
 /* ── extra keyframes ── */
 const glow = keyframes`0%,100%{box-shadow:0 0 20px rgba(212,168,75,0.15)}50%{box-shadow:0 0 50px rgba(212,168,75,0.35)}`
@@ -416,11 +417,11 @@ export default function Landing(){
         <WaSection>
           <SectionHead style={{marginBottom:24}}>רוצים לדבר עם מומחה?</SectionHead>
           <p style={{color:t.textSec,marginBottom:28,fontSize:16}}>צוות מומחי הקרקע שלנו זמין עבורכם לכל שאלה</p>
-          <WaBtn href="https://wa.me/9720521234567" target="_blank" rel="noopener">
+          <WaBtn href={SITE_CONFIG.waLink} target="_blank" rel="noopener">
             <MessageCircle size={22}/> שלח הודעה בוואטסאפ
           </WaBtn>
           <br/>
-          <PhoneLink href="tel:052-1234567"><Phone size={15}/> 052-1234567</PhoneLink>
+          <PhoneLink href={`tel:${SITE_CONFIG.phone}`}><Phone size={15}/> {SITE_CONFIG.phone}</PhoneLink>
         </WaSection>
 
         {/* ── Final CTA ── */}

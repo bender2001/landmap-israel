@@ -13,8 +13,11 @@ export function useAllPlots(filters: Partial<Filters> = {}) {
     queryFn: async () => {
       try {
         const data = await api.getPlots(filters as Record<string, string>) as Plot[]
+        // Track data freshness
+        try { sessionStorage.setItem('data_last_fetched', String(Date.now())); sessionStorage.setItem('data_source', 'api') } catch {}
         return data.map(normalizePlot)
       } catch {
+        try { sessionStorage.setItem('data_last_fetched', String(Date.now())); sessionStorage.setItem('data_source', 'demo') } catch {}
         return mockPlots.map(normalizePlot)
       }
     },
@@ -167,6 +170,68 @@ export function useRecentlyViewed() {
   }, [])
 
   return { ids, add, count: ids.length }
+}
+
+// ── Saved Searches (localStorage, max 8) ──
+
+export interface SavedSearch {
+  id: string
+  name: string
+  filters: Record<string, string>
+  createdAt: number
+}
+
+const MAX_SAVED = 8
+
+export function useSavedSearches() {
+  const [searches, setSearches] = useState<SavedSearch[]>(() => {
+    try { return JSON.parse(localStorage.getItem('saved_searches') || '[]') } catch { return [] }
+  })
+
+  const save = useCallback((name: string, filters: Record<string, string>) => {
+    setSearches(prev => {
+      const next = [
+        { id: Date.now().toString(), name, filters, createdAt: Date.now() },
+        ...prev,
+      ].slice(0, MAX_SAVED)
+      localStorage.setItem('saved_searches', JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  const remove = useCallback((id: string) => {
+    setSearches(prev => {
+      const next = prev.filter(s => s.id !== id)
+      localStorage.setItem('saved_searches', JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  return { searches, save, remove }
+}
+
+// ── Data Freshness Tracker ──
+
+export function useDataFreshness() {
+  const [lastFetched, setLastFetched] = useState<number | null>(() => {
+    try { return Number(sessionStorage.getItem('data_last_fetched')) || null } catch { return null }
+  })
+
+  const markFetched = useCallback(() => {
+    const now = Date.now()
+    setLastFetched(now)
+    try { sessionStorage.setItem('data_last_fetched', String(now)) } catch {}
+  }, [])
+
+  const relativeTime = lastFetched ? (() => {
+    const secs = Math.floor((Date.now() - lastFetched) / 1000)
+    if (secs < 60) return 'עכשיו'
+    if (secs < 3600) return `לפני ${Math.floor(secs / 60)} דק׳`
+    if (secs < 86400) return `לפני ${Math.floor(secs / 3600)} שע׳`
+    return `לפני ${Math.floor(secs / 86400)} ימים`
+  })() : null
+
+  return { lastFetched, markFetched, relativeTime }
 }
 
 // ── Auth ──

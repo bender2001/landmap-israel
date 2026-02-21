@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import styled, { keyframes, css } from 'styled-components'
-import { Search, SlidersHorizontal, X, Sparkles, MapPin } from 'lucide-react'
+import { Search, SlidersHorizontal, X, Sparkles, MapPin, Bookmark, BookmarkCheck, Trash2 } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { Select, RangeInput } from './UI'
 import { p, fmt } from '../utils'
+import { useSavedSearches } from '../hooks'
 import type { Filters, Plot } from '../types'
 
 const EMPTY: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '' }
@@ -137,6 +138,36 @@ const Chip = styled.span`
   &:hover{background:${t.gold};color:${t.bg};transform:scale(1.05);}
 `
 
+/* ── Saved Searches ── */
+const SavedRow = styled.div`
+  display:flex;align-items:center;gap:6px;width:100%;padding:0 4px;direction:rtl;
+  ${mobile}{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+    &::-webkit-scrollbar{display:none;}}
+`
+const SavedChip = styled.button<{ $active?: boolean }>`
+  display:inline-flex;align-items:center;gap:4px;padding:5px 12px;
+  border:1px solid ${pr => pr.$active ? t.gold : 'rgba(139,92,246,0.25)'};
+  border-radius:${t.r.full};font-size:11px;font-weight:600;font-family:${t.font};cursor:pointer;
+  background:${pr => pr.$active ? t.goldDim : 'rgba(139,92,246,0.06)'};
+  color:${pr => pr.$active ? t.gold : '#A78BFA'};
+  backdrop-filter:blur(8px);transition:all ${t.tr};white-space:nowrap;flex-shrink:0;
+  &:hover{border-color:${t.gold};color:${t.gold};background:${t.goldDim};transform:translateY(-1px);}
+`
+const SavedChipDelete = styled.span`
+  display:inline-flex;align-items:center;justify-content:center;
+  width:14px;height:14px;border-radius:50%;cursor:pointer;opacity:0.6;
+  transition:all ${t.tr};flex-shrink:0;
+  &:hover{opacity:1;background:rgba(239,68,68,0.15);color:${t.err};}
+`
+const SaveBtn = styled.button`
+  display:inline-flex;align-items:center;gap:4px;padding:5px 12px;
+  border:1px dashed rgba(212,168,75,0.4);border-radius:${t.r.full};
+  font-size:11px;font-weight:600;font-family:${t.font};cursor:pointer;
+  background:transparent;color:${t.textDim};
+  transition:all ${t.tr};white-space:nowrap;flex-shrink:0;
+  &:hover{border-color:${t.gold};color:${t.gold};background:${t.goldDim};}
+`
+
 /* ── Search Suggestions ── */
 const SuggestWrap = styled.div`
   position:absolute;top:calc(100% + 6px);left:0;right:0;
@@ -172,6 +203,7 @@ interface Props { filters: Filters; onChange: (f: Filters) => void; resultCount?
 export default function FiltersBar({ filters, onChange, resultCount, plots, onSelectPlot }: Props) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Filters>(filters)
+  const { searches: savedSearches, save: saveSearch, remove: removeSavedSearch } = useSavedSearches()
 
   // Build city options with plot counts from actual data
   const CITIES = useMemo(() => {
@@ -392,6 +424,33 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
           <ChipsRow>
             {chips.map(c => <Chip key={c.key} onClick={() => removeChip(c.key)}>{c.label}<X size={10} /></Chip>)}
           </ChipsRow>
+        )}
+
+        {/* Saved Searches */}
+        {(savedSearches.length > 0 || activeCount > 0) && (
+          <SavedRow>
+            {activeCount > 0 && (
+              <SaveBtn onClick={() => {
+                const parts: string[] = []
+                if (filters.city && filters.city !== 'all') parts.push(filters.city)
+                if (filters.zoning) parts.push(ZONING.find(z => z.value === filters.zoning)?.label || '')
+                if (filters.priceMax) parts.push(`עד ${fmtPrice(Number(filters.priceMax))}`)
+                const name = parts.length > 0 ? parts.join(' · ') : `חיפוש ${savedSearches.length + 1}`
+                saveSearch(name, filters as unknown as Record<string, string>)
+              }}>
+                <Bookmark size={11} /> שמור חיפוש
+              </SaveBtn>
+            )}
+            {savedSearches.map(s => (
+              <SavedChip key={s.id} onClick={() => onChange(s.filters as unknown as Filters)}>
+                <BookmarkCheck size={11} />
+                {s.name}
+                <SavedChipDelete onClick={(e) => { e.stopPropagation(); removeSavedSearch(s.id) }}>
+                  <X size={8} />
+                </SavedChipDelete>
+              </SavedChip>
+            ))}
+          </SavedRow>
         )}
 
         <Drawer $open={open}>

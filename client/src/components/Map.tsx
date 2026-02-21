@@ -2,7 +2,7 @@ import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker, useMap, WMSTileLayer } from 'react-leaflet'
 import L from 'leaflet'
 import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Palette } from 'lucide-react'
-import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, zoningLabels, zoningPipeline } from '../utils'
+import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, zoningLabels, zoningPipeline, daysOnMarket } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
 import { israelAreas } from '../data'
@@ -404,6 +404,18 @@ function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCada
   )
 }
 
+// ── Zoom Tracker ──
+function ZoomTracker({ onChange }: { onChange: (z: number) => void }) {
+  const map = useMap()
+  useEffect(() => {
+    onChange(map.getZoom())
+    const handler = () => onChange(map.getZoom())
+    map.on('zoomend', handler)
+    return () => { map.off('zoomend', handler) }
+  }, [map, onChange])
+  return null
+}
+
 // ── Main Component ──
 function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, darkMode = false }: MapProps) {
   const [tileIdx, setTileIdx] = useState(2) // default to dark tiles for cohesive dark UI
@@ -412,6 +424,8 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [colorMode, setColorMode] = useState<ColorMode>('grade')
   const prefetch = usePrefetchPlot()
+  const [zoom, setZoom] = useState(13)
+  const handleZoomChange = useCallback((z: number) => setZoom(z), [])
 
   const tile = TILES[tileIdx]
   const center = useMemo<[number, number]>(() => {
@@ -503,6 +517,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         <AutoFitBounds plots={plots} />
         <UserLocation />
         <PlotBoundsTracker plots={plots} />
+        <ZoomTracker onChange={handleZoomChange} />
 
         {/* Area divisions with price stats */}
         {showAreas && israelAreas.map(area => {
@@ -590,6 +605,36 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
             </Tooltip>
           </CircleMarker>
         ))}
+
+        {/* Permanent price labels at high zoom */}
+        {zoom >= 15 && plots.map(plot => {
+          if (!plot.coordinates?.length) return null
+          const c = plotCenter(plot.coordinates)
+          if (!c) return null
+          const d = p(plot), grade = getGrade(calcScore(plot))
+          const icon = L.divIcon({
+            className: 'plot-price-label',
+            html: `<div class="ppl-inner"><span class="ppl-price">${fmt.short(d.price)}</span><span class="ppl-sep">·</span><span class="ppl-grade" style="color:${grade.color}">${grade.grade}</span></div>`,
+            iconSize: [90, 28],
+            iconAnchor: [45, 14],
+          })
+          return <Marker key={`price-${plot.id}`} position={[c.lat, c.lng]} icon={icon} interactive={false} />
+        })}
+
+        {/* New listing badges */}
+        {zoom >= 14 && plots.map(plot => {
+          const dom = daysOnMarket(p(plot).created)
+          if (!dom || dom.days > 7) return null
+          const c = plotCenter(plot.coordinates)
+          if (!c) return null
+          const icon = L.divIcon({
+            className: 'plot-new-badge',
+            html: '<div class="pnb-inner">חדש ✨</div>',
+            iconSize: [48, 20],
+            iconAnchor: [24, 32],
+          })
+          return <Marker key={`new-${plot.id}`} position={[c.lat, c.lng]} icon={icon} interactive={false} />
+        })}
 
         {/* POI markers */}
         {pois.map(poi => (
