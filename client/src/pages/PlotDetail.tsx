@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler } from 'lucide-react'
+import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle } from 'lucide-react'
 import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard } from '../components/UI'
 import { PublicLayout } from '../components/Layout'
-import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, plotCenter } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, plotCenter, calcRisk, setOgMeta, removeOgMeta } from '../utils'
+import type { RiskAssessment } from '../utils'
 import type { Plot } from '../types'
 
 const LeadModal = lazy(() => import('../components/LeadModal'))
@@ -235,6 +236,44 @@ function PlotDetailSkeleton() {
   )
 }
 
+/* ── Risk Indicator ── */
+const RiskCard = styled(AnimatedCard)`
+  background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};padding:24px;
+  @media print{break-inside:avoid;border:1px solid #ddd;box-shadow:none;}
+`
+const RiskHeader = styled.div`display:flex;align-items:center;gap:12px;margin-bottom:16px;`
+const RiskMeter = styled.div`display:flex;align-items:center;gap:4px;flex:1;`
+const RiskBar = styled.div<{$pct:number;$color:string}>`
+  flex:1;height:8px;background:${t.lBorder};border-radius:${t.r.full};overflow:hidden;position:relative;
+  &::after{content:'';position:absolute;top:0;left:0;height:100%;width:${pr=>pr.$pct}%;
+    background:${pr=>pr.$color};border-radius:${t.r.full};transition:width 1s ease;}
+`
+const RiskLabel = styled.span<{$color:string}>`
+  font-size:14px;font-weight:800;color:${pr=>pr.$color};white-space:nowrap;
+`
+const RiskFactors = styled.div`display:flex;flex-direction:column;gap:8px;`
+const RiskFactor = styled.div<{$impact:string}>`
+  display:flex;align-items:center;gap:10px;padding:8px 12px;
+  background:${pr=>pr.$impact === 'positive' ? 'rgba(16,185,129,0.06)' : pr.$impact === 'negative' ? 'rgba(239,68,68,0.06)' : t.lBg};
+  border:1px solid ${pr=>pr.$impact === 'positive' ? 'rgba(16,185,129,0.15)' : pr.$impact === 'negative' ? 'rgba(239,68,68,0.15)' : t.lBorder};
+  border-radius:${t.r.md};font-size:13px;
+`
+const FactorIcon = styled.span<{$impact:string}>`
+  font-size:14px;flex-shrink:0;
+  color:${pr=>pr.$impact === 'positive' ? t.ok : pr.$impact === 'negative' ? t.err : t.lTextSec};
+`
+const FactorName = styled.span`font-weight:600;color:${t.lText};`
+const FactorDetail = styled.span`color:${t.lTextSec};font-size:12px;margin-inline-start:auto;`
+
+/* ── Print Button ── */
+const PrintBtn = styled.button`
+  display:flex;align-items:center;justify-content:center;width:40px;height:40px;
+  border-radius:${t.r.md};border:1px solid ${t.lBorder};background:#fff;
+  color:${t.lTextSec};cursor:pointer;transition:all ${t.tr};
+  &:hover{border-color:${t.gold};color:${t.gold};}
+  @media print{display:none;}
+`
+
 /* ── Recently Viewed: now uses shared useRecentlyViewed hook ── */
 
 /* ── Mini Map (lazy loaded) ── */
@@ -305,12 +344,31 @@ export default function PlotDetail() {
   // Track recently viewed
   useEffect(() => { if (id) addRecentlyViewed(id) }, [id, addRecentlyViewed])
 
-  // Dynamic document title
+  // Dynamic document title + OG meta tags
   useEffect(() => {
     if (!plot) return
-    const d = p(plot)
-    document.title = `גוש ${d.block} חלקה ${plot.number} - ${plot.city} | LandMap Israel`
-    return () => { document.title = 'LandMap Israel' }
+    const d = p(plot), r = roi(plot)
+    const title = `גוש ${d.block} חלקה ${plot.number} - ${plot.city} | LandMap Israel`
+    const desc = `חלקת קרקע להשקעה ב${plot.city} | ${fmt.compact(d.price)} | ${fmt.num(d.size)} מ״ר | תשואה ${Math.round(r)}% | ציון ${calcScore(plot)}/10`
+    const url = window.location.href
+
+    document.title = title
+    setOgMeta({
+      'og:title': title,
+      'og:description': desc,
+      'og:url': url,
+      'og:type': 'website',
+      'og:site_name': 'LandMap Israel',
+      'og:locale': 'he_IL',
+      'twitter:card': 'summary',
+      'twitter:title': title,
+      'twitter:description': desc,
+    })
+
+    return () => {
+      document.title = 'LandMap Israel'
+      removeOgMeta(['og:title', 'og:description', 'og:url', 'og:type', 'og:site_name', 'og:locale', 'twitter:card', 'twitter:title', 'twitter:description'])
+    }
   }, [plot])
 
   const { data: similarPlots = [] } = useSimilarPlots(id)
@@ -341,6 +399,7 @@ export default function PlotDetail() {
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
   const cagr = calcCAGR(r, d.readiness), timeline = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot)
   const mortgage = d.price > 0 ? calcMonthly(d.price, ltvPct / 100, interestRate / 100, loanYears) : null
+  const risk = useMemo(() => calcRisk(plot, similarPlots.length > 0 ? [plot, ...similarPlots] : undefined), [plot, similarPlots])
 
   return (
     <PublicLayout>
@@ -361,6 +420,7 @@ export default function PlotDetail() {
             <Actions>
               <IconBtn $active={isFav(plot.id)} onClick={() => toggle(plot.id)} aria-label="מועדפים"><Heart size={20} fill={isFav(plot.id) ? t.gold : 'none'} /></IconBtn>
               <IconBtn onClick={handleShare} aria-label="שיתוף">{copied ? <Check size={20} color={t.ok} /> : <Share2 size={20} />}</IconBtn>
+              <PrintBtn onClick={() => window.print()} aria-label="הדפס דו״ח"><Printer size={20} /></PrintBtn>
               <IconBtn aria-label="ניווט" onClick={() => window.open(`https://waze.com/ul?ll=${plot.coordinates?.[0]?.[0]},${plot.coordinates?.[0]?.[1]}&navigate=yes`, '_blank')}><Navigation size={20} /></IconBtn>
             </Actions>
           </TitleRow>
@@ -385,6 +445,29 @@ export default function PlotDetail() {
                 <Row><Label>צפיפות</Label><Value>{d.density} יח"ד/דונם</Value></Row>
                 <Row><Label>אומדן מוכנות</Label><Value>{d.readiness || '--'}</Value></Row>
               </Card>
+
+              {/* Risk Assessment — like Madlan's risk meter */}
+              <RiskCard $delay={0.15}>
+                <CardTitle><AlertTriangle size={18} color={risk.color} /> הערכת סיכון</CardTitle>
+                <RiskHeader>
+                  <RiskLabel $color={risk.color}>{risk.icon} {risk.label}</RiskLabel>
+                  <RiskMeter>
+                    <RiskBar $pct={risk.score * 10} $color={risk.color} />
+                    <span style={{ fontSize: 12, fontWeight: 800, color: risk.color, minWidth: 28, textAlign: 'center' }}>{risk.score}/10</span>
+                  </RiskMeter>
+                </RiskHeader>
+                <RiskFactors>
+                  {risk.factors.map((f, i) => (
+                    <RiskFactor key={i} $impact={f.impact}>
+                      <FactorIcon $impact={f.impact}>
+                        {f.impact === 'positive' ? '✅' : f.impact === 'negative' ? '⚠️' : 'ℹ️'}
+                      </FactorIcon>
+                      <FactorName>{f.name}</FactorName>
+                      <FactorDetail>{f.detail}</FactorDetail>
+                    </RiskFactor>
+                  ))}
+                </RiskFactors>
+              </RiskCard>
 
               {timeline && (
                 <Card $delay={0.2}>

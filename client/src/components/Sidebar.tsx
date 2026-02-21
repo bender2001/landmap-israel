@@ -3,7 +3,7 @@ import styled, { keyframes, css } from 'styled-components'
 import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePosition } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePosition, calcRisk } from '../utils'
 import type { Plot } from '../types'
 import { GoldButton, GhostButton, Badge } from './UI'
 
@@ -136,6 +136,18 @@ const ShareBtn = styled.button<{ $copied?: boolean }>`
   &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
 `
 
+/* ── Risk Badge ── */
+const RiskBadge = styled.div<{ $c: string }>`
+  display:flex;align-items:center;gap:8px;padding:10px 14px;
+  background:${pr => pr.$c}0A;border:1px solid ${pr => pr.$c}22;
+  border-radius:${t.r.md};animation:${fadeSection} 0.5s 0.18s both;
+`
+const RiskMeterMini = styled.div<{$pct:number;$c:string}>`
+  flex:1;height:5px;background:${t.surfaceLight};border-radius:3px;overflow:hidden;position:relative;
+  &::after{content:'';position:absolute;top:0;left:0;height:100%;width:${pr=>pr.$pct}%;
+    background:${pr=>pr.$c};border-radius:3px;transition:width 0.8s ease;}
+`
+
 /* ── Sparkline (SVG mini chart) ── */
 const SparkWrap = styled.div`
   display:flex;align-items:flex-end;gap:8px;padding:12px 0;
@@ -253,6 +265,7 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
 
   const marketTrend = useMarketTrend(plot)
   const pricePos = useMemo(() => plot && plots ? pricePosition(plot, plots) : null, [plot, plots])
+  const risk = useMemo(() => plot ? calcRisk(plot, plots) : null, [plot, plots])
 
   if (!plot) return null
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
@@ -325,6 +338,16 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
               {pricePos.direction === 'below' ? '📉' : pricePos.direction === 'above' ? '📈' : '➡️'}
               מחיר למ״ר {pricePos.label} לממוצע באזור
             </PricePosBadge>
+          )}
+
+          {/* Risk indicator — compact version for sidebar */}
+          {risk && (
+            <RiskBadge $c={risk.color}>
+              <span style={{ fontSize: 14 }}>{risk.icon}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: risk.color }}>{risk.label}</span>
+              <RiskMeterMini $pct={risk.score * 10} $c={risk.color} />
+              <span style={{ fontSize: 11, fontWeight: 800, color: risk.color }}>{risk.score}/10</span>
+            </RiskBadge>
           )}
 
           {/* Market Trend Card — like Madlan's area trend indicator */}

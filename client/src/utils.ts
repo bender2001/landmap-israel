@@ -149,6 +149,110 @@ export function plotCenter(coords: [number, number][] | null | undefined) {
   return { lat: v.reduce((s, c) => s + c[0], 0) / v.length, lng: v.reduce((s, c) => s + c[1], 0) / v.length }
 }
 
+// ── Risk Assessment ──
+export type RiskLevel = 'low' | 'medium' | 'high'
+export interface RiskAssessment {
+  level: RiskLevel
+  score: number // 1-10 (1=lowest risk, 10=highest)
+  label: string
+  color: string
+  icon: string
+  factors: { name: string; impact: 'positive' | 'negative' | 'neutral'; detail: string }[]
+}
+
+export function calcRisk(plot: Plot, allPlots?: Plot[]): RiskAssessment {
+  const d = p(plot), r = roi(plot)
+  const factors: RiskAssessment['factors'] = []
+  let riskScore = 5 // baseline
+
+  // Zoning stage — earlier = higher risk
+  const zi = ZO.indexOf(d.zoning)
+  if (zi <= 1) {
+    riskScore += 2
+    factors.push({ name: 'שלב תכנוני מוקדם', impact: 'negative', detail: zoningLabels[d.zoning] || d.zoning })
+  } else if (zi >= 5) {
+    riskScore -= 2
+    factors.push({ name: 'שלב תכנוני מתקדם', impact: 'positive', detail: zoningLabels[d.zoning] || d.zoning })
+  } else {
+    factors.push({ name: 'שלב תכנוני בינוני', impact: 'neutral', detail: zoningLabels[d.zoning] || d.zoning })
+  }
+
+  // ROI — very high ROI often means higher risk
+  if (r > 100) {
+    riskScore += 1
+    factors.push({ name: 'תשואה גבוהה מאוד', impact: 'negative', detail: `${Math.round(r)}% — תשואות חריגות מרמזות על סיכון` })
+  } else if (r > 40) {
+    factors.push({ name: 'תשואה טובה', impact: 'positive', detail: `${Math.round(r)}%` })
+  } else if (r > 0) {
+    factors.push({ name: 'תשואה נמוכה', impact: 'neutral', detail: `${Math.round(r)}%` })
+  }
+
+  // Readiness
+  if (d.readiness.includes('1-3')) {
+    riskScore -= 1
+    factors.push({ name: 'מוכנות גבוהה', impact: 'positive', detail: '1-3 שנים' })
+  } else if (d.readiness.includes('5+') || d.readiness.includes('7+')) {
+    riskScore += 1
+    factors.push({ name: 'זמן המתנה ארוך', impact: 'negative', detail: d.readiness })
+  }
+
+  // Price vs market (if allPlots available)
+  if (allPlots && allPlots.length >= 3) {
+    const pps = pricePerSqm(plot)
+    if (pps > 0) {
+      const allPps = allPlots.map(pricePerSqm).filter(v => v > 0)
+      const avg = allPps.reduce((s, v) => s + v, 0) / allPps.length
+      const diff = ((pps - avg) / avg) * 100
+      if (diff < -15) {
+        factors.push({ name: 'מחיר מתחת לממוצע', impact: 'positive', detail: `${Math.abs(Math.round(diff))}% מתחת` })
+        riskScore -= 1
+      } else if (diff > 20) {
+        factors.push({ name: 'מחיר מעל הממוצע', impact: 'negative', detail: `${Math.round(diff)}% מעל` })
+        riskScore += 1
+      }
+    }
+  }
+
+  // Committees
+  if (plot.committees) {
+    const approvedCount = Object.values(plot.committees).filter(c => c.status === 'approved').length
+    if (approvedCount >= 2) {
+      riskScore -= 1
+      factors.push({ name: 'אישורי ועדות', impact: 'positive', detail: `${approvedCount} ועדות מאושרות` })
+    }
+  }
+
+  // Clamp
+  riskScore = Math.max(1, Math.min(10, riskScore))
+
+  const level: RiskLevel = riskScore <= 3 ? 'low' : riskScore <= 6 ? 'medium' : 'high'
+  const label = level === 'low' ? 'סיכון נמוך' : level === 'medium' ? 'סיכון בינוני' : 'סיכון גבוה'
+  const color = level === 'low' ? '#10B981' : level === 'medium' ? '#F59E0B' : '#EF4444'
+  const icon = level === 'low' ? '🛡️' : level === 'medium' ? '⚠️' : '🔴'
+
+  return { level, score: riskScore, label, color, icon, factors }
+}
+
+// ── OG Meta Helper ──
+export function setOgMeta(tags: Record<string, string>) {
+  for (const [property, content] of Object.entries(tags)) {
+    let el = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement | null
+    if (!el) {
+      el = document.createElement('meta')
+      el.setAttribute('property', property)
+      document.head.appendChild(el)
+    }
+    el.setAttribute('content', content)
+  }
+}
+
+export function removeOgMeta(properties: string[]) {
+  for (const property of properties) {
+    const el = document.querySelector(`meta[property="${property}"]`)
+    if (el) el.remove()
+  }
+}
+
 // ── Normalize ──
 export function normalizePlot(plot: Plot): Plot {
   return { ...plot, total_price: plot.totalPrice ?? plot.total_price, projected_value: plot.projectedValue ?? plot.projected_value,

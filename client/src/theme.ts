@@ -126,4 +126,29 @@ export const GlobalStyles = createGlobalStyle`
     .leaflet-control-zoom{margin-bottom:100px!important}
     .leaflet-control-zoom a{width:42px!important;height:42px!important;line-height:42px!important;font-size:18px!important}
   }
+
+  /* ── Print Styles ── */
+  @media print{
+    @page{size:A4;margin:15mm 12mm;}
+    body{background:#fff!important;color:#000!important;font-size:11pt!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    nav,footer,.leaflet-container,.map-vignette,button:not(.print-show),[role="navigation"]{display:none!important;}
+    /* Show content without fixed positioning */
+    [style*="position: fixed"],[style*="position:fixed"]{position:static!important;box-shadow:none!important;backdrop-filter:none!important;border:none!important;}
+    /* Cards look clean */
+    *{box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;animation:none!important;transition:none!important;}
+    /* Force visible colors for badges */
+    [class*="Badge"]{border:1px solid #ccc!important;padding:2px 8px!important;}
+    /* Grid layout for print */
+    [class*="Grid"]{display:block!important;}
+    [class*="Grid"] > *{margin-bottom:16px!important;page-break-inside:avoid!important;break-inside:avoid!important;}
+    /* Print header */
+    h1{font-size:20pt!important;color:#000!important;}
+    h2,h3{font-size:14pt!important;color:#111!important;}
+    /* Show URL after links */
+    a[href^="http"]:after{content:" (" attr(href) ")";font-size:8pt;color:#666;}
+    /* Hide interactive elements */
+    input[type="range"],input[type="checkbox"]{display:none!important;}
+    /* Print watermark */
+    body::after{content:"LandMap Israel — Investment Report";position:fixed;bottom:5mm;right:10mm;font-size:8pt;color:#aaa;font-family:${t.font};}
+  }
 `
