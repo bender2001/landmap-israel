@@ -94,9 +94,10 @@ const CitiesSection = styled.section`
   background:${t.bg};
 `
 const CitiesGrid = styled.div`
-  max-width:1060px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;
-  ${md}{grid-template-columns:repeat(3,1fr);}
+  max-width:1060px;margin:0 auto;display:grid;grid-template-columns:repeat(2,1fr);gap:16px;
   ${sm}{grid-template-columns:repeat(2,1fr);}
+  ${md}{grid-template-columns:repeat(3,1fr);}
+  ${lg}{grid-template-columns:repeat(4,1fr);}
   @media(max-width:380px){grid-template-columns:1fr;}
 `
 const CityCard = styled(Link)<{$hue:number;$delay:number}>`
@@ -142,9 +143,9 @@ const StatsStrip = styled.section`
     background-size:200% 100%;animation:${shimmer} 4s linear infinite;}
 `
 const StatsGrid = styled.div`
-  max-width:1000px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:20px;text-align:center;
+  max-width:1000px;margin:0 auto;display:grid;grid-template-columns:repeat(2,1fr);gap:20px;text-align:center;
   position:relative;z-index:1;
-  ${sm}{grid-template-columns:repeat(2,1fr);}
+  ${md}{grid-template-columns:repeat(4,1fr);}
   @media(max-width:480px){grid-template-columns:1fr;}
 `
 const StatItem = styled(AnimatedCard)`display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px;`
@@ -159,7 +160,7 @@ const SectionHead = styled.h2`
 `
 const StepsRow = styled.div`
   max-width:900px;margin:0 auto;display:flex;align-items:flex-start;justify-content:center;gap:20px;
-  position:relative;${md}{flex-direction:column;align-items:center;}
+  position:relative;${mobile}{flex-direction:column;align-items:center;}
 `
 const StepCard = styled(AnimatedCard)<{$delay:number}>`
   flex:1;max-width:260px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:16px;
@@ -181,7 +182,7 @@ const StepIcon = styled.div`
 `
 const Connector = styled.div`
   display:flex;align-items:center;padding-top:60px;color:${t.goldBorder};
-  ${md}{display:none;}
+  ${mobile}{display:none;}
 `
 
 /* ══════ FEATURES ══════ */
@@ -190,9 +191,9 @@ const Features = styled.section`
   background:linear-gradient(180deg,transparent,rgba(212,168,75,0.02),transparent);
 `
 const FeatGrid = styled.div`
-  max-width:1060px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:24px;
-  ${md}{grid-template-columns:repeat(2,1fr);}
-  ${mobile}{grid-template-columns:1fr;}
+  max-width:1060px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:24px;
+  ${sm}{grid-template-columns:repeat(2,1fr);}
+  ${lg}{grid-template-columns:repeat(3,1fr);}
 `
 const Card = styled(AnimatedCard)`
   background:${t.surface};border:1px solid ${t.border};border-radius:${t.r.lg};padding:28px 22px;
@@ -212,8 +213,9 @@ const CardDesc = styled.p`font-size:13px;color:${t.textSec};line-height:1.7;`
 /* ══════ TESTIMONIALS ══════ */
 const TestSection = styled.section`padding:80px 24px;direction:rtl;`
 const TestGrid = styled.div`
-  max-width:1060px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:24px;
-  ${md}{grid-template-columns:1fr;}
+  max-width:1060px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:24px;
+  ${sm}{grid-template-columns:repeat(2,1fr);}
+  ${lg}{grid-template-columns:repeat(3,1fr);}
 `
 const TestCard = styled(AnimatedCard)`
   background:${t.surface};border:1px solid ${t.border};border-radius:${t.r.xl};padding:28px;

@@ -229,6 +229,38 @@ export function calcAggregateStats(plots: Plot[]) {
   }
 }
 
+// ── Best Value per City ──
+/** Returns a Set of plot IDs that are the "best value" in their city (highest score with below-avg price) */
+export function findBestValueIds(plots: Plot[]): Set<string> {
+  const bestIds = new Set<string>()
+  if (plots.length < 2) return bestIds
+  // Group by city
+  const byCity = new Map<string, Plot[]>()
+  for (const pl of plots) {
+    if (!pl.city) continue
+    const arr = byCity.get(pl.city) || []
+    arr.push(pl)
+    byCity.set(pl.city, arr)
+  }
+  // For each city with 2+ plots, find the one with best value score
+  for (const [, cityPlots] of byCity) {
+    if (cityPlots.length < 2) continue
+    const ppsList = cityPlots.map(pricePerSqm).filter(v => v > 0)
+    const avgPps = ppsList.length ? ppsList.reduce((s, v) => s + v, 0) / ppsList.length : 0
+    // Best value = highest investment score among plots with below-avg price/sqm
+    let best: Plot | null = null
+    let bestScore = -1
+    for (const pl of cityPlots) {
+      const pps = pricePerSqm(pl)
+      if (pps <= 0 || pps >= avgPps) continue // only below-average price
+      const score = calcScore(pl)
+      if (score > bestScore) { bestScore = score; best = pl }
+    }
+    if (best) bestIds.add(best.id)
+  }
+  return bestIds
+}
+
 // ── Geo ──
 export function plotCenter(coords: [number, number][] | null | undefined) {
   if (!coords?.length) return null

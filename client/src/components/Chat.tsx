@@ -11,17 +11,17 @@ const fabPop = keyframes`from{transform:scale(0)}to{transform:scale(1)}`
 
 /* ── styled ── */
 const Fab = styled.button`
-  position:fixed;bottom:24px;right:24px;z-index:${t.z.controls};width:56px;height:56px;border-radius:50%;
+  position:fixed;bottom:24px;right:24px;z-index:${t.z.controls};width:48px;height:48px;border-radius:${t.r.lg};
   background:linear-gradient(135deg,${t.gold},${t.goldBright});border:none;cursor:pointer;
   display:flex;align-items:center;justify-content:center;color:${t.bg};
   box-shadow:${t.sh.lg},${t.sh.glow};transition:all ${t.tr};animation:${fabPop} 0.3s ease-out;
   &:hover{transform:translateY(-2px);box-shadow:${t.sh.xl},0 0 32px rgba(212,168,75,0.35);}
   &:active{transform:translateY(0);}
-  ${mobile}{bottom:72px;right:16px;width:48px;height:48px;}
+  ${mobile}{bottom:140px;right:14px;width:44px;height:44px;}
 `
 
 const Panel = styled.div<{$open:boolean}>`
-  position:fixed;bottom:92px;right:24px;z-index:${t.z.controls};width:360px;max-height:520px;
+  position:fixed;bottom:84px;right:24px;z-index:${t.z.controls};width:360px;max-height:520px;
   background:${t.surface};border:1px solid ${t.goldBorder};border-radius:${t.r.lg};
   box-shadow:${t.sh.xl};display:${p=>p.$open?'flex':'none'};flex-direction:column;overflow:hidden;
   animation:${fadeInUp} 0.3s ease-out;

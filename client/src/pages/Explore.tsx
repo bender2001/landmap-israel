@@ -313,17 +313,17 @@ const CalcInput = styled.input`
 /* ── WhatsApp Floating CTA ── */
 const waPulse = keyframes`0%{box-shadow:0 0 0 0 rgba(37,211,102,0.45)}70%{box-shadow:0 0 0 14px rgba(37,211,102,0)}100%{box-shadow:0 0 0 0 rgba(37,211,102,0)}`
 const WhatsAppFab = styled.a`
-  position:fixed;bottom:100px;right:20px;z-index:${t.z.filter};
-  width:56px;height:56px;border-radius:${t.r.full};
+  position:fixed;bottom:92px;right:20px;z-index:${t.z.filter};
+  width:52px;height:52px;border-radius:${t.r.full};
   background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;
   box-shadow:0 4px 16px rgba(37,211,102,0.4);cursor:pointer;
   transition:all ${t.tr};animation:${waPulse} 2.5s ease-in-out infinite;
   text-decoration:none !important;
   &:hover{transform:scale(1.1) translateY(-2px);box-shadow:0 8px 28px rgba(37,211,102,0.5);}
-  ${mobile}{bottom:120px;right:14px;width:48px;height:48px;}
+  ${mobile}{bottom:196px;right:14px;width:44px;height:44px;}
 `
 const WhatsAppTooltip = styled.div`
-  position:fixed;bottom:108px;right:82px;z-index:${t.z.filter};
+  position:fixed;bottom:100px;right:78px;z-index:${t.z.filter};
   padding:8px 14px;background:${t.glass};backdrop-filter:blur(16px);
   border:1px solid ${t.glassBorder};border-radius:${t.r.md};
   font-size:12px;font-weight:600;color:${t.text};white-space:nowrap;direction:rtl;
@@ -341,8 +341,14 @@ const MarketPulseWrap = styled.div`
   background:${t.glass};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
   border:1px solid ${t.glassBorder};border-radius:${t.r.lg};box-shadow:${t.sh.lg};
   overflow:hidden;animation:${chipPop} 0.35s cubic-bezier(0.32,0.72,0,1);
+  @media(max-width:900px){
+    top:auto;bottom:42px;right:auto;left:50%;transform:translateX(-50%);
+    max-width:calc(100vw - 32px);overflow-x:auto;scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;&::-webkit-scrollbar{display:none;}
+  }
   ${mobile}{
-    position:absolute;top:46px;right:8px;left:8px;
+    position:absolute;top:46px;right:8px;left:8px;transform:none;
+    bottom:auto;
     overflow-x:auto;scrollbar-width:none;
     -webkit-overflow-scrolling:touch;
     &::-webkit-scrollbar{display:none;}

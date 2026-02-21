@@ -104,7 +104,7 @@ const Title = styled.h1`font-size:clamp(22px,3vw,30px);font-weight:800;color:${t
 const Actions = styled.div`display:flex;gap:8px;`
 const IconBtn = styled.button<{$active?:boolean}>`display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:${t.r.md};border:1px solid ${t.lBorder};background:${pr=>pr.$active?t.goldDim:'#fff'};color:${pr=>pr.$active?t.gold:t.lTextSec};cursor:pointer;transition:all ${t.tr};&:hover{border-color:${t.gold};color:${t.gold};}`
 
-const Metrics = styled.div`display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:32px;${md}{grid-template-columns:repeat(3,1fr);}${sm}{grid-template-columns:repeat(2,1fr);}`
+const Metrics = styled.div`display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:32px;${sm}{grid-template-columns:repeat(2,1fr);}${md}{grid-template-columns:repeat(3,1fr);}${lg}{grid-template-columns:repeat(5,1fr);}`
 const Metric = styled(AnimatedCard)`padding:20px;background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};text-align:center;transition:all ${t.tr};&:hover{border-color:${t.goldBorder};box-shadow:${t.sh.glow};}`
 const MetricVal = styled.div`font-size:24px;font-weight:800;color:${t.lText};font-family:${t.font};`
 const MetricLabel = styled.div`font-size:12px;color:${t.lTextSec};margin-top:4px;`
@@ -128,6 +128,36 @@ const BottomBar = styled.div`position:fixed;bottom:0;left:0;right:0;z-index:40;b
 const BarPrice = styled.span`font-size:20px;font-weight:800;color:${t.lText};font-family:${t.font};`
 
 const Center = styled.div`display:flex;align-items:center;justify-content:center;min-height:60vh;`
+
+/* ── Reading Progress Bar ── */
+const ReadingProgress = styled.div<{$pct:number}>`
+  position:fixed;top:0;left:0;right:0;height:3px;z-index:999;pointer-events:none;
+  background:transparent;
+  &::after{
+    content:'';position:absolute;top:0;left:0;height:100%;
+    width:${pr => pr.$pct}%;
+    background:linear-gradient(90deg,${t.gold},${t.goldBright});
+    transition:width 0.1s linear;
+    box-shadow:${pr => pr.$pct > 5 ? '0 0 8px rgba(212,168,75,0.4)' : 'none'};
+  }
+  @media print{display:none;}
+`
+
+function useReadingProgress() {
+  const [progress, setProgress] = useState(0)
+  useEffect(() => {
+    const handler = () => {
+      const scrollTop = window.scrollY
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight
+      if (docHeight <= 0) { setProgress(0); return }
+      setProgress(Math.min(100, Math.round((scrollTop / docHeight) * 100)))
+    }
+    window.addEventListener('scroll', handler, { passive: true })
+    handler()
+    return () => window.removeEventListener('scroll', handler)
+  }, [])
+  return progress
+}
 
 /* ── Mortgage Calculator ── */
 const CalcWrap = styled.div`display:flex;flex-direction:column;gap:14px;`
@@ -500,6 +530,7 @@ export default function PlotDetail() {
   const [ltvPct, setLtvPct] = useState(50)
   const [loanYears, setLoanYears] = useState(15)
   const [interestRate, setInterestRate] = useState(6)
+  const readingProgress = useReadingProgress()
 
   const handleShare = async () => {
     const url = window.location.href
@@ -583,6 +614,7 @@ export default function PlotDetail() {
   return (
     <PublicLayout>
       <ErrorBoundary>
+        <ReadingProgress $pct={readingProgress} />
         <PlotJsonLd plot={plot} />
         <Page>
           <Breadcrumbs plot={plot} />

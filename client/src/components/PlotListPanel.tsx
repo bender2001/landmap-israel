@@ -3,7 +3,7 @@ import styled, { keyframes } from 'styled-components'
 import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download, Share2, MessageCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, estimatedYear, SITE_CONFIG } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, estimatedYear, findBestValueIds, SITE_CONFIG } from '../utils'
 import { Skeleton } from './UI'
 import type { Plot } from '../types'
 
@@ -297,6 +297,16 @@ const EstYearBadge = styled.span`
   white-space:nowrap;letter-spacing:0.3px;
 `
 
+/* ── Best Value Badge ── */
+const bestValueGlow = keyframes`0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0.3)}50%{box-shadow:0 0 0 5px rgba(16,185,129,0)}`
+const BestValueBadge = styled.span`
+  display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;
+  padding:2px 8px;border-radius:${t.r.full};color:#10B981;
+  background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);
+  white-space:nowrap;letter-spacing:0.3px;
+  animation:${bestValueGlow} 3s ease-in-out infinite;
+`
+
 /* ── WhatsApp Quick CTA ── */
 const WaCta = styled.a`
   display:flex;align-items:center;justify-content:center;width:28px;height:28px;
@@ -466,9 +476,9 @@ interface Props {
   userLocation?: { lat: number; lng: number } | null
 }
 
-function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userLocation }: {
+function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userLocation, isBestValue }: {
   plot: Plot; active: boolean; index: number; onClick: () => void; allPlots: Plot[]; onDetailClick: (id: string) => void
-  userLocation?: { lat: number; lng: number } | null
+  userLocation?: { lat: number; lng: number } | null; isBestValue?: boolean
 }) {
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
   const status = (plot.status || 'AVAILABLE') as string
@@ -498,6 +508,7 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userL
           {isHot && <HotBadge>🔥 HOT</HotBadge>}
           {percentile && <PercentileBadge $c={percentile.color}>{percentile.icon} {percentile.label}</PercentileBadge>}
           {estYear && <EstYearBadge title={`${estYear.monthsLeft} חודשים צפויים`}>🏗️ {estYear.label}</EstYearBadge>}
+          {isBestValue && <BestValueBadge title="ערך הכי טוב בעיר — ציון גבוה + מחיר מתחת לממוצע">💎 BEST VALUE</BestValueBadge>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           {distance != null && <DistanceBadge>📍 {fmtDistance(distance)}</DistanceBadge>}
@@ -602,6 +613,7 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, u
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [showScrollTop, setShowScrollTop] = useState(false)
   const stats = useMemo(() => calcAggregateStats(plots), [plots])
+  const bestValueIds = useMemo(() => findBestValueIds(plots), [plots])
   const goToDetail = useCallback((id: string) => navigate(`/plot/${id}`), [navigate])
 
   // City counts for chips
@@ -765,6 +777,7 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, u
                     allPlots={plots}
                     onDetailClick={goToDetail}
                     userLocation={userLocation}
+                    isBestValue={bestValueIds.has(plot.id)}
                   />
                 ))}
                 {hasMore && (
