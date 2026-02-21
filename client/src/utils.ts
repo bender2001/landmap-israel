@@ -311,6 +311,118 @@ export function calcRisk(plot: Plot, allPlots?: Plot[]): RiskAssessment {
   return { level, score: riskScore, label, color, icon, factors }
 }
 
+// ── Location Quality Score ──
+// Madlan-style location quality assessment based on proximity data
+export interface LocationScore {
+  score: number // 1-10
+  label: string
+  color: string
+  factors: { name: string; icon: string; score: number; maxScore: number; detail: string }[]
+  tags: { label: string; icon: string; color: string }[]
+}
+
+export function calcLocationScore(plot: Plot): LocationScore {
+  const d = p(plot)
+  const factors: LocationScore['factors'] = []
+  const tags: LocationScore['tags'] = []
+  let total = 0, maxTotal = 0
+
+  // 1. Distance to sea (max 2.5 pts) — closer is better
+  const seaDist = d.seaDist
+  if (seaDist != null && seaDist > 0) {
+    const maxPts = 2.5
+    maxTotal += maxPts
+    let pts = 0
+    if (seaDist <= 500) { pts = maxPts; tags.push({ label: 'חוף הים', icon: '🌊', color: '#3B82F6' }) }
+    else if (seaDist <= 1500) { pts = maxPts * 0.8; tags.push({ label: 'קרוב לים', icon: '🌊', color: '#60A5FA' }) }
+    else if (seaDist <= 3000) pts = maxPts * 0.5
+    else if (seaDist <= 5000) pts = maxPts * 0.25
+    else pts = maxPts * 0.1
+    total += pts
+    factors.push({ name: 'קרבה לים', icon: '🌊', score: pts, maxScore: maxPts, detail: `${fmt.num(seaDist)} מ׳` })
+  }
+
+  // 2. Distance to park (max 2.5 pts)
+  const parkDist = d.parkDist
+  if (parkDist != null && parkDist > 0) {
+    const maxPts = 2.5
+    maxTotal += maxPts
+    let pts = 0
+    if (parkDist <= 300) { pts = maxPts; tags.push({ label: 'ליד פארק', icon: '🌳', color: '#10B981' }) }
+    else if (parkDist <= 800) { pts = maxPts * 0.75; tags.push({ label: 'פארק קרוב', icon: '🌳', color: '#4ADE80' }) }
+    else if (parkDist <= 1500) pts = maxPts * 0.5
+    else if (parkDist <= 3000) pts = maxPts * 0.25
+    else pts = maxPts * 0.1
+    total += pts
+    factors.push({ name: 'קרבה לפארק', icon: '🌳', score: pts, maxScore: maxPts, detail: `${fmt.num(parkDist)} מ׳` })
+  }
+
+  // 3. Distance to hospital (max 2 pts)
+  const hospDist = plot.distance_to_hospital ?? plot.distanceToHospital as number | undefined
+  if (hospDist != null && hospDist > 0) {
+    const maxPts = 2
+    maxTotal += maxPts
+    let pts = 0
+    if (hospDist <= 1000) { pts = maxPts; tags.push({ label: 'ליד בי״ח', icon: '🏥', color: '#EF4444' }) }
+    else if (hospDist <= 3000) pts = maxPts * 0.7
+    else if (hospDist <= 5000) pts = maxPts * 0.4
+    else pts = maxPts * 0.15
+    total += pts
+    factors.push({ name: 'קרבה לבי״ח', icon: '🏥', score: pts, maxScore: maxPts, detail: `${fmt.num(hospDist)} מ׳` })
+  }
+
+  // 4. Density — higher density = more developed area (max 2 pts)
+  if (d.density > 0) {
+    const maxPts = 2
+    maxTotal += maxPts
+    let pts = 0
+    if (d.density >= 10) { pts = maxPts; tags.push({ label: 'צפיפות גבוהה', icon: '🏙️', color: '#8B5CF6' }) }
+    else if (d.density >= 6) pts = maxPts * 0.7
+    else if (d.density >= 3) pts = maxPts * 0.4
+    else pts = maxPts * 0.15
+    total += pts
+    factors.push({ name: 'צפיפות פיתוח', icon: '🏙️', score: pts, maxScore: maxPts, detail: `${d.density} יח"ד/דונם` })
+  }
+
+  // 5. Zoning stage bonus (max 1 pt) — advanced zoning = better location infrastructure
+  const zi = ZO.indexOf(d.zoning)
+  if (zi >= 0) {
+    const maxPts = 1
+    maxTotal += maxPts
+    const pts = (zi / (ZO.length - 1)) * maxPts
+    total += pts
+    factors.push({ name: 'רמת פיתוח', icon: '📋', score: pts, maxScore: maxPts, detail: zoningLabels[d.zoning] || d.zoning })
+  }
+
+  // Normalize to 1-10 scale
+  const normalizedScore = maxTotal > 0 ? Math.max(1, Math.min(10, Math.round((total / maxTotal) * 10))) : 5
+  const label = normalizedScore >= 9 ? 'מיקום מעולה' : normalizedScore >= 7 ? 'מיקום טוב מאוד'
+    : normalizedScore >= 5 ? 'מיקום טוב' : normalizedScore >= 3 ? 'מיקום סביר' : 'מיקום בסיסי'
+  const color = normalizedScore >= 8 ? '#10B981' : normalizedScore >= 6 ? '#84CC16'
+    : normalizedScore >= 4 ? '#F59E0B' : '#EF4444'
+
+  return { score: normalizedScore, label, color, factors, tags }
+}
+
+/** Get just the location proximity tags for a plot (lightweight for list cards) */
+export function getLocationTags(plot: Plot): { label: string; icon: string; color: string }[] {
+  const d = p(plot)
+  const tags: { label: string; icon: string; color: string }[] = []
+  const seaDist = d.seaDist
+  if (seaDist != null && seaDist > 0 && seaDist <= 2000) {
+    tags.push({ label: seaDist <= 500 ? 'חוף הים' : 'קרוב לים', icon: '🌊', color: '#3B82F6' })
+  }
+  const parkDist = d.parkDist
+  if (parkDist != null && parkDist > 0 && parkDist <= 1000) {
+    tags.push({ label: parkDist <= 300 ? 'ליד פארק' : 'פארק קרוב', icon: '🌳', color: '#10B981' })
+  }
+  const hospDist = plot.distance_to_hospital ?? plot.distanceToHospital as number | undefined
+  if (hospDist != null && hospDist > 0 && hospDist <= 2000) {
+    tags.push({ label: 'ליד בי״ח', icon: '🏥', color: '#EF4444' })
+  }
+  return tags
+}
+
 // ── OG Meta Helper ──
 export function setOgMeta(tags: Record<string, string>) {
   for (const [property, content] of Object.entries(tags)) {

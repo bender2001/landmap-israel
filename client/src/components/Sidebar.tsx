@@ -3,7 +3,7 @@ import styled, { keyframes, css } from 'styled-components'
 import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe, Sparkles, Printer, Navigation, Map as MapIcon2, Eye, Calculator } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter, getLocationTags } from '../utils'
 import type { Plot } from '../types'
 import { GoldButton, GhostButton, Badge, RadialScore, InfoTooltip } from './UI'
 
@@ -34,6 +34,14 @@ const TopRow = styled.div`display:flex;align-items:center;justify-content:space-
 const Badges = styled.div`display:flex;align-items:center;gap:6px;flex-wrap:wrap;`
 const Title = styled.h2`font-size:18px;font-weight:800;color:${t.text};margin:0;direction:rtl;`
 const City = styled.span`font-size:13px;color:${t.textSec};margin-top:2px;display:block;direction:rtl;`
+const SidebarLocTags = styled.div`
+  display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:4px;
+`
+const SidebarLocTag = styled.span<{$c:string}>`
+  display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;
+  padding:2px 7px;border-radius:${t.r.full};color:${pr=>pr.$c};
+  background:${pr=>pr.$c}12;border:1px solid ${pr=>pr.$c}22;
+`
 const CloseBtn = styled.button`
   display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:${t.r.sm};
   background:transparent;border:1px solid ${t.border};color:${t.textSec};cursor:pointer;transition:all ${t.tr};flex-shrink:0;
@@ -952,6 +960,7 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
   if (!plot) return null
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
   const cagr = calcCAGR(r, d.readiness), tl = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot), ppd = pricePerDunam(plot)
+  const locTags = getLocationTags(plot)
 
   const currentIdx = plots?.findIndex(pl => pl.id === plot.id) ?? -1
   const hasPrev = plots && currentIdx > 0
@@ -1007,6 +1016,11 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
             <div style={{ flex: 1, minWidth: 0 }}>
               <Title>חלקה {plot.number} · גוש {d.block}</Title>
               <City>{plot.city}</City>
+              {locTags.length > 0 && (
+                <SidebarLocTags>
+                  {locTags.map((tag, i) => <SidebarLocTag key={i} $c={tag.color}>{tag.icon} {tag.label}</SidebarLocTag>)}
+                </SidebarLocTags>
+              )}
               <div style={{ fontSize: 11, color: grade.color, fontWeight: 700, marginTop: 2 }}>
                 {score}/10 · {grade.grade === 'A+' ? 'מצוין+' : grade.grade === 'A' ? 'מצוין' : grade.grade === 'A-' ? 'טוב מאוד' : grade.grade === 'B+' ? 'טוב' : grade.grade === 'B' ? 'סביר' : grade.grade === 'B-' ? 'מתחת לממוצע' : 'חלש'}
               </div>

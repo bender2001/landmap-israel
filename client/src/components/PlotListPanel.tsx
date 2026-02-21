@@ -3,7 +3,7 @@ import styled, { keyframes } from 'styled-components'
 import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download, Share2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags } from '../utils'
 import { Skeleton } from './UI'
 import type { Plot } from '../types'
 
@@ -270,6 +270,17 @@ const DistLabels = styled.div`
 `
 const DistLabel = styled.span`font-size:9px;color:${t.textDim};`
 
+/* ── Location Proximity Tags ── */
+const LocationTagsRow = styled.div`
+  display:flex;align-items:center;gap:4px;margin-top:6px;flex-wrap:wrap;
+`
+const LocTag = styled.span<{ $c: string }>`
+  display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;
+  padding:2px 7px;border-radius:${t.r.full};color:${pr => pr.$c};
+  background:${pr => pr.$c}10;border:1px solid ${pr => pr.$c}22;
+  white-space:nowrap;
+`
+
 /* ── Zoning Pipeline Mini Bar ── */
 const ZoningBar = styled.div`
   display:flex;align-items:center;gap:2px;margin-top:6px;width:100%;
@@ -533,6 +544,15 @@ function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userL
           </ZoningLabel>
         </>
       )}
+      {/* Location proximity tags (like Madlan) */}
+      {(() => {
+        const tags = getLocationTags(plot)
+        return tags.length > 0 ? (
+          <LocationTagsRow>
+            {tags.map((tag, i) => <LocTag key={i} $c={tag.color}>{tag.icon} {tag.label}</LocTag>)}
+          </LocationTagsRow>
+        ) : null
+      })()}
     </ItemWrap>
   )
 }

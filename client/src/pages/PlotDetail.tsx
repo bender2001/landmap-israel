@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon } from 'lucide-react'
+import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon, MessageCircle, Compass } from 'lucide-react'
 import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard, ScrollToTop } from '../components/UI'
 import { PublicLayout } from '../components/Layout'
-import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, plotCenter, calcRisk, setOgMeta, removeOgMeta } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, plotCenter, calcRisk, calcLocationScore, setOgMeta, removeOgMeta, SITE_CONFIG } from '../utils'
 import type { RiskAssessment } from '../utils'
 import type { Plot } from '../types'
 
@@ -287,6 +287,58 @@ const AmenityIcon = styled.div<{$color:string}>`
 const AmenityLabel = styled.div`font-size:12px;color:${t.lTextSec};`
 const AmenityVal = styled.div`font-size:14px;font-weight:700;color:${t.lText};`
 
+/* ── Location Score Card ── */
+const LocationScoreCard = styled(AnimatedCard)`
+  background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};padding:24px;
+  @media print{break-inside:avoid;border:1px solid #ddd;box-shadow:none;}
+`
+const LocScoreHeader = styled.div`
+  display:flex;align-items:center;gap:16px;margin-bottom:20px;
+`
+const LocGauge = styled.div`
+  position:relative;width:72px;height:72px;flex-shrink:0;
+`
+const LocGaugeSvg = styled.svg`
+  width:72px;height:72px;transform:rotate(-90deg);
+`
+const LocScoreNum = styled.div<{$color:string}>`
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:22px;font-weight:900;color:${pr=>pr.$color};font-family:${t.font};
+`
+const LocScoreLabel = styled.div<{$color:string}>`
+  font-size:16px;font-weight:800;color:${pr=>pr.$color};font-family:${t.font};
+`
+const LocScoreDesc = styled.div`font-size:12px;color:${t.lTextSec};margin-top:2px;`
+const LocFactors = styled.div`display:flex;flex-direction:column;gap:8px;`
+const LocFactor = styled.div`display:flex;align-items:center;gap:10px;`
+const LocFactorIcon = styled.span`font-size:16px;flex-shrink:0;width:24px;text-align:center;`
+const LocFactorName = styled.span`font-size:13px;font-weight:600;color:${t.lText};flex:1;`
+const LocBarTrack = styled.div`width:80px;height:6px;background:${t.lBorder};border-radius:3px;overflow:hidden;flex-shrink:0;`
+const LocBarFill = styled.div<{$pct:number;$color:string}>`
+  width:${pr=>pr.$pct}%;height:100%;background:${pr=>pr.$color};border-radius:3px;transition:width 0.8s ease;
+`
+const LocFactorDetail = styled.span`font-size:11px;color:${t.lTextSec};min-width:60px;text-align:left;`
+const LocationTags = styled.div`display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;`
+const LocationTag = styled.span<{$color:string}>`
+  display:inline-flex;align-items:center;gap:4px;padding:4px 10px;
+  background:${pr=>pr.$color}0F;border:1px solid ${pr=>pr.$color}25;
+  border-radius:${t.r.full};font-size:11px;font-weight:600;color:${pr=>pr.$color};
+`
+
+/* ── WhatsApp FAB for PlotDetail ── */
+const waPulse = keyframes`0%{box-shadow:0 0 0 0 rgba(37,211,102,0.45)}70%{box-shadow:0 0 0 14px rgba(37,211,102,0)}100%{box-shadow:0 0 0 0 rgba(37,211,102,0)}`
+const WhatsAppFab = styled.a`
+  position:fixed;bottom:80px;left:20px;z-index:40;
+  width:52px;height:52px;border-radius:${t.r.full};
+  background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 16px rgba(37,211,102,0.4);cursor:pointer;
+  transition:all ${t.tr};animation:${waPulse} 2.5s ease-in-out infinite;
+  text-decoration:none!important;
+  &:hover{transform:scale(1.1) translateY(-2px);box-shadow:0 8px 28px rgba(37,211,102,0.5);}
+  @media print{display:none;}
+  @media(max-width:639px){bottom:72px;left:14px;width:46px;height:46px;}
+`
+
 /* ── Skeleton Loading ── */
 const shimmer = keyframes`0%{background-position:-200% 0}100%{background-position:200% 0}`
 const SkeletonPulse = styled.div<{$w?:string;$h?:string}>`
@@ -520,6 +572,13 @@ export default function PlotDetail() {
   const cagr = calcCAGR(r, d.readiness), timeline = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot), ppd = pricePerDunam(plot)
   const mortgage = d.price > 0 ? calcMonthly(d.price, ltvPct / 100, interestRate / 100, loanYears) : null
   const risk = useMemo(() => calcRisk(plot, similarPlots.length > 0 ? [plot, ...similarPlots] : undefined), [plot, similarPlots])
+  const locationScore = useMemo(() => calcLocationScore(plot), [plot])
+
+  // WhatsApp link with plot context
+  const waLink = useMemo(() => {
+    const msg = `היי, מתעניין/ת בחלקה ${plot.number} גוש ${d.block} ב${plot.city} (${fmt.compact(d.price)}). אשמח לפרטים נוספים.`
+    return `${SITE_CONFIG.waLink}?text=${encodeURIComponent(msg)}`
+  }, [plot, d])
 
   return (
     <PublicLayout>
@@ -596,6 +655,49 @@ export default function PlotDetail() {
                   ))}
                 </RiskFactors>
               </RiskCard>
+
+              {/* Location Quality Score — Madlan-style location assessment */}
+              {locationScore.factors.length > 0 && (
+                <LocationScoreCard $delay={0.17}>
+                  <CardTitle><Compass size={18} color={t.gold} /> איכות מיקום</CardTitle>
+                  <LocScoreHeader>
+                    <LocGauge>
+                      <LocGaugeSvg viewBox="0 0 72 72">
+                        <circle cx="36" cy="36" r="30" fill="none" stroke={t.lBorder} strokeWidth="6" />
+                        <circle cx="36" cy="36" r="30" fill="none" stroke={locationScore.color} strokeWidth="6"
+                          strokeLinecap="round"
+                          strokeDasharray={`${(locationScore.score / 10) * 188.5} 188.5`}
+                          style={{ transition: 'stroke-dasharray 1s ease' }}
+                        />
+                      </LocGaugeSvg>
+                      <LocScoreNum $color={locationScore.color}>{locationScore.score}</LocScoreNum>
+                    </LocGauge>
+                    <div>
+                      <LocScoreLabel $color={locationScore.color}>{locationScore.label}</LocScoreLabel>
+                      <LocScoreDesc>דירוג מיקום מבוסס על קרבה למוקדי שירות, ים, שטחים ירוקים ורמת הפיתוח</LocScoreDesc>
+                    </div>
+                  </LocScoreHeader>
+                  <LocFactors>
+                    {locationScore.factors.map((f, i) => (
+                      <LocFactor key={i}>
+                        <LocFactorIcon>{f.icon}</LocFactorIcon>
+                        <LocFactorName>{f.name}</LocFactorName>
+                        <LocBarTrack>
+                          <LocBarFill $pct={f.maxScore > 0 ? (f.score / f.maxScore) * 100 : 0} $color={locationScore.color} />
+                        </LocBarTrack>
+                        <LocFactorDetail>{f.detail}</LocFactorDetail>
+                      </LocFactor>
+                    ))}
+                  </LocFactors>
+                  {locationScore.tags.length > 0 && (
+                    <LocationTags>
+                      {locationScore.tags.map((tag, i) => (
+                        <LocationTag key={i} $color={tag.color}>{tag.icon} {tag.label}</LocationTag>
+                      ))}
+                    </LocationTags>
+                  )}
+                </LocationScoreCard>
+              )}
 
               {timeline && (
                 <Card $delay={0.2}>
@@ -799,6 +901,14 @@ export default function PlotDetail() {
         <Suspense fallback={null}>
           <LeadModal plot={plot} open={leadOpen} onClose={() => setLeadOpen(false)} />
         </Suspense>
+        {/* WhatsApp Floating CTA */}
+        <WhatsAppFab
+          href={waLink}
+          target="_blank" rel="noopener noreferrer"
+          aria-label="שלח הודעה בוואטסאפ"
+        >
+          <MessageCircle size={24} />
+        </WhatsAppFab>
         <ScrollToTop threshold={300} />
       </ErrorBoundary>
     </PublicLayout>
