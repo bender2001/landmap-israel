@@ -1,6 +1,6 @@
 import { memo, useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download, Share2, MessageCircle } from 'lucide-react'
+import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download, Share2, MessageCircle, LayoutGrid, Table2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, estimatedYear, findBestValueIds, SITE_CONFIG } from '../utils'
@@ -296,6 +296,129 @@ const EstYearBadge = styled.span`
   background:${t.goldDim};border:1px solid ${t.goldBorder};
   white-space:nowrap;letter-spacing:0.3px;
 `
+
+/* ── View Toggle ── */
+const ViewToggle = styled.div`
+  display:flex;align-items:center;gap:0;border:1px solid ${t.border};border-radius:${t.r.sm};overflow:hidden;flex-shrink:0;
+`
+const ViewToggleBtn = styled.button<{$active:boolean}>`
+  display:flex;align-items:center;justify-content:center;width:30px;height:28px;
+  background:${pr=>pr.$active?t.goldDim:'transparent'};border:none;
+  color:${pr=>pr.$active?t.gold:t.textDim};cursor:pointer;transition:all ${t.tr};
+  &:hover{color:${t.gold};background:${t.goldDim};}
+  &:not(:last-child){border-right:1px solid ${t.border};}
+`
+
+/* ── Compact Table View ── */
+const TableWrap = styled.div`
+  overflow-x:auto;direction:rtl;width:100%;
+  scrollbar-width:thin;
+  &::-webkit-scrollbar{height:4px;}
+  &::-webkit-scrollbar-thumb{background:${t.surfaceLight};border-radius:2px;}
+`
+const StyledTable = styled.table`
+  width:100%;border-collapse:collapse;font-size:11px;min-width:520px;
+`
+const Th = styled.th<{$sortable?:boolean;$active?:boolean}>`
+  position:sticky;top:0;z-index:2;
+  padding:8px 6px;text-align:right;font-weight:700;font-size:10px;
+  color:${pr=>pr.$active?t.gold:t.textDim};background:${t.surface};
+  border-bottom:2px solid ${pr=>pr.$active?t.gold:t.border};
+  cursor:${pr=>pr.$sortable?'pointer':'default'};white-space:nowrap;
+  letter-spacing:0.3px;user-select:none;transition:all ${t.tr};
+  &:hover{${pr=>pr.$sortable?`color:${t.gold};`:''}}
+`
+const Td = styled.td<{$bold?:boolean;$c?:string}>`
+  padding:7px 6px;border-bottom:1px solid ${t.border};
+  font-weight:${pr=>pr.$bold?700:500};
+  color:${pr=>pr.$c||t.text};white-space:nowrap;
+  transition:background ${t.tr};
+`
+const TableRow = styled.tr<{$active?:boolean;$gradeColor?:string}>`
+  cursor:pointer;background:${pr=>pr.$active?t.goldDim:'transparent'};
+  border-right:3px solid ${pr=>pr.$active?t.gold:pr.$gradeColor||'transparent'};
+  transition:all ${t.tr};
+  &:hover{background:${t.hover};}
+`
+const TableGrade = styled.span<{$c:string}>`
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:${t.r.sm};font-size:10px;font-weight:800;
+  color:${pr=>pr.$c};border:1px solid ${pr=>pr.$c}44;background:${pr=>pr.$c}12;
+`
+
+type TableSortKey = 'city' | 'price' | 'size' | 'roi' | 'score' | 'ppd'
+type TableSortDir = 'asc' | 'desc'
+
+function CompactTableView({ plots, selected, onSelect, onDetailClick, allPlots }: {
+  plots: Plot[]; selected: Plot | null; onSelect: (plot: Plot) => void
+  onDetailClick: (id: string) => void; allPlots: Plot[]
+}) {
+  const [sortKey, setSortKey] = useState<TableSortKey>('score')
+  const [sortDir, setSortDir] = useState<TableSortDir>('desc')
+
+  const toggleSort = useCallback((key: TableSortKey) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('desc') }
+  }, [sortKey])
+
+  const sorted = useMemo(() => {
+    const copy = [...plots]
+    copy.sort((a, b) => {
+      const da = p(a), db = p(b)
+      let cmp = 0
+      switch (sortKey) {
+        case 'city': cmp = (a.city || '').localeCompare(b.city || '', 'he'); break
+        case 'price': cmp = da.price - db.price; break
+        case 'size': cmp = da.size - db.size; break
+        case 'roi': cmp = roi(a) - roi(b); break
+        case 'score': cmp = calcScore(a) - calcScore(b); break
+        case 'ppd': cmp = pricePerDunam(a) - pricePerDunam(b); break
+      }
+      return sortDir === 'desc' ? -cmp : cmp
+    })
+    return copy
+  }, [plots, sortKey, sortDir])
+
+  const arrow = (key: TableSortKey) => sortKey === key ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ''
+
+  return (
+    <TableWrap>
+      <StyledTable>
+        <thead>
+          <tr>
+            <Th $sortable $active={sortKey==='city'} onClick={()=>toggleSort('city')}>עיר{arrow('city')}</Th>
+            <Th>גוש / חלקה</Th>
+            <Th $sortable $active={sortKey==='price'} onClick={()=>toggleSort('price')}>מחיר{arrow('price')}</Th>
+            <Th $sortable $active={sortKey==='size'} onClick={()=>toggleSort('size')}>שטח{arrow('size')}</Th>
+            <Th $sortable $active={sortKey==='ppd'} onClick={()=>toggleSort('ppd')}>₪/דונם{arrow('ppd')}</Th>
+            <Th $sortable $active={sortKey==='roi'} onClick={()=>toggleSort('roi')}>ROI{arrow('roi')}</Th>
+            <Th $sortable $active={sortKey==='score'} onClick={()=>toggleSort('score')}>ציון{arrow('score')}</Th>
+            <Th>סטטוס</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map(plot => {
+            const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
+            const ppd = pricePerDunam(plot)
+            const isActive = selected?.id === plot.id
+            return (
+              <TableRow key={plot.id} $active={isActive} $gradeColor={grade.color} onClick={() => onSelect(plot)}>
+                <Td $bold>{plot.city}</Td>
+                <Td style={{color:t.textSec,fontSize:10}}>{d.block}/{plot.number}</Td>
+                <Td $bold $c={t.gold}>{d.price > 0 ? fmt.compact(d.price) : '—'}</Td>
+                <Td>{d.size > 0 ? `${fmt.num(d.size)}` : '—'}</Td>
+                <Td>{ppd > 0 ? fmt.num(ppd) : '—'}</Td>
+                <Td $c={r > 30 ? t.ok : r > 0 ? t.warn : t.textDim}>{r > 0 ? `+${Math.round(r)}%` : '—'}</Td>
+                <Td><TableGrade $c={grade.color}>{grade.grade}</TableGrade></Td>
+                <Td style={{fontSize:10,color:statusColors[plot.status||'']||t.textDim}}>{statusLabels[plot.status||'']||plot.status||'—'}</Td>
+              </TableRow>
+            )
+          })}
+        </tbody>
+      </StyledTable>
+    </TableWrap>
+  )
+}
 
 /* ── Best Value Badge ── */
 const bestValueGlow = keyframes`0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0.3)}50%{box-shadow:0 0 0 5px rgba(16,185,129,0)}`
@@ -653,6 +776,7 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, u
   const navigate = useNavigate()
   const [cityFilter, setCityFilter] = useState<string | null>(null)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [viewMode, setViewMode] = useState<'cards'|'table'>('cards')
   const [showScrollTop, setShowScrollTop] = useState(false)
   const stats = useMemo(() => calcAggregateStats(plots), [plots])
   const bestValueIds = useMemo(() => findBestValueIds(plots), [plots])
@@ -750,6 +874,14 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, u
             <Count>{cityFilter ? allVisiblePlots.length : plots.length}</Count>
           </Title>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <ViewToggle>
+              <ViewToggleBtn $active={viewMode==='cards'} onClick={()=>setViewMode('cards')} aria-label="תצוגת כרטיסים" title="כרטיסים">
+                <LayoutGrid size={13} />
+              </ViewToggleBtn>
+              <ViewToggleBtn $active={viewMode==='table'} onClick={()=>setViewMode('table')} aria-label="תצוגת טבלה" title="טבלה">
+                <Table2 size={13} />
+              </ViewToggleBtn>
+            </ViewToggle>
             {allVisiblePlots.length > 0 && (
               <ExportBtn onClick={() => exportPlotsCsv(allVisiblePlots, `landmap-${cityFilter || 'all'}-${new Date().toISOString().slice(0, 10)}.csv`)} title="ייצוא לאקסל">
                 <Download size={13} /> CSV
@@ -823,6 +955,14 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, u
                   }}>הצג את כל הערים</button>
                 )}
               </EmptyState>
+            ) : viewMode === 'table' ? (
+              <CompactTableView
+                plots={allVisiblePlots}
+                selected={selected}
+                onSelect={onSelect}
+                onDetailClick={goToDetail}
+                allPlots={plots}
+              />
             ) : (
               <>
                 {visiblePlots.map((plot, i) => (

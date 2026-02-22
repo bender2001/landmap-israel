@@ -3,7 +3,7 @@ import styled, { keyframes, css } from 'styled-components'
 import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe, Sparkles, Printer, Navigation, Map as MapIcon2, Eye, Calculator } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter, getLocationTags } from '../utils'
+import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter, getLocationTags } from '../utils'
 import type { Plot } from '../types'
 import { GoldButton, GhostButton, Badge, RadialScore, InfoTooltip, PriceAlertButton } from './UI'
 
@@ -57,6 +57,57 @@ const MetricCard = styled.div`
 `
 const MetricLabel = styled.div`font-size:10px;color:${t.textDim};font-weight:600;text-transform:uppercase;margin-bottom:4px;`
 const MetricVal = styled.div<{ $gold?: boolean }>`font-size:16px;font-weight:800;color:${p => p.$gold ? t.gold : t.text};`
+
+/* ── Score Breakdown ── */
+const BreakdownWrap = styled.div`
+  display:flex;flex-direction:column;gap:6px;padding:12px 14px;margin-bottom:16px;
+  background:${t.surfaceLight};border:1px solid ${t.border};border-radius:${t.r.md};
+  animation:${fadeSection} 0.45s 0.08s both;
+`
+const BreakdownTitle = styled.div`
+  display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+  color:${t.textDim};letter-spacing:0.3px;margin-bottom:2px;
+`
+const BreakdownRow = styled.div`
+  display:flex;align-items:center;gap:8px;
+`
+const BreakdownIcon = styled.span`font-size:13px;flex-shrink:0;`
+const BreakdownLabel = styled.span`font-size:11px;font-weight:600;color:${t.textSec};min-width:72px;`
+const BreakdownBarOuter = styled.div`flex:1;height:6px;background:${t.bg};border-radius:3px;overflow:hidden;position:relative;`
+const BreakdownBarInner = styled.div<{$pct:number;$c:string}>`
+  position:absolute;top:0;left:0;height:100%;width:${pr=>pr.$pct}%;
+  background:linear-gradient(90deg,${pr=>pr.$c},${pr=>pr.$c}CC);border-radius:3px;
+  transition:width 0.6s cubic-bezier(0.32,0.72,0,1);
+`
+const BreakdownScore = styled.span<{$c:string}>`
+  font-size:11px;font-weight:800;color:${pr=>pr.$c};min-width:36px;text-align:left;
+`
+const BreakdownDetail = styled.span`font-size:9px;color:${t.textDim};margin-inline-start:auto;`
+
+function ScoreBreakdown({ plot }: { plot: Plot }) {
+  const breakdown = useMemo(() => calcScoreBreakdown(plot), [plot])
+  if (!breakdown) return null
+  const grade = getGrade(breakdown.total)
+  return (
+    <BreakdownWrap>
+      <BreakdownTitle>📊 פירוט ציון השקעה — {breakdown.total}/10</BreakdownTitle>
+      {breakdown.factors.map(f => {
+        const pct = f.maxScore > 0 ? (f.score / f.maxScore) * 100 : 0
+        const color = pct >= 70 ? t.ok : pct >= 40 ? t.warn : t.err
+        return (
+          <BreakdownRow key={f.label} title={f.detail}>
+            <BreakdownIcon>{f.icon}</BreakdownIcon>
+            <BreakdownLabel>{f.label}</BreakdownLabel>
+            <BreakdownBarOuter>
+              <BreakdownBarInner $pct={pct} $c={color} />
+            </BreakdownBarOuter>
+            <BreakdownScore $c={color}>{f.score}/{f.maxScore}</BreakdownScore>
+          </BreakdownRow>
+        )
+      })}
+    </BreakdownWrap>
+  )
+}
 
 /* ── Price Position ── */
 const PricePosBadge = styled.div<{ $c: string }>`
@@ -1076,6 +1127,9 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
             {ppd > 0 && <MetricCard><MetricLabel>₪ / דונם <InfoTooltip text="מחיר לדונם — מאפשר השוואה בין חלקות בגדלים שונים. ככל שנמוך יותר, כך המחיר אטרקטיבי יותר." pos="bottom" /></MetricLabel><MetricVal>{fmt.num(ppd)}</MetricVal></MetricCard>}
             <MetricCard><MetricLabel>תשואה <InfoTooltip text="תשואה צפויה (ROI) — אחוז הרווח הנקי מהשקעה עד למימוש. מבוססת על שווי חזוי ושלב תכנוני." pos="bottom" /></MetricLabel><MetricVal $gold={r > 0}>{fmt.pct(r)}</MetricVal></MetricCard>
           </MetricsGrid>
+
+          {/* Score Breakdown — shows WHY the plot got its grade */}
+          <ScoreBreakdown plot={plot} />
 
           {/* Total Acquisition Cost Breakdown — critical for investors */}
           {d.price > 0 && <AcquisitionCostBreakdown price={d.price} />}

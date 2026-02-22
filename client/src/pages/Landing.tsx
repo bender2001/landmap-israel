@@ -5,8 +5,8 @@ import { MapPin, Zap, TrendingUp, ChevronLeft, ChevronDown, Phone, Bell, Smartph
 import { t, fadeInUp, fadeInScale, shimmer, float, gradientShift, sm, md, lg, mobile } from '../theme'
 import { PublicLayout } from '../components/Layout'
 import { GoldButton, GhostButton, AnimatedCard, CountUpNumber, ScrollToTop } from '../components/UI'
-import { SITE_CONFIG, p, roi, fmt } from '../utils'
-import { useAllPlots } from '../hooks'
+import { SITE_CONFIG, p, roi, fmt, pricePerDunam } from '../utils'
+import { useAllPlots, useInView } from '../hooks'
 
 /* ── extra keyframes ── */
 const glow = keyframes`0%,100%{box-shadow:0 0 20px rgba(212,168,75,0.15)}50%{box-shadow:0 0 50px rgba(212,168,75,0.35)}`
@@ -117,6 +117,16 @@ const CityCard = styled(Link)<{$hue:number;$delay:number}>`
 const CityEmoji = styled.span`font-size:32px;position:relative;z-index:1;`
 const CityName = styled.span`font-size:16px;font-weight:700;color:${t.text};position:relative;z-index:1;`
 const CityCount = styled.span`font-size:12px;color:${t.textSec};position:relative;z-index:1;`
+const CityLiveData = styled.div`
+  display:flex;align-items:center;gap:8px;position:relative;z-index:1;
+  padding:4px 10px;border-radius:${t.r.full};
+  background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);
+`
+const CityLiveVal = styled.span`font-size:11px;font-weight:800;color:${t.goldBright};`
+const CityLiveLabel = styled.span`font-size:9px;color:${t.textDim};`
+const CityLiveItem = styled.div`
+  display:flex;flex-direction:column;align-items:center;gap:1px;
+`
 const CitiesSectionHead = styled.h2`
   text-align:center;font-size:clamp(22px,3.5vw,32px);font-weight:800;color:${t.text};
   margin-bottom:32px;font-family:${t.font};
@@ -326,6 +336,17 @@ const DisclaimerText = styled.p`
   font-size:11px;color:${t.textDim};line-height:1.7;margin:0;
 `
 
+/* ── Scroll Reveal Wrapper ── */
+const RevealWrap = styled.div<{$visible:boolean}>`
+  opacity:${pr=>pr.$visible?1:0};
+  transform:translateY(${pr=>pr.$visible?'0':'32px'});
+  transition:opacity 0.7s cubic-bezier(0.16,1,0.3,1),transform 0.7s cubic-bezier(0.16,1,0.3,1);
+`
+function Reveal({ children }: { children: React.ReactNode }) {
+  const { ref, inView } = useInView()
+  return <RevealWrap ref={ref} $visible={inView}>{children}</RevealWrap>
+}
+
 /* ── data ── */
 const PARTICLES = Array.from({length:8},(_,i)=>({x:Math.random()*100,size:3+Math.random()*4,dur:8+Math.random()*7,delay:i*1.5}))
 const FALLBACK_STATS = [
@@ -401,6 +422,31 @@ export default function Landing(){
 
   // Fetch live market data for stats
   const { data: plots } = useAllPlots()
+
+  // Per-city live data for city cards
+  const cityData = useMemo(() => {
+    if (!plots || plots.length === 0) return new Map<string, { count: number; avgPrice: number; avgPpd: number }>()
+    const map = new Map<string, { prices: number[]; ppds: number[] }>()
+    for (const pl of plots) {
+      if (!pl.city) continue
+      if (!map.has(pl.city)) map.set(pl.city, { prices: [], ppds: [] })
+      const entry = map.get(pl.city)!
+      const d = p(pl)
+      if (d.price > 0) entry.prices.push(d.price)
+      const ppd = pricePerDunam(pl)
+      if (ppd > 0) entry.ppds.push(ppd)
+    }
+    const result = new Map<string, { count: number; avgPrice: number; avgPpd: number }>()
+    for (const [city, data] of map) {
+      result.set(city, {
+        count: data.prices.length || 1,
+        avgPrice: data.prices.length > 0 ? Math.round(data.prices.reduce((s, v) => s + v, 0) / data.prices.length) : 0,
+        avgPpd: data.ppds.length > 0 ? Math.round(data.ppds.reduce((s, v) => s + v, 0) / data.ppds.length) : 0,
+      })
+    }
+    return result
+  }, [plots])
+
   const liveStats = useMemo(() => {
     if (!plots || plots.length === 0) return FALLBACK_STATS
     const uniqueCities = new Set(plots.map(pl => pl.city).filter(Boolean))
@@ -448,21 +494,34 @@ export default function Landing(){
         </Hero>
 
         {/* ── Popular Cities ── */}
+        <Reveal>
         <CitiesSection>
           <CitiesSectionHead>חפשו קרקע לפי <span>עיר</span></CitiesSectionHead>
           <CitiesGrid>
-            {POPULAR_CITIES.map((c,i)=>(
+            {POPULAR_CITIES.map((c,i)=>{
+              const cd = cityData.get(c.name)
+              return (
               <CityCard key={c.name} to={`/explore?city=${encodeURIComponent(c.name)}`} $hue={c.hue} $delay={i*0.06}>
                 <CityEmoji>{c.emoji}</CityEmoji>
                 <CityName>{c.name}</CityName>
-                <CityCount>{c.count}</CityCount>
+                {cd ? (
+                  <CityLiveData>
+                    <CityLiveItem><CityLiveVal>{cd.count}</CityLiveVal><CityLiveLabel>חלקות</CityLiveLabel></CityLiveItem>
+                    {cd.avgPrice > 0 && <CityLiveItem><CityLiveVal>{fmt.compact(cd.avgPrice)}</CityLiveVal><CityLiveLabel>ממוצע</CityLiveLabel></CityLiveItem>}
+                    {cd.avgPpd > 0 && <CityLiveItem><CityLiveVal>₪{(cd.avgPpd/1000).toFixed(0)}K</CityLiveVal><CityLiveLabel>/דונם</CityLiveLabel></CityLiveItem>}
+                  </CityLiveData>
+                ) : (
+                  <CityCount>{c.count}</CityCount>
+                )}
               </CityCard>
-            ))}
+              )
+            })}
           </CitiesGrid>
         </CitiesSection>
+        </Reveal>
 
         {/* ── Stats (live market data) ── */}
-        <StatsStrip>
+        <Reveal><StatsStrip>
           <StatsGrid>
             {liveStats.map((s,i)=>(
               <StatItem key={i} $delay={i*0.1}>
@@ -471,10 +530,10 @@ export default function Landing(){
               </StatItem>
             ))}
           </StatsGrid>
-        </StatsStrip>
+        </StatsStrip></Reveal>
 
         {/* ── How It Works ── */}
-        <HowSection>
+        <Reveal><HowSection>
           <SectionHead>איך זה עובד?</SectionHead>
           <StepsRow>
             {STEPS.map((s,i)=>(
@@ -489,10 +548,10 @@ export default function Landing(){
               </React.Fragment>
             ))}
           </StepsRow>
-        </HowSection>
+        </HowSection></Reveal>
 
         {/* ── Features ── */}
-        <Features id="features">
+        <Reveal><Features id="features">
           <SectionHead>למה LandMap?</SectionHead>
           <FeatGrid>
             {FEATURES.map((f,i)=>(
@@ -503,10 +562,10 @@ export default function Landing(){
               </Card>
             ))}
           </FeatGrid>
-        </Features>
+        </Features></Reveal>
 
         {/* ── Testimonials ── */}
-        <TestSection>
+        <Reveal><TestSection>
           <SectionHead>מה אומרים המשקיעים שלנו</SectionHead>
           <TestGrid>
             {TESTIMONIALS.map((tt,i)=>(
@@ -520,13 +579,13 @@ export default function Landing(){
               </TestCard>
             ))}
           </TestGrid>
-        </TestSection>
+        </TestSection></Reveal>
 
         {/* ── FAQ ── */}
-        <FaqSection id="faq">
+        <Reveal><FaqSection id="faq">
           <SectionHead>שאלות נפוצות</SectionHead>
           <FaqAccordion />
-        </FaqSection>
+        </FaqSection></Reveal>
 
         {/* ── WhatsApp ── */}
         <WaSection>

@@ -43,7 +43,7 @@ export const GlobalStyles = createGlobalStyle`
   :root{--vh:100vh}
   @supports(height:100dvh){:root{--vh:100dvh}}
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-  html{scroll-behavior:smooth;scroll-padding-top:80px;}
+  html{scroll-behavior:smooth;scroll-padding-top:80px;text-size-adjust:100%;-webkit-text-size-adjust:100%;}
   html,body,#root{min-height:100%;width:100%}
   body{font-family:${t.font};background:${t.lBg};color:${t.lText};-webkit-font-smoothing:antialiased;line-height:1.6}
   ::selection{background:rgba(212,168,75,0.25);color:${t.black}}
