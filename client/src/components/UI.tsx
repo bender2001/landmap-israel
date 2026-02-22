@@ -911,42 +911,153 @@ const AlertTooltip = styled.div<{$show:boolean}>`
     border-bottom:1px solid #8B5CF6;transform:rotate(45deg);}
 `
 
-function readAlertSet(): Set<string> {
-  try { return new Set(JSON.parse(localStorage.getItem('price_alerts') || '[]')) } catch { return new Set() }
-}
-function writeAlertSet(s: Set<string>) { localStorage.setItem('price_alerts', JSON.stringify([...s])) }
+/* ── Price Alert Popover (with target price input) ── */
+const AlertPopoverWrap = styled.div<{$show:boolean}>`
+  position:absolute;bottom:calc(100% + 10px);right:0;z-index:10;
+  width:240px;padding:14px;direction:rtl;
+  background:${t.surface};border:1px solid ${t.goldBorder};
+  border-radius:${t.r.lg};box-shadow:${t.sh.xl};
+  opacity:${pr=>pr.$show?1:0};transform:translateY(${pr=>pr.$show?'0':'8px'}) scale(${pr=>pr.$show?1:0.95});
+  transition:all 0.2s cubic-bezier(0.32,0.72,0,1);
+  pointer-events:${pr=>pr.$show?'auto':'none'};
+  &::after{content:'';position:absolute;bottom:-6px;right:12px;
+    width:12px;height:12px;background:${t.surface};border-right:1px solid ${t.goldBorder};
+    border-bottom:1px solid ${t.goldBorder};transform:rotate(45deg);}
+`
+const AlertPopTitle = styled.div`font-size:13px;font-weight:700;color:${t.text};margin-bottom:10px;display:flex;align-items:center;gap:6px;`
+const AlertPopInput = styled.input`
+  width:100%;padding:8px 12px;background:${t.surfaceLight};border:1px solid ${t.border};
+  border-radius:${t.r.md};color:${t.text};font-size:14px;font-weight:700;font-family:${t.font};
+  outline:none;direction:ltr;text-align:center;
+  &:focus{border-color:${t.goldBorder};box-shadow:0 0 0 3px ${t.goldDim};}
+  &::placeholder{color:${t.textDim};font-weight:400;}
+`
+const AlertPopHint = styled.div`font-size:10px;color:${t.textDim};margin-top:6px;text-align:center;`
+const AlertPopSubmit = styled.button`
+  width:100%;padding:8px;margin-top:8px;
+  background:linear-gradient(135deg,#8B5CF6,#A78BFA);color:#fff;
+  border:none;border-radius:${t.r.md};font-weight:700;font-size:12px;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};
+  &:hover{box-shadow:0 4px 16px rgba(139,92,246,0.35);transform:translateY(-1px);}
+  &:disabled{opacity:0.5;cursor:not-allowed;transform:none;box-shadow:none;}
+`
 
-export function PriceAlertButton({ plotId, onToggle }: { plotId: string; onToggle?: (active: boolean) => void }) {
-  const [alerts, setAlerts] = useState<Set<string>>(() => readAlertSet())
+export function PriceAlertButton({ plotId, plotLabel, currentPrice, onToggle }: {
+  plotId: string; plotLabel?: string; currentPrice?: number; onToggle?: (active: boolean) => void
+}) {
   const [showTooltip, setShowTooltip] = useState(false)
+  const [showPopover, setShowPopover] = useState(false)
+  const [targetPrice, setTargetPrice] = useState('')
+  const popRef = useRef<HTMLDivElement>(null)
+
+  // Check if alert exists for this plot using the simple legacy storage
+  const [alerts, setAlerts] = useState<Set<string>>(() => {
+    try {
+      // Support both old format (string[]) and new format (PriceAlert[])
+      const raw = JSON.parse(localStorage.getItem('price_alerts') || '[]')
+      if (raw.length > 0 && typeof raw[0] === 'string') return new Set(raw)
+      // New format: extract plotIds
+      return new Set((raw as Array<{plotId?:string}>).filter((a: any) => a.plotId && !a.triggered).map((a: any) => a.plotId))
+    } catch { return new Set() }
+  })
   const isActive = alerts.has(plotId)
 
-  const toggle = useCallback(() => {
+  // Close popover on click outside
+  useEffect(() => {
+    if (!showPopover) return
+    const handler = (e: MouseEvent) => {
+      if (popRef.current && !popRef.current.contains(e.target as Node)) setShowPopover(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showPopover])
+
+  const handleClick = useCallback(() => {
+    if (isActive) {
+      // Remove alert
+      setAlerts(prev => {
+        const next = new Set(prev)
+        next.delete(plotId)
+        // Also clean from new format storage
+        try {
+          const raw = JSON.parse(localStorage.getItem('price_alerts') || '[]')
+          if (Array.isArray(raw)) {
+            const cleaned = raw.filter((a: any) => typeof a === 'string' ? a !== plotId : a.plotId !== plotId)
+            localStorage.setItem('price_alerts', JSON.stringify(cleaned))
+          }
+        } catch {}
+        onToggle?.(false)
+        return next
+      })
+      setShowPopover(false)
+    } else {
+      // Show target price input
+      if (currentPrice) setTargetPrice(String(Math.round(currentPrice * 0.9)))
+      setShowPopover(true)
+    }
+  }, [plotId, isActive, currentPrice, onToggle])
+
+  const submitAlert = useCallback(() => {
+    const target = Number(targetPrice)
+    if (!target || target <= 0) return
     setAlerts(prev => {
       const next = new Set(prev)
-      if (next.has(plotId)) next.delete(plotId)
-      else next.add(plotId)
-      writeAlertSet(next)
-      onToggle?.(!isActive)
+      next.add(plotId)
+      // Store in new format
+      try {
+        const raw = JSON.parse(localStorage.getItem('price_alerts') || '[]')
+        const alerts = Array.isArray(raw) ? raw.filter((a: any) => typeof a !== 'string') : []
+        alerts.unshift({
+          id: Date.now().toString(),
+          plotId,
+          plotLabel: plotLabel || plotId,
+          targetPrice: target,
+          currentPrice: currentPrice || 0,
+          createdAt: Date.now(),
+          triggered: false,
+        })
+        localStorage.setItem('price_alerts', JSON.stringify(alerts.slice(0, 20)))
+      } catch {}
       return next
     })
-  }, [plotId, isActive, onToggle])
+    onToggle?.(true)
+    setShowPopover(false)
+  }, [plotId, plotLabel, currentPrice, targetPrice, onToggle])
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative' }} ref={popRef}>
       <AlertBtn
         $active={isActive}
-        onClick={toggle}
-        onMouseEnter={() => setShowTooltip(true)}
+        onClick={handleClick}
+        onMouseEnter={() => !showPopover && setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
-        aria-label={isActive ? 'בטל התראת מחיר' : 'התראה על שינוי מחיר'}
-        title={isActive ? 'בטל התראת מחיר' : 'התראה על שינוי מחיר'}
+        aria-label={isActive ? 'בטל התראת מחיר' : 'הגדר התראת מחיר'}
+        title={isActive ? 'בטל התראת מחיר' : 'הגדר התראת מחיר'}
       >
         {isActive ? <BellOff size={15} /> : <Bell size={15} />}
       </AlertBtn>
-      <AlertTooltip $show={showTooltip}>
-        {isActive ? '🔕 בטל התראת מחיר' : '🔔 הודע לי על שינוי מחיר'}
-      </AlertTooltip>
+      {!showPopover && (
+        <AlertTooltip $show={showTooltip}>
+          {isActive ? '🔕 בטל התראת מחיר' : '🔔 הגדר התראת מחיר'}
+        </AlertTooltip>
+      )}
+      <AlertPopoverWrap $show={showPopover}>
+        <AlertPopTitle><Bell size={14} color="#8B5CF6" /> התראת מחיר</AlertPopTitle>
+        <AlertPopInput
+          type="number"
+          value={targetPrice}
+          onChange={e => setTargetPrice(e.target.value)}
+          placeholder="מחיר יעד ב-₪"
+          onKeyDown={e => e.key === 'Enter' && submitAlert()}
+          autoFocus={showPopover}
+        />
+        {currentPrice && currentPrice > 0 && (
+          <AlertPopHint>מחיר נוכחי: ₪{currentPrice.toLocaleString()}</AlertPopHint>
+        )}
+        <AlertPopSubmit onClick={submitAlert} disabled={!targetPrice || Number(targetPrice) <= 0}>
+          🔔 הפעל התראה
+        </AlertPopSubmit>
+      </AlertPopoverWrap>
     </div>
   )
 }

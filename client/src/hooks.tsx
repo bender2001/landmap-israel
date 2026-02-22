@@ -469,3 +469,66 @@ export function useMarketOverview() {
     staleTime: 300_000,
   })
 }
+
+// ── Price Alerts (localStorage) ──
+
+export interface PriceAlert {
+  id: string
+  plotId: string
+  plotLabel: string     // "גוש 1234 חלקה 56 — חדרה"
+  targetPrice: number   // alert when price ≤ this
+  currentPrice: number  // price at time of creation
+  createdAt: number
+  triggered: boolean
+}
+
+const MAX_ALERTS = 20
+
+export function usePriceAlerts() {
+  const [alerts, setAlerts] = useState<PriceAlert[]>(() => {
+    try { return JSON.parse(localStorage.getItem('price_alerts') || '[]') } catch { return [] }
+  })
+
+  const persist = useCallback((next: PriceAlert[]) => {
+    localStorage.setItem('price_alerts', JSON.stringify(next))
+    setAlerts(next)
+  }, [])
+
+  const add = useCallback((alert: Omit<PriceAlert, 'id' | 'createdAt' | 'triggered'>) => {
+    setAlerts(prev => {
+      // Don't duplicate for same plot
+      if (prev.some(a => a.plotId === alert.plotId && !a.triggered)) return prev
+      const next = [
+        { ...alert, id: Date.now().toString(), createdAt: Date.now(), triggered: false },
+        ...prev,
+      ].slice(0, MAX_ALERTS)
+      localStorage.setItem('price_alerts', JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  const remove = useCallback((id: string) => {
+    setAlerts(prev => {
+      const next = prev.filter(a => a.id !== id)
+      localStorage.setItem('price_alerts', JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  const check = useCallback((plotId: string, currentPrice: number): PriceAlert | null => {
+    const alert = alerts.find(a => a.plotId === plotId && !a.triggered && currentPrice <= a.targetPrice)
+    if (alert) {
+      const next = alerts.map(a => a.id === alert.id ? { ...a, triggered: true } : a)
+      localStorage.setItem('price_alerts', JSON.stringify(next))
+      setAlerts(next)
+      return alert
+    }
+    return null
+  }, [alerts])
+
+  const hasAlert = useCallback((plotId: string) => alerts.some(a => a.plotId === plotId && !a.triggered), [alerts])
+
+  const clearAll = useCallback(() => persist([]), [persist])
+
+  return { alerts, add, remove, check, hasAlert, clearAll, activeCount: alerts.filter(a => !a.triggered).length }
+}

@@ -1,7 +1,7 @@
 import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker, Polyline, useMap, useMapEvents, WMSTileLayer } from 'react-leaflet'
 import L from 'leaflet'
-import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette, Ruler, Undo2, Trash2, LocateFixed } from 'lucide-react'
+import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette, Ruler, Undo2, Trash2, LocateFixed, Copy, Check } from 'lucide-react'
 import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
@@ -703,6 +703,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
   const [showAreas, setShowAreasRaw] = useState(savedPrefs.showAreas ?? true)
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [colorMode, setColorModeRaw] = useState<ColorMode>(savedPrefs.colorMode ?? 'grade')
+  const [hoveredPlotId, setHoveredPlotId] = useState<string | null>(null)
 
   // Wrap setters to persist preferences
   const setTileIdx = useCallback((i: number) => { setTileIdxRaw(i); saveMapPrefs({ tileIdx: i, colorMode, showCadastral, showAreas }) }, [colorMode, showCadastral, showAreas])
@@ -755,6 +756,15 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
       radius: Math.max(15, Math.min(60, 15 + (Math.sqrt(d.size) / Math.sqrt(maxSize || 1)) * 45)),
     }))
   }, [plots, colorMode])
+
+  const [copiedCoords, setCopiedCoords] = useState<string | null>(null)
+  const copyCoordinates = useCallback((lat: number, lng: number, plotId: string) => {
+    const text = `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedCoords(plotId)
+      setTimeout(() => setCopiedCoords(null), 2000)
+    }).catch(() => {})
+  }, [])
 
   const renderPopup = useCallback((plot: Plot) => {
     const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score), fav = favorites.isFav(plot.id), pps = pricePerSqm(plot), ppd = pricePerDunam(plot)
@@ -837,6 +847,21 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
                 }}
                 title="נווט עם Waze"
               >🚗 Waze</a>
+              <button
+                onClick={() => copyCoordinates(center!.lat, center!.lng, plot.id)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 8px',
+                  background: copiedCoords === plot.id ? 'rgba(16,185,129,0.1)' : 'rgba(148,163,184,0.1)',
+                  border: `1px solid ${copiedCoords === plot.id ? 'rgba(16,185,129,0.3)' : 'rgba(148,163,184,0.2)'}`,
+                  borderRadius: t.r.full, fontSize: 10, fontWeight: 700,
+                  color: copiedCoords === plot.id ? '#10B981' : '#94A3B8',
+                  cursor: 'pointer', whiteSpace: 'nowrap', transition: `all ${t.tr}`,
+                  fontFamily: t.font,
+                }}
+                title={`${center!.lat.toFixed(6)}, ${center!.lng.toFixed(6)}`}
+              >
+                {copiedCoords === plot.id ? <><Check size={10} /> הועתק!</> : <><Copy size={10} /> קואורדינטות</>}
+              </button>
             </div>
           )}
 
@@ -871,7 +896,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         </div>
       </div>
     )
-  }, [favorites, compare, onLead])
+  }, [favorites, compare, onLead, copiedCoords, copyCoordinates])
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }} className={darkMode ? 'dark' : ''}>
@@ -987,13 +1012,21 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         {plots.map(plot => {
           if (!plot.coordinates?.length) return null
           const d = p(plot), color = getPolygonColor(plot, colorMode), isSel = selected?.id === plot.id
+          const isHov = hoveredPlotId === plot.id && !isSel
           const score = calcScore(plot), grade = getGrade(score)
           const zoningStage = zoningPipeline.find(z => z.key === d.zoning)
           return (
             <Polygon key={plot.id} positions={plot.coordinates} eventHandlers={{
               click: () => onSelect(plot),
-              mouseover: () => prefetch(plot.id),
-            }} pathOptions={{ color: isSel ? t.gold : color, weight: isSel ? 3.5 : 2, fillColor: isSel ? t.gold : color, fillOpacity: isSel ? 0.4 : 0.18, className: isSel ? 'plot-selected' : undefined }}>
+              mouseover: () => { prefetch(plot.id); setHoveredPlotId(plot.id) },
+              mouseout: () => { if (hoveredPlotId === plot.id) setHoveredPlotId(null) },
+            }} pathOptions={{
+              color: isSel ? t.gold : isHov ? t.goldBright : color,
+              weight: isSel ? 3.5 : isHov ? 3 : 2,
+              fillColor: isSel ? t.gold : isHov ? t.goldBright : color,
+              fillOpacity: isSel ? 0.4 : isHov ? 0.32 : 0.18,
+              className: isSel ? 'plot-selected' : isHov ? 'plot-hovered' : undefined,
+            }}>
               <Tooltip className="price-tooltip plot-tooltip-rich" direction="top" offset={[0, -8]} opacity={1}>
                 <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

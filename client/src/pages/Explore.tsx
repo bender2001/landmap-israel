@@ -846,6 +846,16 @@ export default function Explore() {
     } catch { return null }
   }, [plots])
 
+  // Total area in dunams and city count
+  const totalDunams = useMemo(() => {
+    if (!filtered.length) return 0
+    return Math.round(filtered.reduce((s, pl) => s + p(pl).size, 0) / 1000 * 10) / 10
+  }, [filtered])
+  const cityCount = useMemo(() => {
+    if (!filtered.length) return 0
+    return new Set(filtered.map(pl => pl.city).filter(Boolean)).size
+  }, [filtered])
+
   // Recently viewed plots (resolve IDs to actual plot objects)
   const recentPlots = useMemo(() => {
     if (!recentIds.length || !plots.length) return []
@@ -1276,6 +1286,8 @@ export default function Explore() {
           {medianPrice > 0 && <Stat>חציון <Val><AnimatedValue value={Math.round(medianPrice)} format={fmt.compact} /></Val></Stat>}
           {avgPpd > 0 && <Stat>₪/דונם <Val><AnimatedValue value={avgPpd} format={fmt.num} /></Val></Stat>}
           {marketPulse && marketPulse.avgRoi > 0 && <Stat>ROI <Val style={{color: marketPulse.avgRoi > 30 ? t.ok : t.warn}}>+<AnimatedValue value={marketPulse.avgRoi} />%</Val></Stat>}
+          {totalDunams > 0 && <Stat>📐 <Val>{totalDunams}</Val> דונם</Stat>}
+          {cityCount > 1 && <Stat>🏘️ <Val>{cityCount}</Val> ערים</Stat>}
           {favIds.length > 0 && <Stat><Heart size={12} color={t.gold} /><Val>{favIds.length}</Val></Stat>}
           {compareIds.length > 0 && <Stat><GitCompareArrows size={12} color={t.gold} /><Val>{compareIds.length}</Val></Stat>}
           {sortKey === 'nearest' && userGeo.location && <Stat>📍 <Val>לפי קרבה</Val></Stat>}

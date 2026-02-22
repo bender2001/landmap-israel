@@ -4,7 +4,7 @@ import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, Chevron
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, estimatedYear, findBestValueIds, SITE_CONFIG } from '../utils'
-import { Skeleton } from './UI'
+import { Skeleton, PriceAlertButton } from './UI'
 import type { Plot } from '../types'
 
 const PAGE_SIZE = 20
@@ -315,6 +315,40 @@ const WaCta = styled.a`
   &:hover{border-color:rgba(37,211,102,0.5);background:rgba(37,211,102,0.15);transform:scale(1.08);}
 `
 
+/* ── Mini Sparkline (synthetic price trend based on ROI + zoning) ── */
+function MiniSparkline({ plot }: { plot: Plot }) {
+  const d = p(plot), r = roi(plot)
+  if (d.price <= 0) return null
+  // Generate synthetic price trend points based on zoning stage + ROI
+  const zoningIdx = zoningPipeline.findIndex(z => z.key === d.zoning)
+  const stages = Math.max(1, zoningIdx + 1)
+  const growthFactor = r > 0 ? 1 + (r / 100) : 1.1
+  const pts: number[] = []
+  for (let i = 0; i <= 5; i++) {
+    const progress = i / 5
+    const value = d.price * (1 - (1 - 1 / growthFactor) * (1 - progress))
+    pts.push(value)
+  }
+  pts.push(d.price) // current price is last point
+  const min = Math.min(...pts) * 0.98
+  const max = Math.max(...pts) * 1.02
+  const range = max - min || 1
+  const w = 48, h = 20
+  const points = pts.map((v, i) => ({
+    x: (i / (pts.length - 1)) * w,
+    y: h - ((v - min) / range) * h,
+  }))
+  const path = points.map((pt, i) => `${i === 0 ? 'M' : 'L'}${pt.x.toFixed(1)},${pt.y.toFixed(1)}`).join(' ')
+  const isUp = pts[pts.length - 1] >= pts[0]
+  const color = isUp ? t.ok : t.err
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ flexShrink: 0 }}>
+      <path d={path} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.7" />
+      <circle cx={points[points.length - 1].x} cy={points[points.length - 1].y} r="2" fill={color} />
+    </svg>
+  )
+}
+
 /* ── Zoning Pipeline Mini Bar ── */
 const ZoningBar = styled.div`
   display:flex;align-items:center;gap:2px;margin-top:6px;width:100%;
@@ -543,6 +577,14 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
           </Metric>
         )}
         {dom && <ItemDom $c={dom.color}>{dom.label}</ItemDom>}
+        <MiniSparkline plot={plot} />
+        <div onClick={e => e.stopPropagation()} style={{ display: 'flex' }}>
+          <PriceAlertButton
+            plotId={plot.id}
+            plotLabel={`גוש ${d.block} חלקה ${plot.number} — ${plot.city}`}
+            currentPrice={d.price}
+          />
+        </div>
         <DetailLink
           onClick={(e) => {
             e.stopPropagation()

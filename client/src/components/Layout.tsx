@@ -293,7 +293,14 @@ const PublicWrap = styled.div`min-height: 100vh; display: flex; flex-direction: 
 const PublicMain = styled.main`flex: 1;`
 
 export function PublicLayout({ children }: { children: React.ReactNode }) {
-  return <PublicWrap><PublicNav /><PublicMain>{children}</PublicMain><PublicFooter /></PublicWrap>
+  return (
+    <PublicWrap>
+      <a href="#main-content" className="skip-link">דלג לתוכן הראשי</a>
+      <PublicNav />
+      <PublicMain id="main-content" role="main">{children}</PublicMain>
+      <PublicFooter />
+    </PublicWrap>
+  )
 }
 
 const DashWrap = styled.div`min-height: 100vh; display: flex; direction: rtl;`
