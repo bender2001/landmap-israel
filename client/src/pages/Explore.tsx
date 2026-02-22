@@ -347,12 +347,7 @@ const MarketPulseWrap = styled.div`
     -webkit-overflow-scrolling:touch;&::-webkit-scrollbar{display:none;}
   }
   ${mobile}{
-    position:absolute;top:46px;right:8px;left:8px;transform:none;
-    bottom:auto;
-    overflow-x:auto;scrollbar-width:none;
-    -webkit-overflow-scrolling:touch;
-    &::-webkit-scrollbar{display:none;}
-    border-radius:${t.r.md};
+    display:none;
   }
 `
 const PulseCell = styled.div<{$accent?:string}>`

@@ -1,5 +1,6 @@
 import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker, Polyline, useMap, useMapEvents, WMSTileLayer } from 'react-leaflet'
+import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette, Ruler, Undo2, Trash2, LocateFixed, Copy, Check } from 'lucide-react'
 import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket } from '../utils'
@@ -686,12 +687,14 @@ function ZoomTracker({ onChange }: { onChange: (z: number) => void }) {
   return null
 }
 
-// ── Zoom Level Indicator with Area Name ──
+// ── Zoom Level Indicator with Area Name (renders OUTSIDE MapContainer — uses mapRef) ──
 function ZoomLevelIndicator({ zoom, plots, darkMode }: { zoom: number; plots: Plot[]; darkMode: boolean }) {
-  const map = useMap()
   const [areaName, setAreaName] = useState<string | null>(null)
 
   useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
     const updateArea = () => {
       const center = map.getCenter()
       // Find nearest area based on map center
@@ -725,7 +728,7 @@ function ZoomLevelIndicator({ zoom, plots, darkMode }: { zoom: number; plots: Pl
     updateArea()
     map.on('moveend', updateArea)
     return () => { map.off('moveend', updateArea) }
-  }, [map, plots])
+  }, [plots, zoom]) // zoom dependency triggers re-check on zoom change
 
   const zoomLabel = zoom <= 10 ? 'ארצי' : zoom <= 12 ? 'אזורי' : zoom <= 14 ? 'עירוני' : zoom <= 16 ? 'שכונתי' : 'חלקה'
   const zoomColor = zoom >= 15 ? t.ok : zoom >= 13 ? t.gold : t.info
@@ -809,6 +812,7 @@ function saveMapPrefs(prefs: MapPrefs) {
 }
 
 function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, darkMode = false, filterCity, fullscreen, onToggleFullscreen, onVisiblePlotsChange }: MapProps) {
+  const navigate = useNavigate()
   const savedPrefs = useMemo(() => loadMapPrefs(), [])
   const [tileIdx, setTileIdxRaw] = useState(savedPrefs.tileIdx ?? 2)
   const [showCadastral, setShowCadastralRaw] = useState(savedPrefs.showCadastral ?? false)
@@ -994,7 +998,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
             </button>
             <a
               href={`/plot/${plot.id}`}
-              onClick={(e) => { e.preventDefault(); window.location.href = `/plot/${plot.id}` }}
+              onClick={(e) => { e.preventDefault(); navigate(`/plot/${plot.id}`) }}
               style={{ width: 36, height: 36, border: `1px solid ${t.border}`, borderRadius: t.r.sm, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: `all ${t.tr}`, textDecoration: 'none' }}
               title="עמוד מלא"
             >
@@ -1019,7 +1023,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         </div>
       </div>
     )
-  }, [favorites, compare, onLead, copiedCoords, copyCoordinates])
+  }, [favorites, compare, onLead, copiedCoords, copyCoordinates, navigate])
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }} className={darkMode ? 'dark' : ''}>
