@@ -690,6 +690,65 @@ export function generatePlotReport(plot: Plot, allPlots?: Plot[]): string {
   return lines.join('\n')
 }
 
+// ── Satellite Tile URL ──
+/** Generate a static satellite tile URL centered on a lat/lng using ESRI World Imagery */
+export function satelliteTileUrl(lat: number, lng: number, zoom: number = 16): string {
+  const n = Math.pow(2, zoom)
+  const x = Math.floor(((lng + 180) / 360) * n)
+  const latRad = (lat * Math.PI) / 180
+  const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n)
+  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${y}/${x}`
+}
+
+// ── Alternative Investment Comparison ──
+export type AltInvestment = { name: string; emoji: string; annualReturn: number; futureValue: number; totalReturn: number; color: string }
+/** Compare a plot's expected return against standard financial instruments */
+export function calcAlternativeInvestments(plot: Plot): AltInvestment[] | null {
+  const d = p(plot), tl = calcTimeline(plot)
+  if (d.price <= 0 || d.projected <= d.price) return null
+  const years = tl.remaining > 0 ? Math.max(1, Math.round(tl.remaining / 12)) : 5
+  const plotReturn = ((d.projected - d.price) / d.price) * 100
+  const plotCAGR = (Math.pow(d.projected / d.price, 1 / years) - 1) * 100
+  const fv = (rate: number) => d.price * Math.pow(1 + rate / 100, years)
+  return [
+    { name: 'חלקה זו', emoji: '🏗️', annualReturn: Math.round(plotCAGR * 10) / 10, futureValue: Math.round(d.projected), totalReturn: Math.round(plotReturn), color: '#10B981' },
+    { name: 'פיקדון בנקאי', emoji: '🏦', annualReturn: 3.5, futureValue: Math.round(fv(3.5)), totalReturn: Math.round(((fv(3.5) - d.price) / d.price) * 100), color: '#94A3B8' },
+    { name: 'אג״ח ממשלתי', emoji: '📜', annualReturn: 5.0, futureValue: Math.round(fv(5.0)), totalReturn: Math.round(((fv(5.0) - d.price) / d.price) * 100), color: '#64748B' },
+    { name: 'מדד S&P 500', emoji: '📈', annualReturn: 10.0, futureValue: Math.round(fv(10.0)), totalReturn: Math.round(((fv(10.0) - d.price) / d.price) * 100), color: '#3B82F6' },
+  ]
+}
+
+// ── Market Temperature ──
+export function calcMarketTemperature(plots: Plot[]): { label: string; emoji: string; color: string; score: number } {
+  if (!plots.length) return { label: 'אין נתונים', emoji: '❓', color: '#64748B', score: 0 }
+  const rois = plots.map(roi).filter(v => v > 0)
+  const avgRoi = rois.length ? rois.reduce((s, v) => s + v, 0) / rois.length : 0
+  const scores = plots.map(calcScore)
+  const avgScore = scores.reduce((s, v) => s + v, 0) / scores.length
+  const hotDeals = plots.filter(pl => calcScore(pl) >= 8).length
+  const hotRatio = hotDeals / plots.length
+  // Weighted temperature: ROI weight 40%, score weight 40%, hot ratio 20%
+  const temp = (avgRoi / 300) * 40 + (avgScore / 10) * 40 + hotRatio * 20
+  if (temp >= 60) return { label: 'שוק חם', emoji: '🔥', color: '#EF4444', score: Math.min(100, Math.round(temp)) }
+  if (temp >= 40) return { label: 'שוק פעיל', emoji: '📈', color: '#F59E0B', score: Math.round(temp) }
+  if (temp >= 20) return { label: 'שוק יציב', emoji: '📊', color: '#3B82F6', score: Math.round(temp) }
+  return { label: 'שוק קר', emoji: '❄️', color: '#94A3B8', score: Math.round(temp) }
+}
+
+// ── Investment Recommendation ──
+/** Generate a short Hebrew investment recommendation based on plot metrics */
+export function investmentRecommendation(plot: Plot): { text: string; emoji: string; color: string } {
+  const score = calcScore(plot), r = roi(plot), d = p(plot)
+  const pps = pricePerSqm(plot)
+  if (score >= 9) return { text: 'מומלץ בחום', emoji: '🔥', color: '#10B981' }
+  if (score >= 8 && r >= 100) return { text: 'פוטנציאל גבוה', emoji: '🚀', color: '#10B981' }
+  if (score >= 7) return { text: 'השקעה מומלצת', emoji: '👍', color: '#4ADE80' }
+  if (score >= 6) return { text: 'שווה בדיקה', emoji: '🔍', color: '#84CC16' }
+  if (score >= 5) return { text: 'סיכון בינוני', emoji: '⚖️', color: '#F59E0B' }
+  if (score >= 4) return { text: 'דורש ניתוח', emoji: '📊', color: '#F97316' }
+  return { text: 'סיכון גבוה', emoji: '⚠️', color: '#EF4444' }
+}
+
 // ── Normalize ──
 export function normalizePlot(plot: Plot): Plot {
   return { ...plot, total_price: plot.totalPrice ?? plot.total_price, projected_value: plot.projectedValue ?? plot.projected_value,

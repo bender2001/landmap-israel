@@ -7,7 +7,7 @@ import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, 
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, Spinner, useToast, Badge, NetworkBanner, AnimatedValue, DemoModeBanner, ExploreLoadingSkeleton } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance, zoningLabels, calcAggregateStats, estimatedYear, plotCenter, SITE_CONFIG } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance, zoningLabels, calcAggregateStats, estimatedYear, plotCenter, SITE_CONFIG, calcMarketTemperature } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -95,6 +95,24 @@ const SortOption = styled.button<{$active?:boolean}>`
   font-family:${t.font};cursor:pointer;transition:all ${t.tr};
   &:hover{background:${t.hover};color:${t.gold};}
 `
+
+/* ── Breadcrumb Navigation ── */
+const BreadcrumbWrap = styled.nav`
+  position:absolute;bottom:42px;left:16px;z-index:${t.z.filter - 2};
+  display:flex;align-items:center;gap:0;direction:rtl;
+  background:${t.glass};backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid ${t.glassBorder};border-radius:${t.r.full};
+  padding:4px 14px;box-shadow:${t.sh.sm};
+  font-size:11px;font-weight:600;font-family:${t.font};
+  ${mobile}{display:none;}
+`
+const BreadcrumbItem = styled.span<{$active?:boolean;$clickable?:boolean}>`
+  color:${pr=>pr.$active?t.gold:t.textDim};
+  cursor:${pr=>pr.$clickable?'pointer':'default'};
+  white-space:nowrap;transition:color ${t.tr};
+  ${pr=>pr.$clickable?`&:hover{color:${t.goldBright};text-decoration:underline;}`:``}
+`
+const BreadcrumbSep = styled.span`color:${t.textDim};margin:0 6px;opacity:0.4;font-size:9px;`
 
 /* ── Share View Button ── */
 const shareSuccess = keyframes`0%{transform:scale(0.8);opacity:0}50%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}`
@@ -505,6 +523,47 @@ const KbdFooter = styled.div`
   font-size:11px;color:${t.textDim};text-align:center;
 `
 
+/* ── Quick City Navigation Pills ── */
+const CityPillsWrap = styled.div`
+  position:absolute;top:114px;left:50%;transform:translateX(-50%);z-index:${t.z.filter};
+  display:flex;align-items:center;gap:6px;direction:rtl;
+  max-width:min(620px,calc(100vw - 32px));overflow-x:auto;
+  scrollbar-width:none;&::-webkit-scrollbar{display:none;}
+  padding:4px 8px;
+  background:${t.glass};backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid ${t.glassBorder};border-radius:${t.r.full};box-shadow:${t.sh.md};
+  ${mobile}{top:90px;left:8px;right:8px;transform:none;gap:5px;border-radius:${t.r.lg};}
+`
+const CityPill = styled.button<{$active?:boolean}>`
+  display:inline-flex;align-items:center;gap:4px;padding:5px 14px;
+  background:${pr=>pr.$active ? t.goldDim : t.glass};backdrop-filter:blur(16px);
+  border:1px solid ${pr=>pr.$active ? t.gold : t.glassBorder};border-radius:${t.r.full};
+  color:${pr=>pr.$active ? t.gold : t.textSec};font-size:11px;font-weight:700;
+  font-family:${t.font};cursor:pointer;transition:all ${t.tr};white-space:nowrap;flex-shrink:0;
+  box-shadow:${t.sh.sm};
+  &:hover{border-color:${t.gold};color:${t.gold};transform:translateY(-1px);}
+  ${pr=>pr.$active && `box-shadow:0 0 12px rgba(212,168,75,0.2);`}
+`
+
+/* ── Market Temperature Gauge ── */
+const TempGauge = styled.div<{$c:string}>`
+  display:flex;align-items:center;gap:4px;
+`
+const TempBar = styled.div<{$pct:number;$c:string}>`
+  width:40px;height:5px;border-radius:3px;background:${t.bg};overflow:hidden;position:relative;
+  &::after{content:'';position:absolute;top:0;left:0;height:100%;
+    width:${pr=>pr.$pct}%;background:${pr=>pr.$c};border-radius:3px;
+    transition:width 0.8s ease;}
+`
+
+/* City emoji map — used by dynamic city pills */
+const CITY_EMOJI: Record<string, string> = {
+  'חדרה': '🏗️', 'נתניה': '🌊', 'קיסריה': '🏛️', 'הרצליה': '💎',
+  'כפר סבא': '🌳', 'רעננה': '🏠', 'הוד השרון': '🌿', 'תל אביב': '🏙️',
+  'חיפה': '⚓', 'באר שבע': '🏜️', 'ראשון לציון': '🌅', 'אשדוד': '🚢',
+  'ירושלים': '✡️', 'פתח תקווה': '🌳', 'רחובות': '🔬', 'אשקלון': '🏖️',
+}
+
 const SHORTCUTS = [
   { keys: ['/'], label: 'מיקוד בחיפוש' },
   { keys: ['?'], label: 'פתח/סגור קיצורי מקשים' },
@@ -581,6 +640,29 @@ export default function Explore() {
     if (filters.belowAvg === 'true') count++
     return count
   }, [filters])
+
+  // Dynamic city pills — built from actual plot data instead of hardcoded list
+  const cityPills = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const pl of plots) {
+      if (pl.city) counts.set(pl.city, (counts.get(pl.city) || 0) + 1)
+    }
+    const pills = [{ name: 'הכל', emoji: '🗺️', value: '', count: plots.length }]
+    // Sort cities by plot count descending, take top 8
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+    for (const [city, count] of sorted) {
+      pills.push({ name: city, emoji: CITY_EMOJI[city] || '📍', value: city, count })
+    }
+    return pills
+  }, [plots])
+
+  // Tab visibility — pause expensive intervals when tab is hidden
+  const [tabVisible, setTabVisible] = useState(true)
+  useEffect(() => {
+    const handler = () => setTabVisible(document.visibilityState === 'visible')
+    document.addEventListener('visibilitychange', handler)
+    return () => document.removeEventListener('visibilitychange', handler)
+  }, [])
 
   // Mobile calculator state
   const [calcPrice, setCalcPrice] = useState(500000)
@@ -768,6 +850,9 @@ export default function Explore() {
     return { totalValue, hotDeals, belowAvgCount, avgRoi }
   }, [filtered])
 
+  // Market temperature
+  const marketTemp = useMemo(() => calcMarketTemperature(filtered), [filtered])
+
   // Reset city stats dismissed state when city changes
   useEffect(() => { setCityStatsDismissed(false) }, [filters.city])
 
@@ -920,9 +1005,10 @@ export default function Explore() {
 
   useEffect(() => {
     if (insights.length <= 1) return
+    if (!tabVisible) return // Pause ticker when tab is hidden — save CPU
     const id = setInterval(() => setInsightIdx(i => (i + 1) % insights.length), 5000)
     return () => clearInterval(id)
-  }, [insights.length])
+  }, [insights.length, tabVisible])
 
   // Dynamic document title + meta + OG tags based on active filters
   useEffect(() => {
@@ -1006,6 +1092,32 @@ export default function Explore() {
     return () => { el?.remove() }
   }, [filtered, filters.city])
 
+  // Schema.org BreadcrumbList for SEO (like Madlan)
+  useEffect(() => {
+    const bcId = 'landmap-breadcrumb-ld'
+    let el = document.getElementById(bcId) as HTMLScriptElement | null
+    if (!el) {
+      el = document.createElement('script')
+      el.id = bcId
+      el.type = 'application/ld+json'
+      document.head.appendChild(el)
+    }
+    const cityLabel = filters.city && filters.city !== 'all' ? filters.city : ''
+    const items: Record<string, unknown>[] = [
+      { '@type': 'ListItem', position: 1, name: 'ראשי', item: window.location.origin },
+      { '@type': 'ListItem', position: 2, name: 'חלקות להשקעה', item: `${window.location.origin}/explore` },
+    ]
+    if (cityLabel) {
+      items.push({ '@type': 'ListItem', position: 3, name: cityLabel, item: `${window.location.origin}/explore?city=${encodeURIComponent(cityLabel)}` })
+    }
+    el.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: items,
+    })
+    return () => { el?.remove() }
+  }, [filters.city])
+
   // Close sort dropdown on click outside
   useEffect(() => {
     if (!sortOpen) return
@@ -1087,6 +1199,46 @@ export default function Explore() {
         />
         {!mapFullscreen && <FilterBar filters={filters} onChange={setFilters} resultCount={filtered.length}
           plots={plots} onSelectPlot={(id) => { const pl = plots.find(pp => pp.id === id); if (pl) selectPlot(pl) }} />}
+
+        {/* Breadcrumb navigation — SEO + UX context (like Madlan) */}
+        {!mapFullscreen && !isMobile && (
+          <BreadcrumbWrap aria-label="מיקום נוכחי">
+            <BreadcrumbItem $clickable onClick={() => window.location.href = '/'}>ראשי</BreadcrumbItem>
+            <BreadcrumbSep>‹</BreadcrumbSep>
+            <BreadcrumbItem $clickable={!!(filters.city && filters.city !== 'all')} $active={!filters.city || filters.city === 'all'}
+              onClick={() => { if (filters.city && filters.city !== 'all') setFilters({ ...filters, city: '' }) }}>
+              חלקות להשקעה
+            </BreadcrumbItem>
+            {filters.city && filters.city !== 'all' && (
+              <>
+                <BreadcrumbSep>‹</BreadcrumbSep>
+                <BreadcrumbItem $active>{filters.city}</BreadcrumbItem>
+              </>
+            )}
+            {selected && (
+              <>
+                <BreadcrumbSep>‹</BreadcrumbSep>
+                <BreadcrumbItem $active>חלקה {selected.number}</BreadcrumbItem>
+              </>
+            )}
+          </BreadcrumbWrap>
+        )}
+
+        {/* Quick City Navigation Pills — dynamic from actual data */}
+        {!mapFullscreen && !selected && !listOpen && !cityStats && recentPlots.length === 0 && cityPills.length > 1 && (
+          <CityPillsWrap>
+            {cityPills.map(cp => (
+              <CityPill
+                key={cp.value || 'all'}
+                $active={(filters.city || '') === cp.value || (!filters.city && !cp.value)}
+                onClick={() => setFilters({ ...filters, city: cp.value })}
+                title={cp.count != null ? `${cp.count} חלקות` : undefined}
+              >
+                {cp.emoji} {cp.name}{cp.count != null && cp.value ? ` (${cp.count})` : ''}
+              </CityPill>
+            ))}
+          </CityPillsWrap>
+        )}
 
         {/* Empty state when no plots match filters */}
         {!mapFullscreen && !isLoading && filtered.length === 0 && hasActiveFilters && (
@@ -1436,6 +1588,18 @@ export default function Explore() {
         {/* Market Pulse Widget — investment at-a-glance (desktop only, when no plot/city selected) */}
         {!mapFullscreen && marketPulse && !selected && !cityStats && !listOpen && filtered.length >= 2 && (
           <MarketPulseWrap>
+            {/* Market Temperature Gauge */}
+            {marketTemp.score > 0 && (
+              <PulseCell>
+                <PulseVal $c={marketTemp.color}>
+                  <TempGauge $c={marketTemp.color}>
+                    <span>{marketTemp.emoji}</span>
+                    <TempBar $pct={marketTemp.score} $c={marketTemp.color} />
+                  </TempGauge>
+                </PulseVal>
+                <PulseLabel>{marketTemp.label}</PulseLabel>
+              </PulseCell>
+            )}
             <PulseCell>
               <PulseVal>{fmt.compact(marketPulse.totalValue)}</PulseVal>
               <PulseLabel><PieChart size={8} style={{marginLeft:3}} /> שווי כולל</PulseLabel>

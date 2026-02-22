@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker,
 import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette, Ruler, Undo2, Trash2, LocateFixed, Copy, Check } from 'lucide-react'
-import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket } from '../utils'
+import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket, investmentRecommendation, estimatedYear } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
 import { israelAreas } from '../data'
@@ -897,6 +897,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
     const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score), fav = favorites.isFav(plot.id), pps = pricePerSqm(plot), ppd = pricePerDunam(plot)
     const comp = compare?.has(plot.id)
     const zoningStage = zoningPipeline.find(z => z.key === d.zoning)
+    const estYear = estimatedYear(plot)
     const center = plotCenter(plot.coordinates)
     const navLinks = center ? {
       gmaps: `https://www.google.com/maps/@${center.lat},${center.lng},17z`,
@@ -917,6 +918,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
               <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                 📍 {plot.city}
                 {zoningStage && <span style={{ opacity: 0.6 }}>· {zoningStage.icon} {zoningStage.label}</span>}
+                {estYear && <span style={{ color: t.gold, fontWeight: 700 }}>· 🏗️ {estYear.label}</span>}
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
@@ -942,6 +944,21 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
           <div className="plot-popup-row"><span className="plot-popup-label">שטח</span><span className="plot-popup-value">{fmt.dunam(d.size)} דונם ({fmt.num(d.size)} מ״ר)</span></div>
           {ppd > 0 && <div className="plot-popup-row"><span className="plot-popup-label">₪/דונם</span><span className="plot-popup-value">{fmt.num(ppd)}</span></div>}
           <div className="plot-popup-row"><span className="plot-popup-label">תשואה צפויה</span><span className="plot-popup-value gold">+{fmt.pct(r)}</span></div>
+
+          {/* Investment recommendation */}
+          {(() => {
+            const reco = investmentRecommendation(plot)
+            return (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, padding: '5px 10px',
+                background: `${reco.color}10`, border: `1px solid ${reco.color}25`,
+                borderRadius: t.r.full, fontSize: 10, fontWeight: 800, color: reco.color,
+                direction: 'rtl',
+              }}>
+                {reco.emoji} {reco.text}
+              </div>
+            )
+          })()}
 
           {/* Navigation quick links row */}
           {navLinks && (
@@ -1156,20 +1173,29 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
               className: isSel ? 'plot-selected' : isHov ? 'plot-hovered' : undefined,
             }}>
               <Tooltip className="price-tooltip plot-tooltip-rich" direction="top" offset={[0, -8]} opacity={1}>
-                <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>{fmt.short(d.price)}</span>
-                    <span style={{ width: 1, height: 10, background: 'currentColor', opacity: 0.2 }} />
-                    <span style={{ fontSize: 10, opacity: 0.7 }}>{fmt.dunam(d.size)} ד׳</span>
-                    <span style={{ fontSize: 10, fontWeight: 800, color: grade.color }}>{grade.grade}</span>
-                  </span>
-                  {zoningStage && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, opacity: 0.65 }}>
-                      <span>{zoningStage.icon}</span>
-                      <span>{zoningStage.label}</span>
+                {(() => {
+                  const reco = investmentRecommendation(plot)
+                  return (
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>{fmt.short(d.price)}</span>
+                        <span style={{ width: 1, height: 10, background: 'currentColor', opacity: 0.2 }} />
+                        <span style={{ fontSize: 10, opacity: 0.7 }}>{fmt.dunam(d.size)} ד׳</span>
+                        <span style={{ fontSize: 10, fontWeight: 800, color: grade.color }}>{grade.grade}</span>
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9 }}>
+                        {zoningStage && (
+                          <span style={{ opacity: 0.65, display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <span>{zoningStage.icon}</span>
+                            <span>{zoningStage.label}</span>
+                          </span>
+                        )}
+                        <span style={{ width: 1, height: 8, background: 'currentColor', opacity: 0.15 }} />
+                        <span style={{ color: reco.color, fontWeight: 800 }}>{reco.emoji} {reco.text}</span>
+                      </span>
                     </span>
-                  )}
-                </span>
+                  )
+                })()}
               </Tooltip>
               <Popup maxWidth={280} minWidth={240}>{renderPopup(plot)}</Popup>
             </Polygon>

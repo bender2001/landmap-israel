@@ -3,7 +3,7 @@ import styled, { keyframes } from 'styled-components'
 import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download, Share2, MessageCircle, LayoutGrid, Table2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, estimatedYear, findBestValueIds, SITE_CONFIG } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, estimatedYear, findBestValueIds, SITE_CONFIG, plotCenter, satelliteTileUrl, investmentRecommendation } from '../utils'
 import { Skeleton, PriceAlertButton } from './UI'
 import type { Plot } from '../types'
 
@@ -430,6 +430,24 @@ const BestValueBadge = styled.span`
   animation:${bestValueGlow} 3s ease-in-out infinite;
 `
 
+/* ── Satellite Thumbnail ── */
+const SatThumb = styled.div<{ $url: string }>`
+  width:56px;height:56px;border-radius:${t.r.md};flex-shrink:0;
+  background-image:url(${pr => pr.$url});background-size:cover;background-position:center;
+  border:1px solid ${t.border};position:relative;overflow:hidden;
+  transition:all ${t.tr};
+  &::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 60%,rgba(0,0,0,0.3));border-radius:inherit;}
+  &:hover{border-color:${t.goldBorder};transform:scale(1.05);box-shadow:${t.sh.sm};}
+`
+
+/* ── Investment Recommendation Chip ── */
+const RecoChip = styled.span<{$c:string}>`
+  display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;
+  padding:2px 8px;border-radius:${t.r.full};color:${pr=>pr.$c};
+  background:${pr=>pr.$c}10;border:1px solid ${pr=>pr.$c}25;
+  white-space:nowrap;letter-spacing:0.2px;
+`
+
 /* ── WhatsApp Quick CTA ── */
 const WaCta = styled.a`
   display:flex;align-items:center;justify-content:center;width:28px;height:28px;
@@ -650,6 +668,9 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
   const percentile = calcPercentileRank(plot, allPlots)
 
   const estYear = estimatedYear(plot)
+  const reco = investmentRecommendation(plot)
+  const center = plotCenter(plot.coordinates)
+  const thumbUrl = center ? satelliteTileUrl(center.lat, center.lng) : null
 
   // Zoning pipeline stage
   const zoningIdx = zoningPipeline.findIndex(z => z.key === d.zoning)
@@ -657,6 +678,9 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
 
   return (
     <ItemWrap $active={active} $i={index} $gradeColor={grade.color} onClick={onClick} aria-label={`חלקה ${plot.number} גוש ${d.block}`}>
+      <div style={{ display: 'flex', gap: 12 }}>
+        {thumbUrl && <SatThumb $url={thumbUrl} title={`תצלום לוויין — ${plot.city}`} />}
+        <div style={{ flex: 1, minWidth: 0 }}>
       <ItemTop>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <ItemCity>{plot.city}</ItemCity>
@@ -758,15 +782,17 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
           </ZoningLabel>
         </>
       )}
-      {/* Location proximity tags (like Madlan) */}
-      {(() => {
-        const tags = getLocationTags(plot)
-        return tags.length > 0 ? (
-          <LocationTagsRow>
-            {tags.map((tag, i) => <LocTag key={i} $c={tag.color}>{tag.icon} {tag.label}</LocTag>)}
-          </LocationTagsRow>
-        ) : null
-      })()}
+      {/* Investment recommendation chip */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+        <RecoChip $c={reco.color}>{reco.emoji} {reco.text}</RecoChip>
+        {/* Location proximity tags (like Madlan) */}
+        {(() => {
+          const tags = getLocationTags(plot)
+          return tags.length > 0 ? tags.map((tag, i) => <LocTag key={i} $c={tag.color}>{tag.icon} {tag.label}</LocTag>) : null
+        })()}
+      </div>
+        </div>{/* close flex inner */}
+      </div>{/* close flex row */}
     </ItemWrap>
   )
 })

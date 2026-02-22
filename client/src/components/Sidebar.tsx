@@ -3,7 +3,7 @@ import styled, { keyframes, css } from 'styled-components'
 import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe, Sparkles, Printer, Navigation, Map as MapIcon2, Eye, Calculator, ClipboardCopy, Banknote } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
-import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcTimeline, calcMonthly, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter, getLocationTags, generatePlotReport } from '../utils'
+import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcTimeline, calcMonthly, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter, getLocationTags, generatePlotReport, calcAlternativeInvestments } from '../utils'
 import type { Plot } from '../types'
 import { GoldButton, GhostButton, Badge, RadialScore, InfoTooltip, PriceAlertButton } from './UI'
 
@@ -254,6 +254,74 @@ function Sparkline({ data, width = 80, height = 28, color }: { data: number[]; w
         />
       )}
     </svg>
+  )
+}
+
+/* ── Alternative Investment Comparison ── */
+const AltInvestWrap = styled.div`
+  margin-bottom:16px;padding:14px;background:${t.surfaceLight};
+  border:1px solid ${t.border};border-radius:${t.r.md};
+  animation:${fadeSection} 0.5s 0.2s both;
+`
+const AltInvestTitle = styled.div`
+  font-size:11px;font-weight:700;color:${t.textDim};margin-bottom:12px;
+  display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:0.3px;
+`
+const AltInvestRow = styled.div<{$highlight?:boolean}>`
+  display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;
+  padding:8px 10px;margin-bottom:4px;
+  background:${pr=>pr.$highlight ? 'rgba(16,185,129,0.06)' : 'transparent'};
+  border:1px solid ${pr=>pr.$highlight ? 'rgba(16,185,129,0.15)' : 'transparent'};
+  border-radius:${t.r.sm};transition:all ${t.tr};
+  &:last-child{margin-bottom:0;}
+`
+const AltInvestName = styled.div`
+  display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
+  color:${t.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+`
+const AltInvestFV = styled.div`
+  font-size:12px;font-weight:700;color:${t.textSec};text-align:left;white-space:nowrap;
+`
+const AltInvestReturn = styled.div<{$c:string}>`
+  font-size:12px;font-weight:800;color:${pr=>pr.$c};text-align:left;white-space:nowrap;min-width:50px;
+`
+const AltInvestBar = styled.div<{$pct:number;$c:string}>`
+  height:4px;border-radius:2px;background:${t.bg};overflow:hidden;
+  grid-column:1/-1;margin-top:-2px;
+  &::after{content:'';display:block;height:100%;width:${pr=>Math.min(100,Math.max(3,pr.$pct))}%;
+    background:${pr=>pr.$c};border-radius:2px;transition:width 0.8s ease;}
+`
+const AltInvestWinner = styled.span`
+  font-size:8px;font-weight:800;color:#10B981;background:rgba(16,185,129,0.12);
+  padding:1px 6px;border-radius:${t.r.full};margin-inline-start:4px;
+`
+
+function AlternativeInvestments({ plot }: { plot: Plot }) {
+  const alts = useMemo(() => calcAlternativeInvestments(plot), [plot])
+  if (!alts || alts.length === 0) return null
+  const maxReturn = Math.max(...alts.map(a => a.totalReturn))
+  const winner = alts[0] // The plot is always first and should be the winner for good plots
+  const isPlotBest = winner.totalReturn >= alts[1]?.totalReturn
+  return (
+    <AltInvestWrap>
+      <AltInvestTitle>
+        <Calculator size={12} color={t.gold} />
+        השוואה מול השקעות חלופיות
+      </AltInvestTitle>
+      {alts.map((alt, i) => (
+        <div key={alt.name}>
+          <AltInvestRow $highlight={i === 0}>
+            <AltInvestName>
+              <span>{alt.emoji}</span> {alt.name}
+              {i === 0 && isPlotBest && <AltInvestWinner>✓ מנצח</AltInvestWinner>}
+            </AltInvestName>
+            <AltInvestFV>{fmt.compact(alt.futureValue)}</AltInvestFV>
+            <AltInvestReturn $c={alt.color}>+{alt.totalReturn}%</AltInvestReturn>
+          </AltInvestRow>
+          <AltInvestBar $pct={(alt.totalReturn / maxReturn) * 100} $c={alt.color} />
+        </div>
+      ))}
+    </AltInvestWrap>
   )
 }
 
@@ -1249,6 +1317,9 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
               )}
             </ProjWrap>
           )}
+
+          {/* Alternative Investment Comparison — show ROI vs bank, bonds, S&P 500 */}
+          <AlternativeInvestments plot={plot} />
 
           {/* Market Trend Card — like Madlan's area trend indicator */}
           {marketTrend && (
