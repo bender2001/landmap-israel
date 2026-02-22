@@ -684,6 +684,22 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, u
     setVisibleCount(prev => prev + PAGE_SIZE)
   }, [])
 
+  // IntersectionObserver-based infinite scroll
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!hasMore || !loadMoreRef.current) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleCount(prev => prev + PAGE_SIZE)
+        }
+      },
+      { root: bodyRef.current, rootMargin: '200px', threshold: 0 }
+    )
+    observer.observe(loadMoreRef.current)
+    return () => observer.disconnect()
+  }, [hasMore, allVisiblePlots.length])
+
   // Reset pagination when filters/city change
   useEffect(() => { setVisibleCount(PAGE_SIZE) }, [cityFilter, plots])
 
@@ -823,11 +839,12 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, u
                   />
                 ))}
                 {hasMore && (
-                  <LoadMoreBtn onClick={loadMore}>
-                    <LoadMoreIcon size={16} />
-                    טען עוד חלקות
-                    <LoadMoreCount>{remainingCount > 0 ? `+${remainingCount}` : ''}</LoadMoreCount>
-                  </LoadMoreBtn>
+                  <div ref={loadMoreRef} style={{ padding: '12px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <LoadMoreBtn onClick={loadMore}>
+                      <LoadMoreIcon size={16} />
+                      טוען עוד {remainingCount > 0 ? `(${Math.min(remainingCount, PAGE_SIZE)} מתוך ${remainingCount})` : ''}
+                    </LoadMoreBtn>
+                  </div>
                 )}
               </>
             )}

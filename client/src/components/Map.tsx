@@ -124,6 +124,7 @@ interface MapProps {
   filterCity?: string
   fullscreen?: boolean
   onToggleFullscreen?: () => void
+  onVisiblePlotsChange?: (count: number) => void
 }
 
 // ── URL Sync ──
@@ -685,6 +686,117 @@ function ZoomTracker({ onChange }: { onChange: (z: number) => void }) {
   return null
 }
 
+// ── Zoom Level Indicator with Area Name ──
+function ZoomLevelIndicator({ zoom, plots, darkMode }: { zoom: number; plots: Plot[]; darkMode: boolean }) {
+  const map = useMap()
+  const [areaName, setAreaName] = useState<string | null>(null)
+
+  useEffect(() => {
+    const updateArea = () => {
+      const center = map.getCenter()
+      // Find nearest area based on map center
+      for (const area of israelAreas) {
+        const [minLat, minLng] = area.bounds[0]
+        const [maxLat, maxLng] = area.bounds[2]
+        if (center.lat >= minLat && center.lat <= maxLat && center.lng >= minLng && center.lng <= maxLng) {
+          setAreaName(area.name)
+          return
+        }
+      }
+      // Fallback: find city from nearby plots
+      const nearPlots = plots.filter(pl => {
+        const c = plotCenter(pl.coordinates)
+        if (!c) return false
+        const dist = Math.abs(c.lat - center.lat) + Math.abs(c.lng - center.lng)
+        return dist < 0.05
+      })
+      if (nearPlots.length > 0) {
+        // Most common city in nearby plots
+        const cityMap = new Map<string, number>()
+        for (const pl of nearPlots) {
+          if (pl.city) cityMap.set(pl.city, (cityMap.get(pl.city) || 0) + 1)
+        }
+        const topCity = [...cityMap.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+        setAreaName(topCity || null)
+      } else {
+        setAreaName(null)
+      }
+    }
+    updateArea()
+    map.on('moveend', updateArea)
+    return () => { map.off('moveend', updateArea) }
+  }, [map, plots])
+
+  const zoomLabel = zoom <= 10 ? 'ארצי' : zoom <= 12 ? 'אזורי' : zoom <= 14 ? 'עירוני' : zoom <= 16 ? 'שכונתי' : 'חלקה'
+  const zoomColor = zoom >= 15 ? t.ok : zoom >= 13 ? t.gold : t.info
+
+  return (
+    <div style={{
+      position: 'absolute', top: 16, left: 16, zIndex: t.z.controls,
+      display: 'flex', alignItems: 'center', gap: 6, direction: 'rtl',
+      padding: '6px 12px',
+      background: darkMode ? 'rgba(11,17,32,0.88)' : 'rgba(255,255,255,0.92)',
+      backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+      border: `1px solid ${darkMode ? t.border : t.lBorder}`,
+      borderRadius: t.r.full, boxShadow: t.sh.sm,
+      fontSize: 11, fontWeight: 600, fontFamily: t.font,
+      color: darkMode ? t.textSec : t.lTextSec,
+      transition: `all ${t.tr}`,
+      pointerEvents: 'none',
+    }}>
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 20, height: 20, borderRadius: '50%',
+        background: `${zoomColor}18`, border: `1px solid ${zoomColor}40`,
+        fontSize: 9, fontWeight: 800, color: zoomColor, lineHeight: 1,
+      }}>
+        {zoom}
+      </span>
+      <span style={{ color: zoomColor, fontWeight: 700 }}>{zoomLabel}</span>
+      {areaName && (
+        <>
+          <span style={{ width: 1, height: 12, background: darkMode ? t.border : t.lBorder, opacity: 0.5 }} />
+          <span style={{ color: darkMode ? t.text : t.lText, fontWeight: 700 }}>📍 {areaName}</span>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Viewport Visible Plot Counter ──
+function ViewportPlotCounter({ plots, onChange }: { plots: Plot[]; onChange: (visible: number) => void }) {
+  const map = useMap()
+  const countRef = useRef(plots.length)
+
+  const recount = useCallback(() => {
+    const bounds = map.getBounds()
+    let visible = 0
+    for (const pl of plots) {
+      if (!pl.coordinates?.length) continue
+      const inView = pl.coordinates.some(c =>
+        c.length >= 2 && bounds.contains([c[0], c[1]])
+      )
+      if (inView) visible++
+    }
+    if (visible !== countRef.current) {
+      countRef.current = visible
+      onChange(visible)
+    }
+  }, [map, plots, onChange])
+
+  useEffect(() => {
+    recount()
+    map.on('moveend', recount)
+    map.on('zoomend', recount)
+    return () => {
+      map.off('moveend', recount)
+      map.off('zoomend', recount)
+    }
+  }, [map, recount])
+
+  return null
+}
+
 // ── Main Component ──
 // ── Persisted Map Preferences ──
 const MAP_PREFS_KEY = 'landmap_map_prefs'
@@ -696,7 +808,7 @@ function saveMapPrefs(prefs: MapPrefs) {
   try { localStorage.setItem(MAP_PREFS_KEY, JSON.stringify(prefs)) } catch {}
 }
 
-function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, darkMode = false, filterCity, fullscreen, onToggleFullscreen }: MapProps) {
+function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, darkMode = false, filterCity, fullscreen, onToggleFullscreen, onVisiblePlotsChange }: MapProps) {
   const savedPrefs = useMemo(() => loadMapPrefs(), [])
   const [tileIdx, setTileIdxRaw] = useState(savedPrefs.tileIdx ?? 2)
   const [showCadastral, setShowCadastralRaw] = useState(savedPrefs.showCadastral ?? false)
@@ -723,11 +835,22 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
   }, [])
   const clearRuler = useCallback(() => setRulerPoints(0), [])
 
-  // ESC to exit ruler mode
+  // Keyboard shortcuts for ruler mode
   useEffect(() => {
-    if (!rulerActive) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setRulerActive(false); setRulerPoints(0) }
+      // Don't intercept when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.key === 'Escape' && rulerActive) {
+        setRulerActive(false)
+        setRulerPoints(0)
+      }
+      // 'R' key to toggle ruler mode
+      if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        setRulerActive(prev => {
+          if (prev) setRulerPoints(0)
+          return !prev
+        })
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -917,6 +1040,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         <UserLocation />
         <PlotBoundsTracker plots={plots} />
         <ZoomTracker onChange={handleZoomChange} />
+        {onVisiblePlotsChange && <ViewportPlotCounter plots={plots} onChange={onVisiblePlotsChange} />}
 
         {/* Distance ruler tool */}
         <RulerTool active={rulerActive} darkMode={darkMode} onPointsChange={setRulerPoints} />
@@ -1118,6 +1242,9 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
 
       {/* Vignette overlay */}
       <div className="map-vignette" />
+
+      {/* Zoom Level Indicator */}
+      {!fullscreen && <ZoomLevelIndicator zoom={zoom} plots={plots} darkMode={darkMode} />}
 
       {/* Map Legend */}
       <MapLegend colorMode={colorMode} darkMode={darkMode} />

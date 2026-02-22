@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, createContext, useContext } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, createContext, useContext } from 'react'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import type { Plot, Lead, Role, User, Filters } from './types'
 import { plots as mockPlots } from './data'
@@ -531,4 +531,89 @@ export function usePriceAlerts() {
   const clearAll = useCallback(() => persist([]), [persist])
 
   return { alerts, add, remove, check, hasAlert, clearAll, activeCount: alerts.filter(a => !a.triggered).length }
+}
+
+// ── PWA Install Prompt ──
+
+interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: string[]
+  readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+  prompt(): Promise<void>
+}
+
+export function usePWAInstall() {
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [isInstalled, setIsInstalled] = useState(false)
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem('pwa_install_dismissed') === 'true' } catch { return false }
+  })
+
+  useEffect(() => {
+    // Check if already installed (standalone mode)
+    if (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone) {
+      setIsInstalled(true)
+      return
+    }
+
+    const handler = (e: Event) => {
+      e.preventDefault()
+      setDeferredPrompt(e as BeforeInstallPromptEvent)
+    }
+
+    const installedHandler = () => {
+      setIsInstalled(true)
+      setDeferredPrompt(null)
+    }
+
+    window.addEventListener('beforeinstallprompt', handler)
+    window.addEventListener('appinstalled', installedHandler)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler)
+      window.removeEventListener('appinstalled', installedHandler)
+    }
+  }, [])
+
+  const install = useCallback(async () => {
+    if (!deferredPrompt) return false
+    await deferredPrompt.prompt()
+    const choice = await deferredPrompt.userChoice
+    setDeferredPrompt(null)
+    if (choice.outcome === 'accepted') {
+      setIsInstalled(true)
+      return true
+    }
+    return false
+  }, [deferredPrompt])
+
+  const dismiss = useCallback(() => {
+    setDismissed(true)
+    try { localStorage.setItem('pwa_install_dismissed', 'true') } catch {}
+  }, [])
+
+  return {
+    canInstall: !!deferredPrompt && !isInstalled && !dismissed,
+    isInstalled,
+    install,
+    dismiss,
+  }
+}
+
+// ── Map Viewport Visible Plots ──
+
+export function useViewportPlots(plots: { id: string; coordinates?: [number, number][] }[], mapBounds: { north: number; south: number; east: number; west: number } | null) {
+  return useMemo(() => {
+    if (!mapBounds || !plots.length) return { visible: plots.length, total: plots.length }
+    let visible = 0
+    for (const pl of plots) {
+      if (!pl.coordinates?.length) continue
+      // Check if any coordinate of the plot is within the viewport
+      const inView = pl.coordinates.some(c =>
+        c.length >= 2 &&
+        c[0] >= mapBounds.south && c[0] <= mapBounds.north &&
+        c[1] >= mapBounds.west && c[1] <= mapBounds.east
+      )
+      if (inView) visible++
+    }
+    return { visible, total: plots.length }
+  }, [plots, mapBounds])
 }

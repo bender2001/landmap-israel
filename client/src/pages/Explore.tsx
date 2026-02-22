@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink, MessageCircle, Clock, Building2, BarChart3, ArrowUpRight, ArrowDownRight, Zap, Target, PieChart, Share2, Check, Filter } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation, useOnlineStatus, useIsMobile } from '../hooks'
+import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation, useOnlineStatus, useIsMobile, useFocusTrap } from '../hooks'
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, Spinner, useToast, Badge, NetworkBanner, AnimatedValue, DemoModeBanner, ExploreLoadingSkeleton } from '../components/UI'
@@ -560,6 +560,7 @@ export default function Explore() {
   const { toast } = useToast()
   const sortRef = useRef<HTMLDivElement>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const kbdTrapRef = useFocusTrap(shortcutsOpen)
   const [cityStatsDismissed, setCityStatsDismissed] = useState(false)
   const userGeo = useUserLocation()
   const { online, wasOffline } = useOnlineStatus()
@@ -568,6 +569,7 @@ export default function Explore() {
   const [mapFullscreen, setMapFullscreen] = useState(false)
   const toggleFullscreen = useCallback(() => setMapFullscreen(f => !f), [])
   const [shareCopied, setShareCopied] = useState(false)
+  const [visibleInViewport, setVisibleInViewport] = useState<number | null>(null)
 
   // Active filter count for badge
   const activeFilterCount = useMemo(() => {
@@ -1073,6 +1075,7 @@ export default function Explore() {
           filterCity={filters.city}
           fullscreen={mapFullscreen}
           onToggleFullscreen={toggleFullscreen}
+          onVisiblePlotsChange={setVisibleInViewport}
         />
         {!mapFullscreen && <FilterBar filters={filters} onChange={setFilters} resultCount={filtered.length}
           plots={plots} onSelectPlot={(id) => { const pl = plots.find(pp => pp.id === id); if (pl) selectPlot(pl) }} />}
@@ -1280,7 +1283,7 @@ export default function Explore() {
         </div>
 
         {!mapFullscreen && <Stats>
-          <Stat><Val><AnimatedValue value={filtered.length} /></Val> חלקות</Stat>
+          <Stat><Val><AnimatedValue value={filtered.length} /></Val> חלקות{visibleInViewport != null && visibleInViewport < filtered.length && <span style={{ opacity: 0.5, fontSize: 10 }}> ({visibleInViewport} בתצוגה)</span>}</Stat>
           {marketPulse && marketPulse.totalValue > 0 && <Stat>סה״כ <Val><AnimatedValue value={marketPulse.totalValue} format={fmt.compact} /></Val></Stat>}
           <Stat>ממוצע <Val><AnimatedValue value={Math.round(avg)} format={fmt.compact} /></Val></Stat>
           {medianPrice > 0 && <Stat>חציון <Val><AnimatedValue value={Math.round(medianPrice)} format={fmt.compact} /></Val></Stat>}
@@ -1487,7 +1490,7 @@ export default function Explore() {
 
         {/* Keyboard Shortcuts Help Dialog */}
         <KbdBackdrop $open={shortcutsOpen} onClick={() => setShortcutsOpen(false)}>
-          <KbdPanel onClick={e => e.stopPropagation()}>
+          <KbdPanel ref={kbdTrapRef} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="קיצורי מקשים">
             <KbdHeader>
               <KbdTitle>⌨️ קיצורי מקשים</KbdTitle>
               <KbdCloseBtn onClick={() => setShortcutsOpen(false)}><X size={16} /></KbdCloseBtn>

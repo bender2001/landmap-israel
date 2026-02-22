@@ -1,10 +1,11 @@
 import { Component, useState, useEffect, useCallback, useRef, useMemo, createContext, useContext, type ReactNode } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { t, fadeInUp, popIn, countUp, mobile } from '../theme'
-import { X, AlertTriangle, Check, ChevronDown, Search as SearchIcon, Heart, Eye, TrendingUp, TrendingDown, MessageCircle, ArrowUp, Bell, BellOff } from 'lucide-react'
+import { t, fadeInUp, popIn, countUp, pulse, mobile } from '../theme'
+import { X, AlertTriangle, Check, ChevronDown, Search as SearchIcon, Heart, Eye, TrendingUp, TrendingDown, MessageCircle, ArrowUp, Bell, BellOff, Download, Smartphone } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Plot } from '../types'
 import { p, roi, calcScore, getGrade, fmt, statusColors, statusLabels, daysOnMarket } from '../utils'
+import { usePWAInstall } from '../hooks'
 
 /* ── Spinner ── */
 export const Spinner = ({ size = 24, color = '#D4A84B' }: { size?: number; color?: string }) => (
@@ -150,7 +151,7 @@ const InfoWrap = styled.span`
 `
 const InfoBubble = styled.div<{$pos?:'top'|'bottom'}>`
   position:absolute;${pr=>pr.$pos==='bottom'?'top:calc(100% + 8px)':'bottom:calc(100% + 8px)'};
-  right:50%;transform:translateX(50%);z-index:${t.z.tooltip};
+  right:50%;transform:translateX(50%);z-index:${t.z.toast};
   min-width:200px;max-width:260px;padding:10px 14px;
   background:${t.surface};border:1px solid ${t.goldBorder};border-radius:${t.r.md};
   box-shadow:${t.sh.lg};font-size:12px;font-weight:500;color:${t.textSec};
@@ -1131,5 +1132,95 @@ export function CookieConsent() {
         <CookieDeclineBtn onClick={decline}>דחה</CookieDeclineBtn>
       </CookieActions>
     </CookieBanner>
+  )
+}
+
+/* ── 13. PWA Install Prompt ── */
+const pwaSlide = keyframes`from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}`
+const pwaPulse = keyframes`0%,100%{box-shadow:0 0 0 0 rgba(212,168,75,0.2)}50%{box-shadow:0 0 0 8px rgba(212,168,75,0)}`
+const PWABanner = styled.div<{ $show: boolean }>`
+  position:fixed;bottom:16px;left:16px;z-index:85;direction:rtl;
+  display:${pr => pr.$show ? 'flex' : 'none'};align-items:center;gap:14px;
+  padding:14px 18px;max-width:380px;width:calc(100vw - 32px);
+  background:linear-gradient(135deg,rgba(11,17,32,0.95),rgba(17,24,39,0.95));
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid rgba(212,168,75,0.25);border-radius:16px;
+  box-shadow:0 12px 40px rgba(0,0,0,0.4),0 0 0 1px rgba(255,255,255,0.05);
+  animation:${pwaSlide} 0.4s cubic-bezier(0.32,0.72,0,1);
+  ${mobile}{left:8px;right:8px;bottom:72px;width:auto;max-width:none;padding:12px 14px;gap:10px;}
+`
+const PWAIconWrap = styled.div`
+  width:44px;height:44px;border-radius:12px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,rgba(212,168,75,0.15),rgba(212,168,75,0.05));
+  border:1px solid rgba(212,168,75,0.2);
+  animation:${pwaPulse} 3s ease-in-out infinite;
+  ${mobile}{width:38px;height:38px;border-radius:10px;}
+`
+const PWAContent = styled.div`flex:1;min-width:0;`
+const PWATitle = styled.div`
+  font-size:14px;font-weight:700;color:${t.text};font-family:${t.font};
+  display:flex;align-items:center;gap:6px;
+  ${mobile}{font-size:13px;}
+`
+const PWADesc = styled.div`
+  font-size:12px;color:${t.textSec};margin-top:2px;line-height:1.5;
+  ${mobile}{font-size:11px;}
+`
+const PWAActions = styled.div`display:flex;align-items:center;gap:8px;flex-shrink:0;`
+const PWAInstallBtn = styled.button`
+  display:inline-flex;align-items:center;gap:6px;padding:8px 18px;
+  background:linear-gradient(135deg,${t.gold},${t.goldBright});color:${t.bg};
+  border:none;border-radius:9999px;font-weight:700;font-size:13px;font-family:${t.font};
+  cursor:pointer;transition:all 0.25s;white-space:nowrap;
+  &:hover{box-shadow:0 0 20px rgba(212,168,75,0.35);transform:translateY(-1px);}
+  ${mobile}{padding:7px 14px;font-size:12px;}
+`
+const PWADismissBtn = styled.button`
+  display:flex;align-items:center;justify-content:center;width:28px;height:28px;
+  border-radius:8px;background:transparent;border:1px solid ${t.border};
+  color:${t.textDim};cursor:pointer;transition:all 0.2s;flex-shrink:0;
+  &:hover{border-color:${t.goldBorder};color:${t.textSec};}
+`
+
+export function PWAInstallPrompt() {
+  const { canInstall, install, dismiss } = usePWAInstall()
+  const [show, setShow] = useState(false)
+
+  // Delay showing to avoid competing with cookie banner
+  useEffect(() => {
+    if (!canInstall) { setShow(false); return }
+    const timer = setTimeout(() => setShow(true), 5000)
+    return () => clearTimeout(timer)
+  }, [canInstall])
+
+  const handleInstall = useCallback(async () => {
+    await install()
+    setShow(false)
+  }, [install])
+
+  const handleDismiss = useCallback(() => {
+    dismiss()
+    setShow(false)
+  }, [dismiss])
+
+  return (
+    <PWABanner $show={show} role="dialog" aria-label="התקנת אפליקציה">
+      <PWAIconWrap>
+        <Smartphone size={22} color={t.gold} />
+      </PWAIconWrap>
+      <PWAContent>
+        <PWATitle>📲 התקינו את LandMap</PWATitle>
+        <PWADesc>גישה מהירה מהמסך הראשי — עובד גם אופליין</PWADesc>
+      </PWAContent>
+      <PWAActions>
+        <PWAInstallBtn onClick={handleInstall}>
+          <Download size={14} /> התקן
+        </PWAInstallBtn>
+        <PWADismissBtn onClick={handleDismiss} aria-label="סגור">
+          <X size={14} />
+        </PWADismissBtn>
+      </PWAActions>
+    </PWABanner>
   )
 }

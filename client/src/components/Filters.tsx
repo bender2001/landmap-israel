@@ -4,7 +4,7 @@ import { Search, SlidersHorizontal, X, Sparkles, MapPin, Bookmark, BookmarkCheck
 import { t, mobile } from '../theme'
 import { Select, RangeInput } from './UI'
 import { p, fmt } from '../utils'
-import { useSavedSearches } from '../hooks'
+import { useSavedSearches, useFocusTrap } from '../hooks'
 import type { Filters, Plot } from '../types'
 
 const EMPTY: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '' }
@@ -234,6 +234,7 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Filters>(filters)
   const { searches: savedSearches, save: saveSearch, remove: removeSavedSearch } = useSavedSearches()
+  const drawerTrapRef = useFocusTrap(open)
 
   // Build city options with plot counts from actual data
   const CITIES = useMemo(() => {
@@ -484,7 +485,7 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
           </SavedRow>
         )}
 
-        <Drawer $open={open}>
+        <Drawer $open={open} ref={drawerTrapRef} role="dialog" aria-modal="true" aria-label="סינון מתקדם">
           <DrawerHead>
             <DrawerTitle><Sparkles size={16} color={t.gold} />סינון מתקדם</DrawerTitle>
             <CloseBtn onClick={() => setOpen(false)}><X size={16} /></CloseBtn>
