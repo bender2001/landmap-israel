@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, TrendingDown, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon, MessageCircle, Compass } from 'lucide-react'
+import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, TrendingDown, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon, MessageCircle, Compass, ClipboardCopy, Construction, Milestone } from 'lucide-react'
 import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard, ScrollToTop } from '../components/UI'
@@ -696,6 +696,61 @@ const PrintMeta = styled.div`
   text-align:left;font-size:9px;color:#666;line-height:1.5;
 `
 
+/* ── Copy Investment Report Button ── */
+const copyFlash = keyframes`0%{transform:scale(1)}50%{transform:scale(1.05)}100%{transform:scale(1)}`
+const CopyReportBtn = styled.button<{$copied?:boolean}>`
+  display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:12px 18px;
+  background:${pr=>pr.$copied?'rgba(16,185,129,0.08)':'linear-gradient(135deg,rgba(212,168,75,0.08),rgba(212,168,75,0.03))'};
+  border:1px solid ${pr=>pr.$copied?'rgba(16,185,129,0.25)':t.goldBorder};border-radius:${t.r.md};
+  color:${pr=>pr.$copied?t.ok:t.gold};font-size:13px;font-weight:700;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};margin-top:16px;
+  ${pr=>pr.$copied?`animation:${copyFlash} 0.3s ease;`:''}
+  &:hover{background:${pr=>pr.$copied?'rgba(16,185,129,0.12)':t.goldDim};border-color:${pr=>pr.$copied?t.ok:t.gold};transform:translateY(-1px);box-shadow:${t.sh.sm};}
+  @media print{display:none;}
+`
+
+/* ── Neighborhood Development Card ── */
+const DevCard = styled(AnimatedCard)`
+  background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};padding:24px;
+  @media print{break-inside:avoid;border:1px solid #ddd;box-shadow:none;}
+`
+const DevSection = styled.div`
+  padding:14px 16px;background:${t.lBg};border:1px solid ${t.lBorder};border-radius:${t.r.md};
+  transition:all ${t.tr};&:hover{border-color:${t.goldBorder};}
+`
+const DevSectionTitle = styled.div`
+  display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:${t.lText};margin-bottom:8px;
+`
+const DevSectionText = styled.p`
+  font-size:13px;color:${t.lTextSec};line-height:1.8;margin:0;white-space:pre-wrap;
+`
+
+/* ── Tax Authority Value Comparison ── */
+const TaxCompWrap = styled.div`
+  margin-top:16px;padding:14px 16px;
+  background:linear-gradient(135deg,rgba(59,130,246,0.04),rgba(59,130,246,0.01));
+  border:1px solid rgba(59,130,246,0.15);border-radius:${t.r.md};
+`
+const TaxCompHeader = styled.div`
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;
+`
+const TaxCompTitle = styled.span`font-size:12px;font-weight:700;color:${t.lTextSec};display:flex;align-items:center;gap:6px;`
+const TaxCompDelta = styled.span<{$positive:boolean}>`
+  display:inline-flex;align-items:center;gap:3px;padding:3px 10px;
+  border-radius:${t.r.full};font-size:11px;font-weight:800;
+  background:${pr=>pr.$positive?'rgba(16,185,129,0.08)':'rgba(239,68,68,0.08)'};
+  color:${pr=>pr.$positive?t.ok:t.err};
+`
+const TaxCompBars = styled.div`display:flex;flex-direction:column;gap:6px;`
+const TaxCompBarRow = styled.div`display:flex;align-items:center;gap:10px;`
+const TaxCompBarLabel = styled.span`font-size:11px;font-weight:600;color:${t.lTextSec};min-width:65px;`
+const TaxCompBarTrack = styled.div`flex:1;height:10px;background:${t.lBorder};border-radius:5px;overflow:hidden;`
+const TaxCompBarFill = styled.div<{$pct:number;$color:string}>`
+  height:100%;width:${pr=>Math.min(100,pr.$pct)}%;background:${pr=>pr.$color};border-radius:5px;
+  transition:width 0.8s cubic-bezier(0.32,0.72,0,1);
+`
+const TaxCompVal = styled.span<{$color?:string}>`font-size:12px;font-weight:800;color:${pr=>pr.$color||t.lText};font-family:${t.font};min-width:60px;text-align:left;`
+
 /* ── View on Map Button ── */
 const ViewOnMapBtn = styled(Link)`
   display:inline-flex;align-items:center;gap:6px;padding:8px 16px;
@@ -859,15 +914,17 @@ export default function PlotDetail() {
   const scoreBreakdown = useMemo(() => calcScoreBreakdown(plot), [plot])
 
   // Section IDs for scroll-spy
+  const hasDevContext = !!(plot.area_context || plot.nearby_development || plot.nearbyDevelopment)
   const sectionIds = useMemo(() => {
     const ids = ['investment', 'risk']
     if (locationScore.factors.length > 0) ids.push('location')
+    if (hasDevContext) ids.push('neighborhood')
     if (similarPlots.length > 1) ids.push('vs-area')
     if (timeline) ids.push('timeline')
     if (d.price > 0) ids.push('mortgage')
     if (similarPlots.length > 0) ids.push('similar')
     return ids
-  }, [locationScore.factors.length, similarPlots.length, timeline, d.price])
+  }, [locationScore.factors.length, similarPlots.length, timeline, d.price, hasDevContext])
   const { activeId, showSticky } = useScrollSpy(sectionIds)
 
   // Section labels for nav
@@ -875,6 +932,7 @@ export default function PlotDetail() {
     investment: { icon: <TrendingUp size={12} />, label: 'ניתוח השקעה' },
     risk: { icon: <AlertTriangle size={12} />, label: 'סיכון' },
     location: { icon: <Compass size={12} />, label: 'מיקום' },
+    neighborhood: { icon: <Construction size={12} />, label: 'סביבה' },
     'vs-area': { icon: <BarChart3 size={12} />, label: 'vs ממוצע' },
     timeline: { icon: <Clock size={12} />, label: 'ציר זמן' },
     mortgage: { icon: <Calculator size={12} />, label: 'מחשבון' },
@@ -900,6 +958,52 @@ export default function PlotDetail() {
     const msg = `היי, מתעניין/ת בחלקה ${plot.number} גוש ${d.block} ב${plot.city} (${fmt.compact(d.price)}). אשמח לפרטים נוספים.`
     return `${SITE_CONFIG.waLink}?text=${encodeURIComponent(msg)}`
   }, [plot, d])
+
+  // Copy investment report to clipboard
+  const [reportCopied, setReportCopied] = useState(false)
+  const copyInvestmentReport = async () => {
+    const lines: string[] = [
+      `📊 דו"ח השקעה — LandMap Israel`,
+      `${'═'.repeat(35)}`,
+      ``,
+      `🏗️ גוש ${d.block} חלקה ${plot.number} — ${plot.city}`,
+      `📅 ${new Date().toLocaleDateString('he-IL')}`,
+      ``,
+      `💰 מחיר: ${fmt.price(d.price)}`,
+    ]
+    if (d.size > 0) lines.push(`📐 שטח: ${fmt.num(d.size)} מ"ר (${fmt.dunam(d.size)} דונם)`)
+    if (ppd > 0) lines.push(`💵 מחיר/דונם: ₪${fmt.num(ppd)}`)
+    if (pps > 0) lines.push(`💵 מחיר/מ"ר: ₪${fmt.num(pps)}`)
+    if (r > 0) lines.push(`📈 תשואה צפויה: ${Math.round(r)}%`)
+    if (d.projected > 0) lines.push(`🎯 שווי חזוי: ${fmt.price(d.projected)}`)
+    if (d.projected > 0 && d.price > 0) lines.push(`💎 רווח צפוי: ${fmt.price(d.projected - d.price)}`)
+    if (cagr) lines.push(`📊 צמיחה שנתית (CAGR): ${cagr.cagr}% על פני ${cagr.years} שנים`)
+    lines.push(``, `🏆 ציון השקעה: ${score}/10 (${grade.grade})`)
+    lines.push(`⚠️ סיכון: ${risk.label} (${risk.score}/10)`)
+    if (zoningLabels[d.zoning]) lines.push(`📋 שלב תכנוני: ${zoningLabels[d.zoning]}`)
+    if (d.readiness) lines.push(`⏱️ אומדן מוכנות: ${d.readiness}`)
+    if (plot.standard22?.value) lines.push(`🛡️ שומת תקן 22: ${fmt.price(plot.standard22.value)}`)
+    if (plot.tax_authority_value || plot.taxAuthorityValue) {
+      const taxVal = (plot.tax_authority_value ?? plot.taxAuthorityValue) as number
+      if (taxVal > 0) lines.push(`🏛️ שומת רשות המיסים: ${fmt.price(taxVal)}`)
+    }
+    if (locationScore.score > 0) lines.push(`📍 ציון מיקום: ${locationScore.score}/10 (${locationScore.label})`)
+    lines.push(``, `🔗 ${window.location.href}`, ``, `— נוצר ע"י LandMap Israel`)
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'))
+      setReportCopied(true)
+      setTimeout(() => setReportCopied(false), 2500)
+    } catch { /* silently fail */ }
+  }
+
+  // Tax authority value comparison data
+  const taxComparison = useMemo(() => {
+    const taxVal = (plot.tax_authority_value ?? plot.taxAuthorityValue) as number | undefined
+    if (!taxVal || taxVal <= 0 || d.price <= 0) return null
+    const delta = ((d.price - taxVal) / taxVal) * 100
+    const maxVal = Math.max(d.price, taxVal)
+    return { taxVal, delta, pricePct: (d.price / maxVal) * 100, taxPct: (taxVal / maxVal) * 100 }
+  }, [plot, d.price])
 
   return (
     <PublicLayout>
@@ -1067,6 +1171,45 @@ export default function PlotDetail() {
                     ))}
                   </ScoreBreakdownGrid>
                 </ScoreBreakdownWrap>
+                {/* Tax Authority Value Comparison */}
+                {taxComparison && (
+                  <TaxCompWrap>
+                    <TaxCompHeader>
+                      <TaxCompTitle><Landmark size={14} color="#3B82F6" /> שומת רשות המיסים vs מחיר שוק</TaxCompTitle>
+                      <TaxCompDelta $positive={taxComparison.delta <= 0}>
+                        {taxComparison.delta <= 0 ? <TrendingDown size={10} /> : <TrendingUp size={10} />}
+                        {taxComparison.delta > 0 ? '+' : ''}{Math.round(taxComparison.delta)}%
+                      </TaxCompDelta>
+                    </TaxCompHeader>
+                    <TaxCompBars>
+                      <TaxCompBarRow>
+                        <TaxCompBarLabel>מחיר שוק</TaxCompBarLabel>
+                        <TaxCompBarTrack>
+                          <TaxCompBarFill $pct={taxComparison.pricePct} $color={t.gold} />
+                        </TaxCompBarTrack>
+                        <TaxCompVal $color={t.gold}>{fmt.compact(d.price)}</TaxCompVal>
+                      </TaxCompBarRow>
+                      <TaxCompBarRow>
+                        <TaxCompBarLabel>שומת מיסים</TaxCompBarLabel>
+                        <TaxCompBarTrack>
+                          <TaxCompBarFill $pct={taxComparison.taxPct} $color="#3B82F6" />
+                        </TaxCompBarTrack>
+                        <TaxCompVal $color="#3B82F6">{fmt.compact(taxComparison.taxVal)}</TaxCompVal>
+                      </TaxCompBarRow>
+                    </TaxCompBars>
+                    <div style={{ fontSize: 11, color: t.lTextSec, marginTop: 8, lineHeight: 1.5 }}>
+                      {taxComparison.delta > 10
+                        ? '⚠️ מחיר השוק גבוה משמעותית משומת המיסים — בדקו שהמחיר מוצדק'
+                        : taxComparison.delta < -10
+                        ? '✅ מחיר מתחת לשומה — ייתכן שמדובר בהזדמנות'
+                        : 'ℹ️ מחיר השוק קרוב לשומת המיסים — תמחור סביר'}
+                    </div>
+                  </TaxCompWrap>
+                )}
+                {/* Copy Investment Report */}
+                <CopyReportBtn $copied={reportCopied} onClick={copyInvestmentReport}>
+                  {reportCopied ? <><Check size={15} /> הדו"ח הועתק!</> : <><ClipboardCopy size={15} /> העתק דו"ח השקעה</>}
+                </CopyReportBtn>
               </Card>
 
               {/* Risk Assessment — like Madlan's risk meter */}
@@ -1178,8 +1321,32 @@ export default function PlotDetail() {
                 <Card $delay={0.35}>
                   <CardTitle><FileText size={18} color={t.gold} /> תיאור</CardTitle>
                   <p style={{fontSize:14,color:t.lTextSec,lineHeight:1.8}}>{plot.description}</p>
-                  {plot.area_context && <p style={{fontSize:13,color:t.lTextSec,marginTop:12}}>{plot.area_context}</p>}
                 </Card>
+              )}
+
+              {/* Neighborhood Development Context — like Madlan's area development info */}
+              {(plot.area_context || plot.nearby_development || plot.nearbyDevelopment) && (
+                <DevCard $delay={0.37} id="neighborhood">
+                  <CardTitle><Construction size={18} color={t.gold} /> סביבה ופיתוח</CardTitle>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {plot.area_context && (plot.area_context as string).trim() && (
+                      <DevSection>
+                        <DevSectionTitle>
+                          <Milestone size={14} color="#8B5CF6" /> הקשר אזורי
+                        </DevSectionTitle>
+                        <DevSectionText>{plot.area_context as string}</DevSectionText>
+                      </DevSection>
+                    )}
+                    {(plot.nearby_development || plot.nearbyDevelopment) && (
+                      <DevSection>
+                        <DevSectionTitle>
+                          <Building2 size={14} color="#3B82F6" /> פיתוח בסביבה
+                        </DevSectionTitle>
+                        <DevSectionText>{(plot.nearby_development ?? plot.nearbyDevelopment) as string}</DevSectionText>
+                      </DevSection>
+                    )}
+                  </div>
+                </DevCard>
               )}
             </div>
 
