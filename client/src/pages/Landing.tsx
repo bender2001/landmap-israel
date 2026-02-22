@@ -202,6 +202,7 @@ const StatLabel = styled.div`font-size:14px;color:${t.textSec};font-weight:500;`
 const CompareSection = styled.section`
   padding:64px 24px;direction:rtl;position:relative;
   background:linear-gradient(180deg,transparent,rgba(212,168,75,0.02),transparent);
+  content-visibility:auto;contain-intrinsic-size:0 500px;
 `
 const CompareTable = styled.div`
   max-width:780px;margin:0 auto;border-radius:${t.r.xl};overflow:hidden;
@@ -240,7 +241,7 @@ const COMPARE_FEATURES = [
 ]
 
 /* ══════ HOW IT WORKS ══════ */
-const HowSection = styled.section`padding:80px 24px;direction:rtl;position:relative;`
+const HowSection = styled.section`padding:80px 24px;direction:rtl;position:relative;content-visibility:auto;contain-intrinsic-size:0 600px;`
 const SectionHead = styled.h2`
   text-align:center;font-size:clamp(26px,4vw,40px);font-weight:800;color:${t.text};
   margin-bottom:56px;font-family:${t.font};animation:${fadeInUp} 0.5s ease-out both;
@@ -276,6 +277,7 @@ const Connector = styled.div`
 const Features = styled.section`
   padding:80px 24px;direction:rtl;
   background:linear-gradient(180deg,transparent,rgba(212,168,75,0.02),transparent);
+  content-visibility:auto;contain-intrinsic-size:0 700px;
 `
 const FeatGrid = styled.div`
   max-width:1060px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:24px;
@@ -298,7 +300,7 @@ const CardTitle = styled.h3`font-size:17px;font-weight:700;color:${t.text};font-
 const CardDesc = styled.p`font-size:13px;color:${t.textSec};line-height:1.7;`
 
 /* ══════ TESTIMONIALS ══════ */
-const TestSection = styled.section`padding:80px 24px;direction:rtl;`
+const TestSection = styled.section`padding:80px 24px;direction:rtl;content-visibility:auto;contain-intrinsic-size:0 500px;`
 const TestGrid = styled.div`
   max-width:1060px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:24px;
   ${sm}{grid-template-columns:repeat(2,1fr);}
@@ -365,7 +367,7 @@ const CtaGhost = styled(GhostButton).attrs({as:Link})`
 /* ══════ FAQ ══════ */
 const FaqSection = styled.section`
   padding:80px 24px;direction:rtl;position:relative;
-  background:${t.bg};
+  background:${t.bg};content-visibility:auto;contain-intrinsic-size:0 600px;
 `
 const FaqGrid = styled.div`
   max-width:780px;margin:0 auto;display:flex;flex-direction:column;gap:12px;

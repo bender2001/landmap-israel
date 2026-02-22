@@ -6,7 +6,7 @@ import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard, ScrollToTop } from '../components/UI'
 import { PublicLayout } from '../components/Layout'
-import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, plotCenter, calcRisk, calcLocationScore, setOgMeta, removeOgMeta, SITE_CONFIG } from '../utils'
+import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, plotCenter, calcRisk, calcLocationScore, setOgMeta, removeOgMeta, SITE_CONFIG, calcExitScenarios } from '../utils'
 import type { RiskAssessment } from '../utils'
 import type { Plot } from '../types'
 
@@ -709,6 +709,53 @@ const CopyReportBtn = styled.button<{$copied?:boolean}>`
   @media print{display:none;}
 `
 
+/* ── Exit Strategy Scenarios ── */
+const ExitCard = styled(AnimatedCard)`
+  background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};padding:24px;
+  @media print{break-inside:avoid;border:1px solid #ddd;box-shadow:none;}
+`
+const ExitGrid = styled.div`display:flex;flex-direction:column;gap:8px;margin-top:16px;`
+const ExitRow = styled.div<{$highlight?:boolean}>`
+  display:grid;grid-template-columns:auto 1fr auto auto;gap:12px;align-items:center;
+  padding:12px 16px;border-radius:${t.r.md};
+  background:${pr=>pr.$highlight?'linear-gradient(135deg,rgba(16,185,129,0.06),rgba(16,185,129,0.02))':t.lBg};
+  border:1px solid ${pr=>pr.$highlight?'rgba(16,185,129,0.2)':t.lBorder};
+  transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};transform:translateX(-2px);}
+  @media(max-width:639px){grid-template-columns:auto 1fr;gap:8px;padding:10px 12px;}
+`
+const ExitStageCol = styled.div`display:flex;align-items:center;gap:8px;min-width:0;`
+const ExitStageIcon = styled.span`font-size:18px;flex-shrink:0;`
+const ExitStageInfo = styled.div`min-width:0;`
+const ExitStageName = styled.div`font-size:13px;font-weight:700;color:${t.lText};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`
+const ExitStageTime = styled.div`font-size:11px;color:${t.lTextSec};display:flex;align-items:center;gap:4px;`
+const ExitValueCol = styled.div`text-align:left;
+  @media(max-width:639px){grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:4px;border-top:1px solid ${t.lBorder};}
+`
+const ExitValue = styled.div`font-size:15px;font-weight:800;color:${t.lText};font-family:${t.font};`
+const ExitProfit = styled.div<{$color:string}>`font-size:12px;font-weight:700;color:${pr=>pr.$color};display:flex;align-items:center;gap:3px;`
+const ExitRoiCol = styled.div`text-align:center;min-width:72px;
+  @media(max-width:639px){display:none;}
+`
+const ExitRoiBadge = styled.div<{$color:string}>`
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:4px 12px;border-radius:${t.r.full};
+  background:${pr=>pr.$color}12;border:1px solid ${pr=>pr.$color}28;
+  font-size:13px;font-weight:800;color:${pr=>pr.$color};font-family:${t.font};
+`
+const ExitAnnualized = styled.div`font-size:10px;color:${t.lTextSec};margin-top:2px;`
+const ExitBestBadge = styled.span`
+  display:inline-flex;align-items:center;gap:3px;padding:2px 8px;
+  background:linear-gradient(135deg,rgba(16,185,129,0.1),rgba(16,185,129,0.04));
+  border:1px solid rgba(16,185,129,0.2);border-radius:${t.r.full};
+  font-size:10px;font-weight:700;color:${t.ok};white-space:nowrap;
+`
+const ExitDisclaimer = styled.div`
+  font-size:11px;color:${t.lTextSec};line-height:1.6;margin-top:12px;padding:10px 14px;
+  background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.12);border-radius:${t.r.md};
+  display:flex;align-items:flex-start;gap:8px;
+`
+
 /* ── Neighborhood Development Card ── */
 const DevCard = styled(AnimatedCard)`
   background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};padding:24px;
@@ -912,11 +959,13 @@ export default function PlotDetail() {
   const risk = useMemo(() => calcRisk(plot, similarPlots.length > 0 ? [plot, ...similarPlots] : undefined), [plot, similarPlots])
   const locationScore = useMemo(() => calcLocationScore(plot), [plot])
   const scoreBreakdown = useMemo(() => calcScoreBreakdown(plot), [plot])
+  const exitScenarios = useMemo(() => calcExitScenarios(plot), [plot])
 
   // Section IDs for scroll-spy
   const hasDevContext = !!(plot.area_context || plot.nearby_development || plot.nearbyDevelopment)
   const sectionIds = useMemo(() => {
     const ids = ['investment', 'risk']
+    if (exitScenarios) ids.push('exit-strategy')
     if (locationScore.factors.length > 0) ids.push('location')
     if (hasDevContext) ids.push('neighborhood')
     if (similarPlots.length > 1) ids.push('vs-area')
@@ -924,13 +973,14 @@ export default function PlotDetail() {
     if (d.price > 0) ids.push('mortgage')
     if (similarPlots.length > 0) ids.push('similar')
     return ids
-  }, [locationScore.factors.length, similarPlots.length, timeline, d.price, hasDevContext])
+  }, [locationScore.factors.length, similarPlots.length, timeline, d.price, hasDevContext, exitScenarios])
   const { activeId, showSticky } = useScrollSpy(sectionIds)
 
   // Section labels for nav
   const sectionLabels: Record<string, { icon: React.ReactNode; label: string }> = {
     investment: { icon: <TrendingUp size={12} />, label: 'ניתוח השקעה' },
     risk: { icon: <AlertTriangle size={12} />, label: 'סיכון' },
+    'exit-strategy': { icon: <Milestone size={12} />, label: 'אסטרטגיית יציאה' },
     location: { icon: <Compass size={12} />, label: 'מיקום' },
     neighborhood: { icon: <Construction size={12} />, label: 'סביבה' },
     'vs-area': { icon: <BarChart3 size={12} />, label: 'vs ממוצע' },
@@ -1234,6 +1284,52 @@ export default function PlotDetail() {
                   ))}
                 </RiskFactors>
               </RiskCard>
+
+              {/* Exit Strategy Scenarios — unique feature */}
+              {exitScenarios && exitScenarios.length > 0 && (
+                <ExitCard $delay={0.16} id="exit-strategy">
+                  <CardTitle><Milestone size={18} color={t.gold} /> אסטרטגיית יציאה — תרחישי מכירה</CardTitle>
+                  <div style={{ fontSize: 13, color: t.lTextSec, marginTop: -8, marginBottom: 4, lineHeight: 1.6 }}>
+                    מה יקרה אם תמכרו בכל שלב תכנוני? הנה התרחישים:
+                  </div>
+                  <ExitGrid>
+                    {exitScenarios.map((sc, i) => {
+                      const isBest = sc.annualized === Math.max(...exitScenarios.map(s => s.annualized))
+                      return (
+                        <ExitRow key={sc.stage} $highlight={isBest}>
+                          <ExitStageCol>
+                            <ExitStageIcon>{sc.stageIcon}</ExitStageIcon>
+                            <ExitStageInfo>
+                              <ExitStageName>
+                                {sc.stageLabel}
+                                {isBest && <ExitBestBadge style={{ marginInlineStart: 6 }}>⭐ תשואה מיטבית</ExitBestBadge>}
+                              </ExitStageName>
+                              <ExitStageTime><Clock size={10} /> {sc.yearsLabel}</ExitStageTime>
+                            </ExitStageInfo>
+                          </ExitStageCol>
+                          <ExitValueCol>
+                            <ExitValue>{fmt.compact(sc.estimatedValue)}</ExitValue>
+                            <ExitProfit $color={sc.color}>
+                              <TrendingUp size={11} />+{fmt.compact(sc.profit)} רווח
+                            </ExitProfit>
+                          </ExitValueCol>
+                          <ExitRoiCol>
+                            <ExitRoiBadge $color={sc.color}>{sc.roi > 0 ? '+' : ''}{sc.roi}%</ExitRoiBadge>
+                            <ExitAnnualized>{sc.annualized}% שנתי</ExitAnnualized>
+                          </ExitRoiCol>
+                        </ExitRow>
+                      )
+                    })}
+                  </ExitGrid>
+                  <ExitDisclaimer>
+                    <AlertTriangle size={13} color={t.warn} style={{ flexShrink: 0, marginTop: 1 }} />
+                    <span>
+                      התרחישים מבוססים על נתוני שוק ממוצעים ואינם מהווים הבטחת תשואה.
+                      זמני התכנון בפועל תלויים ברשויות התכנון ובגורמים נוספים.
+                    </span>
+                  </ExitDisclaimer>
+                </ExitCard>
+              )}
 
               {/* Location Quality Score — Madlan-style location assessment */}
               {locationScore.factors.length > 0 && (

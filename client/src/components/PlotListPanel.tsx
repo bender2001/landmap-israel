@@ -1,6 +1,6 @@
 import { memo, useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download, Share2, MessageCircle, LayoutGrid, Table2 } from 'lucide-react'
+import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download, Share2, MessageCircle, LayoutGrid, Table2, Eye } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, estimatedYear, findBestValueIds, SITE_CONFIG, plotCenter, satelliteTileUrl, investmentRecommendation } from '../utils'
@@ -724,6 +724,14 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
           </Metric>
         )}
         {dom && <ItemDom $c={dom.color}>{dom.label}</ItemDom>}
+        {(plot.views ?? 0) >= 10 && (
+          <Metric title={`${plot.views} צפיות`} style={{ opacity: 0.7 }}>
+            <Eye size={10} />
+            <MetricVal style={{ fontSize: 10, color: (plot.views ?? 0) >= 50 ? '#EF4444' : t.textDim }}>
+              {plot.views}{(plot.views ?? 0) >= 50 ? ' 🔥' : ''}
+            </MetricVal>
+          </Metric>
+        )}
         <MiniSparkline plot={plot} />
         <div onClick={e => e.stopPropagation()} style={{ display: 'flex' }}>
           <PriceAlertButton

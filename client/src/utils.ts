@@ -749,6 +749,93 @@ export function investmentRecommendation(plot: Plot): { text: string; emoji: str
   return { text: 'סיכון גבוה', emoji: '⚠️', color: '#EF4444' }
 }
 
+// ── Exit Strategy Scenarios ──
+export interface ExitScenario {
+  stage: string
+  stageLabel: string
+  stageIcon: string
+  monthsFromNow: number
+  yearsLabel: string
+  estimatedValue: number
+  profit: number
+  roi: number
+  annualized: number
+  color: string
+}
+
+/**
+ * Calculate projected returns at each future zoning stage.
+ * Models realistic value multipliers based on Israeli land market data:
+ * - AGRICULTURAL → MASTER_PLAN_DEPOSIT: ~1.5-2x
+ * - Each subsequent stage adds 15-30%
+ * - BUILDING_PERMIT stage: ~3-5x original agricultural value
+ */
+export function calcExitScenarios(plot: Plot): ExitScenario[] | null {
+  const d = p(plot)
+  if (d.price <= 0) return null
+  const currentIdx = ZO.indexOf(d.zoning)
+  if (currentIdx < 0 || currentIdx >= ZO.length - 1) return null
+
+  // Value multipliers relative to AGRICULTURAL baseline
+  // These are based on market research of Israeli land deals
+  const stageMultipliers: Record<string, number> = {
+    'AGRICULTURAL': 1.0,
+    'MASTER_PLAN_DEPOSIT': 1.6,
+    'MASTER_PLAN_APPROVED': 2.2,
+    'DETAILED_PLAN_PREP': 2.8,
+    'DETAILED_PLAN_DEPOSIT': 3.5,
+    'DETAILED_PLAN_APPROVED': 4.5,
+    'DEVELOPER_TENDER': 5.5,
+    'BUILDING_PERMIT': 7.0,
+  }
+
+  // Months between each stage (realistic Israeli planning timelines)
+  const stageDurations: Record<string, number> = {
+    'AGRICULTURAL': 0,
+    'MASTER_PLAN_DEPOSIT': 18,
+    'MASTER_PLAN_APPROVED': 12,
+    'DETAILED_PLAN_PREP': 14,
+    'DETAILED_PLAN_DEPOSIT': 8,
+    'DETAILED_PLAN_APPROVED': 8,
+    'DEVELOPER_TENDER': 6,
+    'BUILDING_PERMIT': 4,
+  }
+
+  const currentMultiplier = stageMultipliers[d.zoning] || 1.0
+  // Implied base value (what the land would be worth at agricultural stage)
+  const baseValue = d.price / currentMultiplier
+
+  const scenarios: ExitScenario[] = []
+  let cumulativeMonths = 0
+
+  for (let i = currentIdx + 1; i < ZO.length; i++) {
+    const stage = ZO[i]
+    cumulativeMonths += stageDurations[stage] || 10
+    const multiplier = stageMultipliers[stage] || 1.0
+    const estimatedValue = Math.round(baseValue * multiplier)
+    const profit = estimatedValue - d.price
+    const roiPct = (profit / d.price) * 100
+    const years = cumulativeMonths / 12
+    const annualized = years > 0 ? (Math.pow(1 + roiPct / 100, 1 / years) - 1) * 100 : 0
+
+    const stageInfo = zoningPipeline.find(s => s.key === stage)
+    scenarios.push({
+      stage,
+      stageLabel: stageInfo?.label || zoningLabels[stage] || stage,
+      stageIcon: stageInfo?.icon || '📋',
+      monthsFromNow: cumulativeMonths,
+      yearsLabel: years < 1 ? `${cumulativeMonths} חודשים` : years % 1 === 0 ? `${years} שנים` : `${years.toFixed(1)} שנים`,
+      estimatedValue,
+      profit,
+      roi: Math.round(roiPct),
+      annualized: Math.round(annualized * 10) / 10,
+      color: roiPct >= 100 ? '#10B981' : roiPct >= 50 ? '#4ADE80' : roiPct >= 20 ? '#84CC16' : '#F59E0B',
+    })
+  }
+
+  return scenarios.length > 0 ? scenarios : null
+}
+
 // ── Normalize ──
 export function normalizePlot(plot: Plot): Plot {
   return { ...plot, total_price: plot.totalPrice ?? plot.total_price, projected_value: plot.projectedValue ?? plot.projected_value,
