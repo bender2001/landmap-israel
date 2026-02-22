@@ -124,8 +124,32 @@ const Dot = styled.div<{$done:boolean}>`width:8px;height:8px;border-radius:50%;b
 
 const DocItem = styled.a`display:flex;align-items:center;gap:8px;padding:8px 12px;background:${t.lBg};border-radius:${t.r.md};font-size:13px;color:${t.lText};text-decoration:none!important;transition:all ${t.tr};&:hover{background:${t.lBorder};}`
 
-const BottomBar = styled.div`position:fixed;bottom:0;left:0;right:0;z-index:40;background:rgba(255,255,255,0.97);backdrop-filter:blur(12px);border-top:1px solid ${t.lBorder};padding:12px 24px;display:flex;align-items:center;justify-content:center;gap:16px;`
-const BarPrice = styled.span`font-size:20px;font-weight:800;color:${t.lText};font-family:${t.font};`
+const BottomBar = styled.div`
+  position:fixed;bottom:0;left:0;right:0;z-index:40;
+  background:rgba(255,255,255,0.97);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-top:1px solid ${t.lBorder};padding:12px 24px;
+  display:flex;align-items:center;justify-content:center;gap:12px;direction:rtl;
+  @media(max-width:639px){padding:10px 14px;gap:8px;}
+`
+const BarPrice = styled.span`font-size:20px;font-weight:800;color:${t.lText};font-family:${t.font};
+  @media(max-width:639px){font-size:17px;}
+`
+const BarGradeBadge = styled.span<{$color:string}>`
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:4px 12px;border-radius:${t.r.full};
+  background:${pr=>pr.$color}14;border:1px solid ${pr=>pr.$color}30;
+  font-size:13px;font-weight:800;color:${pr=>pr.$color};font-family:${t.font};
+  @media(max-width:639px){padding:3px 9px;font-size:12px;}
+`
+const BarCallBtn = styled.a`
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  padding:12px 18px;border-radius:${t.r.full};
+  background:#25D366;color:#fff;font-weight:700;font-size:14px;font-family:${t.font};
+  text-decoration:none!important;cursor:pointer;transition:all ${t.tr};
+  &:hover{box-shadow:0 4px 16px rgba(37,211,102,0.4);transform:translateY(-1px);}
+  @media(max-width:639px){padding:10px 14px;font-size:13px;}
+  @media(min-width:640px){display:none;}
+`
 
 const Center = styled.div`display:flex;align-items:center;justify-content:center;min-height:60vh;`
 
@@ -478,8 +502,8 @@ function PlotVsAreaComparison({ plot, similarPlots }: { plot: Plot; similarPlots
   )
 }
 
-/* ── Section Navigation (Table of Contents) ── */
-const SectionNav = styled.nav`
+/* ── Section Navigation (Table of Contents) — sticky scroll-spy ── */
+const SectionNav = styled.nav<{$sticky?:boolean}>`
   display:flex;align-items:center;gap:6px;margin-bottom:24px;
   overflow-x:auto;scrollbar-width:none;direction:rtl;
   -webkit-overflow-scrolling:touch;
@@ -487,14 +511,75 @@ const SectionNav = styled.nav`
   ${sm}{flex-wrap:wrap;}
   @media print{display:none;}
 `
-const SectionNavBtn = styled.a`
+const StickyNav = styled.nav<{$show:boolean}>`
+  position:fixed;top:0;left:0;right:0;z-index:50;
+  display:flex;align-items:center;gap:6px;padding:10px 24px;direction:rtl;
+  background:rgba(255,255,255,0.97);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid ${t.lBorder};
+  overflow-x:auto;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+  &::-webkit-scrollbar{display:none;}
+  transform:translateY(${pr => pr.$show ? '0' : '-100%'});
+  transition:transform 0.3s cubic-bezier(0.4,0,0.2,1),box-shadow 0.3s;
+  box-shadow:${pr => pr.$show ? '0 2px 12px rgba(0,0,0,0.08)' : 'none'};
+  @media print{display:none;}
+  @media(max-width:639px){padding:8px 12px;gap:4px;}
+`
+const SectionNavBtn = styled.a<{$active?:boolean}>`
   display:inline-flex;align-items:center;gap:5px;padding:7px 14px;
-  background:${t.lBg};border:1px solid ${t.lBorder};border-radius:${t.r.full};
-  font-size:12px;font-weight:600;font-family:${t.font};color:${t.lTextSec};
+  background:${pr => pr.$active ? 'rgba(212,168,75,0.1)' : t.lBg};
+  border:1px solid ${pr => pr.$active ? t.goldBorder : t.lBorder};
+  border-radius:${t.r.full};
+  font-size:12px;font-weight:${pr => pr.$active ? 700 : 600};
+  font-family:${t.font};
+  color:${pr => pr.$active ? t.gold : t.lTextSec};
   cursor:pointer;white-space:nowrap;flex-shrink:0;text-decoration:none !important;
   transition:all 0.2s;
   &:hover{border-color:${t.goldBorder};color:${t.gold};background:rgba(212,168,75,0.04);}
 `
+/* ── Scroll-spy hook ── */
+function useScrollSpy(sectionIds: string[], offset = 120) {
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [showSticky, setShowSticky] = useState(false)
+  useEffect(() => {
+    let ticking = false
+    const handler = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        ticking = false
+        // Show sticky nav after scrolling past the inline nav (roughly 400px)
+        setShowSticky(window.scrollY > 400)
+        // Find active section
+        let found: string | null = null
+        for (let i = sectionIds.length - 1; i >= 0; i--) {
+          const el = document.getElementById(sectionIds[i])
+          if (el) {
+            const rect = el.getBoundingClientRect()
+            if (rect.top <= offset) { found = sectionIds[i]; break }
+          }
+        }
+        setActiveId(found)
+      })
+    }
+    window.addEventListener('scroll', handler, { passive: true })
+    handler()
+    return () => window.removeEventListener('scroll', handler)
+  }, [sectionIds, offset])
+  return { activeId, showSticky }
+}
+
+/* ── Investment Summary One-Liner ── */
+const SummaryBar = styled.div`
+  display:flex;align-items:center;gap:10px;padding:14px 18px;margin-bottom:24px;
+  background:linear-gradient(135deg,rgba(212,168,75,0.06),rgba(212,168,75,0.02));
+  border:1px solid ${t.goldBorder};border-radius:${t.r.lg};direction:rtl;
+  font-size:14px;color:${t.lText};line-height:1.6;
+  animation:${fadeInUp} 0.5s ease-out 0.15s both;
+  @media(max-width:639px){font-size:13px;padding:12px 14px;gap:8px;flex-wrap:wrap;}
+`
+const SummaryIcon = styled.span`font-size:20px;flex-shrink:0;`
+const SummaryHighlight = styled.span`color:${t.gold};font-weight:800;`
 
 /* ── Skeleton Loading ── */
 const shimmer = keyframes`0%{background-position:-200% 0}100%{background-position:200% 0}`
@@ -751,6 +836,43 @@ export default function PlotDetail() {
   const risk = useMemo(() => calcRisk(plot, similarPlots.length > 0 ? [plot, ...similarPlots] : undefined), [plot, similarPlots])
   const locationScore = useMemo(() => calcLocationScore(plot), [plot])
 
+  // Section IDs for scroll-spy
+  const sectionIds = useMemo(() => {
+    const ids = ['investment', 'risk']
+    if (locationScore.factors.length > 0) ids.push('location')
+    if (similarPlots.length > 1) ids.push('vs-area')
+    if (timeline) ids.push('timeline')
+    if (d.price > 0) ids.push('mortgage')
+    if (similarPlots.length > 0) ids.push('similar')
+    return ids
+  }, [locationScore.factors.length, similarPlots.length, timeline, d.price])
+  const { activeId, showSticky } = useScrollSpy(sectionIds)
+
+  // Section labels for nav
+  const sectionLabels: Record<string, { icon: React.ReactNode; label: string }> = {
+    investment: { icon: <TrendingUp size={12} />, label: 'ניתוח השקעה' },
+    risk: { icon: <AlertTriangle size={12} />, label: 'סיכון' },
+    location: { icon: <Compass size={12} />, label: 'מיקום' },
+    'vs-area': { icon: <BarChart3 size={12} />, label: 'vs ממוצע' },
+    timeline: { icon: <Clock size={12} />, label: 'ציר זמן' },
+    mortgage: { icon: <Calculator size={12} />, label: 'מחשבון' },
+    similar: { icon: <BarChart3 size={12} />, label: 'דומות' },
+  }
+
+  // Investment summary text
+  const investmentSummary = useMemo(() => {
+    const parts: string[] = []
+    const zoningLabel = zoningLabels[d.zoning] || ''
+    if (zoningLabel) parts.push(zoningLabel)
+    if (d.size > 0) parts.push(`${fmt.dunam(d.size)} דונם`)
+    if (d.price > 0) parts.push(`ב-${fmt.compact(d.price)}`)
+    const summaryParts: string[] = []
+    if (parts.length) summaryParts.push(`קרקע ${parts.join(', ')} ב${plot.city}`)
+    if (r > 0) summaryParts.push(`תשואה צפויה ${Math.round(r)}%`)
+    if (cagr) summaryParts.push(`צמיחה ${cagr.cagr}% שנתי על פני ${cagr.years} שנים`)
+    return summaryParts.join(' · ')
+  }, [plot, d, r, cagr])
+
   // WhatsApp link with plot context
   const waLink = useMemo(() => {
     const msg = `היי, מתעניין/ת בחלקה ${plot.number} גוש ${d.block} ב${plot.city} (${fmt.compact(d.price)}). אשמח לפרטים נוספים.`
@@ -762,6 +884,18 @@ export default function PlotDetail() {
       <ErrorBoundary>
         <ReadingProgress $pct={readingProgress} />
         <PlotJsonLd plot={plot} />
+        {/* Sticky scroll-spy navigation */}
+        <StickyNav $show={showSticky} aria-label="ניווט מהיר">
+          <span style={{ fontSize: 13, fontWeight: 800, color: t.lText, whiteSpace: 'nowrap', marginInlineEnd: 8, fontFamily: t.font }}>
+            גוש {d.block} · {plot.number}
+          </span>
+          <span style={{ width: 1, height: 20, background: t.lBorder, flexShrink: 0 }} />
+          {sectionIds.map(sid => (
+            <SectionNavBtn key={sid} href={`#${sid}`} $active={activeId === sid}>
+              {sectionLabels[sid]?.icon} {sectionLabels[sid]?.label}
+            </SectionNavBtn>
+          ))}
+        </StickyNav>
         <Page>
           <PrintHeader>
             <PrintLogo>🗺️ LandMap Israel</PrintLogo>
@@ -801,15 +935,36 @@ export default function PlotDetail() {
             <Metric $delay={0.24}><MetricVal style={{color:t.gold}}>{cagr ? `${cagr.cagr}%` : '--'}</MetricVal><MetricLabel>CAGR ({cagr?.years || '-'} שנים)</MetricLabel></Metric>
           </Metrics>
 
+          {/* Investment Summary One-Liner */}
+          {investmentSummary && (
+            <SummaryBar>
+              <SummaryIcon>{grade.grade === 'A+' || grade.grade === 'A' ? '🏆' : grade.grade.startsWith('A') ? '⭐' : '📊'}</SummaryIcon>
+              <span>
+                {investmentSummary.split(' · ').map((part, i, arr) => (
+                  <span key={i}>
+                    {i > 0 && <span style={{ color: t.lBorder, margin: '0 6px' }}>·</span>}
+                    {i === 0 ? part : <SummaryHighlight>{part}</SummaryHighlight>}
+                  </span>
+                ))}
+              </span>
+              <span style={{ marginInlineStart: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ 
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '3px 10px', borderRadius: t.r.full,
+                  background: `${grade.color}18`, border: `1px solid ${grade.color}30`,
+                  fontSize: 13, fontWeight: 800, color: grade.color,
+                }}>{grade.grade}</span>
+              </span>
+            </SummaryBar>
+          )}
+
           {/* Section Navigation — quick jump to sections */}
           <SectionNav aria-label="ניווט מהיר לחלקים">
-            <SectionNavBtn href="#investment"><TrendingUp size={12} /> ניתוח השקעה</SectionNavBtn>
-            <SectionNavBtn href="#risk"><AlertTriangle size={12} /> סיכון</SectionNavBtn>
-            {locationScore.factors.length > 0 && <SectionNavBtn href="#location"><Compass size={12} /> מיקום</SectionNavBtn>}
-            {similarPlots.length > 1 && <SectionNavBtn href="#vs-area"><BarChart3 size={12} /> vs ממוצע</SectionNavBtn>}
-            {timeline && <SectionNavBtn href="#timeline"><Clock size={12} /> ציר זמן</SectionNavBtn>}
-            {d.price > 0 && <SectionNavBtn href="#mortgage"><Calculator size={12} /> מחשבון</SectionNavBtn>}
-            {similarPlots.length > 0 && <SectionNavBtn href="#similar"><BarChart3 size={12} /> דומות</SectionNavBtn>}
+            {sectionIds.map(sid => (
+              <SectionNavBtn key={sid} href={`#${sid}`} $active={activeId === sid}>
+                {sectionLabels[sid]?.icon} {sectionLabels[sid]?.label}
+              </SectionNavBtn>
+            ))}
           </SectionNav>
 
           <Grid>
@@ -1098,7 +1253,12 @@ export default function PlotDetail() {
         </Page>
 
         <BottomBar>
+          <BarGradeBadge $color={grade.color}>{grade.grade}</BarGradeBadge>
           <BarPrice>{fmt.price(d.price)}</BarPrice>
+          <span style={{ flex: 1 }} />
+          <BarCallBtn href={waLink} target="_blank" rel="noopener noreferrer">
+            <MessageCircle size={16} /> WhatsApp
+          </BarCallBtn>
           <GoldButton onClick={() => setLeadOpen(true)} style={{padding:'12px 32px',borderRadius:t.r.full}}>קבל פרטים</GoldButton>
         </BottomBar>
 
