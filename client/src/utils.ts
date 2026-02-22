@@ -630,6 +630,66 @@ export function calcPercentileRank(plot: Plot, allPlots: Plot[]): { rank: number
   return null // Don't show for bottom half
 }
 
+// ── Generate Investment Report (clipboard-friendly) ──
+/** Generates a formatted plain-text investment report for a plot — for sharing with partners */
+export function generatePlotReport(plot: Plot, allPlots?: Plot[]): string {
+  const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
+  const pps = pricePerSqm(plot), ppd = pricePerDunam(plot)
+  const cagr = calcCAGR(r, d.readiness)
+  const risk = calcRisk(plot, allPlots)
+  const locTags = getLocationTags(plot)
+  const estYr = estimatedYear(plot)
+  const pos = allPlots ? pricePosition(plot, allPlots) : null
+
+  const lines: string[] = []
+  lines.push('━━━ דוח השקעה — LandMap Israel ━━━')
+  lines.push('')
+  lines.push(`📍 ${plot.city} — גוש ${d.block} · חלקה ${plot.number}`)
+  lines.push(`🏷️ סטטוס: ${statusLabels[plot.status || 'AVAILABLE'] || plot.status || 'לא ידוע'}`)
+  lines.push(`📊 ציון השקעה: ${score}/10 (${grade.grade})`)
+  lines.push('')
+  lines.push('── מחירים ──')
+  lines.push(`💰 מחיר: ${fmt.price(d.price)}`)
+  if (d.projected > 0) lines.push(`📈 שווי חזוי: ${fmt.price(d.projected)}`)
+  if (r > 0) lines.push(`🔄 תשואה (ROI): +${Math.round(r)}%`)
+  if (cagr) lines.push(`📊 CAGR: ${cagr.cagr}% (${cagr.years} שנים)`)
+  if (pps > 0) lines.push(`₪/מ״ר: ${fmt.num(pps)}`)
+  if (ppd > 0) lines.push(`₪/דונם: ${fmt.num(ppd)}`)
+  if (pos) lines.push(`📉 מיקום מחיר: ${pos.label} לממוצע`)
+  lines.push('')
+  lines.push('── חלקה ──')
+  lines.push(`📐 שטח: ${fmt.num(d.size)} מ״ר (${fmt.dunam(d.size)} דונם)`)
+  lines.push(`📋 שלב תכנוני: ${zoningLabels[d.zoning] || d.zoning}`)
+  if (d.readiness) lines.push(`⏱️ מוכנות: ${d.readiness}`)
+  if (estYr) lines.push(`🏗️ השלמה משוערת: ${estYr.label} (~${estYr.monthsLeft} חודשים)`)
+  if (d.density > 0) lines.push(`🏙️ צפיפות: ${d.density} יח"ד/דונם`)
+  lines.push('')
+  lines.push('── סיכון ──')
+  lines.push(`${risk.icon} ${risk.label} (${risk.score}/10)`)
+  if (locTags.length > 0) {
+    lines.push('')
+    lines.push('── מיקום ──')
+    locTags.forEach(tag => lines.push(`${tag.icon} ${tag.label}`))
+    if (d.seaDist != null) lines.push(`🌊 מרחק מהים: ${fmt.num(d.seaDist)} מ׳`)
+    if (d.parkDist != null) lines.push(`🌳 מרחק מפארק: ${fmt.num(d.parkDist)} מ׳`)
+  }
+  // Quick mortgage estimate
+  const mortgage = calcMonthly(d.price, 0.5, 0.06, 15)
+  if (mortgage) {
+    lines.push('')
+    lines.push('── מימון (הערכה) ──')
+    lines.push(`💳 החזר חודשי: ${fmt.price(mortgage.monthly)} (50% מימון, 6%, 15 שנים)`)
+    lines.push(`🏦 הון עצמי: ${fmt.price(mortgage.down)}`)
+  }
+  lines.push('')
+  lines.push(`🔗 ${typeof window !== 'undefined' ? window.location.origin : ''}/plot/${plot.id}`)
+  lines.push(`📅 ${new Date().toLocaleDateString('he-IL', { year: 'numeric', month: 'long', day: 'numeric' })}`)
+  lines.push('')
+  lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+
+  return lines.join('\n')
+}
+
 // ── Normalize ──
 export function normalizePlot(plot: Plot): Plot {
   return { ...plot, total_price: plot.totalPrice ?? plot.total_price, projected_value: plot.projectedValue ?? plot.projected_value,

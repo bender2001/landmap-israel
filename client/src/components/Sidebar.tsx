@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef as useRefHook } from 'react'
 import styled, { keyframes, css } from 'styled-components'
-import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe, Sparkles, Printer, Navigation, Map as MapIcon2, Eye, Calculator } from 'lucide-react'
+import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe, Sparkles, Printer, Navigation, Map as MapIcon2, Eye, Calculator, ClipboardCopy, Banknote } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
-import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcTimeline, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter, getLocationTags } from '../utils'
+import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcTimeline, calcMonthly, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter, getLocationTags, generatePlotReport } from '../utils'
 import type { Plot } from '../types'
 import { GoldButton, GhostButton, Badge, RadialScore, InfoTooltip, PriceAlertButton } from './UI'
 
@@ -880,6 +880,28 @@ const PrintBtn = styled.button`
   &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
 `
 
+/* ── Copy Report Button ── */
+const CopyReportBtn = styled.button<{$copied?:boolean}>`
+  display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 16px;
+  background:${pr=>pr.$copied?'rgba(16,185,129,0.1)':'transparent'};
+  color:${pr=>pr.$copied?'#10B981':t.textSec};
+  border:1px solid ${pr=>pr.$copied?'#10B981':t.border};border-radius:${t.r.md};
+  font-weight:600;font-size:13px;font-family:${t.font};cursor:pointer;transition:all ${t.tr};
+  white-space:nowrap;
+  &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
+  ${mobile}{padding:10px 10px;span{display:none;}}
+`
+
+/* ── Mortgage Quick Estimate Badge ── */
+const MortgageBadge = styled.div`
+  grid-column:1 / -1;display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:10px 14px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);
+  border-radius:${t.r.md};font-size:12px;color:${t.info};font-weight:600;
+  animation:${fadeSection} 0.5s 0.12s both;direction:rtl;
+`
+const MortgageVal = styled.span`font-weight:800;font-size:14px;color:${t.text};`
+const MortgageNote = styled.span`font-size:10px;color:${t.textDim};font-weight:500;`
+
 /* ── Sticky Mini Header (appears on scroll) ── */
 const stickySlide = keyframes`from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}`
 const StickyHeader = styled.div<{$show:boolean}>`
@@ -918,6 +940,7 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
   const panelRef = useRefHook<HTMLDivElement>(null)
   const closeBtnRef = useRefHook<HTMLButtonElement>(null)
   const [copied, setCopied] = useState(false)
+  const [reportCopied, setReportCopied] = useState(false)
   const [showStickyHeader, setShowStickyHeader] = useState(false)
 
   // Lock body scroll when sidebar is open
@@ -989,7 +1012,7 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
   }, [open])
 
   // Reset copied state when plot changes
-  useEffect(() => { setCopied(false) }, [plot?.id])
+  useEffect(() => { setCopied(false); setReportCopied(false) }, [plot?.id])
 
   const handleShare = useCallback(async () => {
     if (!plot) return
@@ -1011,6 +1034,16 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
       setTimeout(() => setCopied(false), 2000)
     } catch { /* clipboard not available */ }
   }, [plot])
+
+  const handleCopyReport = useCallback(async () => {
+    if (!plot) return
+    const report = generatePlotReport(plot, plots)
+    try {
+      await navigator.clipboard.writeText(report)
+      setReportCopied(true)
+      setTimeout(() => setReportCopied(false), 2500)
+    } catch { /* clipboard not available */ }
+  }, [plot, plots])
 
   const marketTrend = useMarketTrend(plot)
   const projection = useProjectionChart(plot)
@@ -1126,6 +1159,19 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
             <MetricCard><MetricLabel>שטח <InfoTooltip text="שטח החלקה ברוטו. דונם = 1,000 מ״ר. שטח בנייה בפועל תלוי בתב״ע." pos="bottom" /></MetricLabel><MetricVal>{d.size >= 1000 ? `${fmt.dunam(d.size)} דונם` : `${fmt.num(d.size)} מ״ר`}</MetricVal></MetricCard>
             {ppd > 0 && <MetricCard><MetricLabel>₪ / דונם <InfoTooltip text="מחיר לדונם — מאפשר השוואה בין חלקות בגדלים שונים. ככל שנמוך יותר, כך המחיר אטרקטיבי יותר." pos="bottom" /></MetricLabel><MetricVal>{fmt.num(ppd)}</MetricVal></MetricCard>}
             <MetricCard><MetricLabel>תשואה <InfoTooltip text="תשואה צפויה (ROI) — אחוז הרווח הנקי מהשקעה עד למימוש. מבוססת על שווי חזוי ושלב תכנוני." pos="bottom" /></MetricLabel><MetricVal $gold={r > 0}>{fmt.pct(r)}</MetricVal></MetricCard>
+            {/* Quick mortgage estimate — like Madlan's affordability indicator */}
+            {(() => {
+              const mortgage = d.price > 0 ? calcMonthly(d.price, 0.5, 0.06, 15) : null
+              if (!mortgage) return null
+              return (
+                <MortgageBadge title="הערכת החזר חודשי: 50% מימון, ריבית 6%, 15 שנים">
+                  <Banknote size={14} />
+                  <span>החזר חודשי:</span>
+                  <MortgageVal>{fmt.price(mortgage.monthly)}</MortgageVal>
+                  <MortgageNote>(50% LTV · 6% · 15שנ׳)</MortgageNote>
+                </MortgageBadge>
+              )
+            })()}
           </MetricsGrid>
 
           {/* Score Breakdown — shows WHY the plot got its grade */}
@@ -1438,6 +1484,10 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
               <GitCompareArrows size={15} />
             </CompareBtn>
           )}
+          <CopyReportBtn $copied={reportCopied} onClick={handleCopyReport} aria-label="העתק דוח השקעה" title="העתק דוח השקעה ללוח">
+            {reportCopied ? <Check size={15} /> : <ClipboardCopy size={15} />}
+            <span>{reportCopied ? 'הועתק!' : 'דוח'}</span>
+          </CopyReportBtn>
           <PrintBtn onClick={() => window.print()} aria-label="הדפס דוח" title="הדפס דוח השקעה">
             <Printer size={15} />
           </PrintBtn>
