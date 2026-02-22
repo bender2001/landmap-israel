@@ -7,7 +7,7 @@ import { p, fmt } from '../utils'
 import { useSavedSearches, useFocusTrap } from '../hooks'
 import type { Filters, Plot } from '../types'
 
-const EMPTY: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '' }
+const EMPTY: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '', belowAvg: '' }
 
 const BASE_CITIES = [
   'חדרה', 'נתניה', 'קיסריה', 'הרצליה', 'כפר סבא', 'רעננה', 'הוד השרון', 'תל אביב',
@@ -271,7 +271,7 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
   }, [open])
 
   const activeCount = useMemo(() =>
-    Object.entries(filters).filter(([k, v]) => k !== 'search' && k !== 'ripeness' && k !== 'minRoi' && v && v !== 'all').length, [filters])
+    Object.entries(filters).filter(([k, v]) => k !== 'search' && v && v !== 'all').length, [filters])
 
   const chips = useMemo(() => {
     const c: { key: string; label: string }[] = []
@@ -281,6 +281,10 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
     if (filters.priceMax) c.push({ key: 'priceMax', label: `\u05E2\u05D3 \u20AA${Number(filters.priceMax).toLocaleString()}` })
     if (filters.sizeMin) c.push({ key: 'sizeMin', label: `${filters.sizeMin}+ \u05DE\u05F4\u05E8` })
     if (filters.sizeMax) c.push({ key: 'sizeMax', label: `\u05E2\u05D3 ${filters.sizeMax} \u05DE\u05F4\u05E8` })
+    if (filters.minRoi) c.push({ key: 'minRoi', label: `תשואה ${filters.minRoi}%+` })
+    if (filters.ripeness === 'high') c.push({ key: 'ripeness', label: '⭐ ציון גבוה' })
+    else if (filters.ripeness === 'medium') c.push({ key: 'ripeness', label: 'ציון בינוני' })
+    else if (filters.ripeness === 'low') c.push({ key: 'ripeness', label: 'ציון נמוך' })
     return c
   }, [filters])
 
@@ -557,6 +561,75 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
                 )
               })}
             </PresetRow>
+          </Section>
+
+          <Divider />
+
+          <Section>
+            <SectionLabel>📈 השקעה</SectionLabel>
+            <Grid>
+              <Field>
+                <FieldLabel>תשואה מינימלית (%ROI)</FieldLabel>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <input
+                    type="range" min={0} max={100} step={5}
+                    value={Number(draft.minRoi) || 0}
+                    onChange={e => set('minRoi', Number(e.target.value) > 0 ? e.target.value : '')}
+                    style={{
+                      flex: 1, height: 6, WebkitAppearance: 'none', appearance: 'none',
+                      borderRadius: 3, outline: 'none', cursor: 'pointer',
+                      background: `linear-gradient(90deg, ${t.gold} 0%, ${t.gold} ${Number(draft.minRoi) || 0}%, ${t.surfaceLight} ${Number(draft.minRoi) || 0}%, ${t.surfaceLight} 100%)`,
+                    }}
+                  />
+                  <span style={{ fontSize: 14, fontWeight: 800, color: Number(draft.minRoi) > 0 ? t.gold : t.textDim, minWidth: 44, textAlign: 'center' }}>
+                    {Number(draft.minRoi) > 0 ? `${draft.minRoi}%` : 'הכל'}
+                  </span>
+                </div>
+                <PresetRow>
+                  {[
+                    { label: 'הכל', value: '' },
+                    { label: '10%+', value: '10' },
+                    { label: '25%+', value: '25' },
+                    { label: '50%+', value: '50' },
+                    { label: '100%+', value: '100' },
+                  ].map(preset => (
+                    <PresetChip key={preset.label} $active={draft.minRoi === preset.value}
+                      onClick={() => set('minRoi', preset.value)}>
+                      {preset.label}
+                    </PresetChip>
+                  ))}
+                </PresetRow>
+              </Field>
+              <Field>
+                <FieldLabel>ציון השקעה</FieldLabel>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {[
+                    { value: '', label: 'כל הציונים', icon: '📊', color: t.textSec },
+                    { value: 'high', label: 'גבוה (7-10)', icon: '⭐', color: '#10B981' },
+                    { value: 'medium', label: 'בינוני (4-6)', icon: '📈', color: '#F59E0B' },
+                    { value: 'low', label: 'נמוך (1-3)', icon: '📉', color: '#EF4444' },
+                  ].map(opt => (
+                    <label key={opt.value} style={{
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+                      background: draft.ripeness === opt.value ? `${opt.color}12` : t.surfaceLight,
+                      border: `1px solid ${draft.ripeness === opt.value ? `${opt.color}40` : t.border}`,
+                      borderRadius: t.r.md, cursor: 'pointer', transition: `all ${t.tr}`,
+                      fontSize: 13, fontWeight: draft.ripeness === opt.value ? 700 : 500,
+                      color: draft.ripeness === opt.value ? opt.color : t.textSec,
+                    }}>
+                      <input
+                        type="radio" name="ripeness" value={opt.value}
+                        checked={draft.ripeness === opt.value}
+                        onChange={() => set('ripeness', opt.value)}
+                        style={{ display: 'none' }}
+                      />
+                      <span>{opt.icon}</span>
+                      <span>{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </Field>
+            </Grid>
           </Section>
 
           <Actions>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { MapPin, Zap, TrendingUp, ChevronLeft, ChevronDown, Phone, Bell, Smartphone, Briefcase, Star, Shield, FileText, Building2, MessageCircle, HelpCircle, AlertTriangle } from 'lucide-react'
+import { MapPin, Zap, TrendingUp, ChevronLeft, ChevronDown, Phone, Bell, Smartphone, Briefcase, Star, Shield, FileText, Building2, MessageCircle, HelpCircle, AlertTriangle, Search, ArrowDown } from 'lucide-react'
 import { t, fadeInUp, fadeInScale, shimmer, float, gradientShift, sm, md, lg, mobile } from '../theme'
 import { PublicLayout } from '../components/Layout'
 import { GoldButton, GhostButton, AnimatedCard, CountUpNumber, ScrollToTop } from '../components/UI'
@@ -89,6 +89,41 @@ const TrustBadge = styled.div`
   background:rgba(255,255,255,0.04);border:1px solid ${t.border};font-size:12px;color:${t.textSec};
 `
 
+/* ── Hero Search Bar ── */
+const HeroSearchWrap = styled.form`
+  display:flex;align-items:center;gap:0;width:100%;max-width:520px;
+  background:rgba(255,255,255,0.06);backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.12);border-radius:${t.r.full};
+  overflow:hidden;transition:all 0.3s;animation:${fadeInUp} 0.6s ease-out 0.3s both;
+  &:focus-within{border-color:${t.gold};box-shadow:0 0 0 3px ${t.goldDim},0 8px 32px rgba(0,0,0,0.2);}
+`
+const HeroSearchInput = styled.input`
+  flex:1;padding:16px 20px;background:transparent;border:none;outline:none;
+  font-size:16px;font-family:${t.font};color:${t.text};direction:rtl;
+  &::placeholder{color:${t.textDim};}
+  ${mobile}{padding:14px 16px;font-size:15px;}
+`
+const HeroSearchBtn = styled.button`
+  display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 28px;
+  background:linear-gradient(135deg,${t.gold},${t.goldBright});color:${t.bg};
+  border:none;font-size:15px;font-weight:700;font-family:${t.font};cursor:pointer;
+  white-space:nowrap;transition:all ${t.tr};
+  &:hover{background:linear-gradient(135deg,${t.goldBright},${t.gold});}
+  ${mobile}{padding:14px 18px;font-size:14px;gap:6px;}
+`
+
+/* ── Scroll Indicator ── */
+const scrollBounce = keyframes`0%,100%{transform:translateY(0);opacity:0.6}50%{transform:translateY(10px);opacity:1}`
+const ScrollIndicator = styled.div`
+  position:absolute;bottom:32px;left:50%;transform:translateX(-50%);z-index:2;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  color:${t.textDim};font-size:12px;font-weight:500;cursor:pointer;
+  animation:${scrollBounce} 2s ease-in-out infinite;
+  transition:opacity ${t.tr};
+  &:hover{color:${t.gold};}
+  ${mobile}{bottom:20px;}
+`
+
 /* ══════ POPULAR CITIES ══════ */
 const CitiesSection = styled.section`
   padding:56px 24px;direction:rtl;position:relative;overflow:hidden;
@@ -162,6 +197,47 @@ const StatsGrid = styled.div`
 const StatItem = styled(AnimatedCard)`display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px;`
 const StatNum = styled.div`font-size:36px;font-weight:900;color:${t.goldBright};font-family:${t.font};`
 const StatLabel = styled.div`font-size:14px;color:${t.textSec};font-weight:500;`
+
+/* ══════ COMPARISON TABLE ══════ */
+const CompareSection = styled.section`
+  padding:64px 24px;direction:rtl;position:relative;
+  background:linear-gradient(180deg,transparent,rgba(212,168,75,0.02),transparent);
+`
+const CompareTable = styled.div`
+  max-width:780px;margin:0 auto;border-radius:${t.r.xl};overflow:hidden;
+  border:1px solid ${t.border};background:${t.surface};
+`
+const CompareRow = styled.div<{$header?:boolean;$even?:boolean}>`
+  display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:0;
+  padding:${pr=>pr.$header?'14px 20px':'12px 20px'};
+  background:${pr=>pr.$header?'linear-gradient(135deg,rgba(212,168,75,0.1),rgba(212,168,75,0.04))':pr.$even?'rgba(255,255,255,0.02)':'transparent'};
+  border-bottom:1px solid ${t.border};
+  &:last-child{border-bottom:none;}
+  ${mobile}{grid-template-columns:1.5fr 1fr 1fr 1fr;padding:${pr=>pr.$header?'10px 12px':'8px 12px'};}
+`
+const CompareLabel = styled.span<{$header?:boolean}>`
+  font-size:${pr=>pr.$header?'12px':'13px'};
+  font-weight:${pr=>pr.$header?'800':'500'};
+  color:${pr=>pr.$header?t.gold:t.textSec};
+  letter-spacing:${pr=>pr.$header?'0.5px':'0'};
+  text-transform:${pr=>pr.$header?'uppercase':'none'};
+  ${mobile}{font-size:${pr=>pr.$header?'10px':'11px'};}
+`
+const CompareCheck = styled.span<{$yes?:boolean}>`
+  font-size:14px;text-align:center;
+  ${mobile}{font-size:12px;}
+`
+
+const COMPARE_FEATURES = [
+  { feature: 'מפה אינטראקטיבית עם גוש/חלקה', us: true, madlan: true, yad2: false },
+  { feature: 'ניתוח AI לכל חלקה', us: true, madlan: false, yad2: false },
+  { feature: 'ציון השקעה ותשואה צפויה', us: true, madlan: false, yad2: false },
+  { feature: 'נתוני ועדות סטטוטוריות', us: true, madlan: true, yad2: false },
+  { feature: 'נתוני תקן 22 (שמאות)', us: true, madlan: false, yad2: false },
+  { feature: 'מחשבון תשואה מובנה', us: true, madlan: false, yad2: false },
+  { feature: 'התראות מחיר בזמן אמת', us: true, madlan: true, yad2: true },
+  { feature: 'מיקוד בקרקעות להשקעה', us: true, madlan: false, yad2: false },
+]
 
 /* ══════ HOW IT WORKS ══════ */
 const HowSection = styled.section`padding:80px 24px;direction:rtl;position:relative;`
@@ -339,11 +415,11 @@ const DisclaimerText = styled.p`
 /* ── Scroll Reveal Wrapper ── */
 const RevealWrap = styled.div<{$visible:boolean}>`
   opacity:${pr=>pr.$visible?1:0};
-  transform:translateY(${pr=>pr.$visible?'0':'32px'});
+  transform:translateY(${pr=>pr.$visible?'0':'24px'});
   transition:opacity 0.7s cubic-bezier(0.16,1,0.3,1),transform 0.7s cubic-bezier(0.16,1,0.3,1);
 `
 function Reveal({ children }: { children: React.ReactNode }) {
-  const { ref, inView } = useInView()
+  const { ref, inView } = useInView({ rootMargin: '0px 0px -20px 0px', threshold: 0.05 })
   return <RevealWrap ref={ref} $visible={inView}>{children}</RevealWrap>
 }
 
@@ -416,8 +492,13 @@ function FaqAccordion() {
 }
 
 /* ══════ PAGE ══════ */
+/* ── Quick search cities for autocomplete ── */
+const SEARCH_CITIES = ['חדרה', 'נתניה', 'קיסריה', 'הרצליה', 'כפר סבא', 'רעננה', 'תל אביב', 'ירושלים', 'חיפה', 'באר שבע', 'ראשון לציון', 'פתח תקווה', 'אשדוד', 'נס ציונה']
+
 export default function Landing(){
   const [vis,setVis]=useState(false)
+  const [heroSearch, setHeroSearch] = useState('')
+  const navigate = useNavigate()
   useEffect(()=>{setVis(true)},[])
 
   // Fetch live market data for stats
@@ -490,12 +571,29 @@ export default function Landing(){
               <TrustBadge><FileText size={14}/> נתוני תקן 22</TrustBadge>
               <TrustBadge><Building2 size={14}/> נתוני ועדות</TrustBadge>
             </TrustRow>
+            <HeroSearchWrap onSubmit={e => { e.preventDefault(); navigate(`/explore${heroSearch ? `?city=${encodeURIComponent(heroSearch)}` : ''}`) }}>
+              <HeroSearchInput
+                value={heroSearch}
+                onChange={e => setHeroSearch(e.target.value)}
+                placeholder="חפשו עיר, ישוב או גוש..."
+                list="hero-cities"
+                aria-label="חיפוש קרקעות"
+              />
+              <datalist id="hero-cities">
+                {SEARCH_CITIES.map(c => <option key={c} value={c} />)}
+              </datalist>
+              <HeroSearchBtn type="submit"><Search size={18}/> חיפוש</HeroSearchBtn>
+            </HeroSearchWrap>
           </HeroContent>
+          <ScrollIndicator onClick={() => document.getElementById('cities')?.scrollIntoView({ behavior: 'smooth' })}>
+            <span>גללו למטה</span>
+            <ArrowDown size={20}/>
+          </ScrollIndicator>
         </Hero>
 
         {/* ── Popular Cities ── */}
         <Reveal>
-        <CitiesSection>
+        <CitiesSection id="cities">
           <CitiesSectionHead>חפשו קרקע לפי <span>עיר</span></CitiesSectionHead>
           <CitiesGrid>
             {POPULAR_CITIES.map((c,i)=>{
@@ -563,6 +661,27 @@ export default function Landing(){
             ))}
           </FeatGrid>
         </Features></Reveal>
+
+        {/* ── Comparison Table ── */}
+        <Reveal><CompareSection>
+          <SectionHead>למה LandMap ולא המתחרים?</SectionHead>
+          <CompareTable>
+            <CompareRow $header>
+              <CompareLabel $header>תכונה</CompareLabel>
+              <CompareLabel $header style={{textAlign:'center'}}>LandMap</CompareLabel>
+              <CompareLabel $header style={{textAlign:'center'}}>Madlan</CompareLabel>
+              <CompareLabel $header style={{textAlign:'center'}}>Yad2</CompareLabel>
+            </CompareRow>
+            {COMPARE_FEATURES.map((f,i) => (
+              <CompareRow key={i} $even={i%2===0}>
+                <CompareLabel>{f.feature}</CompareLabel>
+                <CompareCheck $yes={f.us}>{f.us ? '✅' : '❌'}</CompareCheck>
+                <CompareCheck $yes={f.madlan}>{f.madlan ? '✅' : '❌'}</CompareCheck>
+                <CompareCheck $yes={f.yad2}>{f.yad2 ? '✅' : '❌'}</CompareCheck>
+              </CompareRow>
+            ))}
+          </CompareTable>
+        </CompareSection></Reveal>
 
         {/* ── Testimonials ── */}
         <Reveal><TestSection>

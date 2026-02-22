@@ -606,9 +606,16 @@ export function useInView(options?: IntersectionObserverInit) {
   useEffect(() => {
     const el = ref.current
     if (!el) return
+    // If element is already above or inside the viewport (e.g. user jumped/scrolled past),
+    // make it visible immediately — don't leave invisible sections on the page
+    const rect = el.getBoundingClientRect()
+    if (rect.bottom < window.innerHeight * 1.1 || rect.top < window.innerHeight) {
+      setInView(true)
+      return
+    }
     const observer = new IntersectionObserver(
       ([entry]) => { if (entry.isIntersecting) { setInView(true); observer.disconnect() } },
-      { threshold: 0.15, rootMargin: '0px 0px -60px 0px', ...options }
+      { threshold: 0.05, rootMargin: '0px 0px -20px 0px', ...options }
     )
     observer.observe(el)
     return () => observer.disconnect()

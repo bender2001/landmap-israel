@@ -658,6 +658,19 @@ export default function Explore() {
       const q = dSearch.toLowerCase()
       list = list.filter(pl => pl.city?.toLowerCase().includes(q) || pl.number?.includes(q) || String(p(pl).block).includes(q))
     }
+    // ROI minimum filter
+    const minRoiVal = Number(filters.minRoi)
+    if (minRoiVal > 0) {
+      list = list.filter(pl => roi(pl) >= minRoiVal)
+    }
+    // Readiness / ripeness filter
+    if (filters.ripeness === 'high') {
+      list = list.filter(pl => calcScore(pl) >= 7)
+    } else if (filters.ripeness === 'medium') {
+      list = list.filter(pl => { const s = calcScore(pl); return s >= 4 && s <= 6 })
+    } else if (filters.ripeness === 'low') {
+      list = list.filter(pl => calcScore(pl) < 4)
+    }
     // Below average price-per-sqm filter
     if (filters.belowAvg === 'true' && list.length > 1) {
       const ppsList = list.map(pricePerSqm).filter(v => v > 0)
@@ -667,7 +680,7 @@ export default function Explore() {
       }
     }
     return list
-  }, [plots, filters.sizeMin, filters.sizeMax, filters.belowAvg, dSearch])
+  }, [plots, filters.sizeMin, filters.sizeMax, filters.belowAvg, filters.minRoi, filters.ripeness, dSearch])
 
   const sorted = useMemo(() => sortPlots(filtered, sortKey, userGeo.location), [filtered, sortKey, userGeo.location])
 
