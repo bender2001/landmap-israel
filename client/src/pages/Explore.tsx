@@ -1511,26 +1511,28 @@ export default function Explore() {
 
         {!mapFullscreen && (() => {
           const tabOrder = ['map', 'fav', 'calc', 'areas'] as const
-          const activeIdx = tabOrder.indexOf(tab as any)
+          // Derive effective tab: if list panel is open while tab is 'map', show 'areas' as active
+          const effectiveTab = (tab === 'map' && listOpen) ? 'areas' : tab
+          const activeIdx = tabOrder.indexOf(effectiveTab as any)
           return (
             <MobileNav role="navigation" aria-label="ניווט ראשי" style={{ position: 'relative' }}>
               <NavIndicator $idx={activeIdx >= 0 ? activeIdx : 0} $total={tabOrder.length} />
-              <NavBtn $active={tab==='map'} onClick={()=>setTab('map')} aria-label="מפה" aria-current={tab==='map'?'page':undefined}>
+              <NavBtn $active={effectiveTab==='map'} onClick={()=>{ setTab('map'); setListOpen(false) }} aria-label="מפה" aria-current={effectiveTab==='map'?'page':undefined}>
                 <NavBtnWrap>
                   <MapIcon size={20}/>
                   {activeFilterCount > 0 && <NavBadge>{activeFilterCount}</NavBadge>}
                 </NavBtnWrap>
                 מפה
               </NavBtn>
-              <NavBtn $active={tab==='fav'} onClick={()=>setTab('fav')} aria-label={`מועדפים${favIds.length>0?` (${favIds.length})`:''}`} aria-current={tab==='fav'?'page':undefined}>
+              <NavBtn $active={effectiveTab==='fav'} onClick={()=>{ setTab('fav'); setListOpen(false) }} aria-label={`מועדפים${favIds.length>0?` (${favIds.length})`:''}`} aria-current={effectiveTab==='fav'?'page':undefined}>
                 <NavBtnWrap>
                   <Heart size={20}/>
                   {favIds.length > 0 && <NavBadge>{favIds.length}</NavBadge>}
                 </NavBtnWrap>
                 מועדפים
               </NavBtn>
-              <NavBtn $active={tab==='calc'} onClick={()=>setTab('calc')} aria-label="מחשבון מימון" aria-current={tab==='calc'?'page':undefined}><Calculator size={20}/>מחשבון</NavBtn>
-              <NavBtn $active={tab==='areas'} onClick={()=>{ setTab('map'); setListOpen(o => !o) }} aria-label="רשימת חלקות" aria-current={listOpen?'page':undefined}>
+              <NavBtn $active={effectiveTab==='calc'} onClick={()=>{ setTab('calc'); setListOpen(false) }} aria-label="מחשבון מימון" aria-current={effectiveTab==='calc'?'page':undefined}><Calculator size={20}/>מחשבון</NavBtn>
+              <NavBtn $active={effectiveTab==='areas'} onClick={()=>{ setTab('map'); setListOpen(o => !o) }} aria-label="רשימת חלקות" aria-current={effectiveTab==='areas'?'page':undefined}>
                 <NavBtnWrap>
                   <Layers size={20}/>
                   {sorted.length > 0 && <NavBadge>{sorted.length > 99 ? '99+' : sorted.length}</NavBadge>}

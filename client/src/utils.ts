@@ -72,6 +72,41 @@ export function calcScore(plot: Plot) {
   let rs2 = 1.5; if (readiness.includes('1-3')) rs2 = 3; else if (readiness.includes('3-5')) rs2 = 2; else if (readiness.includes('5+')) rs2 = 0.5
   return Math.max(1, Math.min(10, Math.round(rs + zs + rs2)))
 }
+/** Detailed breakdown of score components for transparency */
+export function calcScoreBreakdown(plot: Plot): { total: number; factors: { label: string; score: number; maxScore: number; icon: string; detail: string }[] } {
+  const r = roi(plot), { zoning, readiness } = p(plot)
+  const rs = Math.min(4, r / 50)
+  const zi = ZO.indexOf(zoning), zs = zi >= 0 ? (zi / 7) * 3 : 0
+  let rs2 = 1.5; if (readiness.includes('1-3')) rs2 = 3; else if (readiness.includes('3-5')) rs2 = 2; else if (readiness.includes('5+')) rs2 = 0.5
+  const total = Math.max(1, Math.min(10, Math.round(rs + zs + rs2)))
+  return {
+    total,
+    factors: [
+      {
+        label: 'תשואה (ROI)',
+        score: Math.round(rs * 10) / 10,
+        maxScore: 4,
+        icon: '📈',
+        detail: r > 0 ? `${Math.round(r)}% תשואה צפויה` : 'ללא נתוני תשואה',
+      },
+      {
+        label: 'שלב תכנוני',
+        score: Math.round(zs * 10) / 10,
+        maxScore: 3,
+        icon: '📋',
+        detail: zoningLabels[zoning] || 'לא ידוע',
+      },
+      {
+        label: 'ציר זמן',
+        score: Math.round(rs2 * 10) / 10,
+        maxScore: 3,
+        icon: '⏱️',
+        detail: readiness.includes('1-3') ? '1-3 שנים' : readiness.includes('3-5') ? '3-5 שנים' : readiness.includes('5+') ? '5+ שנים' : 'בינוני',
+      },
+    ],
+  }
+}
+
 export function getGrade(score: number): InvestmentGrade {
   if (score >= 9) return { grade: 'A+', color: '#10B981', tier: 'exceptional' }
   if (score >= 8) return { grade: 'A', color: '#10B981', tier: 'excellent' }

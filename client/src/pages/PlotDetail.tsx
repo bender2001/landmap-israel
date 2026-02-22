@@ -6,7 +6,7 @@ import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard, ScrollToTop } from '../components/UI'
 import { PublicLayout } from '../components/Layout'
-import { p, roi, fmt, calcScore, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, plotCenter, calcRisk, calcLocationScore, setOgMeta, removeOgMeta, SITE_CONFIG } from '../utils'
+import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, plotCenter, calcRisk, calcLocationScore, setOgMeta, removeOgMeta, SITE_CONFIG } from '../utils'
 import type { RiskAssessment } from '../utils'
 import type { Plot } from '../types'
 
@@ -326,6 +326,27 @@ const MiniMapToggle = styled.button<{$active?:boolean}>`
   cursor:pointer;transition:all ${t.tr};
   &:hover{border-color:${t.gold};color:${t.gold};box-shadow:${t.sh.sm};}
 `
+
+/* ── Score Breakdown ── */
+const ScoreBreakdownWrap = styled.div`
+  margin-top:16px;padding-top:16px;border-top:1px solid ${t.lBorder};
+`
+const ScoreBreakdownTitle = styled.div`
+  font-size:12px;font-weight:700;color:${t.lTextSec};margin-bottom:12px;
+  display:flex;align-items:center;gap:6px;cursor:pointer;transition:color ${t.tr};
+  &:hover{color:${t.gold};}
+`
+const ScoreBreakdownGrid = styled.div`display:flex;flex-direction:column;gap:10px;`
+const ScoreFactorRow = styled.div`display:flex;align-items:center;gap:10px;`
+const ScoreFactorIcon = styled.span`font-size:16px;flex-shrink:0;width:24px;text-align:center;`
+const ScoreFactorLabel = styled.span`font-size:13px;font-weight:600;color:${t.lText};min-width:80px;`
+const ScoreFactorBarTrack = styled.div`flex:1;height:8px;background:${t.lBorder};border-radius:4px;overflow:hidden;`
+const ScoreFactorBarFill = styled.div<{$pct:number;$color:string}>`
+  width:${pr=>pr.$pct}%;height:100%;border-radius:4px;transition:width 0.8s ease;
+  background:linear-gradient(90deg,${pr=>pr.$color},${pr=>pr.$color}dd);
+`
+const ScoreFactorVal = styled.span`font-size:12px;font-weight:800;color:${t.lText};min-width:42px;text-align:left;font-family:${t.font};`
+const ScoreFactorDetail = styled.span`font-size:11px;color:${t.lTextSec};min-width:80px;text-align:left;`
 
 /* ── Nearby Amenities ── */
 const AmenitiesGrid = styled.div`display:grid;grid-template-columns:1fr;gap:10px;${sm}{grid-template-columns:repeat(2,1fr);}${md}{grid-template-columns:repeat(3,1fr);}`
@@ -835,6 +856,7 @@ export default function PlotDetail() {
   const mortgage = d.price > 0 ? calcMonthly(d.price, ltvPct / 100, interestRate / 100, loanYears) : null
   const risk = useMemo(() => calcRisk(plot, similarPlots.length > 0 ? [plot, ...similarPlots] : undefined), [plot, similarPlots])
   const locationScore = useMemo(() => calcLocationScore(plot), [plot])
+  const scoreBreakdown = useMemo(() => calcScoreBreakdown(plot), [plot])
 
   // Section IDs for scroll-spy
   const sectionIds = useMemo(() => {
@@ -928,10 +950,53 @@ export default function PlotDetail() {
           </TitleRow>
 
           <Metrics>
-            <Metric $delay={0}><MetricVal>{fmt.compact(d.price)}</MetricVal><MetricLabel>מחיר</MetricLabel></Metric>
+            <Metric $delay={0}>
+              <MetricVal>{fmt.compact(d.price)}</MetricVal>
+              <MetricLabel>מחיר</MetricLabel>
+              {similarPlots.length >= 2 && d.price > 0 && (() => {
+                const avgPrice = similarPlots.reduce((s, sp) => s + p(sp).price, 0) / similarPlots.length
+                if (avgPrice <= 0) return null
+                const pct = Math.round(((d.price - avgPrice) / avgPrice) * 100)
+                return pct !== 0 ? (
+                  <div style={{ fontSize: 10, fontWeight: 700, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, color: pct < 0 ? t.ok : t.err }}>
+                    {pct < 0 ? <TrendingDown size={10} /> : <TrendingUp size={10} />}
+                    {pct > 0 ? '+' : ''}{pct}% מהממוצע
+                  </div>
+                ) : null
+              })()}
+            </Metric>
             <Metric $delay={0.06}><MetricVal>{fmt.dunam(d.size)} דונם</MetricVal><MetricLabel>שטח ({fmt.num(d.size)} מ״ר)</MetricLabel></Metric>
-            {ppd > 0 && <Metric $delay={0.12}><MetricVal>{fmt.num(ppd)}</MetricVal><MetricLabel>₪ / דונם</MetricLabel></Metric>}
-            <Metric $delay={0.18}><MetricVal style={{color:t.ok}}>{fmt.pct(r)}</MetricVal><MetricLabel>ROI צפוי</MetricLabel></Metric>
+            {ppd > 0 && <Metric $delay={0.12}>
+              <MetricVal>{fmt.num(ppd)}</MetricVal>
+              <MetricLabel>₪ / דונם</MetricLabel>
+              {similarPlots.length >= 2 && (() => {
+                const avgPpd = Math.round(similarPlots.reduce((s, sp) => s + pricePerDunam(sp), 0) / similarPlots.length)
+                if (avgPpd <= 0) return null
+                const pct = Math.round(((ppd - avgPpd) / avgPpd) * 100)
+                return pct !== 0 ? (
+                  <div style={{ fontSize: 10, fontWeight: 700, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, color: pct < 0 ? t.ok : t.err }}>
+                    {pct < 0 ? <TrendingDown size={10} /> : <TrendingUp size={10} />}
+                    {pct > 0 ? '+' : ''}{pct}% מהממוצע
+                  </div>
+                ) : null
+              })()}
+            </Metric>}
+            <Metric $delay={0.18}>
+              <MetricVal style={{color:t.ok}}>{fmt.pct(r)}</MetricVal>
+              <MetricLabel>ROI צפוי</MetricLabel>
+              {similarPlots.length >= 2 && r > 0 && (() => {
+                const rois = similarPlots.map(sp => roi(sp)).filter(v => v > 0)
+                const avgRoi = rois.length ? rois.reduce((s, v) => s + v, 0) / rois.length : 0
+                if (avgRoi <= 0) return null
+                const pct = Math.round(((r - avgRoi) / avgRoi) * 100)
+                return pct !== 0 ? (
+                  <div style={{ fontSize: 10, fontWeight: 700, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, color: pct > 0 ? t.ok : t.err }}>
+                    {pct > 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                    {pct > 0 ? '+' : ''}{pct}% מהממוצע
+                  </div>
+                ) : null
+              })()}
+            </Metric>
             <Metric $delay={0.24}><MetricVal style={{color:t.gold}}>{cagr ? `${cagr.cagr}%` : '--'}</MetricVal><MetricLabel>CAGR ({cagr?.years || '-'} שנים)</MetricLabel></Metric>
           </Metrics>
 
@@ -983,6 +1048,25 @@ export default function PlotDetail() {
                 {d.price > 0 && d.projected > 0 && cagr && (
                   <InvestmentProjectionChart price={d.price} projected={d.projected} years={cagr.years} />
                 )}
+                {/* Score Breakdown — transparent factor analysis */}
+                <ScoreBreakdownWrap>
+                  <ScoreBreakdownTitle>
+                    🔍 מרכיבי ציון ההשקעה ({score}/10)
+                  </ScoreBreakdownTitle>
+                  <ScoreBreakdownGrid>
+                    {scoreBreakdown.factors.map(f => (
+                      <ScoreFactorRow key={f.label}>
+                        <ScoreFactorIcon>{f.icon}</ScoreFactorIcon>
+                        <ScoreFactorLabel>{f.label}</ScoreFactorLabel>
+                        <ScoreFactorBarTrack>
+                          <ScoreFactorBarFill $pct={f.maxScore > 0 ? (f.score / f.maxScore) * 100 : 0} $color={grade.color} />
+                        </ScoreFactorBarTrack>
+                        <ScoreFactorVal>{f.score}/{f.maxScore}</ScoreFactorVal>
+                        <ScoreFactorDetail>{f.detail}</ScoreFactorDetail>
+                      </ScoreFactorRow>
+                    ))}
+                  </ScoreBreakdownGrid>
+                </ScoreBreakdownWrap>
               </Card>
 
               {/* Risk Assessment — like Madlan's risk meter */}
