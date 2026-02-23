@@ -411,6 +411,43 @@ const GaugeLabel = styled.span<{$c:string}>`
   font-size:10px;font-weight:800;color:${pr=>pr.$c};
 `
 
+/* ── Total Portfolio Value in stats bar ── */
+const TotalValueStat = styled.span`
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:10px;font-weight:600;color:${t.textDim};
+  padding:2px 8px;border-radius:${t.r.full};
+  background:rgba(212,168,75,0.06);border:1px solid rgba(212,168,75,0.12);
+  transition:all 0.3s;
+  ${mobile}{display:none;}
+`
+const TotalValueAmount = styled.span`
+  font-weight:800;color:${t.goldBright};
+`
+
+/* ── Market Momentum Badge in stats bar ── */
+const MomentumBadge = styled.span<{$c:string}>`
+  display:inline-flex;align-items:center;gap:3px;
+  font-size:10px;font-weight:700;color:${pr=>pr.$c};
+  padding:2px 8px;border-radius:${t.r.full};
+  background:${pr=>`${pr.$c}08`};border:1px solid ${pr=>`${pr.$c}18`};
+  white-space:nowrap;transition:all 0.3s;
+  ${mobile}{display:none;}
+`
+
+/* ── Clickable LiveBadge variant (replaces inline style={{ cursor: 'pointer' }}) ── */
+const ClickableLiveBadge = styled(LiveBadge)`cursor:pointer;`
+const ClickableDemo = styled(Demo)`cursor:pointer;`
+
+/* ── Skip to content (WCAG 2.1 accessibility) ── */
+const SkipLink = styled.a`
+  position:absolute;top:-100%;left:50%;transform:translateX(-50%);
+  z-index:${t.z.toast + 10};padding:12px 24px;
+  background:${t.gold};color:${t.bg};font-weight:700;font-size:14px;font-family:${t.font};
+  border-radius:0 0 ${t.r.md} ${t.r.md};text-decoration:none;
+  transition:top 0.2s;
+  &:focus{top:0;}
+`
+
 /* ── Compare Bar (floating bottom tray) ── */
 const CompareBar = styled.div`
   position:absolute;bottom:42px;left:50%;transform:translateX(-50%);z-index:${t.z.filter};
@@ -1150,6 +1187,24 @@ export default function Explore() {
     return { prices, minPrice, maxPrice, avgRoi }
   }, [filtered])
 
+  // Total portfolio value — aggregate of all visible plots
+  const totalPortfolioValue = useMemo(() => {
+    return filtered.reduce((s, pl) => s + p(pl).price, 0)
+  }, [filtered])
+
+  // Market momentum — ratio of below-average-priced plots to detect buyer's/seller's market
+  const marketMomentum = useMemo(() => {
+    if (filtered.length < 3) return null
+    const ppsList = filtered.map(pricePerSqm).filter(v => v > 0)
+    if (ppsList.length < 3) return null
+    const avgPps = ppsList.reduce((s, v) => s + v, 0) / ppsList.length
+    const belowCount = ppsList.filter(v => v < avgPps).length
+    const ratio = belowCount / ppsList.length
+    if (ratio >= 0.6) return { label: 'שוק קונים 🟢', color: t.ok, tip: `${Math.round(ratio * 100)}% מהחלקות מתחת לממוצע — הזדמנות לקונים` }
+    if (ratio <= 0.35) return { label: 'שוק פרימיום 🔴', color: t.err, tip: `${Math.round((1 - ratio) * 100)}% מהחלקות מעל הממוצע — שוק יקר` }
+    return { label: 'שוק מאוזן 🟡', color: t.warn, tip: 'פיזור מחירים מאוזן — שוק יציב' }
+  }, [filtered])
+
   // Market Insights for the ticker
   const marketInsights = useMemo(() => {
     const cityName = filters.city && filters.city !== 'all' ? filters.city : undefined
@@ -1455,6 +1510,7 @@ export default function Explore() {
 
   return (
     <Wrap className="dark" aria-label="מפת חלקות להשקעה">
+      <SkipLink href="#landmap-map-region">דלג לתוכן המפה</SkipLink>
       <ErrorBoundary>
         <NetworkBanner online={online} wasOffline={wasOffline} onRetry={() => window.location.reload()} />
         {dataSource === 'demo' && !isLoading && online && (
@@ -1470,6 +1526,7 @@ export default function Explore() {
         )}
         <TopProgress $show={isLoading} />
         {isLoading && <ExploreLoadingSkeleton />}
+        <div id="landmap-map-region" />
         <MapArea
           plots={sorted} pois={pois} selected={selected} darkMode
           onSelect={selectPlot} onLead={setLeadPlot}
@@ -1848,95 +1905,101 @@ export default function Explore() {
         </KbBackdrop>
 
         {/* Market Insights Ticker — rotating contextual intelligence */}
-        {!mapFullscreen && !isLoading && marketInsights.length > 0 && (() => {
-          const insight = marketInsights[insightIdx % marketInsights.length]
-          if (!insight) return null
-          return (
-            <InsightsTicker
-              $hasCompare={compareIds.length > 0}
-              role="marquee"
-              aria-label="תובנות שוק"
-              title={`${insightIdx + 1}/${marketInsights.length} — לחץ לתובנה הבאה`}
-              onClick={() => {
+        {!mapFullscreen && !isLoading && marketInsights.length > 0 && marketInsights[insightIdx % marketInsights.length] && (
+          <InsightsTicker
+            $hasCompare={compareIds.length > 0}
+            role="marquee"
+            aria-label="תובנות שוק"
+            title={`${insightIdx + 1}/${marketInsights.length} — לחץ לתובנה הבאה`}
+            onClick={() => {
+              setInsightEntering(false)
+              setTimeout(() => {
+                setInsightIdx(prev => (prev + 1) % marketInsights.length)
+                setInsightEntering(true)
+              }, 200)
+            }}
+          >
+            <InsightCategory $c={marketInsights[insightIdx % marketInsights.length].color} />
+            <InsightEmoji>{marketInsights[insightIdx % marketInsights.length].emoji}</InsightEmoji>
+            <InsightText $entering={insightEntering}>{marketInsights[insightIdx % marketInsights.length].text}</InsightText>
+            <InsightNav
+              onClick={(e) => {
+                e.stopPropagation()
                 setInsightEntering(false)
                 setTimeout(() => {
                   setInsightIdx(prev => (prev + 1) % marketInsights.length)
                   setInsightEntering(true)
                 }, 200)
               }}
+              aria-label="תובנה הבאה"
             >
-              <InsightCategory $c={insight.color} />
-              <InsightEmoji>{insight.emoji}</InsightEmoji>
-              <InsightText $entering={insightEntering}>{insight.text}</InsightText>
-              <InsightNav
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setInsightEntering(false)
-                  setTimeout(() => {
-                    setInsightIdx(prev => (prev + 1) % marketInsights.length)
-                    setInsightEntering(true)
-                  }, 200)
-                }}
-                aria-label="תובנה הבאה"
-              >
-                ›
-              </InsightNav>
-              <InsightCounter>
-                {insightIdx + 1}/{marketInsights.length}
-              </InsightCounter>
-            </InsightsTicker>
-          )
-        })()}
+              ›
+            </InsightNav>
+            <InsightCounter>
+              {insightIdx + 1}/{marketInsights.length}
+            </InsightCounter>
+          </InsightsTicker>
+        )}
 
-        {/* Stats bar with viewport visible count — values memoized for perf */}
-        {!mapFullscreen && (() => {
-          return (
-            <Stats>
-              <Stat><Val><AnimatedValue value={filtered.length} /></Val> חלקות</Stat>
-              {visibleInViewport != null && visibleInViewport < filtered.length && (
-                <ViewportStat title="חלקות הנראות בתצוגת המפה הנוכחית">
-                  <Eye size={10} /> {visibleInViewport} נראות
-                </ViewportStat>
-              )}
-              <Stat>ממוצע <Val><AnimatedValue value={Math.round(avg)} format={fmt.compact} /></Val></Stat>
-              {statsBarData.prices.length >= 2 && (
-                <Stat title={`טווח: ${fmt.compact(statsBarData.minPrice)} – ${fmt.compact(statsBarData.maxPrice)}`}>
-                  {fmt.short(statsBarData.minPrice)} – <Val>{fmt.short(statsBarData.maxPrice)}</Val>
-                </Stat>
-              )}
-              {statsBarData.avgRoi > 0 && (
-                <Stat title={`תשואה ממוצעת צפויה: +${statsBarData.avgRoi}%`}>
-                  ROI <Val style={{ color: t.ok }}>+{statsBarData.avgRoi}%</Val>
-                </Stat>
-              )}
-              {portfolioQuality && (
-                <PortfolioGauge title={`ציון תיק השקעות ממוצע: ${portfolioQuality.avg}/10 — ${portfolioQuality.grade.grade}`}>
-                  <QualityLabel>איכות</QualityLabel>
-                  <GaugeTrack>
-                    <GaugeFill $w={portfolioQuality.pct} $c={portfolioQuality.grade.color} />
-                  </GaugeTrack>
-                  <GaugeLabel $c={portfolioQuality.grade.color}>{portfolioQuality.avg}</GaugeLabel>
-                </PortfolioGauge>
-              )}
-              {sse.status === 'connected' ? (
-                <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים מתעדכנים אוטומטית${dataFreshness.relativeTime ? ` · עודכן ${dataFreshness.relativeTime}` : ''}`}>
-                  <LiveDot $c={t.ok} /> עדכני {sse.updateCount > 0 && <SseUpdateCount>({sse.updateCount})</SseUpdateCount>}
-                </LiveBadge>
-              ) : dataSource === 'api' ? (
-                <LiveBadge $connected={false} title={`נתונים מהשרת${dataFreshness.relativeTime ? ` · עודכן ${dataFreshness.relativeTime}` : ''} — לחץ לרענון`} style={{ cursor: 'pointer' }}
-                  onClick={() => { window.location.reload() }}>
-                  <LiveDot $c={t.warn} /> {dataFreshness.relativeTime && dataFreshness.relativeTime !== 'עכשיו' ? dataFreshness.relativeTime : 'נתוני שרת'} ↻
-                </LiveBadge>
-              ) : (
-                <Demo title="נתונים לדוגמה — לחץ לנסות שוב" style={{ cursor: 'pointer' }}
-                  onClick={() => { window.location.reload() }}>נתוני דמו ↻</Demo>
-              )}
-              <KbHintBtn onClick={() => setShortcutsOpen(true)} title="קיצורי מקלדת (?)">
-                <Keyboard size={10} /> ?
-              </KbHintBtn>
-            </Stats>
-          )
-        })()}
+        {/* Stats bar with viewport visible count, total value, market momentum */}
+        {!mapFullscreen && (
+          <Stats>
+            <Stat><Val><AnimatedValue value={filtered.length} /></Val> חלקות</Stat>
+            {visibleInViewport != null && visibleInViewport < filtered.length && (
+              <ViewportStat title="חלקות הנראות בתצוגת המפה הנוכחית">
+                <Eye size={10} /> {visibleInViewport} נראות
+              </ViewportStat>
+            )}
+            <Stat>ממוצע <Val><AnimatedValue value={Math.round(avg)} format={fmt.compact} /></Val></Stat>
+            {/* Total portfolio value — shows aggregate investment scope */}
+            {totalPortfolioValue > 0 && (
+              <TotalValueStat title={`סך שווי כל החלקות המוצגות: ${fmt.price(totalPortfolioValue)}`}>
+                💰 סה״כ <TotalValueAmount>{fmt.compact(totalPortfolioValue)}</TotalValueAmount>
+              </TotalValueStat>
+            )}
+            {statsBarData.prices.length >= 2 && (
+              <Stat title={`טווח: ${fmt.compact(statsBarData.minPrice)} – ${fmt.compact(statsBarData.maxPrice)}`}>
+                {fmt.short(statsBarData.minPrice)} – <Val>{fmt.short(statsBarData.maxPrice)}</Val>
+              </Stat>
+            )}
+            {statsBarData.avgRoi > 0 && (
+              <Stat title={`תשואה ממוצעת צפויה: +${statsBarData.avgRoi}%`}>
+                ROI <Val style={{color:t.ok}}>+{statsBarData.avgRoi}%</Val>
+              </Stat>
+            )}
+            {/* Market momentum — buyer's/seller's market indicator */}
+            {marketMomentum && (
+              <MomentumBadge $c={marketMomentum.color} title={marketMomentum.tip}>
+                {marketMomentum.label}
+              </MomentumBadge>
+            )}
+            {portfolioQuality && (
+              <PortfolioGauge title={`ציון תיק השקעות ממוצע: ${portfolioQuality.avg}/10 — ${portfolioQuality.grade.grade}`}>
+                <QualityLabel>איכות</QualityLabel>
+                <GaugeTrack>
+                  <GaugeFill $w={portfolioQuality.pct} $c={portfolioQuality.grade.color} />
+                </GaugeTrack>
+                <GaugeLabel $c={portfolioQuality.grade.color}>{portfolioQuality.avg}</GaugeLabel>
+              </PortfolioGauge>
+            )}
+            {sse.status === 'connected' ? (
+              <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים מתעדכנים אוטומטית${dataFreshness.relativeTime ? ` · עודכן ${dataFreshness.relativeTime}` : ''}`}>
+                <LiveDot $c={t.ok} /> עדכני {sse.updateCount > 0 && <SseUpdateCount>({sse.updateCount})</SseUpdateCount>}
+              </LiveBadge>
+            ) : dataSource === 'api' ? (
+              <ClickableLiveBadge $connected={false} title={`נתונים מהשרת${dataFreshness.relativeTime ? ` · עודכן ${dataFreshness.relativeTime}` : ''} — לחץ לרענון`}
+                onClick={() => { window.location.reload() }}>
+                <LiveDot $c={t.warn} /> {dataFreshness.relativeTime && dataFreshness.relativeTime !== 'עכשיו' ? dataFreshness.relativeTime : 'נתוני שרת'} ↻
+              </ClickableLiveBadge>
+            ) : (
+              <ClickableDemo title="נתונים לדוגמה — לחץ לנסות שוב"
+                onClick={() => { window.location.reload() }}>נתוני דמו ↻</ClickableDemo>
+            )}
+            <KbHintBtn onClick={() => setShortcutsOpen(true)} title="קיצורי מקלדת (?)">
+              <Keyboard size={10} /> ?
+            </KbHintBtn>
+          </Stats>
+        )}
 
         {/* Mobile Favorites Overlay */}
         <MobileOverlay $open={tab === 'fav'}>
@@ -1960,7 +2023,7 @@ export default function Explore() {
                       <MobileFavTitle>גוש {d.block} · חלקה {pl.number}</MobileFavTitle>
                       <MobileFavSub>
                         <span>{pl.city}</span>
-                        <span style={{ color: grade.color, fontWeight: 700 }}>{grade.grade}</span>
+                        <GaugeLabel $c={grade.color}>{grade.grade}</GaugeLabel>
                         <span>{fmt.num(d.size)} מ״ר</span>
                       </MobileFavSub>
                     </MobileFavInfo>
@@ -1973,38 +2036,35 @@ export default function Explore() {
           )}
         </MobileOverlay>
 
-        {/* Mobile Nav — 3 tabs */}
-        {!mapFullscreen && (() => {
-          const tabOrder = ['map', 'fav', 'areas'] as const
-          // Derive effective tab: if list panel is open while tab is 'map', show 'areas' as active
-          const effectiveTab = (tab === 'map' && listOpen) ? 'areas' : tab
-          const activeIdx = tabOrder.indexOf(effectiveTab as any)
-          return (
-            <MobileNav role="navigation" aria-label="ניווט ראשי" style={{ position: 'relative' }}>
-              <NavIndicator $idx={activeIdx >= 0 ? activeIdx : 0} $total={tabOrder.length} />
-              <NavBtn $active={effectiveTab==='map'} onClick={()=>{ setTab('map'); setListOpen(false) }} aria-label="מפה" aria-current={effectiveTab==='map'?'page':undefined}>
-                <NavBtnWrap>
-                  <MapIcon size={20}/>
-                </NavBtnWrap>
-                מפה
-              </NavBtn>
-              <NavBtn $active={effectiveTab==='fav'} onClick={()=>{ setTab('fav'); setListOpen(false) }} aria-label={`מועדפים${favIds.length>0?` (${favIds.length})`:''}`} aria-current={effectiveTab==='fav'?'page':undefined}>
-                <NavBtnWrap>
-                  <Heart size={20}/>
-                  {favIds.length > 0 && <NavBadge>{favIds.length}</NavBadge>}
-                </NavBtnWrap>
-                מועדפים
-              </NavBtn>
-              <NavBtn $active={effectiveTab==='areas'} onClick={()=>{ setTab('map'); setListOpen(o => !o) }} aria-label="רשימת חלקות" aria-current={effectiveTab==='areas'?'page':undefined}>
-                <NavBtnWrap>
-                  <Layers size={20}/>
-                  {sorted.length > 0 && <NavBadge>{sorted.length > 99 ? '99+' : sorted.length}</NavBadge>}
-                </NavBtnWrap>
-                רשימה
-              </NavBtn>
-            </MobileNav>
-          )
-        })()}
+        {/* Mobile Nav — 3 tabs (no IIFE, computed inline for clarity) */}
+        {!mapFullscreen && (
+          <MobileNav role="navigation" aria-label="ניווט ראשי">
+            <NavIndicator
+              $idx={((tab === 'map' && listOpen) ? 'areas' : tab) === 'fav' ? 1 : ((tab === 'map' && listOpen) ? 'areas' : tab) === 'areas' ? 2 : 0}
+              $total={3}
+            />
+            <NavBtn $active={tab==='map' && !listOpen} onClick={()=>{ setTab('map'); setListOpen(false) }} aria-label="מפה" aria-current={tab==='map' && !listOpen ?'page':undefined}>
+              <NavBtnWrap>
+                <MapIcon size={20}/>
+              </NavBtnWrap>
+              מפה
+            </NavBtn>
+            <NavBtn $active={tab==='fav'} onClick={()=>{ setTab('fav'); setListOpen(false) }} aria-label={`מועדפים${favIds.length>0?` (${favIds.length})`:''}`} aria-current={tab==='fav'?'page':undefined}>
+              <NavBtnWrap>
+                <Heart size={20}/>
+                {favIds.length > 0 && <NavBadge>{favIds.length}</NavBadge>}
+              </NavBtnWrap>
+              מועדפים
+            </NavBtn>
+            <NavBtn $active={tab==='map' && listOpen} onClick={()=>{ setTab('map'); setListOpen(o => !o) }} aria-label="רשימת חלקות" aria-current={tab==='map' && listOpen?'page':undefined}>
+              <NavBtnWrap>
+                <Layers size={20}/>
+                {sorted.length > 0 && <NavBadge>{sorted.length > 99 ? '99+' : sorted.length}</NavBadge>}
+              </NavBtnWrap>
+              רשימה
+            </NavBtn>
+          </MobileNav>
+        )}
       </ErrorBoundary>
     </Wrap>
   )
