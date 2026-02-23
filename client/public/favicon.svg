@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#D4A84B"/>
+      <stop offset="100%" stop-color="#E8C96A"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0B1120"/>
+  <!-- Map pin -->
+  <path d="M32 12c-8.284 0-15 6.272-15 14.01C17 36.46 32 52 32 52s15-15.54 15-25.99C47 18.272 40.284 12 32 12zm0 20a6 6 0 110-12 6 6 0 010 12z" fill="url(#g)"/>
+  <!-- Gold accent line -->
+  <rect x="14" y="56" width="36" height="3" rx="1.5" fill="#D4A84B" opacity="0.6"/>
+</svg>

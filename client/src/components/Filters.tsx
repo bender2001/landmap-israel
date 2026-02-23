@@ -386,15 +386,20 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
             aria-label="חיפוש חלקות"
           />
           {resultCount != null && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 3,
-              fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
-              padding: '3px 10px', borderRadius: t.r.full, flexShrink: 0,
-              background: resultCount > 0 ? t.goldDim : 'rgba(239,68,68,0.08)',
-              color: resultCount > 0 ? t.gold : t.err,
-              border: `1px solid ${resultCount > 0 ? t.goldBorder : 'rgba(239,68,68,0.2)'}`,
-              transition: `all ${t.tr}`,
-            }}>
+            <span
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+                fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+                padding: '3px 10px', borderRadius: t.r.full, flexShrink: 0,
+                background: resultCount > 0 ? t.goldDim : 'rgba(239,68,68,0.08)',
+                color: resultCount > 0 ? t.gold : t.err,
+                border: `1px solid ${resultCount > 0 ? t.goldBorder : 'rgba(239,68,68,0.2)'}`,
+                transition: `all ${t.tr}`,
+              }}
+            >
               {resultCount > 0 ? `${resultCount} חלקות` : 'אין תוצאות'}
             </span>
           )}

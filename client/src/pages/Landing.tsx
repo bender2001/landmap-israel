@@ -91,10 +91,10 @@ const TrustBadge = styled.div`
 
 /* ── Hero Search Bar ── */
 const HeroSearchWrap = styled.form`
-  display:flex;align-items:center;gap:0;width:100%;max-width:520px;
+  display:flex;align-items:center;gap:0;width:100%;max-width:520px;position:relative;
   background:rgba(255,255,255,0.06);backdrop-filter:blur(12px);
   border:1px solid rgba(255,255,255,0.12);border-radius:${t.r.full};
-  overflow:hidden;transition:all 0.3s;animation:${fadeInUp} 0.6s ease-out 0.3s both;
+  overflow:visible;transition:all 0.3s;animation:${fadeInUp} 0.6s ease-out 0.3s both;
   &:focus-within{border-color:${t.gold};box-shadow:0 0 0 3px ${t.goldDim},0 8px 32px rgba(0,0,0,0.2);}
 `
 const HeroSearchInput = styled.input`
@@ -107,10 +107,41 @@ const HeroSearchBtn = styled.button`
   display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 28px;
   background:linear-gradient(135deg,${t.gold},${t.goldBright});color:${t.bg};
   border:none;font-size:15px;font-weight:700;font-family:${t.font};cursor:pointer;
-  white-space:nowrap;transition:all ${t.tr};
+  white-space:nowrap;transition:all ${t.tr};border-radius:0 ${t.r.full} ${t.r.full} 0;
   &:hover{background:linear-gradient(135deg,${t.goldBright},${t.gold});}
   ${mobile}{padding:14px 18px;font-size:14px;gap:6px;}
 `
+/* ── Hero Search Autocomplete Dropdown ── */
+const heroDropIn = keyframes`from{opacity:0;transform:translateY(-8px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}`
+const HeroDropdown = styled.div`
+  position:absolute;top:calc(100% + 8px);left:0;right:0;z-index:50;
+  background:rgba(17,24,39,0.97);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid ${t.goldBorder};border-radius:${t.r.lg};overflow:hidden;
+  box-shadow:0 16px 48px rgba(0,0,0,0.5),0 0 0 1px rgba(212,168,75,0.1);
+  animation:${heroDropIn} 0.2s ease-out both;
+`
+const HeroDropGroup = styled.div`
+  padding:8px 14px 4px;font-size:10px;font-weight:700;color:${t.textDim};
+  letter-spacing:0.5px;text-transform:uppercase;direction:rtl;
+`
+const HeroDropItem = styled.div<{$focused?:boolean}>`
+  display:flex;align-items:center;gap:10px;padding:10px 14px;direction:rtl;
+  cursor:pointer;transition:background 0.15s;
+  background:${pr=>pr.$focused?t.goldDim:'transparent'};
+  &:hover{background:${t.goldDim};}
+  &:last-child{border-radius:0 0 ${t.r.lg} ${t.r.lg};}
+`
+const HeroDropIcon = styled.div<{$hue?:number}>`
+  width:36px;height:36px;border-radius:${t.r.md};
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  background:${pr=>pr.$hue!=null?`hsl(${pr.$hue},25%,14%)`:'rgba(212,168,75,0.08)'};
+  border:1px solid ${pr=>pr.$hue!=null?`hsl(${pr.$hue},35%,22%)`:t.goldBorder};
+  font-size:18px;
+`
+const HeroDropInfo = styled.div`flex:1;min-width:0;`
+const HeroDropName = styled.div`font-size:14px;font-weight:700;color:${t.text};`
+const HeroDropMeta = styled.div`font-size:11px;color:${t.textSec};display:flex;gap:8px;margin-top:1px;`
+const HeroDropMetaVal = styled.span`font-weight:700;color:${t.goldBright};`
 
 /* ── Scroll Indicator ── */
 const scrollBounce = keyframes`0%,100%{transform:translateY(0);opacity:0.6}50%{transform:translateY(10px);opacity:1}`
@@ -498,6 +529,9 @@ const SEARCH_CITIES = ['חדרה', 'נתניה', 'קיסריה', 'הרצליה',
 export default function Landing(){
   const [vis,setVis]=useState(false)
   const [heroSearch, setHeroSearch] = useState('')
+  const [heroDropOpen, setHeroDropOpen] = useState(false)
+  const [heroFocusIdx, setHeroFocusIdx] = useState(-1)
+  const heroTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const navigate = useNavigate()
   useEffect(()=>{setVis(true)},[])
 
@@ -527,6 +561,40 @@ export default function Landing(){
     }
     return result
   }, [plots])
+
+  // Hero search autocomplete suggestions
+  const heroSuggestions = useMemo(() => {
+    const q = heroSearch.trim().toLowerCase()
+    if (!q) return SEARCH_CITIES.slice(0, 6).map(name => ({ name, emoji: POPULAR_CITIES.find(c => c.name === name)?.emoji || '📍', hue: POPULAR_CITIES.find(c => c.name === name)?.hue ?? 200 }))
+    return SEARCH_CITIES
+      .filter(c => c.includes(q))
+      .slice(0, 6)
+      .map(name => ({ name, emoji: POPULAR_CITIES.find(c => c.name === name)?.emoji || '📍', hue: POPULAR_CITIES.find(c => c.name === name)?.hue ?? 200 }))
+  }, [heroSearch])
+
+  const selectHeroSuggestion = useCallback((city: string) => {
+    setHeroSearch(city)
+    setHeroDropOpen(false)
+    setHeroFocusIdx(-1)
+    navigate(`/explore?city=${encodeURIComponent(city)}`)
+  }, [navigate])
+
+  const handleHeroKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!heroDropOpen || heroSuggestions.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHeroFocusIdx(i => Math.min(i + 1, heroSuggestions.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHeroFocusIdx(i => Math.max(i - 1, -1))
+    } else if (e.key === 'Enter' && heroFocusIdx >= 0) {
+      e.preventDefault()
+      selectHeroSuggestion(heroSuggestions[heroFocusIdx].name)
+    }
+  }, [heroDropOpen, heroSuggestions, heroFocusIdx, selectHeroSuggestion])
+
+  // Reset focus index when search changes
+  useEffect(() => { setHeroFocusIdx(-1) }, [heroSearch])
 
   const liveStats = useMemo(() => {
     if (!plots || plots.length === 0) return FALLBACK_STATS
@@ -574,15 +642,51 @@ export default function Landing(){
             <HeroSearchWrap onSubmit={e => { e.preventDefault(); navigate(`/explore${heroSearch ? `?city=${encodeURIComponent(heroSearch)}` : ''}`) }}>
               <HeroSearchInput
                 value={heroSearch}
-                onChange={e => setHeroSearch(e.target.value)}
+                onChange={e => { setHeroSearch(e.target.value); setHeroDropOpen(true) }}
+                onFocus={() => setHeroDropOpen(true)}
+                onBlur={() => { heroTimeoutRef.current = setTimeout(() => setHeroDropOpen(false), 180) }}
+                onKeyDown={handleHeroKeyDown}
                 placeholder="חפשו עיר, ישוב או גוש..."
-                list="hero-cities"
+                autoComplete="off"
+                role="combobox"
+                aria-expanded={heroDropOpen && heroSuggestions.length > 0}
+                aria-autocomplete="list"
                 aria-label="חיפוש קרקעות"
               />
-              <datalist id="hero-cities">
-                {SEARCH_CITIES.map(c => <option key={c} value={c} />)}
-              </datalist>
               <HeroSearchBtn type="submit"><Search size={18}/> חיפוש</HeroSearchBtn>
+              {heroDropOpen && heroSuggestions.length > 0 && (
+                <HeroDropdown role="listbox" onMouseDown={() => { if (heroTimeoutRef.current) clearTimeout(heroTimeoutRef.current) }}>
+                  <HeroDropGroup>📍 {heroSearch.trim() ? 'תוצאות' : 'ערים פופולריות'}</HeroDropGroup>
+                  {heroSuggestions.map((s, i) => {
+                    const cd = cityData.get(s.name)
+                    return (
+                      <HeroDropItem
+                        key={s.name}
+                        $focused={heroFocusIdx === i}
+                        role="option"
+                        aria-selected={heroFocusIdx === i}
+                        onMouseDown={() => selectHeroSuggestion(s.name)}
+                      >
+                        <HeroDropIcon $hue={s.hue}>{s.emoji}</HeroDropIcon>
+                        <HeroDropInfo>
+                          <HeroDropName>{s.name}</HeroDropName>
+                          <HeroDropMeta>
+                            {cd ? (
+                              <>
+                                <span><HeroDropMetaVal>{cd.count}</HeroDropMetaVal> חלקות</span>
+                                {cd.avgPrice > 0 && <span>ממוצע <HeroDropMetaVal>{fmt.compact(cd.avgPrice)}</HeroDropMetaVal></span>}
+                                {cd.avgPpd > 0 && <span><HeroDropMetaVal>₪{(cd.avgPpd/1000).toFixed(0)}K</HeroDropMetaVal>/דונם</span>}
+                              </>
+                            ) : (
+                              <span>{POPULAR_CITIES.find(c => c.name === s.name)?.count || 'חפשו חלקות'}</span>
+                            )}
+                          </HeroDropMeta>
+                        </HeroDropInfo>
+                      </HeroDropItem>
+                    )
+                  })}
+                </HeroDropdown>
+              )}
             </HeroSearchWrap>
           </HeroContent>
           <ScrollIndicator onClick={() => document.getElementById('cities')?.scrollIntoView({ behavior: 'smooth' })}>

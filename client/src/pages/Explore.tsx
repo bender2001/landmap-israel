@@ -638,6 +638,19 @@ export default function Explore() {
   const [shareCopied, setShareCopied] = useState(false)
   const [visibleInViewport, setVisibleInViewport] = useState<number | null>(null)
 
+  // API filters + data fetch — MUST come before any useMemo that depends on `plots`
+  const apiFilters = useMemo(() => {
+    const f: Record<string, string> = {}
+    if (filters.city && filters.city !== 'all') f.city = filters.city
+    if (filters.priceMin) f.priceMin = filters.priceMin
+    if (filters.priceMax) f.priceMax = filters.priceMax
+    if (filters.zoning) f.zoning = filters.zoning
+    return f
+  }, [filters.city, filters.priceMin, filters.priceMax, filters.zoning])
+
+  const { data: plots = [], isLoading } = useAllPlots(apiFilters)
+  const dSearch = useDebounce(filters.search, 300)
+
   // Active filter count for badge
   const activeFilterCount = useMemo(() => {
     let count = 0
@@ -730,18 +743,6 @@ export default function Explore() {
     if (key !== 'recommended') sp.set('sort', key)
     setSearchParams(sp, { replace: true })
   }, [filters, setSearchParams, userGeo])
-
-  const apiFilters = useMemo(() => {
-    const f: Record<string, string> = {}
-    if (filters.city && filters.city !== 'all') f.city = filters.city
-    if (filters.priceMin) f.priceMin = filters.priceMin
-    if (filters.priceMax) f.priceMax = filters.priceMax
-    if (filters.zoning) f.zoning = filters.zoning
-    return f
-  }, [filters.city, filters.priceMin, filters.priceMax, filters.zoning])
-
-  const { data: plots = [], isLoading } = useAllPlots(apiFilters)
-  const dSearch = useDebounce(filters.search, 300)
 
   // Auto-select plot from URL param (e.g. from PlotDetail "View on Map" button)
   useEffect(() => {
@@ -1226,6 +1227,13 @@ export default function Explore() {
         />
         {!mapFullscreen && <FilterBar filters={filters} onChange={setFilters} resultCount={filtered.length}
           plots={plots} onSelectPlot={(id) => { const pl = plots.find(pp => pp.id === id); if (pl) selectPlot(pl) }} />}
+        {/* Accessibility: aria-live announcer for screen readers when filter results change */}
+        <div aria-live="polite" aria-atomic="true" role="status" className="sr-only">
+          {!isLoading && (filtered.length > 0
+            ? `נמצאו ${filtered.length} חלקות${filters.city && filters.city !== 'all' ? ` ב${filters.city}` : ''}`
+            : hasActiveFilters ? 'לא נמצאו חלקות התואמות את הסינון' : ''
+          )}
+        </div>
 
         {/* Breadcrumb navigation — SEO + UX context (like Madlan) */}
         {!mapFullscreen && !isMobile && (

@@ -1,5 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
-  <rect width="192" height="192" rx="40" fill="#050D1A"/>
-  <text x="96" y="120" text-anchor="middle" font-size="100" font-family="sans-serif">🗺️</text>
-  <rect x="20" y="160" width="152" height="4" rx="2" fill="#C8942A"/>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#D4A84B"/>
+      <stop offset="100%" stop-color="#E8C96A"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0F1B2E"/>
+      <stop offset="100%" stop-color="#0B1120"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="40" fill="url(#bg)"/>
+  <!-- Map pin icon -->
+  <path d="M96 36c-24.853 0-45 18.815-45 42.03C51 109.38 96 156 96 156s45-46.62 45-77.97C141 54.815 120.853 36 96 36zm0 60c-9.941 0-18-8.059-18-18s8.059-18 18-18 18 8.059 18 18-8.059 18-18 18z" fill="url(#g)"/>
+  <!-- Gold bar accent -->
+  <rect x="40" y="168" width="112" height="5" rx="2.5" fill="#D4A84B" opacity="0.5"/>
 </svg>
