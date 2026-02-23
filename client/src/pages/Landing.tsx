@@ -1,12 +1,12 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { MapPin, Zap, TrendingUp, ChevronLeft, ChevronDown, Phone, Bell, Smartphone, Briefcase, Star, Shield, FileText, Building2, MessageCircle, HelpCircle, AlertTriangle, Search, ArrowDown, ArrowUpRight, Eye, Flame } from 'lucide-react'
+import { MapPin, Zap, TrendingUp, ChevronLeft, ChevronDown, Phone, Bell, Smartphone, Briefcase, Star, Shield, FileText, Building2, MessageCircle, HelpCircle, AlertTriangle, Search, ArrowDown, ArrowUpRight, Eye, Flame, Clock, Mail, ArrowLeft } from 'lucide-react'
 import { t, fadeInUp, fadeInScale, shimmer, float, gradientShift, sm, md, lg, mobile } from '../theme'
 import { PublicLayout } from '../components/Layout'
 import { GoldButton, GhostButton, AnimatedCard, CountUpNumber, ScrollToTop } from '../components/UI'
-import { SITE_CONFIG, p, roi, fmt, pricePerDunam, calcScore, getGrade, zoningLabels, statusColors } from '../utils'
-import { useAllPlots, useInView, usePrefetchPlotsByCity } from '../hooks'
+import { SITE_CONFIG, p, roi, fmt, pricePerDunam, calcScore, getGrade, zoningLabels, statusColors, pricePerSqm } from '../utils'
+import { useAllPlots, useInView, usePrefetchPlotsByCity, useRecentlyViewed, usePlotsBatch, useDocumentTitle, useMetaDescription } from '../hooks'
 
 /* ── extra keyframes ── */
 const glow = keyframes`0%,100%{box-shadow:0 0 20px rgba(212,168,75,0.15)}50%{box-shadow:0 0 50px rgba(212,168,75,0.35)}`
@@ -538,6 +538,78 @@ const FaqA = styled.div<{$open:boolean}>`
   font-size:14px;color:${t.textSec};line-height:1.8;
 `
 
+/* ══════ RECENTLY VIEWED ══════ */
+const RecentSection = styled.section`
+  padding:48px 24px;direction:rtl;position:relative;
+  background:linear-gradient(180deg,${t.bg},rgba(212,168,75,0.02),${t.bg});
+`
+const RecentGrid = styled.div`
+  max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:14px;
+  ${sm}{grid-template-columns:repeat(2,1fr);}
+  ${lg}{grid-template-columns:repeat(4,1fr);}
+`
+const RecentCard = styled(Link)<{$delay:number}>`
+  display:flex;align-items:center;gap:14px;padding:16px;
+  background:${t.surface};border:1px solid ${t.border};border-radius:${t.r.lg};
+  text-decoration:none!important;transition:all 0.3s cubic-bezier(0.32,0.72,0,1);
+  animation:${fadeInUp} 0.4s ease-out ${p=>p.$delay}s both;
+  &:hover{border-color:${t.goldBorder};transform:translateY(-4px);box-shadow:0 12px 36px rgba(212,168,75,0.12);}
+`
+const RecentScoreBubble = styled.div<{$c:string}>`
+  width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:${pr=>pr.$c}15;border:2px solid ${pr=>pr.$c}40;flex-shrink:0;
+  font-size:14px;font-weight:900;color:${pr=>pr.$c};font-family:${t.font};
+`
+const RecentInfo = styled.div`flex:1;min-width:0;`
+const RecentName = styled.div`font-size:14px;font-weight:700;color:${t.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`
+const RecentMeta = styled.div`font-size:11px;color:${t.textSec};display:flex;align-items:center;gap:6px;margin-top:3px;`
+const RecentPrice = styled.span`font-size:15px;font-weight:800;color:${t.gold};white-space:nowrap;flex-shrink:0;`
+const RecentSeeAll = styled(Link)`
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  margin:24px auto 0;padding:12px 28px;width:fit-content;
+  background:transparent;border:1px solid ${t.goldBorder};border-radius:${t.r.full};
+  color:${t.gold};font-size:14px;font-weight:700;font-family:${t.font};
+  text-decoration:none!important;transition:all ${t.tr};
+  &:hover{background:${t.goldDim};border-color:${t.gold};transform:translateY(-2px);}
+`
+
+/* ══════ NEWSLETTER SIGNUP ══════ */
+const NewsletterSection = styled.section`
+  padding:56px 24px;direction:rtl;text-align:center;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,rgba(212,168,75,0.08),rgba(212,168,75,0.02));
+  border-top:1px solid ${t.goldBorder};border-bottom:1px solid ${t.goldBorder};
+`
+const NewsletterTitle = styled.h3`
+  font-size:clamp(20px,3vw,28px);font-weight:800;color:${t.text};margin-bottom:8px;font-family:${t.font};
+`
+const NewsletterSub = styled.p`
+  font-size:15px;color:${t.textSec};margin-bottom:28px;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.7;
+`
+const NewsletterForm = styled.form`
+  display:flex;align-items:center;gap:0;max-width:440px;margin:0 auto;
+  background:rgba(255,255,255,0.06);backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.12);border-radius:${t.r.full};
+  overflow:hidden;transition:all 0.3s;
+  &:focus-within{border-color:${t.gold};box-shadow:0 0 0 3px ${t.goldDim};}
+`
+const NewsletterInput = styled.input`
+  flex:1;padding:14px 18px;background:transparent;border:none;outline:none;
+  font-size:15px;font-family:${t.font};color:${t.text};direction:ltr;text-align:right;
+  &::placeholder{color:${t.textDim};}
+  ${mobile}{padding:12px 14px;font-size:14px;}
+`
+const NewsletterBtn = styled.button<{$success?:boolean}>`
+  display:flex;align-items:center;justify-content:center;gap:6px;padding:14px 24px;
+  background:${pr=>pr.$success?t.ok:`linear-gradient(135deg,${t.gold},${t.goldBright})`};color:${t.bg};
+  border:none;font-size:14px;font-weight:700;font-family:${t.font};cursor:pointer;
+  white-space:nowrap;transition:all 0.3s;border-radius:0 ${t.r.full} ${t.r.full} 0;
+  &:hover{opacity:0.9;}
+  ${mobile}{padding:12px 16px;font-size:13px;}
+`
+const NewsletterPrivacy = styled.p`
+  font-size:11px;color:${t.textDim};margin-top:14px;max-width:380px;margin-left:auto;margin-right:auto;
+`
+
 /* ══════ DISCLAIMER ══════ */
 const DisclaimerBanner = styled.div`
   padding:20px 24px;direction:rtl;text-align:center;
@@ -637,10 +709,14 @@ function FaqAccordion() {
 const SEARCH_CITIES = ['חדרה', 'נתניה', 'קיסריה', 'הרצליה', 'כפר סבא', 'רעננה', 'תל אביב', 'ירושלים', 'חיפה', 'באר שבע', 'ראשון לציון', 'פתח תקווה', 'אשדוד', 'נס ציונה']
 
 export default function Landing(){
+  useDocumentTitle('קרקעות להשקעה בישראל — מפה אינטראקטיבית')
+  useMetaDescription('מצא קרקעות להשקעה בישראל עם מפה אינטראקטיבית, ניתוח AI, ציוני השקעה, תחזיות תשואה ומעקב סטטוטורי. חינם.')
   const [vis,setVis]=useState(false)
   const [heroSearch, setHeroSearch] = useState('')
   const [heroDropOpen, setHeroDropOpen] = useState(false)
   const [heroFocusIdx, setHeroFocusIdx] = useState(-1)
+  const [nlEmail, setNlEmail] = useState('')
+  const [nlSubmitted, setNlSubmitted] = useState(false)
   const heroTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const navigate = useNavigate()
   const prefetchCity = usePrefetchPlotsByCity()
@@ -648,6 +724,26 @@ export default function Landing(){
 
   // Fetch live market data for stats
   const { data: plots } = useAllPlots()
+
+  // Recently viewed plots for returning users
+  const { ids: recentIds } = useRecentlyViewed()
+  const { data: recentPlots } = usePlotsBatch(recentIds.slice(0, 4))
+
+  // Newsletter signup handler
+  const handleNewsletterSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault()
+    if (!nlEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nlEmail)) return
+    // Store email locally (could be sent to server later)
+    try {
+      const existing = JSON.parse(localStorage.getItem('nl_emails') || '[]') as string[]
+      if (!existing.includes(nlEmail.trim())) {
+        localStorage.setItem('nl_emails', JSON.stringify([...existing, nlEmail.trim()]))
+      }
+    } catch {}
+    setNlSubmitted(true)
+    setNlEmail('')
+    setTimeout(() => setNlSubmitted(false), 5000)
+  }, [nlEmail])
 
   // Per-city live data for city cards
   const cityData = useMemo(() => {
@@ -1039,6 +1135,57 @@ export default function Landing(){
           <SectionHead>שאלות נפוצות</SectionHead>
           <FaqAccordion />
         </FaqSection></Reveal>
+
+        {/* ── Recently Viewed (returning users only) ── */}
+        {recentPlots && recentPlots.length > 0 && (
+          <Reveal><RecentSection>
+            <CitiesSectionHead><Clock size={22} style={{verticalAlign:'middle',marginLeft:8}} /> חזרתם? הנה מה <span>שצפיתם</span> לאחרונה</CitiesSectionHead>
+            <RecentGrid>
+              {recentPlots.slice(0, 4).map((pl, i) => {
+                const d = p(pl), score = calcScore(pl), grade = getGrade(score)
+                return (
+                  <RecentCard key={pl.id} to={`/plot/${pl.id}`} $delay={i * 0.08}>
+                    <RecentScoreBubble $c={grade.color}>{score}</RecentScoreBubble>
+                    <RecentInfo>
+                      <RecentName>גוש {d.block} · {pl.city}</RecentName>
+                      <RecentMeta>
+                        <span>{fmt.dunam(d.size)} דונם</span>
+                        <span>·</span>
+                        <span style={{color:grade.color,fontWeight:700}}>{grade.grade}</span>
+                      </RecentMeta>
+                    </RecentInfo>
+                    <RecentPrice>{fmt.compact(d.price)}</RecentPrice>
+                  </RecentCard>
+                )
+              })}
+            </RecentGrid>
+            <RecentSeeAll to="/explore">
+              <Eye size={16}/> צפו בכל ההיסטוריה שלי
+            </RecentSeeAll>
+          </RecentSection></Reveal>
+        )}
+
+        {/* ── Newsletter Signup ── */}
+        <Reveal><NewsletterSection>
+          <Mail size={32} color={t.gold} style={{marginBottom:12}} />
+          <NewsletterTitle>קבלו התראות על הזדמנויות חדשות</NewsletterTitle>
+          <NewsletterSub>הירשמו לעדכוני שוק שבועיים — חלקות חדשות, שינויי מחירים, והזדמנויות השקעה ישירות למייל</NewsletterSub>
+          <NewsletterForm onSubmit={handleNewsletterSubmit}>
+            <NewsletterInput
+              type="email"
+              value={nlEmail}
+              onChange={e => setNlEmail(e.target.value)}
+              placeholder="your@email.com"
+              required
+              aria-label="כתובת אימייל לעדכונים"
+              dir="ltr"
+            />
+            <NewsletterBtn type="submit" $success={nlSubmitted}>
+              {nlSubmitted ? <>✓ נרשמת!</> : <><Bell size={16}/> הרשמה</>}
+            </NewsletterBtn>
+          </NewsletterForm>
+          <NewsletterPrivacy>🔒 לא נשלח ספאם. ניתן לבטל בכל עת. פרטיות מלאה.</NewsletterPrivacy>
+        </NewsletterSection></Reveal>
 
         {/* ── WhatsApp ── */}
         <WaSection>

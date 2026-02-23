@@ -870,3 +870,43 @@ export function usePlotCityRanking(plot: Plot | null | undefined, allPlots: Plot
     }
   }, [plot, allPlots])
 }
+
+// ── Document Title ──
+const BASE_TITLE = 'LandMap Israel'
+const TITLE_SEP = ' — '
+
+/**
+ * Dynamically updates document.title for SEO and browser tab clarity.
+ * Automatically restores the base title on unmount.
+ */
+export function useDocumentTitle(title: string | null | undefined) {
+  useEffect(() => {
+    const prev = document.title
+    if (title) {
+      document.title = `${title}${TITLE_SEP}${BASE_TITLE}`
+    } else {
+      document.title = `${BASE_TITLE}${TITLE_SEP}מפת קרקעות להשקעה`
+    }
+    return () => { document.title = prev }
+  }, [title])
+}
+
+/**
+ * Dynamically updates the meta description tag for SEO.
+ * Google uses this in search result snippets.
+ */
+export function useMetaDescription(description: string | null | undefined) {
+  useEffect(() => {
+    if (!description) return
+    const meta = document.querySelector('meta[name="description"]') as HTMLMetaElement | null
+    const prev = meta?.getAttribute('content') || ''
+    if (meta) {
+      meta.setAttribute('content', description)
+    }
+    return () => {
+      if (meta && prev) meta.setAttribute('content', prev)
+    }
+  }, [description])
+}
+
+// (useDataFreshness already defined above at line ~243)

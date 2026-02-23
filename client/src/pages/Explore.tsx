@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink, MessageCircle, Clock, Building2, BarChart3, ArrowUpRight, ArrowDownRight, Zap, Target, PieChart, Share2, Check, Filter } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation, useOnlineStatus, useIsMobile, useFocusTrap, useSSE } from '../hooks'
+import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation, useOnlineStatus, useIsMobile, useFocusTrap, useSSE, useDocumentTitle, useMetaDescription } from '../hooks'
+// Note: dataFreshness and dataSource are computed locally in this component (not via hooks)
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, Spinner, useToast, Badge, NetworkBanner, AnimatedValue, DemoModeBanner, ExploreLoadingSkeleton } from '../components/UI'
@@ -840,6 +841,22 @@ export default function Explore() {
 
   const sorted = useMemo(() => sortPlots(filtered, sortKey, userGeo.location), [filtered, sortKey, userGeo.location])
 
+  // Dynamic document title + meta description based on active city filter
+  const exploreTitle = useMemo(() => {
+    const city = filters.city && filters.city !== 'all' ? filters.city : null
+    const count = filtered.length
+    if (city) return `${count} חלקות ב${city} — מפת קרקעות`
+    return `${count} חלקות להשקעה — מפה אינטראקטיבית`
+  }, [filters.city, filtered.length])
+  useDocumentTitle(exploreTitle)
+  const exploreDesc = useMemo(() => {
+    const city = filters.city && filters.city !== 'all' ? filters.city : null
+    const count = filtered.length
+    if (city && avg > 0) return `${count} חלקות קרקע להשקעה ב${city}. מחיר ממוצע ${fmt.compact(Math.round(avg))}. מפה אינטראקטיבית עם ניתוח AI ותחזיות תשואה.`
+    return `${count} חלקות קרקע להשקעה בישראל. מפה אינטראקטיבית, סינון מתקדם, ניתוח AI וציוני השקעה.`
+  }, [filters.city, filtered.length, avg])
+  useMetaDescription(exploreDesc)
+
   // Share current view URL (must be after filtered is declared)
   const shareView = useCallback(async () => {
     const url = window.location.href
@@ -1034,7 +1051,7 @@ export default function Explore() {
     return base + encodeURIComponent('היי, אשמח לשמוע על הזדמנויות קרקע')
   }, [selected])
 
-  // Data freshness
+  // Data freshness — enhanced with live/demo status and relative time
   const dataSource = useMemo(() => {
     try { return sessionStorage.getItem('data_source') || 'demo' } catch { return 'demo' }
   }, [plots])
@@ -1047,6 +1064,13 @@ export default function Explore() {
       if (secs < 3600) return `לפני ${Math.floor(secs / 60)} דק׳`
       return `לפני ${Math.floor(secs / 3600)} שע׳`
     } catch { return null }
+  }, [plots])
+  const dataFreshnessTitle = useMemo(() => {
+    try {
+      const ts = Number(sessionStorage.getItem('data_last_fetched'))
+      if (!ts) return undefined
+      return `עדכון אחרון: ${new Date(ts).toLocaleString('he-IL')}`
+    } catch { return undefined }
   }, [plots])
 
   // Total area in dunams and city count
@@ -1572,7 +1596,7 @@ export default function Explore() {
           {sortKey === 'nearest' && userGeo.location && <Stat>📍 <Val>לפי קרבה</Val></Stat>}
           {sortKey === 'nearest' && userGeo.loading && <Stat>📍 מאתר...</Stat>}
           {sortKey === 'nearest' && userGeo.error && <Stat style={{color:t.err}}>⚠️ שגיאה</Stat>}
-          {dataFreshness && <Stat>🕐 <span style={{opacity:0.7}}>{dataFreshness}</span></Stat>}
+          {dataFreshness && <Stat title={dataFreshnessTitle}>🕐 <span style={{opacity:0.7}}>{dataFreshness}</span></Stat>}
           {sse.status === 'connected' ? (
             <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים`}>
               <LiveDot $c={t.ok} /> LIVE

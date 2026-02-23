@@ -4,6 +4,7 @@ import { Shield, BarChart3, MapPin, Zap, Phone, Mail, Check } from 'lucide-react
 import { t, fadeInUp, sm, md } from '../theme'
 import { PublicLayout } from '../components/Layout'
 import { AnimatedCard, GoldButton } from '../components/UI'
+import { useDocumentTitle, useMetaDescription } from '../hooks'
 
 /* ── styled ── */
 const Wrap = styled.div`max-width:960px;margin:0 auto;padding:64px 24px;direction:rtl;`
@@ -99,6 +100,14 @@ function Pricing() {
 
 export default function Public() {
   const { pathname } = useLocation()
+  const titleMap: Record<string, string> = { '/about': 'אודות', '/contact': 'צור קשר', '/pricing': 'תוכניות ומחירים' }
+  const descMap: Record<string, string> = {
+    '/about': 'LandMap Israel — פלטפורמת השקעות קרקעות מובילה בישראל עם מפה אינטראקטיבית וניתוח AI.',
+    '/contact': 'צרו קשר עם צוות LandMap Israel — ייעוץ השקעות קרקע, תמיכה טכנית ושיתופי פעולה.',
+    '/pricing': 'תוכניות מנוי LandMap Israel — גישה חינמית למפה, כלים מתקדמים למשקיעים ועסקים.',
+  }
+  useDocumentTitle(titleMap[pathname] || 'אודות')
+  useMetaDescription(descMap[pathname])
   const page = pathname === '/contact' ? <ContactPage /> : pathname === '/pricing' ? <Pricing /> : <About />
   return <PublicLayout>{page}</PublicLayout>
 }

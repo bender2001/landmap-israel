@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { Mail, Lock, User, Briefcase, ArrowLeft } from 'lucide-react'
 import { t, fadeInUp, fadeInScale, mobile, gradientShift } from '../theme'
-import { useAuth } from '../hooks'
+import { useAuth, useDocumentTitle } from '../hooks'
 import { GoldButton, GhostButton, useToast } from '../components/UI'
 import type { Role } from '../types'
 
@@ -61,6 +61,7 @@ const Footer = styled.p`font-size:13px;color:${t.lTextSec};text-align:center;mar
 const FooterLink = styled.button`background:none;border:none;color:${t.gold};font-weight:600;cursor:pointer;font-family:${t.font};font-size:13px;&:hover{text-decoration:underline;}`
 
 export default function Auth() {
+  useDocumentTitle('כניסה / הרשמה')
   const [tab, setTab] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
