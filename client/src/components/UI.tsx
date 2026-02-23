@@ -947,14 +947,13 @@ const AlertTooltip = styled.div<{$show:boolean}>`
 `
 
 /* ── Price Alert Popover (with target price input) ── */
+const alertPopIn = keyframes`from{opacity:0;transform:translateY(8px) scale(0.95)}to{opacity:1;transform:translateY(0) scale(1)}`
 const AlertPopoverWrap = styled.div<{$show:boolean}>`
   position:absolute;bottom:calc(100% + 10px);right:0;z-index:10;
   width:240px;padding:14px;direction:rtl;
   background:${t.surface};border:1px solid ${t.goldBorder};
   border-radius:${t.r.lg};box-shadow:${t.sh.xl};
-  opacity:${pr=>pr.$show?1:0};transform:translateY(${pr=>pr.$show?'0':'8px'}) scale(${pr=>pr.$show?1:0.95});
-  transition:all 0.2s cubic-bezier(0.32,0.72,0,1);
-  pointer-events:${pr=>pr.$show?'auto':'none'};
+  animation:${alertPopIn} 0.2s cubic-bezier(0.32,0.72,0,1);
   &::after{content:'';position:absolute;bottom:-6px;right:12px;
     width:12px;height:12px;background:${t.surface};border-right:1px solid ${t.goldBorder};
     border-bottom:1px solid ${t.goldBorder};transform:rotate(45deg);}
@@ -1072,27 +1071,29 @@ export function PriceAlertButton({ plotId, plotLabel, currentPrice, onToggle }: 
         {isActive ? <BellOff size={15} /> : <Bell size={15} />}
       </AlertBtn>
       {!showPopover && (
-        <AlertTooltip $show={showTooltip}>
+        <AlertTooltip $show={showTooltip} aria-hidden={!showTooltip}>
           {isActive ? '🔕 בטל התראת מחיר' : '🔔 הגדר התראת מחיר'}
         </AlertTooltip>
       )}
-      <AlertPopoverWrap $show={showPopover}>
-        <AlertPopTitle><Bell size={14} color="#8B5CF6" /> התראת מחיר</AlertPopTitle>
-        <AlertPopInput
-          type="number"
-          value={targetPrice}
-          onChange={e => setTargetPrice(e.target.value)}
-          placeholder="מחיר יעד ב-₪"
-          onKeyDown={e => e.key === 'Enter' && submitAlert()}
-          autoFocus={showPopover}
-        />
-        {currentPrice && currentPrice > 0 && (
-          <AlertPopHint>מחיר נוכחי: ₪{currentPrice.toLocaleString()}</AlertPopHint>
-        )}
-        <AlertPopSubmit onClick={submitAlert} disabled={!targetPrice || Number(targetPrice) <= 0}>
-          🔔 הפעל התראה
-        </AlertPopSubmit>
-      </AlertPopoverWrap>
+      {showPopover && (
+        <AlertPopoverWrap $show={showPopover} role="dialog" aria-label="התראת מחיר">
+          <AlertPopTitle><Bell size={14} color="#8B5CF6" /> התראת מחיר</AlertPopTitle>
+          <AlertPopInput
+            type="number"
+            value={targetPrice}
+            onChange={e => setTargetPrice(e.target.value)}
+            placeholder="מחיר יעד ב-₪"
+            onKeyDown={e => { if (e.key === 'Enter') submitAlert(); if (e.key === 'Escape') setShowPopover(false) }}
+            autoFocus
+          />
+          {currentPrice && currentPrice > 0 && (
+            <AlertPopHint>מחיר נוכחי: ₪{currentPrice.toLocaleString()}</AlertPopHint>
+          )}
+          <AlertPopSubmit onClick={submitAlert} disabled={!targetPrice || Number(targetPrice) <= 0}>
+            🔔 הפעל התראה
+          </AlertPopSubmit>
+        </AlertPopoverWrap>
+      )}
     </div>
   )
 }

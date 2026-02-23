@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus } from 'lucide-react'
+import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus, Home, BarChart3 } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription, useRecentlyViewed } from '../hooks'
 // Note: dataFreshness and dataSource are computed locally in this component (not via hooks)
@@ -87,6 +87,60 @@ const NavBadge = styled.span`
 `
 const NavBtnWrap = styled.div`position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;`
 
+/* ── Breadcrumb Navigation ── */
+const BreadcrumbBar = styled.nav`
+  position:absolute;top:72px;left:50%;transform:translateX(-50%);z-index:${t.z.filter - 1};
+  display:flex;align-items:center;gap:6px;padding:6px 16px;direction:rtl;
+  background:${t.glass};backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid ${t.glassBorder};border-radius:${t.r.full};
+  box-shadow:${t.sh.sm};font-size:12px;font-family:${t.font};
+  animation:${slideUp} 0.25s ease-out;
+  ${mobile}{top:52px;font-size:11px;padding:5px 12px;gap:4px;max-width:calc(100vw - 24px);}
+`
+const BreadcrumbLink = styled(Link)`
+  color:${t.textDim};font-weight:500;transition:color ${t.tr};text-decoration:none;
+  white-space:nowrap;
+  &:hover{color:${t.gold};}
+`
+const BreadcrumbSep = styled.span`
+  color:${t.textDim};opacity:0.4;font-size:10px;flex-shrink:0;
+`
+const BreadcrumbCurrent = styled.span`
+  color:${t.gold};font-weight:700;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;max-width:160px;
+`
+
+/* ── City Market Summary Card ── */
+const citySummaryIn = keyframes`from{opacity:0;transform:translateY(-8px) scale(0.96)}to{opacity:1;transform:translateY(0) scale(1)}`
+const CityMarketCard = styled.div`
+  position:absolute;top:16px;left:16px;z-index:${t.z.filter};
+  width:220px;padding:14px 16px;direction:rtl;
+  background:${t.glass};backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid ${t.glassBorder};border-radius:${t.r.lg};
+  box-shadow:${t.sh.lg};animation:${citySummaryIn} 0.35s cubic-bezier(0.32,0.72,0,1);
+  &::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,transparent,${t.gold},${t.goldBright},${t.gold},transparent);
+    border-radius:${t.r.lg} ${t.r.lg} 0 0;}
+  ${mobile}{display:none;}
+`
+const CityMarketTitle = styled.div`
+  font-size:14px;font-weight:800;color:${t.text};margin-bottom:10px;
+  display:flex;align-items:center;gap:6px;
+`
+const CityMarketGrid = styled.div`display:grid;grid-template-columns:1fr 1fr;gap:8px;`
+const CityMarketStat = styled.div`
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:8px 6px;background:${t.surfaceLight};border:1px solid ${t.border};
+  border-radius:${t.r.sm};transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};}
+`
+const CityMarketStatVal = styled.div<{$c?:string}>`
+  font-size:14px;font-weight:800;color:${pr=>pr.$c||t.gold};
+`
+const CityMarketStatLabel = styled.div`
+  font-size:9px;font-weight:600;color:${t.textDim};text-align:center;
+`
+
 /* ── Sort ── */
 const SortWrap = styled.div`
   position:absolute;top:16px;right:16px;z-index:${t.z.filter};direction:rtl;
@@ -100,10 +154,12 @@ const SortBtn = styled.button<{$active?:boolean}>`
   cursor:pointer;transition:all ${t.tr};box-shadow:${t.sh.sm};
   &:hover{border-color:${t.goldBorder};color:${t.gold};}
 `
+const sortDropIn = keyframes`from{opacity:0;transform:translateY(-6px) scale(0.95)}to{opacity:1;transform:translateY(0) scale(1)}`
 const SortDrop = styled.div`
   position:absolute;top:calc(100% + 6px);right:0;min-width:140px;
   background:${t.glass};backdrop-filter:blur(24px);border:1px solid ${t.glassBorder};
   border-radius:${t.r.md};box-shadow:${t.sh.lg};overflow:hidden;
+  animation:${sortDropIn} 0.2s cubic-bezier(0.32,0.72,0,1);
 `
 const SortOption = styled.button<{$active?:boolean}>`
   display:block;width:100%;padding:8px 14px;text-align:right;
@@ -491,6 +547,28 @@ export default function Explore() {
   // ── Computed stats ──
   const avg = useMemo(() => filtered.length ? filtered.reduce((s, pl) => s + p(pl).price, 0) / filtered.length : 0, [filtered])
 
+  // City market summary stats (shown when a city filter is active)
+  const cityMarketStats = useMemo(() => {
+    const city = filters.city && filters.city !== 'all' ? filters.city : null
+    if (!city || filtered.length === 0) return null
+    const prices = filtered.map(pl => p(pl).price).filter(v => v > 0)
+    const sizes = filtered.map(pl => p(pl).size).filter(v => v > 0)
+    const scores = filtered.map(pl => calcScore(pl))
+    const avgScore = scores.length ? scores.reduce((s, v) => s + v, 0) / scores.length : 0
+    const minPrice = prices.length ? Math.min(...prices) : 0
+    const maxPrice = prices.length ? Math.max(...prices) : 0
+    const avgSize = sizes.length ? sizes.reduce((s, v) => s + v, 0) / sizes.length : 0
+    return {
+      city,
+      count: filtered.length,
+      avgPrice: avg,
+      minPrice,
+      maxPrice,
+      avgScore: Math.round(avgScore * 10) / 10,
+      avgSize: Math.round(avgSize),
+    }
+  }, [filters.city, filtered, avg])
+
   // Dynamic document title + meta description based on active city filter
   const exploreTitle = useMemo(() => {
     const city = filters.city && filters.city !== 'all' ? filters.city : null
@@ -777,6 +855,54 @@ export default function Explore() {
         />
         {!mapFullscreen && <FilterBar filters={filters} onChange={setFilters} resultCount={filtered.length}
           plots={plots} onSelectPlot={(id) => { const pl = plots.find(pp => pp.id === id); if (pl) selectPlot(pl) }} />}
+
+        {/* Visual Breadcrumb Navigation (like Madlan) */}
+        {!mapFullscreen && !isLoading && filtered.length > 0 && (
+          <BreadcrumbBar aria-label="ניווט מיקום">
+            <BreadcrumbLink to="/"><Home size={12} /></BreadcrumbLink>
+            <BreadcrumbSep>›</BreadcrumbSep>
+            {filters.city && filters.city !== 'all' ? (
+              <>
+                <BreadcrumbLink to="/explore">חלקות להשקעה</BreadcrumbLink>
+                <BreadcrumbSep>›</BreadcrumbSep>
+                <BreadcrumbCurrent>{filters.city} ({filtered.length})</BreadcrumbCurrent>
+              </>
+            ) : (
+              <BreadcrumbCurrent>חלקות להשקעה ({filtered.length})</BreadcrumbCurrent>
+            )}
+          </BreadcrumbBar>
+        )}
+
+        {/* City Market Summary Card (shown when filtering by city) */}
+        {!mapFullscreen && cityMarketStats && !isLoading && (
+          <CityMarketCard>
+            <CityMarketTitle>
+              <BarChart3 size={16} color={t.gold} />
+              שוק {cityMarketStats.city}
+            </CityMarketTitle>
+            <CityMarketGrid>
+              <CityMarketStat>
+                <CityMarketStatVal>{cityMarketStats.count}</CityMarketStatVal>
+                <CityMarketStatLabel>חלקות</CityMarketStatLabel>
+              </CityMarketStat>
+              <CityMarketStat>
+                <CityMarketStatVal>{fmt.compact(Math.round(cityMarketStats.avgPrice))}</CityMarketStatVal>
+                <CityMarketStatLabel>מחיר ממוצע</CityMarketStatLabel>
+              </CityMarketStat>
+              <CityMarketStat>
+                <CityMarketStatVal $c={cityMarketStats.avgScore >= 7 ? t.ok : cityMarketStats.avgScore >= 5 ? t.warn : t.err}>
+                  {cityMarketStats.avgScore}
+                </CityMarketStatVal>
+                <CityMarketStatLabel>ציון ממוצע</CityMarketStatLabel>
+              </CityMarketStat>
+              <CityMarketStat>
+                <CityMarketStatVal style={{fontSize:11}}>{fmt.compact(cityMarketStats.minPrice)}–{fmt.compact(cityMarketStats.maxPrice)}</CityMarketStatVal>
+                <CityMarketStatLabel>טווח מחירים</CityMarketStatLabel>
+              </CityMarketStat>
+            </CityMarketGrid>
+          </CityMarketCard>
+        )}
+
         {/* Accessibility: aria-live announcer for screen readers when filter results change */}
         <div aria-live="polite" aria-atomic="true" role="status" className="sr-only">
           {!isLoading && (filtered.length > 0
@@ -980,11 +1106,15 @@ export default function Explore() {
                 </Stat>
               )}
               {sse.status === 'connected' ? (
-                <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים`}>
-                  <LiveDot $c={t.ok} /> LIVE
+                <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים מתעדכנים אוטומטית`}>
+                  <LiveDot $c={t.ok} /> עדכני
+                </LiveBadge>
+              ) : dataSource === 'api' ? (
+                <LiveBadge $connected={false} title="נתונים מהשרת — חיבור חי לא פעיל">
+                  <LiveDot $c={t.warn} /> נתוני שרת
                 </LiveBadge>
               ) : (
-                <Demo>{dataSource === 'api' ? 'API' : 'DEMO'}</Demo>
+                <Demo title="נתונים לדוגמה — השרת לא זמין">נתוני דמו</Demo>
               )}
               <KbHintBtn onClick={() => setShortcutsOpen(true)} title="קיצורי מקלדת (?)">
                 <Keyboard size={10} /> ?

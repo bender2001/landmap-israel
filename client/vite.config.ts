@@ -22,29 +22,28 @@ export default defineConfig({
     port: 5173,
     open: true,
     proxy: {
-      // SSE endpoint needs special handling — no timeout, no buffering
+      // SSE endpoint — long-lived connection, no timeout, no buffering.
+      // http-proxy can strip Content-Type from chunked/streaming responses.
+      // We force the correct MIME type via proxyRes to prevent the browser
+      // from seeing application/octet-stream and aborting EventSource.
       '/api/events': {
         target: 'http://localhost:3001',
         changeOrigin: true,
         timeout: 0,
-        headers: { 'Accept': 'text/event-stream' },
         configure: (proxy) => {
-          // Ensure SSE content-type is preserved through proxy
-          proxy.on('proxyRes', (proxyRes: any) => {
-            if (!proxyRes.headers['content-type']?.includes('text/event-stream')) {
-              proxyRes.headers['content-type'] = 'text/event-stream'
-            }
-            proxyRes.headers['x-accel-buffering'] = 'no'
+          proxy.on('proxyRes', (proxyRes) => {
+            // Force text/event-stream — some http-proxy versions drop it
+            proxyRes.headers['content-type'] = 'text/event-stream; charset=utf-8'
             proxyRes.headers['cache-control'] = 'no-cache, no-transform'
+            proxyRes.headers['x-accel-buffering'] = 'no'
           })
-          proxy.on('proxyReq', (_proxyReq: any, _req: any, res: any) => {
-            // Prevent proxy from buffering SSE responses
-            res?.flushHeaders?.()
-          })
-          proxy.on('error', (_err: any, _req: any, res: any) => {
+          proxy.on('error', (_err, _req, res) => {
             if (res && 'writeHead' in res && !res.headersSent) {
-              res.writeHead(503, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' })
-              res.end('data: {"type":"proxy_error"}\n\n')
+              (res as any).writeHead(503, {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+              })
+              ;(res as any).end('data: {"type":"proxy_error"}\n\n')
             }
           })
         },
