@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, TrendingDown, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon, MessageCircle, Compass, ClipboardCopy, Construction, Milestone } from 'lucide-react'
+import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, TrendingDown, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon, MessageCircle, Compass, ClipboardCopy, Construction, Milestone, Phone } from 'lucide-react'
 import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed, useAllPlots, usePlotCityRanking } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard, ScrollToTop } from '../components/UI'
@@ -517,6 +517,62 @@ const WhatsAppFab = styled.a`
   &:hover{transform:scale(1.1) translateY(-2px);box-shadow:0 8px 28px rgba(37,211,102,0.5);}
   @media print{display:none;}
   @media(max-width:639px){bottom:72px;left:14px;width:46px;height:46px;}
+`
+
+/* ── Contact Agent Card (like Madlan's agent sidebar) ── */
+const AgentCard = styled(AnimatedCard)`
+  background:linear-gradient(145deg,#fff,#FAFBFC);
+  border:1px solid ${t.goldBorder};border-radius:${t.r.lg};padding:0;overflow:hidden;
+  @media print{display:none;}
+`
+const AgentCardHeader = styled.div`
+  padding:16px 20px;
+  background:linear-gradient(135deg,rgba(212,168,75,0.08),rgba(212,168,75,0.03));
+  border-bottom:1px solid rgba(212,168,75,0.12);
+  display:flex;align-items:center;gap:12px;
+`
+const AgentAvatar = styled.div`
+  width:48px;height:48px;border-radius:${t.r.full};
+  background:linear-gradient(135deg,${t.gold},${t.goldBright});
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:900;color:${t.bg};font-family:${t.font};
+  flex-shrink:0;box-shadow:0 2px 8px rgba(212,168,75,0.3);
+`
+const AgentInfo = styled.div`flex:1;min-width:0;`
+const AgentName = styled.div`font-size:15px;font-weight:700;color:${t.lText};font-family:${t.font};`
+const AgentRole = styled.div`font-size:11px;color:${t.lTextSec};font-weight:500;display:flex;align-items:center;gap:4px;`
+const AgentVerifiedBadge = styled.span`
+  display:inline-flex;align-items:center;gap:2px;padding:1px 6px;
+  background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);
+  border-radius:${t.r.full};font-size:10px;font-weight:700;color:${t.ok};
+`
+const AgentCardBody = styled.div`padding:16px 20px;display:flex;flex-direction:column;gap:10px;`
+const AgentCTARow = styled.div`display:flex;gap:8px;`
+const AgentWhatsAppBtn = styled.a`
+  flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:12px 16px;background:#25D366;color:#fff;border:none;border-radius:${t.r.md};
+  font-size:14px;font-weight:700;font-family:${t.font};cursor:pointer;
+  text-decoration:none!important;transition:all ${t.tr};
+  &:hover{background:#1DAF54;box-shadow:0 4px 16px rgba(37,211,102,0.3);transform:translateY(-1px);}
+`
+const AgentPhoneBtn = styled.a`
+  display:flex;align-items:center;justify-content:center;width:44px;height:44px;
+  border-radius:${t.r.md};border:1px solid ${t.lBorder};background:#fff;
+  color:${t.lTextSec};text-decoration:none!important;transition:all ${t.tr};flex-shrink:0;
+  &:hover{border-color:${t.gold};color:${t.gold};box-shadow:${t.sh.sm};}
+`
+const AgentMetaRow = styled.div`
+  display:flex;align-items:center;justify-content:center;gap:16px;
+  padding:10px;background:${t.lBg};border-radius:${t.r.md};
+  font-size:11px;color:${t.lTextSec};font-weight:500;
+`
+const AgentMetaItem = styled.span`display:flex;align-items:center;gap:4px;white-space:nowrap;`
+const AgentMetaVal = styled.span`color:${t.lText};font-weight:700;`
+
+/* ── Lazy Satellite Thumbnail ── */
+const SatThumbImg = styled.img`
+  width:100%;height:80px;object-fit:cover;display:block;
+  background:${t.lBorder};transition:opacity 0.3s;
 `
 
 /* ── Plot vs Area Average Comparison ── */
@@ -1700,6 +1756,34 @@ export default function PlotDetail() {
                 )}
               </HighlightsCard>
 
+              {/* Contact Agent Card — Madlan-style */}
+              <AgentCard $delay={0.07}>
+                <AgentCardHeader>
+                  <AgentAvatar>LM</AgentAvatar>
+                  <AgentInfo>
+                    <AgentName>צוות LandMap</AgentName>
+                    <AgentRole>
+                      מומחי קרקע להשקעה
+                      <AgentVerifiedBadge>✓ מאומת</AgentVerifiedBadge>
+                    </AgentRole>
+                  </AgentInfo>
+                </AgentCardHeader>
+                <AgentCardBody>
+                  <AgentCTARow>
+                    <AgentWhatsAppBtn href={waLink} target="_blank" rel="noopener noreferrer">
+                      <MessageCircle size={18} /> שלח הודעה
+                    </AgentWhatsAppBtn>
+                    <AgentPhoneBtn href={`tel:${SITE_CONFIG.phone}`} aria-label="התקשר">
+                      <Phone size={18} />
+                    </AgentPhoneBtn>
+                  </AgentCTARow>
+                  <AgentMetaRow>
+                    <AgentMetaItem>⏱️ זמן תגובה: <AgentMetaVal>&lt;1 שעה</AgentMetaVal></AgentMetaItem>
+                    <AgentMetaItem>⭐ <AgentMetaVal>4.9</AgentMetaVal>/5</AgentMetaItem>
+                  </AgentMetaRow>
+                </AgentCardBody>
+              </AgentCard>
+
               {/* Mini Map */}
               <Card $delay={0.1}>
                 <CardTitle><MapPin size={18} color={t.gold} /> מיקום על המפה</CardTitle>
@@ -1835,12 +1919,14 @@ export default function PlotDetail() {
                     return (
                       <SimilarCard key={sp.id} to={`/plot/${sp.id}`}>
                         {spThumb && (
-                          <SimilarThumb $url={spThumb}>
+                          <div style={{ position: 'relative', width: '100%', height: 80, overflow: 'hidden' }}>
+                            <SatThumbImg src={spThumb} alt={`לוויין — גוש ${sd.block} חלקה ${sp.number}`} loading="lazy" decoding="async" />
+                            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,transparent 40%,rgba(0,0,0,0.45))' }} />
                             <SimilarThumbOverlay>
                               <SimilarThumbPrice>{fmt.compact(sd.price)}</SimilarThumbPrice>
                               <SimilarThumbGrade $c={sg.color}>{sg.grade}</SimilarThumbGrade>
                             </SimilarThumbOverlay>
-                          </SimilarThumb>
+                          </div>
                         )}
                         <SimilarBody>
                         <SimilarTop>
