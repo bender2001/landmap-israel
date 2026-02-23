@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense, memo, forwardRef } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus, Home, BarChart3, Building2, MapPin } from 'lucide-react'
+import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus, Home, BarChart3, Building2, MapPin, Clock } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription, useRecentlyViewed, useDataFreshness } from '../hooks'
 // Note: dataFreshness and dataSource are computed locally in this component (not via hooks)
@@ -346,6 +346,47 @@ const QualityLabel = styled.span`
 /* ── SSE update count sub-text ── */
 const SseUpdateCount = styled.span`
   opacity:0.6;font-size:9px;
+`
+
+/* ── Recently Viewed Floating Pill ── */
+const recentPillIn = keyframes`from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}`
+const RecentPill = styled.div`
+  position:absolute;top:136px;left:16px;z-index:${t.z.filter - 1};
+  display:flex;flex-direction:column;gap:0;
+  background:${t.glass};backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid ${t.glassBorder};border-radius:${t.r.lg};
+  box-shadow:${t.sh.md};overflow:hidden;width:200px;
+  animation:${recentPillIn} 0.3s cubic-bezier(0.32,0.72,0,1);
+  ${mobile}{display:none;}
+`
+const RecentPillHeader = styled.div`
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px;border-bottom:1px solid ${t.border};direction:rtl;
+`
+const RecentPillTitle = styled.span`
+  font-size:11px;font-weight:700;color:${t.textDim};
+  display:flex;align-items:center;gap:5px;
+`
+const RecentPillToggle = styled.button`
+  background:none;border:none;color:${t.textDim};cursor:pointer;
+  font-size:10px;font-weight:600;font-family:${t.font};
+  padding:2px 6px;border-radius:${t.r.full};transition:all ${t.tr};
+  &:hover{color:${t.gold};background:${t.goldDim};}
+`
+const RecentPillItem = styled.button`
+  display:flex;align-items:center;gap:8px;padding:8px 12px;width:100%;
+  background:transparent;border:none;border-bottom:1px solid ${t.border};
+  cursor:pointer;direction:rtl;font-family:${t.font};text-align:right;
+  transition:background ${t.tr};
+  &:last-child{border-bottom:none;}
+  &:hover{background:${t.hover};}
+`
+const RecentPillName = styled.span`
+  font-size:11px;font-weight:700;color:${t.text};
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;
+`
+const RecentPillPrice = styled.span`
+  font-size:10px;font-weight:800;color:${t.gold};white-space:nowrap;flex-shrink:0;
 `
 
 /* ── Empty state suggestions container ── */
@@ -699,6 +740,168 @@ function filtersToParams(f: Filters): URLSearchParams {
   return sp
 }
 
+/* ── Extracted: MobilePreviewCard (memoized to avoid re-renders when parent state changes) ── */
+interface MobilePreviewProps {
+  plot: Plot
+  allSorted: Plot[]
+  onExpand: () => void
+  onShare: (pl: Plot) => void
+  onClose: () => void
+  isFav: boolean
+  onToggleFav: () => void
+  isCompared: boolean
+  onToggleCompare: () => void
+}
+
+const MobilePreviewCard = memo(forwardRef<HTMLDivElement, MobilePreviewProps>(
+  function MobilePreviewCard({ plot, allSorted, onExpand, onShare, onClose, isFav, onToggleFav, isCompared, onToggleCompare }, ref) {
+    const d = p(plot), score = calcScore(plot), grade = getGrade(score)
+    const insight = calcQuickInsight(plot, allSorted)
+    const pp = pricePosition(plot, allSorted)
+    const dom = daysOnMarket(d.created)
+    const demand = estimateDemand(plot, allSorted)
+
+    // Calculate "vs city average" stats for quick comparison
+    const cityPlots = allSorted.filter(pl => pl.city === plot.city && pl.id !== plot.id)
+    const cityAvgPrice = cityPlots.length > 0 ? cityPlots.reduce((s, pl) => s + p(pl).price, 0) / cityPlots.length : 0
+    const cityAvgScore = cityPlots.length > 0 ? cityPlots.reduce((s, pl) => s + calcScore(pl), 0) / cityPlots.length : 0
+    const cityAvgPps = (() => {
+      const ppsList = cityPlots.map(pricePerSqm).filter(v => v > 0)
+      return ppsList.length > 0 ? ppsList.reduce((s, v) => s + v, 0) / ppsList.length : 0
+    })()
+    const plotPps = pricePerSqm(plot)
+    const priceDiffPct = cityAvgPrice > 0 ? Math.round(((d.price - cityAvgPrice) / cityAvgPrice) * 100) : 0
+    const ppsDiffPct = cityAvgPps > 0 && plotPps > 0 ? Math.round(((plotPps - cityAvgPps) / cityAvgPps) * 100) : 0
+    const scoreDiff = cityAvgScore > 0 ? Math.round((score - cityAvgScore) * 10) / 10 : 0
+
+    return (
+      <MobilePreview $show ref={ref}>
+        <PreviewHandle />
+        <PreviewBody>
+          <PreviewTopRow>
+            <PreviewInfo>
+              <PreviewTitle>גוש {d.block} · חלקה {plot.number}</PreviewTitle>
+              <PreviewCity>
+                <MapIcon size={12} /> {plot.city}
+                {dom && <DaysOnMarketBadge $c={dom.color}>🕐 {dom.label}</DaysOnMarketBadge>}
+                {pp && (
+                  <PricePositionBadge $color={pp.color}>
+                    {pp.direction === 'below' ? <TrendingDown size={10} /> : pp.direction === 'above' ? <TrendingUp size={10} /> : <Minus size={10} />}
+                    {pp.label}
+                  </PricePositionBadge>
+                )}
+              </PreviewCity>
+            </PreviewInfo>
+            <PreviewPrice>{fmt.compact(d.price)}</PreviewPrice>
+          </PreviewTopRow>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <PreviewScore $c={grade.color}>
+              ציון השקעה: {score}/10 — {grade.grade}
+            </PreviewScore>
+            {demand.viewers >= 15 && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 10, fontWeight: 700, color: demand.color,
+                padding: '4px 10px', borderRadius: t.r.full,
+                background: `${demand.color}10`, border: `1px solid ${demand.color}22`,
+              }}>
+                👁 ~{demand.label}
+                {demand.intensity === 'hot' && ' 🔥'}
+              </span>
+            )}
+          </div>
+          {/* Vs City Average — compact comparison grid */}
+          {cityPlots.length >= 2 && (
+            <PreviewCompareGrid>
+              <PreviewCompareStat>
+                <PreviewCompareVal $c={priceDiffPct <= 0 ? t.ok : t.err}>
+                  {priceDiffPct > 0 ? '+' : ''}{priceDiffPct}%
+                </PreviewCompareVal>
+                <PreviewCompareLabel>מחיר vs ממוצע</PreviewCompareLabel>
+              </PreviewCompareStat>
+              <PreviewCompareStat>
+                <PreviewCompareVal $c={ppsDiffPct <= 0 ? t.ok : t.err}>
+                  {ppsDiffPct > 0 ? '+' : ''}{ppsDiffPct}%
+                </PreviewCompareVal>
+                <PreviewCompareLabel>₪/מ״ר vs ממוצע</PreviewCompareLabel>
+              </PreviewCompareStat>
+              <PreviewCompareStat>
+                <PreviewCompareVal $c={scoreDiff >= 0 ? t.ok : t.err}>
+                  {scoreDiff > 0 ? '+' : ''}{scoreDiff}
+                </PreviewCompareVal>
+                <PreviewCompareLabel>ציון vs ממוצע</PreviewCompareLabel>
+              </PreviewCompareStat>
+            </PreviewCompareGrid>
+          )}
+          {/* Quick investment insight */}
+          {insight.priority >= 4 && (
+            <PreviewInsightChip $c={insight.color}>
+              {insight.emoji} {insight.text}
+            </PreviewInsightChip>
+          )}
+          <PreviewActions>
+            <PreviewDetailBtn onClick={onExpand}>
+              <ChevronLeft size={16} /> פרטים מלאים
+            </PreviewDetailBtn>
+            <PreviewQuickActions>
+              <PreviewQuickBtn onClick={() => onShare(plot)} aria-label="שתף חלקה" title="שתף">
+                <Share2 size={16} />
+              </PreviewQuickBtn>
+              <PreviewQuickBtn $active={isFav} $color="#EF4444" onClick={onToggleFav}
+                aria-label={isFav ? 'הסר מהמועדפים' : 'הוסף למועדפים'} title="מועדפים">
+                <Heart size={16} fill={isFav ? '#EF4444' : 'none'} />
+              </PreviewQuickBtn>
+              <PreviewQuickBtn $active={isCompared} $color={t.info} onClick={onToggleCompare}
+                aria-label={isCompared ? 'הסר מהשוואה' : 'הוסף להשוואה'} title="השוואה">
+                <GitCompareArrows size={16} />
+              </PreviewQuickBtn>
+            </PreviewQuickActions>
+            <PreviewCloseBtn onClick={onClose} aria-label="סגור">
+              <X size={18} />
+            </PreviewCloseBtn>
+          </PreviewActions>
+        </PreviewBody>
+      </MobilePreview>
+    )
+  }
+))
+
+/* ── Recently Viewed Widget (desktop only, shown below city market card) ── */
+const RecentlyViewedWidget = memo(function RecentlyViewedWidget({
+  recentIds, plots, onSelect,
+}: { recentIds: string[]; plots: Plot[]; onSelect: (pl: Plot) => void }) {
+  const [collapsed, setCollapsed] = useState(false)
+  const recentPlots = useMemo(() => {
+    if (recentIds.length === 0) return []
+    return recentIds
+      .map(id => plots.find(pl => pl.id === id))
+      .filter((pl): pl is Plot => !!pl)
+      .slice(0, 5)
+  }, [recentIds, plots])
+
+  if (recentPlots.length === 0) return null
+
+  return (
+    <RecentPill>
+      <RecentPillHeader>
+        <RecentPillTitle><Clock size={11} color={t.gold} /> נצפו לאחרונה</RecentPillTitle>
+        <RecentPillToggle onClick={() => setCollapsed(c => !c)}>
+          {collapsed ? 'הצג' : 'הסתר'}
+        </RecentPillToggle>
+      </RecentPillHeader>
+      {!collapsed && recentPlots.map(pl => {
+        const d = p(pl)
+        return (
+          <RecentPillItem key={pl.id} onClick={() => onSelect(pl)}>
+            <RecentPillName>גוש {d.block} · {pl.number}</RecentPillName>
+            <RecentPillPrice>{fmt.compact(d.price)}</RecentPillPrice>
+          </RecentPillItem>
+        )
+      })}
+    </RecentPill>
+  )
+})
+
 export default function Explore() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [filters, setFiltersRaw] = useState<Filters>(() => filtersFromParams(searchParams))
@@ -894,9 +1097,9 @@ export default function Explore() {
     }
   }, [filters.city, filtered, avg])
 
-  // City comparison data (all cities side-by-side for the comparison overlay)
+  // City comparison data — deferred: only compute when panel is open (expensive O(n) with findBestValueIds)
   const cityComparisonData = useMemo(() => {
-    if (plots.length < 2) return []
+    if (!cityCompOpen || plots.length < 2) return []
     const byCity = new Map<string, Plot[]>()
     for (const pl of plots) {
       if (!pl.city) continue
@@ -920,6 +1123,12 @@ export default function Explore() {
         return { city, count: pls.length, avgPrice, avgScore: Math.round(avgScore * 10) / 10, avgPps: Math.round(avgPps), avgPpd: Math.round(avgPpd), bestCount }
       })
       .sort((a, b) => b.avgScore - a.avgScore)
+  }, [plots, cityCompOpen])
+  // Quick city count for button visibility (cheap: just count unique cities)
+  const hasMutipleCities = useMemo(() => {
+    if (plots.length < 2) return false
+    const first = plots[0]?.city
+    return plots.some(pl => pl.city !== first)
   }, [plots])
 
   // Portfolio quality score (weighted avg of all visible plot scores)
@@ -1384,6 +1593,15 @@ export default function Explore() {
           </MobileCityStrip>
         )}
 
+        {/* Recently Viewed — desktop floating widget (below city market card area) */}
+        {!mapFullscreen && !isLoading && !cityMarketStats && recentlyViewed.ids.length > 0 && (
+          <RecentlyViewedWidget
+            recentIds={recentlyViewed.ids}
+            plots={plots}
+            onSelect={selectPlot}
+          />
+        )}
+
         {/* Accessibility: aria-live announcer for screen readers when filter results change */}
         <div aria-live="polite" aria-atomic="true" role="status" className="sr-only">
           {!isLoading && (filtered.length > 0
@@ -1449,7 +1667,7 @@ export default function Explore() {
         {/* Sort dropdown + City Comparison button */}
         {!mapFullscreen && <SortWrap ref={sortRef}>
           <SortActionsRow>
-            {cityComparisonData.length > 1 && (
+            {hasMutipleCities && (
               <CityCompBtn $active={cityCompOpen} onClick={() => setCityCompOpen(o => !o)} aria-label="השוואת ערים">
                 <Building2 size={14} />
                 ערים
@@ -1558,132 +1776,21 @@ export default function Explore() {
         <Suspense fallback={selected ? <SidebarFallback /> : null}>
           {selected && <Sidebar plot={selected} open={isMobile ? mobileExpanded : true} onClose={() => { setSelected(null); setMobileExpanded(false) }} onLead={() => setLeadPlot(selected)} plots={sorted} onNavigate={selectPlot} isCompared={isCompared(selected.id)} onToggleCompare={toggleCompare} />}
         </Suspense>
-        {/* Mobile Plot Preview Bottom Card — enhanced with city comparison */}
-        {selected && !mobileExpanded && (() => {
-          const d = p(selected), score = calcScore(selected), grade = getGrade(score)
-          const insight = calcQuickInsight(selected, sorted)
-          const pp = pricePosition(selected, sorted)
-          const dom = daysOnMarket(d.created)
-          // Calculate "vs city average" stats for quick comparison
-          const cityPlots = sorted.filter(pl => pl.city === selected.city && pl.id !== selected.id)
-          const cityAvgPrice = cityPlots.length > 0 ? cityPlots.reduce((s, pl) => s + p(pl).price, 0) / cityPlots.length : 0
-          const cityAvgScore = cityPlots.length > 0 ? cityPlots.reduce((s, pl) => s + calcScore(pl), 0) / cityPlots.length : 0
-          const cityAvgPps = (() => {
-            const ppsList = cityPlots.map(pricePerSqm).filter(v => v > 0)
-            return ppsList.length > 0 ? ppsList.reduce((s, v) => s + v, 0) / ppsList.length : 0
-          })()
-          const plotPps = pricePerSqm(selected)
-          const priceDiffPct = cityAvgPrice > 0 ? Math.round(((d.price - cityAvgPrice) / cityAvgPrice) * 100) : 0
-          const ppsDiffPct = cityAvgPps > 0 && plotPps > 0 ? Math.round(((plotPps - cityAvgPps) / cityAvgPps) * 100) : 0
-          const scoreDiff = cityAvgScore > 0 ? Math.round((score - cityAvgScore) * 10) / 10 : 0
-
-          return (
-            <MobilePreview $show={true} ref={previewRef}>
-              <PreviewHandle />
-              <PreviewBody>
-                <PreviewTopRow>
-                  <PreviewInfo>
-                    <PreviewTitle>גוש {d.block} · חלקה {selected.number}</PreviewTitle>
-                    <PreviewCity>
-                      <MapIcon size={12} /> {selected.city}
-                      {dom && <DaysOnMarketBadge $c={dom.color}>🕐 {dom.label}</DaysOnMarketBadge>}
-                      {pp && (
-                        <PricePositionBadge $color={pp.color}>
-                          {pp.direction === 'below' ? <TrendingDown size={10} /> : pp.direction === 'above' ? <TrendingUp size={10} /> : <Minus size={10} />}
-                          {pp.label}
-                        </PricePositionBadge>
-                      )}
-                    </PreviewCity>
-                  </PreviewInfo>
-                  <PreviewPrice>{fmt.compact(d.price)}</PreviewPrice>
-                </PreviewTopRow>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <PreviewScore $c={grade.color}>
-                    ציון השקעה: {score}/10 — {grade.grade}
-                  </PreviewScore>
-                  {(() => {
-                    const demand = estimateDemand(selected, sorted)
-                    return demand.viewers >= 15 ? (
-                      <span style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                        fontSize: 10, fontWeight: 700, color: demand.color,
-                        padding: '4px 10px', borderRadius: t.r.full,
-                        background: `${demand.color}10`, border: `1px solid ${demand.color}22`,
-                      }}>
-                        👁 ~{demand.label}
-                        {demand.intensity === 'hot' && ' 🔥'}
-                      </span>
-                    ) : null
-                  })()}
-                </div>
-                {/* Vs City Average — compact comparison grid */}
-                {cityPlots.length >= 2 && (
-                  <PreviewCompareGrid>
-                    <PreviewCompareStat>
-                      <PreviewCompareVal $c={priceDiffPct <= 0 ? t.ok : t.err}>
-                        {priceDiffPct > 0 ? '+' : ''}{priceDiffPct}%
-                      </PreviewCompareVal>
-                      <PreviewCompareLabel>מחיר vs ממוצע</PreviewCompareLabel>
-                    </PreviewCompareStat>
-                    <PreviewCompareStat>
-                      <PreviewCompareVal $c={ppsDiffPct <= 0 ? t.ok : t.err}>
-                        {ppsDiffPct > 0 ? '+' : ''}{ppsDiffPct}%
-                      </PreviewCompareVal>
-                      <PreviewCompareLabel>₪/מ״ר vs ממוצע</PreviewCompareLabel>
-                    </PreviewCompareStat>
-                    <PreviewCompareStat>
-                      <PreviewCompareVal $c={scoreDiff >= 0 ? t.ok : t.err}>
-                        {scoreDiff > 0 ? '+' : ''}{scoreDiff}
-                      </PreviewCompareVal>
-                      <PreviewCompareLabel>ציון vs ממוצע</PreviewCompareLabel>
-                    </PreviewCompareStat>
-                  </PreviewCompareGrid>
-                )}
-                {/* Quick investment insight */}
-                {insight.priority >= 4 && (
-                  <PreviewInsightChip $c={insight.color}>
-                    {insight.emoji} {insight.text}
-                  </PreviewInsightChip>
-                )}
-                <PreviewActions>
-                  <PreviewDetailBtn onClick={() => setMobileExpanded(true)}>
-                    <ChevronLeft size={16} /> פרטים מלאים
-                  </PreviewDetailBtn>
-                  <PreviewQuickActions>
-                    <PreviewQuickBtn
-                      onClick={() => sharePlot(selected)}
-                      aria-label="שתף חלקה"
-                      title="שתף"
-                    >
-                      <Share2 size={16} />
-                    </PreviewQuickBtn>
-                    <PreviewQuickBtn
-                      $active={isFav(selected.id)}
-                      $color="#EF4444"
-                      onClick={() => toggle(selected.id)}
-                      aria-label={isFav(selected.id) ? 'הסר מהמועדפים' : 'הוסף למועדפים'}
-                      title="מועדפים"
-                    >
-                      <Heart size={16} fill={isFav(selected.id) ? '#EF4444' : 'none'} />
-                    </PreviewQuickBtn>
-                    <PreviewQuickBtn
-                      $active={isCompared(selected.id)}
-                      $color={t.info}
-                      onClick={() => toggleCompare(selected.id)}
-                      aria-label={isCompared(selected.id) ? 'הסר מהשוואה' : 'הוסף להשוואה'}
-                      title="השוואה"
-                    >
-                      <GitCompareArrows size={16} />
-                    </PreviewQuickBtn>
-                  </PreviewQuickActions>
-                  <PreviewCloseBtn onClick={() => setSelected(null)} aria-label="סגור">
-                    <X size={18} />
-                  </PreviewCloseBtn>
-                </PreviewActions>
-              </PreviewBody>
-            </MobilePreview>
-          )
-        })()}
+        {/* Mobile Plot Preview Bottom Card — extracted memoized component */}
+        {selected && !mobileExpanded && (
+          <MobilePreviewCard
+            ref={previewRef}
+            plot={selected}
+            allSorted={sorted}
+            onExpand={() => setMobileExpanded(true)}
+            onShare={sharePlot}
+            onClose={() => setSelected(null)}
+            isFav={isFav(selected.id)}
+            onToggleFav={() => toggle(selected.id)}
+            isCompared={isCompared(selected.id)}
+            onToggleCompare={() => toggleCompare(selected.id)}
+          />
+        )}
 
         <Suspense fallback={null}>
           <LeadModal plot={leadPlot} open={!!leadPlot} onClose={() => setLeadPlot(null)} />
