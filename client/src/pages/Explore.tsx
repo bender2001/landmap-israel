@@ -853,6 +853,11 @@ export default function Explore() {
 
   const sorted = useMemo(() => sortPlots(filtered, sortKey, userGeo.location), [filtered, sortKey, userGeo.location])
 
+  // ── Computed stats (must be declared before memos that reference them) ──
+  const avg = useMemo(() => filtered.length ? filtered.reduce((s, pl) => s + p(pl).price, 0) / filtered.length : 0, [filtered])
+  const avgPps = useMemo(() => filtered.length ? Math.round(filtered.reduce((s, pl) => s + pricePerSqm(pl), 0) / filtered.length) : 0, [filtered])
+  const avgPpd = useMemo(() => filtered.length ? Math.round(filtered.reduce((s, pl) => s + pricePerDunam(pl), 0) / filtered.length) : 0, [filtered])
+
   // Dynamic document title + meta description based on active city filter
   const exploreTitle = useMemo(() => {
     const city = filters.city && filters.city !== 'all' ? filters.city : null
@@ -897,9 +902,6 @@ export default function Explore() {
     }
   }, [filters.city, filtered.length, isMobile, toast])
 
-  const avg = filtered.length ? filtered.reduce((s, pl) => s + p(pl).price, 0) / filtered.length : 0
-  const avgPps = filtered.length ? Math.round(filtered.reduce((s, pl) => s + pricePerSqm(pl), 0) / filtered.length) : 0
-  const avgPpd = filtered.length ? Math.round(filtered.reduce((s, pl) => s + pricePerDunam(pl), 0) / filtered.length) : 0
   const medianPrice = useMemo(() => {
     if (!filtered.length) return 0
     const prices = filtered.map(pl => p(pl).price).filter(v => v > 0).sort((a, b) => a - b)

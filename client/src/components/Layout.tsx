@@ -94,9 +94,10 @@ export function PublicNav() {
         <NavInner>
           <Logo to="/">LandMap</Logo>
           <NavLinks>
-            {NAV_ITEMS.map(n => (
-              <NavLink key={n.to} to={n.to} $active={pathname.startsWith(n.to)}>{n.label}</NavLink>
-            ))}
+            {NAV_ITEMS.map(n => {
+              const active = pathname.startsWith(n.to)
+              return <NavLink key={n.to} to={n.to} $active={active} aria-current={active ? 'page' : undefined}>{n.label}</NavLink>
+            })}
           </NavLinks>
           <AuthBtns>
             <BtnGhost to="/login">התחבר</BtnGhost>
@@ -157,9 +158,9 @@ export function PublicFooter() {
           <FooterLogo>LandMap</FooterLogo>
           <FooterDesc>פלטפורמת השקעות קרקע מובילה בישראל — מפה אינטראקטיבית, ניתוח AI ונתוני שוק בזמן אמת.</FooterDesc>
           <FooterSocials>
-            <FooterSocialLink href="https://wa.me/9720521234567" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" title="WhatsApp">💬</FooterSocialLink>
+            <FooterSocialLink href="https://wa.me/message/landmap" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" title="WhatsApp">💬</FooterSocialLink>
             <FooterSocialLink href="mailto:info@landmap.co.il" aria-label="אימייל" title="אימייל">📧</FooterSocialLink>
-            <FooterSocialLink href="tel:052-1234567" aria-label="טלפון" title="טלפון">📞</FooterSocialLink>
+            <FooterSocialLink href="/contact" aria-label="צור קשר" title="צור קשר">📞</FooterSocialLink>
           </FooterSocials>
         </FooterCol>
         <FooterCol>
