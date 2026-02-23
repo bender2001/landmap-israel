@@ -251,26 +251,55 @@ export function useSavedSearches() {
   return { searches, save, remove }
 }
 
-// ── Data Freshness Tracker ──
+// ── Data Freshness Tracker (auto-updating relative time) ──
+
+function computeRelativeTime(ts: number | null): string | null {
+  if (!ts) return null
+  const secs = Math.floor((Date.now() - ts) / 1000)
+  if (secs < 60) return 'עכשיו'
+  if (secs < 3600) return `לפני ${Math.floor(secs / 60)} דק׳`
+  if (secs < 86400) return `לפני ${Math.floor(secs / 3600)} שע׳`
+  return `לפני ${Math.floor(secs / 86400)} ימים`
+}
 
 export function useDataFreshness() {
   const [lastFetched, setLastFetched] = useState<number | null>(() => {
     try { return Number(sessionStorage.getItem('data_last_fetched')) || null } catch { return null }
   })
+  const [relativeTime, setRelativeTime] = useState<string | null>(() => computeRelativeTime(
+    (() => { try { return Number(sessionStorage.getItem('data_last_fetched')) || null } catch { return null } })()
+  ))
 
   const markFetched = useCallback(() => {
     const now = Date.now()
     setLastFetched(now)
+    setRelativeTime('עכשיו')
     try { sessionStorage.setItem('data_last_fetched', String(now)) } catch {}
   }, [])
 
-  const relativeTime = lastFetched ? (() => {
-    const secs = Math.floor((Date.now() - lastFetched) / 1000)
-    if (secs < 60) return 'עכשיו'
-    if (secs < 3600) return `לפני ${Math.floor(secs / 60)} דק׳`
-    if (secs < 86400) return `לפני ${Math.floor(secs / 3600)} שע׳`
-    return `לפני ${Math.floor(secs / 86400)} ימים`
-  })() : null
+  // Auto-update relative time every 30s so "עכשיו" → "לפני 1 דק׳" etc.
+  useEffect(() => {
+    if (!lastFetched) return
+    const update = () => setRelativeTime(computeRelativeTime(lastFetched))
+    update()
+    const interval = setInterval(update, 30_000)
+    return () => clearInterval(interval)
+  }, [lastFetched])
+
+  // Also sync from sessionStorage on tab focus (e.g. SSE updated in another tab)
+  useEffect(() => {
+    const handler = () => {
+      try {
+        const ts = Number(sessionStorage.getItem('data_last_fetched')) || null
+        if (ts && ts !== lastFetched) {
+          setLastFetched(ts)
+          setRelativeTime(computeRelativeTime(ts))
+        }
+      } catch {}
+    }
+    window.addEventListener('focus', handler)
+    return () => window.removeEventListener('focus', handler)
+  }, [lastFetched])
 
   return { lastFetched, markFetched, relativeTime }
 }

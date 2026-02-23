@@ -3,7 +3,7 @@ import styled, { keyframes, css } from 'styled-components'
 import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download, Share2, MessageCircle, LayoutGrid, Table2, Eye } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, estimatedYear, findBestValueIds, SITE_CONFIG, plotCenter, satelliteTileUrl, investmentRecommendation, calcQuickInsight } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, estimatedYear, findBestValueIds, SITE_CONFIG, plotCenter, satelliteTileUrl, investmentRecommendation, calcQuickInsight, estimateDemand } from '../utils'
 import { Skeleton, PriceAlertButton } from './UI'
 import type { Plot } from '../types'
 
@@ -316,6 +316,16 @@ const EstYearBadge = styled.span`
   padding:2px 7px;border-radius:${t.r.full};color:${t.gold};
   background:${t.goldDim};border:1px solid ${t.goldBorder};
   white-space:nowrap;letter-spacing:0.3px;
+`
+
+/* ── Demand/Views Badge (social proof) ── */
+const demandPulse = keyframes`0%,100%{opacity:1}50%{opacity:0.75}`
+const DemandBadge = styled.span<{$c:string;$hot?:boolean}>`
+  display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;
+  padding:2px 7px;border-radius:${t.r.full};color:${pr=>pr.$c};
+  background:${pr=>pr.$c}10;border:1px solid ${pr=>pr.$c}22;
+  white-space:nowrap;
+  ${pr=>pr.$hot?css`animation:${demandPulse} 2s ease-in-out infinite;`:''};
 `
 
 /* ── View Toggle ── */
@@ -805,14 +815,26 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
           </Metric>
         )}
         {dom && <ItemDom $c={dom.color}>{dom.label}</ItemDom>}
-        {(plot.views ?? 0) >= 10 && (
-          <Metric title={`${plot.views} צפיות`} style={{ opacity: 0.7 }}>
-            <Eye size={10} />
-            <MetricVal style={{ fontSize: 10, color: (plot.views ?? 0) >= 50 ? '#EF4444' : t.textDim }}>
-              {plot.views}{(plot.views ?? 0) >= 50 ? ' 🔥' : ''}
-            </MetricVal>
-          </Metric>
-        )}
+        {(() => {
+          // Show real views if available, otherwise show estimated demand
+          const realViews = plot.views ?? 0
+          if (realViews >= 10) {
+            return (
+              <Metric title={`${realViews} צפיות`} style={{ opacity: 0.7 }}>
+                <Eye size={10} />
+                <MetricVal style={{ fontSize: 10, color: realViews >= 50 ? '#EF4444' : t.textDim }}>
+                  {realViews}{realViews >= 50 ? ' 🔥' : ''}
+                </MetricVal>
+              </Metric>
+            )
+          }
+          const demand = estimateDemand(plot, allPlots)
+          return (
+            <DemandBadge $c={demand.color} $hot={demand.intensity === 'hot'} title={`~${demand.viewers} צפיות השבוע`}>
+              👁 ~{demand.label}
+            </DemandBadge>
+          )
+        })()}
         <MiniSparkline plot={plot} />
         <div onClick={e => e.stopPropagation()} style={{ display: 'flex' }}>
           <PriceAlertButton

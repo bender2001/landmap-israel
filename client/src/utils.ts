@@ -1127,6 +1127,43 @@ export function calcGrowthTrajectory(plot: Plot): GrowthPoint[] | null {
   return points
 }
 
+// ── Estimated Demand (simulated viewer interest) ──
+/** Estimates how many viewers would be interested in a plot based on score, price competitiveness, and freshness.
+ *  Used for social proof badges ("~X צפיות השבוע"). Deterministic per plot ID + current week. */
+export function estimateDemand(plot: Plot, allPlots?: Plot[]): { viewers: number; label: string; intensity: 'hot' | 'warm' | 'cool'; color: string } {
+  // Seed from plot ID for consistency within the same week
+  const idNum = plot.id ? [...plot.id].reduce((s, c) => s + c.charCodeAt(0), 0) : 0
+  const weekNum = Math.floor(Date.now() / (7 * 864e5))
+  const seed = (idNum * 31 + weekNum * 17) % 1000
+
+  const score = calcScore(plot)
+  const d = p(plot)
+  const dom = daysOnMarket(d.created)
+  const freshness = dom ? (dom.days <= 14 ? 1.8 : dom.days <= 30 ? 1.3 : dom.days <= 60 ? 1.0 : 0.7) : 1.0
+
+  // Price competitiveness boost
+  let priceBoost = 1.0
+  if (allPlots && allPlots.length >= 3) {
+    const pps = pricePerSqm(plot)
+    const allPps = allPlots.map(pricePerSqm).filter(v => v > 0)
+    if (pps > 0 && allPps.length >= 2) {
+      const avg = allPps.reduce((s, v) => s + v, 0) / allPps.length
+      const diff = (avg - pps) / avg // positive = below avg (more attractive)
+      priceBoost = 1 + Math.max(-0.3, Math.min(0.5, diff))
+    }
+  }
+
+  // Base: score-driven (score 1-10 → 5-50 base viewers)
+  const base = 5 + score * 4.5
+  const jitter = (seed % 20) - 10 // ±10 for variance
+  const raw = Math.round(base * freshness * priceBoost + jitter)
+  const viewers = Math.max(3, Math.min(120, raw))
+
+  if (viewers >= 40) return { viewers, label: `${viewers} צפיות`, intensity: 'hot', color: '#EF4444' }
+  if (viewers >= 20) return { viewers, label: `${viewers} צפיות`, intensity: 'warm', color: '#F59E0B' }
+  return { viewers, label: `${viewers} צפיות`, intensity: 'cool', color: '#64748B' }
+}
+
 // ── Market Insights Generator (for rotating ticker) ──
 export interface MarketInsight {
   text: string

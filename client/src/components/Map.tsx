@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker,
 import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette, Ruler, Undo2, Trash2, LocateFixed, Copy, Check, Search } from 'lucide-react'
-import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket, investmentRecommendation, estimatedYear, pricePosition, calcPercentileRank, findBestValueIds } from '../utils'
+import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, calcScoreBreakdown, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket, investmentRecommendation, estimatedYear, pricePosition, calcPercentileRank, findBestValueIds, estimateDemand } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
 import { israelAreas } from '../data'
@@ -1013,6 +1013,50 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
           <div className="plot-popup-row"><span className="plot-popup-label">שטח</span><span className="plot-popup-value">{fmt.dunam(d.size)} דונם ({fmt.num(d.size)} מ״ר)</span></div>
           {ppd > 0 && <div className="plot-popup-row"><span className="plot-popup-label">₪/דונם</span><span className="plot-popup-value">{fmt.num(ppd)}</span></div>}
           <div className="plot-popup-row"><span className="plot-popup-label">תשואה צפויה</span><span className="plot-popup-value gold">+{fmt.pct(r)}</span></div>
+
+          {/* Score breakdown mini-bars */}
+          {(() => {
+            const bd = calcScoreBreakdown(plot)
+            if (!bd) return null
+            return (
+              <div style={{
+                display: 'flex', flexDirection: 'column', gap: 3, marginTop: 6, padding: '6px 10px',
+                background: 'rgba(0,0,0,0.03)', borderRadius: t.r.sm, direction: 'rtl',
+              }}>
+                {bd.factors.map(f => {
+                  const pct = f.maxScore > 0 ? (f.score / f.maxScore) * 100 : 0
+                  const barColor = pct >= 70 ? '#10B981' : pct >= 40 ? '#F59E0B' : '#EF4444'
+                  return (
+                    <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }} title={f.detail}>
+                      <span style={{ fontSize: 10, flexShrink: 0 }}>{f.icon}</span>
+                      <span style={{ fontSize: 9, fontWeight: 600, color: t.textDim, minWidth: 48, flexShrink: 0 }}>{f.label}</span>
+                      <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: 2, transition: 'width 0.4s' }} />
+                      </div>
+                      <span style={{ fontSize: 9, fontWeight: 800, color: barColor, minWidth: 20, textAlign: 'left' }}>{f.score}/{f.maxScore}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
+
+          {/* Estimated demand / social proof */}
+          {(() => {
+            const demand = estimateDemand(plot, plots)
+            return demand.viewers >= 15 ? (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, padding: '4px 10px',
+                background: demand.intensity === 'hot' ? 'rgba(239,68,68,0.06)' : 'rgba(148,163,184,0.06)',
+                border: `1px solid ${demand.color}20`,
+                borderRadius: t.r.full, fontSize: 10, fontWeight: 700, color: demand.color,
+                direction: 'rtl',
+              }}>
+                👁 ~{demand.label} השבוע
+                {demand.intensity === 'hot' && <span style={{ fontSize: 9, fontWeight: 800, color: '#EF4444' }}>🔥 ביקוש גבוה</span>}
+              </div>
+            ) : null
+          })()}
 
           {/* Investment recommendation */}
           {(() => {

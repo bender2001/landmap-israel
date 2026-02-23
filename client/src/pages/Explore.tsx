@@ -8,8 +8,8 @@ import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, us
 import MapArea from '../components/Map'
 import type { MapBounds } from '../components/Map'
 import FilterBar from '../components/Filters'
-import { ErrorBoundary, useToast, NetworkBanner, AnimatedValue, DemoModeBanner, StaleDataBanner, ExploreLoadingSkeleton } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcQuickInsight, pricePosition, findBestValueIds, calcAggregateStats, generateMarketInsights, plotCenter, daysOnMarket } from '../utils'
+import { ErrorBoundary, useToast, NetworkBanner, AnimatedValue, DemoModeBanner, StaleDataBanner, ExploreLoadingSkeleton, SidebarFallback, CompareDrawerFallback, InlineFallback } from '../components/UI'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcQuickInsight, pricePosition, findBestValueIds, calcAggregateStats, generateMarketInsights, plotCenter, daysOnMarket, estimateDemand } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -931,6 +931,16 @@ export default function Explore() {
     return { avg: Math.round(avg * 10) / 10, grade, pct: Math.round((avg / 10) * 100) }
   }, [filtered])
 
+  // Stats bar aggregated values (memoized to avoid recomputing in render)
+  const statsBarData = useMemo(() => {
+    const prices = filtered.map(pl => p(pl).price).filter(v => v > 0)
+    const minPrice = prices.length ? Math.min(...prices) : 0
+    const maxPrice = prices.length ? Math.max(...prices) : 0
+    const rois = filtered.map(pl => roi(pl)).filter(v => v > 0)
+    const avgRoi = rois.length ? Math.round(rois.reduce((s, v) => s + v, 0) / rois.length) : 0
+    return { prices, minPrice, maxPrice, avgRoi }
+  }, [filtered])
+
   // Market Insights for the ticker
   const marketInsights = useMemo(() => {
     const cityName = filters.city && filters.city !== 'all' ? filters.city : undefined
@@ -1545,7 +1555,7 @@ export default function Explore() {
             recentlyViewedIds={recentlyViewed.ids}
           />
         </Suspense>
-        <Suspense fallback={null}>
+        <Suspense fallback={selected ? <SidebarFallback /> : null}>
           {selected && <Sidebar plot={selected} open={isMobile ? mobileExpanded : true} onClose={() => { setSelected(null); setMobileExpanded(false) }} onLead={() => setLeadPlot(selected)} plots={sorted} onNavigate={selectPlot} isCompared={isCompared(selected.id)} onToggleCompare={toggleCompare} />}
         </Suspense>
         {/* Mobile Plot Preview Bottom Card — enhanced with city comparison */}
@@ -1587,9 +1597,25 @@ export default function Explore() {
                   </PreviewInfo>
                   <PreviewPrice>{fmt.compact(d.price)}</PreviewPrice>
                 </PreviewTopRow>
-                <PreviewScore $c={grade.color}>
-                  ציון השקעה: {score}/10 — {grade.grade}
-                </PreviewScore>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <PreviewScore $c={grade.color}>
+                    ציון השקעה: {score}/10 — {grade.grade}
+                  </PreviewScore>
+                  {(() => {
+                    const demand = estimateDemand(selected, sorted)
+                    return demand.viewers >= 15 ? (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        fontSize: 10, fontWeight: 700, color: demand.color,
+                        padding: '4px 10px', borderRadius: t.r.full,
+                        background: `${demand.color}10`, border: `1px solid ${demand.color}22`,
+                      }}>
+                        👁 ~{demand.label}
+                        {demand.intensity === 'hot' && ' 🔥'}
+                      </span>
+                    ) : null
+                  })()}
+                </div>
                 {/* Vs City Average — compact comparison grid */}
                 {cityPlots.length >= 2 && (
                   <PreviewCompareGrid>
@@ -1679,7 +1705,7 @@ export default function Explore() {
         )}
 
         {/* Inline Compare Drawer — no auth needed, works for everyone */}
-        <Suspense fallback={null}>
+        <Suspense fallback={compareOpen ? <CompareDrawerFallback /> : null}>
           <CompareDrawer
             open={compareOpen}
             onClose={() => setCompareOpen(false)}
@@ -1755,13 +1781,8 @@ export default function Explore() {
           )
         })()}
 
-        {/* Stats bar with viewport visible count */}
+        {/* Stats bar with viewport visible count — values memoized for perf */}
         {!mapFullscreen && (() => {
-          const prices = filtered.map(pl => p(pl).price).filter(v => v > 0)
-          const minPrice = prices.length ? Math.min(...prices) : 0
-          const maxPrice = prices.length ? Math.max(...prices) : 0
-          const rois = filtered.map(pl => roi(pl)).filter(v => v > 0)
-          const avgRoi = rois.length ? Math.round(rois.reduce((s, v) => s + v, 0) / rois.length) : 0
           return (
             <Stats>
               <Stat><Val><AnimatedValue value={filtered.length} /></Val> חלקות</Stat>
@@ -1771,14 +1792,14 @@ export default function Explore() {
                 </ViewportStat>
               )}
               <Stat>ממוצע <Val><AnimatedValue value={Math.round(avg)} format={fmt.compact} /></Val></Stat>
-              {prices.length >= 2 && (
-                <Stat title={`טווח: ${fmt.compact(minPrice)} – ${fmt.compact(maxPrice)}`}>
-                  {fmt.short(minPrice)} – <Val>{fmt.short(maxPrice)}</Val>
+              {statsBarData.prices.length >= 2 && (
+                <Stat title={`טווח: ${fmt.compact(statsBarData.minPrice)} – ${fmt.compact(statsBarData.maxPrice)}`}>
+                  {fmt.short(statsBarData.minPrice)} – <Val>{fmt.short(statsBarData.maxPrice)}</Val>
                 </Stat>
               )}
-              {avgRoi > 0 && (
-                <Stat title={`תשואה ממוצעת צפויה: +${avgRoi}%`}>
-                  ROI <Val style={{ color: t.ok }}>+{avgRoi}%</Val>
+              {statsBarData.avgRoi > 0 && (
+                <Stat title={`תשואה ממוצעת צפויה: +${statsBarData.avgRoi}%`}>
+                  ROI <Val style={{ color: t.ok }}>+{statsBarData.avgRoi}%</Val>
                 </Stat>
               )}
               {portfolioQuality && (
@@ -1791,13 +1812,13 @@ export default function Explore() {
                 </PortfolioGauge>
               )}
               {sse.status === 'connected' ? (
-                <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים מתעדכנים אוטומטית`}>
+                <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים מתעדכנים אוטומטית${dataFreshness.relativeTime ? ` · עודכן ${dataFreshness.relativeTime}` : ''}`}>
                   <LiveDot $c={t.ok} /> עדכני {sse.updateCount > 0 && <SseUpdateCount>({sse.updateCount})</SseUpdateCount>}
                 </LiveBadge>
               ) : dataSource === 'api' ? (
-                <LiveBadge $connected={false} title="נתונים מהשרת — לחץ לרענון" style={{ cursor: 'pointer' }}
+                <LiveBadge $connected={false} title={`נתונים מהשרת${dataFreshness.relativeTime ? ` · עודכן ${dataFreshness.relativeTime}` : ''} — לחץ לרענון`} style={{ cursor: 'pointer' }}
                   onClick={() => { window.location.reload() }}>
-                  <LiveDot $c={t.warn} /> נתוני שרת ↻
+                  <LiveDot $c={t.warn} /> {dataFreshness.relativeTime && dataFreshness.relativeTime !== 'עכשיו' ? dataFreshness.relativeTime : 'נתוני שרת'} ↻
                 </LiveBadge>
               ) : (
                 <Demo title="נתונים לדוגמה — לחץ לנסות שוב" style={{ cursor: 'pointer' }}

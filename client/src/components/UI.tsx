@@ -1137,6 +1137,69 @@ export function PriceAlertButton({ plotId, plotLabel, currentPrice, onToggle }: 
   )
 }
 
+/* ── Lazy Suspense Fallbacks ── */
+const lazyFadeIn = keyframes`from{opacity:0}to{opacity:1}`
+const lazyPulse = keyframes`0%,100%{opacity:0.5}50%{opacity:0.25}`
+
+const LazyFallbackWrap = styled.div<{$position?:'sidebar'|'bottom'|'overlay'}>`
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  font-size:12px;color:${t.textDim};font-family:${t.font};
+  animation:${lazyFadeIn} 0.2s ease-out;
+  ${pr => pr.$position === 'sidebar' ? `
+    position:fixed;top:0;right:0;bottom:0;width:420px;max-width:100vw;
+    background:${t.surface};border-left:1px solid ${t.border};z-index:${t.z.sidebar};
+    flex-direction:column;padding:32px;
+    ${mobile}{width:100vw;}
+  ` : pr.$position === 'bottom' ? `
+    position:fixed;bottom:0;left:0;right:0;height:56px;
+    background:${t.surface};border-top:1px solid ${t.border};z-index:40;
+  ` : pr.$position === 'overlay' ? `
+    position:fixed;inset:0;z-index:${t.z.modal};
+    background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);flex-direction:column;
+  ` : `
+    padding:24px;
+  `}
+`
+const LazyFallbackBar = styled.div`
+  width:48px;height:3px;border-radius:2px;background:${t.gold};
+  animation:${lazyPulse} 1.5s ease-in-out infinite;
+`
+
+/** Sidebar loading placeholder — shows while Sidebar.tsx lazy-loads */
+export const SidebarFallback = () => (
+  <LazyFallbackWrap $position="sidebar">
+    <div style={{ height: 3, background: `linear-gradient(90deg,transparent,${t.gold},${t.goldBright},${t.gold},transparent)`, width: '100%', borderRadius: 2, marginBottom: 16 }} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', padding: '0 4px' }}>
+      <Skeleton $w="60%" $h="18px" />
+      <Skeleton $w="40%" $h="12px" />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <Skeleton $w="100%" $h="64px" $r={t.r.md} />
+        <Skeleton $w="100%" $h="64px" $r={t.r.md} />
+        <Skeleton $w="100%" $h="64px" $r={t.r.md} />
+        <Skeleton $w="100%" $h="64px" $r={t.r.md} />
+      </div>
+      <Skeleton $w="100%" $h="80px" $r={t.r.md} />
+      <Skeleton $w="80%" $h="12px" />
+      <Skeleton $w="100%" $h="120px" $r={t.r.md} />
+    </div>
+  </LazyFallbackWrap>
+)
+
+/** Compare drawer loading placeholder */
+export const CompareDrawerFallback = () => (
+  <LazyFallbackWrap $position="overlay">
+    <LazyFallbackBar />
+    <span style={{ marginTop: 8 }}>טוען השוואה...</span>
+  </LazyFallbackWrap>
+)
+
+/** Generic inline loading fallback */
+export const InlineFallback = () => (
+  <LazyFallbackWrap>
+    <LazyFallbackBar />
+  </LazyFallbackWrap>
+)
+
 /* ── Cookie Consent Banner ── */
 const cookieSlideUp = keyframes`from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}`
 const CookieBanner = styled.div<{$show:boolean}>`
