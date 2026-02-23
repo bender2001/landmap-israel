@@ -150,6 +150,44 @@ const BarCallBtn = styled.a`
   @media(max-width:639px){padding:10px 14px;font-size:13px;}
   @media(min-width:640px){display:none;}
 `
+const BarRoiBadge = styled.span<{$color:string}>`
+  display:inline-flex;align-items:center;gap:4px;
+  padding:4px 10px;border-radius:${t.r.full};
+  background:${pr=>pr.$color}12;border:1px solid ${pr=>pr.$color}28;
+  font-size:12px;font-weight:800;color:${pr=>pr.$color};font-family:${t.font};
+  @media(max-width:639px){padding:3px 8px;font-size:11px;}
+`
+const BarProfit = styled.span`
+  font-size:12px;font-weight:700;color:${t.ok};
+  @media(max-width:639px){display:none;}
+`
+/* ── Updated At Indicator ── */
+const UpdatedAtTag = styled.span`
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:11px;font-weight:500;color:${t.lTextSec};
+  padding:3px 10px;border-radius:${t.r.full};
+  background:${t.lBg};border:1px solid ${t.lBorder};
+`
+/* ── Investment Highlights Card ── */
+const HighlightsCard = styled(AnimatedCard)`
+  background:linear-gradient(135deg,rgba(212,168,75,0.06),rgba(212,168,75,0.02));
+  border:1px solid ${t.goldBorder};border-radius:${t.r.lg};padding:20px;overflow:hidden;
+  position:relative;
+  &::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,transparent,${t.gold},${t.goldBright},${t.gold},transparent);}
+`
+const HighlightItem = styled.div`
+  display:flex;align-items:center;gap:10px;padding:8px 0;
+  border-bottom:1px solid rgba(212,168,75,0.1);
+  &:last-child{border-bottom:none;}
+`
+const HighlightIcon = styled.span`
+  width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:rgba(212,168,75,0.12);font-size:14px;flex-shrink:0;
+`
+const HighlightText = styled.div`flex:1;min-width:0;`
+const HighlightLabel = styled.div`font-size:11px;color:${t.lTextSec};font-weight:500;`
+const HighlightVal = styled.div<{$c?:string}>`font-size:15px;font-weight:800;color:${pr=>pr.$c||t.lText};font-family:${t.font};`
 
 const Center = styled.div`display:flex;align-items:center;justify-content:center;min-height:60vh;`
 
@@ -1132,6 +1170,11 @@ export default function PlotDetail() {
                 <Badge $color={statusColors[plot.status || 'AVAILABLE']}>{statusLabels[plot.status || 'AVAILABLE'] || plot.status}</Badge>
                 <Badge $color={grade.color}>{grade.grade}</Badge>
                 {dom && <Badge $color={dom.color}>{dom.label}</Badge>}
+                {(plot.updated_at || plot.updatedAt) && (
+                  <UpdatedAtTag title={`עודכן: ${new Date((plot.updated_at || plot.updatedAt) as string).toLocaleDateString('he-IL', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`}>
+                    <Clock size={10} /> {fmt.relative((plot.updated_at || plot.updatedAt) as string) || fmt.date((plot.updated_at || plot.updatedAt) as string)}
+                  </UpdatedAtTag>
+                )}
               </Badges>
               <Title>גוש {d.block} חלקה {plot.number} - {plot.city}</Title>
             </TitleLeft>
@@ -1563,6 +1606,63 @@ export default function PlotDetail() {
 
             {/* Side column */}
             <div style={{display:'flex',flexDirection:'column',gap:24}}>
+              {/* Investment Highlights — quick snapshot for investors */}
+              <HighlightsCard $delay={0.05}>
+                <CardTitle style={{marginBottom:12}}>⚡ נקודות מפתח</CardTitle>
+                {d.projected > d.price && d.price > 0 && (
+                  <HighlightItem>
+                    <HighlightIcon>💰</HighlightIcon>
+                    <HighlightText>
+                      <HighlightLabel>רווח צפוי</HighlightLabel>
+                      <HighlightVal $c={t.ok}>+{fmt.compact(d.projected - d.price)}</HighlightVal>
+                    </HighlightText>
+                  </HighlightItem>
+                )}
+                {cagr && (
+                  <HighlightItem>
+                    <HighlightIcon>📈</HighlightIcon>
+                    <HighlightText>
+                      <HighlightLabel>צמיחה שנתית (CAGR)</HighlightLabel>
+                      <HighlightVal $c={t.gold}>{cagr.cagr}% · {cagr.years} שנים</HighlightVal>
+                    </HighlightText>
+                  </HighlightItem>
+                )}
+                {ppd > 0 && (
+                  <HighlightItem>
+                    <HighlightIcon>📐</HighlightIcon>
+                    <HighlightText>
+                      <HighlightLabel>מחיר לדונם</HighlightLabel>
+                      <HighlightVal>₪{fmt.num(ppd)}</HighlightVal>
+                    </HighlightText>
+                  </HighlightItem>
+                )}
+                <HighlightItem>
+                  <HighlightIcon>🛡️</HighlightIcon>
+                  <HighlightText>
+                    <HighlightLabel>רמת סיכון</HighlightLabel>
+                    <HighlightVal $c={risk.color}>{risk.icon} {risk.label}</HighlightVal>
+                  </HighlightText>
+                </HighlightItem>
+                {zoningLabels[d.zoning] && (
+                  <HighlightItem>
+                    <HighlightIcon>📋</HighlightIcon>
+                    <HighlightText>
+                      <HighlightLabel>שלב תכנוני</HighlightLabel>
+                      <HighlightVal>{zoningLabels[d.zoning]}</HighlightVal>
+                    </HighlightText>
+                  </HighlightItem>
+                )}
+                {estimatedYear(plot) && (
+                  <HighlightItem>
+                    <HighlightIcon>🏗️</HighlightIcon>
+                    <HighlightText>
+                      <HighlightLabel>היתר בנייה צפוי</HighlightLabel>
+                      <HighlightVal $c={t.gold}>{estimatedYear(plot)!.label}</HighlightVal>
+                    </HighlightText>
+                  </HighlightItem>
+                )}
+              </HighlightsCard>
+
               {/* Mini Map */}
               <Card $delay={0.1}>
                 <CardTitle><MapPin size={18} color={t.gold} /> מיקום על המפה</CardTitle>
@@ -1717,6 +1817,8 @@ export default function PlotDetail() {
         <BottomBar>
           <BarGradeBadge $color={grade.color}>{grade.grade}</BarGradeBadge>
           <BarPrice>{fmt.price(d.price)}</BarPrice>
+          {r > 0 && <BarRoiBadge $color={r > 30 ? t.ok : t.warn}><TrendingUp size={11} />+{Math.round(r)}%</BarRoiBadge>}
+          {d.projected > d.price && d.price > 0 && <BarProfit>+{fmt.compact(d.projected - d.price)} רווח</BarProfit>}
           <span style={{ flex: 1 }} />
           <BarCallBtn href={waLink} target="_blank" rel="noopener noreferrer">
             <MessageCircle size={16} /> WhatsApp
