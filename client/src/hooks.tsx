@@ -69,15 +69,28 @@ export function useSimilarPlots(id: string | undefined) {
 }
 
 export function usePlotsBatch(ids: string[]) {
+  // Only send valid UUIDs to API; resolve non-UUID IDs from mock data locally
+  const validUUIDs = useMemo(() => ids.filter(isValidUUID), [ids])
+  const nonUUIDs = useMemo(() => ids.filter(id => !isValidUUID(id)), [ids])
+
   return useQuery<Plot[]>({
     queryKey: ['plots-batch', ids],
     queryFn: async () => {
-      try {
-        const data = await api.getPlotsBatch(ids) as Plot[]
-        return data.map(normalizePlot)
-      } catch {
-        return mockPlots.filter(p => ids.includes(p.id)).map(normalizePlot)
+      const results: Plot[] = []
+      // Resolve valid UUIDs via API
+      if (validUUIDs.length > 0) {
+        try {
+          const data = await api.getPlotsBatch(validUUIDs) as Plot[]
+          results.push(...data.map(normalizePlot))
+        } catch {
+          results.push(...mockPlots.filter(p => validUUIDs.includes(p.id)).map(normalizePlot))
+        }
       }
+      // Resolve non-UUID IDs from mock data
+      if (nonUUIDs.length > 0) {
+        results.push(...mockPlots.filter(p => nonUUIDs.includes(p.id)).map(normalizePlot))
+      }
+      return results
     },
     enabled: ids.length > 0,
   })
@@ -750,17 +763,25 @@ export function useSSE() {
 
         es.onerror = () => {
           if (!mounted) return
+          // Check readyState: if CONNECTING (0) on first error, likely MIME type
+          // or server issue — use aggressive backoff to avoid console spam
+          const wasNeverOpen = es.readyState === EventSource.CONNECTING ||
+            (es.readyState === EventSource.CLOSED && retryCount.current === 0)
           es.close()
           esRef.current = null
           setStatus('disconnected')
 
-          // Exponential backoff reconnect with longer delays to reduce 503 spam
-          if (retryCount.current < maxRetries) {
-            // Start with 5s, then double: 5s, 10s, 20s, 40s, 60s, 60s...
-            const delay = Math.min(5000 * Math.pow(2, retryCount.current), 60000)
+          // If SSE never opened successfully, likely wrong MIME type or server
+          // not supporting SSE — limit retries more aggressively
+          const effectiveMax = wasNeverOpen ? 3 : maxRetries
+          if (retryCount.current < effectiveMax) {
+            // Start with 10s for MIME errors, 5s for normal; double each time
+            const baseDelay = wasNeverOpen ? 10000 : 5000
+            const delay = Math.min(baseDelay * Math.pow(2, retryCount.current), 120000)
             retryCount.current++
             retryTimer = setTimeout(connect, delay)
           }
+          // After max retries: stay disconnected silently (no console noise)
         }
       } catch {
         setStatus('disconnected')

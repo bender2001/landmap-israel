@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef as useRefHook } from 'react'
 import styled, { keyframes, css } from 'styled-components'
-import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe, Sparkles, Printer, Navigation, Map as MapIcon2, Eye, Calculator, ClipboardCopy, Banknote } from 'lucide-react'
+import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe, Sparkles, Printer, Navigation, Map as MapIcon2, Eye, Calculator, ClipboardCopy, Banknote, AlertTriangle } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
-import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcTimeline, calcMonthly, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter, getLocationTags, generatePlotReport, calcAlternativeInvestments } from '../utils'
+import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcTimeline, calcMonthly, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter, getLocationTags, generatePlotReport, calcAlternativeInvestments, nearestTrainStation, nearestHighway, calcBettermentTax } from '../utils'
 import type { Plot } from '../types'
 import { GoldButton, GhostButton, Badge, RadialScore, InfoTooltip, PriceAlertButton } from './UI'
 
@@ -668,6 +668,66 @@ function useAcquisitionCost(price: number) {
       overheadPct: (((total - price) / price) * 100).toFixed(1),
     }
   }, [price])
+}
+
+/* ── Betterment Tax Card (היטל השבחה) ── */
+const BettermentWrap = styled.div`
+  padding:14px;margin-bottom:16px;
+  background:linear-gradient(135deg,rgba(249,115,22,0.04),rgba(239,68,68,0.02));
+  border:1px solid rgba(249,115,22,0.2);border-radius:${t.r.md};
+  animation:${fadeSection} 0.5s 0.18s both;direction:rtl;
+`
+const BettermentTitle = styled.div`
+  font-size:11px;font-weight:700;color:#F97316;margin-bottom:10px;
+  display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:0.3px;
+`
+const BettermentRow = styled.div`
+  display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:12px;
+  border-bottom:1px dashed rgba(255,255,255,0.04);
+  &:last-child{border-bottom:none;}
+`
+const BettermentNote = styled.div`
+  margin-top:10px;padding:8px 12px;
+  background:rgba(249,115,22,0.06);border:1px dashed rgba(249,115,22,0.2);
+  border-radius:${t.r.sm};font-size:10px;color:${t.textDim};line-height:1.6;
+`
+
+function BettermentTaxCard({ plot }: { plot: Plot }) {
+  const betterment = useMemo(() => calcBettermentTax(plot), [plot])
+  if (!betterment || betterment.estimatedTax <= 0) return null
+  return (
+    <BettermentWrap>
+      <BettermentTitle>
+        <AlertTriangle size={12} color="#F97316" />
+        היטל השבחה (הערכה)
+        <InfoTooltip text="היטל השבחה: 50% מעליית ערך הקרקע בעקבות שינוי ייעוד/תכנית. נגבה בעת מימוש — מכירה או קבלת היתר." pos="bottom" />
+      </BettermentTitle>
+      <BettermentRow>
+        <CostLabel>שווי נוכחי</CostLabel>
+        <CostVal>{fmt.compact(betterment.currentStageValue)}</CostVal>
+      </BettermentRow>
+      <BettermentRow>
+        <CostLabel>שווי צפוי (סוף תהליך)</CostLabel>
+        <CostVal>{fmt.compact(betterment.finalStageValue)}</CostVal>
+      </BettermentRow>
+      <BettermentRow>
+        <CostLabel>עליית ערך</CostLabel>
+        <CostVal $c={t.ok}>+{fmt.compact(betterment.valueIncrease)}</CostVal>
+      </BettermentRow>
+      <CostDivider />
+      <BettermentRow>
+        <CostLabel $dim>שיעור ההיטל</CostLabel>
+        <CostVal>{betterment.taxRate}%</CostVal>
+      </BettermentRow>
+      <BettermentRow>
+        <CostLabel>היטל השבחה משוער</CostLabel>
+        <CostVal $c="#F97316" $bold>{fmt.compact(betterment.estimatedTax)}</CostVal>
+      </BettermentRow>
+      <BettermentNote>
+        ⚠️ {betterment.label}. הסכום בפועל נקבע ע״י שמאי מקרקעין של הוועדה המקומית. פטורים: דירת מגורים יחידה בתנאים מסוימים. יש להתייעץ עם עו״ד.
+      </BettermentNote>
+    </BettermentWrap>
+  )
 }
 
 function AcquisitionCostBreakdown({ price }: { price: number }) {
@@ -1382,6 +1442,9 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
           {/* Total Acquisition Cost Breakdown — critical for investors */}
           {d.price > 0 && <AcquisitionCostBreakdown price={d.price} />}
 
+          {/* Betterment Tax (היטל השבחה) — critical cost for Israeli land investors */}
+          <BettermentTaxCard plot={plot} />
+
           {/* Area Quality Radar — visual pentagon score chart */}
           {areaQuality && (
             <RadarWrap>
@@ -1577,8 +1640,70 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
                     🏥 {fmt.num((plot.distance_to_hospital ?? plot.distanceToHospital) as number)} מ׳
                   </div>
                 )}
+                {/* Train station proximity badge */}
+                {(() => {
+                  const station = nearestTrainStation(plot)
+                  if (!station) return null
+                  const isClose = station.distance <= 2000
+                  const isMedium = station.distance <= 5000
+                  return (
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px',
+                      background: isClose ? 'rgba(139,92,246,0.1)' : 'transparent',
+                      border: `1px solid ${isClose ? 'rgba(139,92,246,0.3)' : isMedium ? 'rgba(139,92,246,0.15)' : t.border}`,
+                      borderRadius: t.r.full, fontSize: 11, fontWeight: 600,
+                      color: isClose ? '#8B5CF6' : isMedium ? '#A78BFA' : t.textSec,
+                    }} title={`תחנת ${station.name}`}>
+                      🚂 {station.distance < 1000 ? `${station.distance} מ׳` : `${(station.distance / 1000).toFixed(1)} ק״מ`}
+                      {isClose && <span style={{ fontSize: 9, fontWeight: 800 }}>רכבת!</span>}
+                    </div>
+                  )
+                })()}
+                {/* Highway proximity badge */}
+                {(() => {
+                  const hw = nearestHighway(plot)
+                  if (!hw || hw.distance > 15000) return null
+                  const isClose = hw.distance <= 3000
+                  return (
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px',
+                      background: isClose ? 'rgba(59,130,246,0.06)' : 'transparent',
+                      border: `1px solid ${isClose ? 'rgba(59,130,246,0.15)' : t.border}`,
+                      borderRadius: t.r.full, fontSize: 11, fontWeight: 600,
+                      color: isClose ? '#60A5FA' : t.textSec,
+                    }} title={hw.name}>
+                      🛣️ {hw.distance < 1000 ? `${hw.distance} מ׳` : `${(hw.distance / 1000).toFixed(1)} ק״מ`}
+                    </div>
+                  )
+                })()}
               </div>
             )}
+            {/* Train station proximity — detailed */}
+            {(() => {
+              const station = nearestTrainStation(plot)
+              if (!station) return null
+              const distLabel = station.distance < 1000 ? `${station.distance} מ׳` : `${(station.distance / 1000).toFixed(1)} ק״מ`
+              return (
+                <Row>
+                  <Label>🚂 תחנת רכבת</Label>
+                  <Val $c={station.distance <= 2000 ? '#8B5CF6' : station.distance <= 5000 ? t.textSec : t.textDim}>
+                    {station.name} ({distLabel})
+                  </Val>
+                </Row>
+              )
+            })()}
+            {/* Highway proximity — detailed */}
+            {(() => {
+              const hw = nearestHighway(plot)
+              if (!hw || hw.distance > 20000) return null
+              const distLabel = hw.distance < 1000 ? `${hw.distance} מ׳` : `${(hw.distance / 1000).toFixed(1)} ק״מ`
+              return (
+                <Row>
+                  <Label>🛣️ כביש ראשי</Label>
+                  <Val $c={hw.distance <= 3000 ? '#60A5FA' : t.textSec}>{hw.name.replace('מחלף ', '')} ({distLabel})</Val>
+                </Row>
+              )
+            })()}
             {d.density > 0 && <Row><Label>צפיפות</Label><Val>{d.density} יח׳/דונם</Val></Row>}
             {d.block && (
               <Row>

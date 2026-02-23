@@ -27,12 +27,21 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
         timeout: 0,
+        headers: { 'Accept': 'text/event-stream' },
         configure: (proxy) => {
-          proxy.on('proxyReq', (_proxyReq, _req, res) => {
-            // Prevent proxy from buffering SSE responses
-            (res as any).flushHeaders?.()
+          // Ensure SSE content-type is preserved through proxy
+          proxy.on('proxyRes', (proxyRes: any) => {
+            if (!proxyRes.headers['content-type']?.includes('text/event-stream')) {
+              proxyRes.headers['content-type'] = 'text/event-stream'
+            }
+            proxyRes.headers['x-accel-buffering'] = 'no'
+            proxyRes.headers['cache-control'] = 'no-cache, no-transform'
           })
-          proxy.on('error', (_err, _req, res) => {
+          proxy.on('proxyReq', (_proxyReq: any, _req: any, res: any) => {
+            // Prevent proxy from buffering SSE responses
+            res?.flushHeaders?.()
+          })
+          proxy.on('error', (_err: any, _req: any, res: any) => {
             if (res && 'writeHead' in res && !res.headersSent) {
               res.writeHead(503, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' })
               res.end('data: {"type":"proxy_error"}\n\n')

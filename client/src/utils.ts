@@ -466,7 +466,22 @@ export function calcLocationScore(plot: Plot): LocationScore {
     factors.push({ name: 'צפיפות פיתוח', icon: '🏙️', score: pts, maxScore: maxPts, detail: `${d.density} יח"ד/דונם` })
   }
 
-  // 5. Zoning stage bonus (max 1 pt) — advanced zoning = better location infrastructure
+  // 5. Train station proximity (max 2 pts)
+  const station = nearestTrainStation(plot)
+  if (station) {
+    const maxPts = 2
+    maxTotal += maxPts
+    let pts = 0
+    if (station.distance <= 1000) { pts = maxPts; tags.push({ label: 'ליד רכבת', icon: '🚂', color: '#8B5CF6' }) }
+    else if (station.distance <= 2500) { pts = maxPts * 0.75; tags.push({ label: 'קרוב לרכבת', icon: '🚂', color: '#A78BFA' }) }
+    else if (station.distance <= 5000) pts = maxPts * 0.4
+    else if (station.distance <= 10000) pts = maxPts * 0.15
+    else pts = 0
+    total += pts
+    factors.push({ name: 'קרבה לרכבת', icon: '🚂', score: pts, maxScore: maxPts, detail: `${station.name} (${fmtDistance(station.distance)})` })
+  }
+
+  // 6. Zoning stage bonus (max 1 pt) — advanced zoning = better location infrastructure
   const zi = ZO.indexOf(d.zoning)
   if (zi >= 0) {
     const maxPts = 1
@@ -501,6 +516,11 @@ export function getLocationTags(plot: Plot): { label: string; icon: string; colo
   const hospDist = plot.distance_to_hospital ?? plot.distanceToHospital as number | undefined
   if (hospDist != null && hospDist > 0 && hospDist <= 2000) {
     tags.push({ label: 'ליד בי״ח', icon: '🏥', color: '#EF4444' })
+  }
+  // Train station proximity tag
+  const station = nearestTrainStation(plot)
+  if (station && station.distance <= 2000) {
+    tags.push({ label: 'ליד רכבת', icon: '🚂', color: '#8B5CF6' })
   }
   return tags
 }
@@ -673,6 +693,11 @@ export function generatePlotReport(plot: Plot, allPlots?: Plot[]): string {
     if (d.seaDist != null) lines.push(`🌊 מרחק מהים: ${fmt.num(d.seaDist)} מ׳`)
     if (d.parkDist != null) lines.push(`🌳 מרחק מפארק: ${fmt.num(d.parkDist)} מ׳`)
   }
+  // Infrastructure proximity
+  const station = nearestTrainStation(plot)
+  if (station) lines.push(`🚂 תחנת רכבת: ${station.name} (${fmtDistance(station.distance)})`)
+  const hw = nearestHighway(plot)
+  if (hw) lines.push(`🛣️ כביש ראשי: ${hw.name} (${fmtDistance(hw.distance)})`)
   // Quick mortgage estimate
   const mortgage = calcMonthly(d.price, 0.5, 0.06, 15)
   if (mortgage) {
@@ -680,6 +705,14 @@ export function generatePlotReport(plot: Plot, allPlots?: Plot[]): string {
     lines.push('── מימון (הערכה) ──')
     lines.push(`💳 החזר חודשי: ${fmt.price(mortgage.monthly)} (50% מימון, 6%, 15 שנים)`)
     lines.push(`🏦 הון עצמי: ${fmt.price(mortgage.down)}`)
+  }
+  // Betterment tax estimate
+  const betterment = calcBettermentTax(plot)
+  if (betterment) {
+    lines.push('')
+    lines.push('── היטל השבחה (הערכה) ──')
+    lines.push(`⚠️ היטל משוער: ${fmt.price(betterment.estimatedTax)} (${betterment.taxRate}% מעליית ערך ${fmt.compact(betterment.valueIncrease)})`)
+    lines.push(`📋 ${betterment.label}`)
   }
   lines.push('')
   lines.push(`🔗 ${typeof window !== 'undefined' ? window.location.origin : ''}/plot/${plot.id}`)
@@ -834,6 +867,109 @@ export function calcExitScenarios(plot: Plot): ExitScenario[] | null {
   }
 
   return scenarios.length > 0 ? scenarios : null
+}
+
+// ── Israel Rail Stations (coordinates from Israel Railways) ──
+export const ISRAEL_RAIL_STATIONS: { name: string; lat: number; lng: number }[] = [
+  { name: 'חיפה מרכזית', lat: 32.7925, lng: 34.9891 },
+  { name: 'חיפה חוף הכרמל', lat: 32.7995, lng: 34.9628 },
+  { name: 'בנימינה', lat: 32.5179, lng: 34.9496 },
+  { name: 'קיסריה-פרדס חנה', lat: 32.4751, lng: 34.9462 },
+  { name: 'חדרה מערב', lat: 32.4488, lng: 34.9003 },
+  { name: 'נתניה', lat: 32.3234, lng: 34.8567 },
+  { name: 'הרצליה', lat: 32.1621, lng: 34.7975 },
+  { name: 'תל אביב מרכז', lat: 32.0741, lng: 34.7862 },
+  { name: 'תל אביב השלום', lat: 32.0686, lng: 34.7867 },
+  { name: 'כפר סבא-נורדאו', lat: 32.1784, lng: 34.9005 },
+  { name: 'ראש העין צפון', lat: 32.0973, lng: 34.9554 },
+  { name: 'רעננה מערב', lat: 32.1871, lng: 34.8385 },
+  { name: 'רעננה דרום', lat: 32.1705, lng: 34.8541 },
+  { name: 'הוד השרון-סוקולוב', lat: 32.1539, lng: 34.8759 },
+  { name: 'ירושלים יצחק נבון', lat: 31.7879, lng: 35.2026 },
+  { name: 'באר שבע מרכזית', lat: 31.2429, lng: 34.7951 },
+  { name: 'אשדוד', lat: 31.8044, lng: 34.6535 },
+  { name: 'אשקלון', lat: 31.6659, lng: 34.5682 },
+  { name: 'רחובות', lat: 31.8987, lng: 34.8095 },
+  { name: 'לוד', lat: 31.9523, lng: 34.8756 },
+  { name: 'ראשון לציון', lat: 31.9693, lng: 34.7748 },
+  { name: 'פתח תקווה', lat: 32.0924, lng: 34.8837 },
+  { name: 'עכו', lat: 32.9285, lng: 35.0777 },
+  { name: 'נהריה', lat: 33.0072, lng: 35.0956 },
+]
+
+/** Find the nearest Israel Rail station to a plot */
+export function nearestTrainStation(plot: Plot): { name: string; distance: number } | null {
+  const center = plotCenter(plot.coordinates)
+  if (!center) return null
+  let best: { name: string; distance: number } | null = null
+  for (const station of ISRAEL_RAIL_STATIONS) {
+    const dist = haversineDistance(center.lat, center.lng, station.lat, station.lng)
+    if (!best || dist < best.distance) {
+      best = { name: station.name, distance: Math.round(dist) }
+    }
+  }
+  return best
+}
+
+// ── Major Highway Interchanges (Israel) ──
+export const MAJOR_HIGHWAYS: { name: string; lat: number; lng: number }[] = [
+  { name: 'מחלף נתניה (כביש 2)', lat: 32.3268, lng: 34.8654 },
+  { name: 'מחלף חדרה (כביש 2/65)', lat: 32.4362, lng: 34.9203 },
+  { name: 'מחלף הרצליה (כביש 2)', lat: 32.1600, lng: 34.7998 },
+  { name: 'מחלף קיסריה (כביש 2)', lat: 32.4943, lng: 34.9126 },
+  { name: 'מחלף כפר סבא (כביש 6/531)', lat: 32.1862, lng: 34.9251 },
+  { name: 'גלילות (כביש 5/2)', lat: 32.1321, lng: 34.8059 },
+  { name: 'מחלף בר אילן (כביש 4)', lat: 32.0880, lng: 34.8510 },
+  { name: 'מחלף אייר-פורט סיטי (כביש 1/6)', lat: 31.9753, lng: 34.8908 },
+  { name: 'מחלף נחשונים (כביש 6)', lat: 32.0490, lng: 34.9507 },
+]
+
+/** Find the nearest major highway interchange to a plot */
+export function nearestHighway(plot: Plot): { name: string; distance: number } | null {
+  const center = plotCenter(plot.coordinates)
+  if (!center) return null
+  let best: { name: string; distance: number } | null = null
+  for (const hw of MAJOR_HIGHWAYS) {
+    const dist = haversineDistance(center.lat, center.lng, hw.lat, hw.lng)
+    if (!best || dist < best.distance) {
+      best = { name: hw.name, distance: Math.round(dist) }
+    }
+  }
+  return best
+}
+
+// ── Betterment Tax (היטל השבחה) Estimation ──
+/** Estimate the betterment tax (היטל השבחה) for a plot based on value increase from zoning change.
+ *  In Israel, municipalities levy ~50% of the value increase resulting from planning approvals.
+ *  This is due on sale or permit, not on purchase, but investors must account for it.
+ */
+export function calcBettermentTax(plot: Plot): {
+  estimatedTax: number; taxRate: number; valueIncrease: number;
+  currentStageValue: number; finalStageValue: number; label: string;
+} | null {
+  const d = p(plot)
+  if (d.price <= 0 || d.projected <= d.price) return null
+
+  // The betterment tax is assessed on the value increase attributable to planning changes
+  // Standard rate: 50% of the appreciation (חוק התכנון והבנייה §196א)
+  const TAX_RATE = 0.50
+  const valueIncrease = d.projected - d.price
+  const estimatedTax = Math.round(valueIncrease * TAX_RATE)
+
+  // Label based on when tax is typically triggered
+  const zi = ZO.indexOf(d.zoning)
+  let label = 'בעת מימוש (מכירה/היתר)'
+  if (zi <= 2) label = 'בעת אישור תוכנית ומימוש'
+  else if (zi >= 5) label = 'בעת קבלת היתר/מכירה'
+
+  return {
+    estimatedTax,
+    taxRate: TAX_RATE * 100,
+    valueIncrease,
+    currentStageValue: d.price,
+    finalStageValue: d.projected,
+    label,
+  }
 }
 
 // ── Normalize ──

@@ -1,13 +1,15 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink, MessageCircle, Clock, Building2, BarChart3, ArrowUpRight, ArrowDownRight, Zap, Target, PieChart, Share2, Check, Filter } from 'lucide-react'
+import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, DollarSign, ExternalLink, MessageCircle, Share2, Check, Filter } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation, useOnlineStatus, useIsMobile, useFocusTrap, useSSE, useDocumentTitle, useMetaDescription } from '../hooks'
 // Note: dataFreshness and dataSource are computed locally in this component (not via hooks)
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
-import { ErrorBoundary, Spinner, useToast, Badge, NetworkBanner, AnimatedValue, DemoModeBanner, ExploreLoadingSkeleton } from '../components/UI'
+import { ErrorBoundary, useToast, NetworkBanner, AnimatedValue, DemoModeBanner, ExploreLoadingSkeleton } from '../components/UI'
+import { CityStatsOverlay, MarketPulseOverlay, InsightsTickerOverlay, RecentlyViewedStrip, TopPickOverlay } from '../components/ExploreOverlays'
+import type { MarketPulseData, InsightItem } from '../components/ExploreOverlays'
 import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance, zoningLabels, calcAggregateStats, estimatedYear, plotCenter, SITE_CONFIG, calcMarketTemperature } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
@@ -378,130 +380,6 @@ const WhatsAppTooltip = styled.div`
   ${mobile}{display:none;}
 `
 
-/* ── Market Pulse Widget ── */
-const pulseGlow = keyframes`0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0.15)}50%{box-shadow:0 0 0 6px rgba(16,185,129,0.08)}`
-const MarketPulseWrap = styled.div`
-  position:absolute;top:80px;right:80px;z-index:${t.z.filter - 1};direction:rtl;
-  display:flex;align-items:stretch;gap:0;
-  background:${t.glass};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-  border:1px solid ${t.glassBorder};border-radius:${t.r.lg};box-shadow:${t.sh.lg};
-  overflow:hidden;animation:${chipPop} 0.35s cubic-bezier(0.32,0.72,0,1);
-  @media(max-width:900px){
-    top:auto;bottom:42px;right:auto;left:50%;transform:translateX(-50%);
-    max-width:calc(100vw - 32px);overflow-x:auto;scrollbar-width:none;
-    -webkit-overflow-scrolling:touch;&::-webkit-scrollbar{display:none;}
-  }
-  ${mobile}{
-    display:none;
-  }
-`
-const PulseCell = styled.div<{$accent?:string}>`
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  padding:10px 16px;border-left:1px solid ${t.border};
-  &:last-child{border-left:none;}
-  ${mobile}{padding:8px 12px;min-width:0;flex-shrink:0;}
-`
-const PulseVal = styled.div<{$c?:string}>`font-size:14px;font-weight:800;color:${pr=>pr.$c||t.gold};white-space:nowrap;
-  ${mobile}{font-size:12px;}
-`
-const PulseLabel = styled.div`font-size:9px;font-weight:600;color:${t.textDim};white-space:nowrap;letter-spacing:0.3px;
-  ${mobile}{font-size:8px;}
-`
-const PulseDot = styled.span<{$c:string}>`
-  display:inline-block;width:6px;height:6px;border-radius:50%;background:${pr=>pr.$c};
-  animation:${pulseGlow} 2s ease-in-out infinite;flex-shrink:0;
-`
-
-/* ── Market Insights Ticker ── */
-const tickerFade = keyframes`0%{opacity:0;transform:translateY(6px)}15%{opacity:1;transform:translateY(0)}85%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-6px)}`
-const InsightsTicker = styled.div`
-  position:absolute;top:56px;left:50%;transform:translateX(-50%);z-index:${t.z.filter - 1};
-  display:flex;align-items:center;gap:8px;padding:5px 16px;direction:rtl;
-  background:${t.glass};backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-  border:1px solid ${t.glassBorder};border-radius:${t.r.full};box-shadow:${t.sh.sm};
-  font-size:12px;font-weight:600;color:${t.textSec};white-space:nowrap;
-  max-width:min(520px,calc(100vw - 32px));overflow:hidden;
-  ${mobile}{top:46px;left:8px;right:8px;transform:none;font-size:11px;padding:4px 12px;}
-`
-const InsightText = styled.span`
-  animation:${tickerFade} 5s ease-in-out infinite;
-  display:flex;align-items:center;gap:6px;
-`
-const InsightIcon = styled.span`font-size:14px;flex-shrink:0;`
-const InsightVal = styled.span`color:${t.goldBright};font-weight:800;`
-
-/* ── Recently Viewed Strip ── */
-const RecentStrip = styled.div`
-  position:absolute;top:80px;left:50%;transform:translateX(-50%);z-index:${t.z.filter - 1};
-  display:flex;align-items:center;gap:8px;padding:6px 14px;direction:rtl;
-  background:${t.glass};backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-  border:1px solid ${t.glassBorder};border-radius:${t.r.full};box-shadow:${t.sh.md};
-  max-width:calc(100vw - 32px);overflow-x:auto;
-  scrollbar-width:none;&::-webkit-scrollbar{display:none;}
-  ${mobile}{top:100px;left:8px;right:8px;transform:none;}
-`
-const RecentLabel = styled.span`
-  font-size:11px;font-weight:600;color:${t.textDim};white-space:nowrap;
-  display:flex;align-items:center;gap:4px;flex-shrink:0;
-`
-const RecentChip = styled.button`
-  display:inline-flex;align-items:center;gap:4px;padding:4px 12px;
-  background:${t.surfaceLight};border:1px solid ${t.border};border-radius:${t.r.full};
-  font-size:11px;font-weight:600;color:${t.textSec};font-family:${t.font};
-  cursor:pointer;white-space:nowrap;transition:all ${t.tr};flex-shrink:0;
-  &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
-`
-
-/* ── City Statistics Card ── */
-const cityCardSlide = keyframes`from{opacity:0;transform:translateY(-16px) translateX(-50%)}to{opacity:1;transform:translateY(0) translateX(-50%)}`
-const cityCardSlideMobile = keyframes`from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}`
-const CityStatsCard = styled.div`
-  position:absolute;top:80px;left:50%;transform:translateX(-50%);z-index:${t.z.filter - 1};
-  display:flex;align-items:stretch;gap:0;direction:rtl;
-  background:${t.glass};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-  border:1px solid ${t.goldBorder};border-radius:${t.r.lg};box-shadow:${t.sh.lg};
-  overflow:hidden;min-width:480px;max-width:min(680px,calc(100vw - 32px));
-  animation:${cityCardSlide} 0.35s cubic-bezier(0.32,0.72,0,1);
-  ${mobile}{
-    top:56px;left:8px;right:8px;transform:none;min-width:0;
-    flex-wrap:wrap;animation:${cityCardSlideMobile} 0.35s cubic-bezier(0.32,0.72,0,1);
-  }
-`
-const CityStatsHeader = styled.div`
-  display:flex;align-items:center;gap:8px;padding:10px 16px;
-  background:linear-gradient(135deg,rgba(212,168,75,0.12),rgba(212,168,75,0.04));
-  border-left:1px solid ${t.border};min-width:120px;
-  ${mobile}{width:100%;border-left:none;border-bottom:1px solid ${t.border};padding:8px 12px;}
-`
-const CityStatsName = styled.div`font-size:14px;font-weight:800;color:${t.text};white-space:nowrap;`
-const CityStatsCount = styled.div`font-size:11px;color:${t.textSec};font-weight:600;`
-const CityStatsCells = styled.div`
-  display:flex;align-items:stretch;gap:0;flex:1;
-  ${mobile}{width:100%;}
-`
-const CityStatCell = styled.div`
-  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  padding:10px 12px;border-left:1px solid ${t.border};
-  &:last-child{border-left:none;}
-  ${mobile}{padding:8px 6px;}
-`
-const CityStatVal = styled.div<{$c?:string}>`
-  font-size:13px;font-weight:800;color:${pr => pr.$c || t.gold};
-  white-space:nowrap;font-family:${t.font};
-  ${mobile}{font-size:12px;}
-`
-const CityStatLabel = styled.div`
-  font-size:9px;font-weight:600;color:${t.textDim};text-transform:uppercase;
-  white-space:nowrap;letter-spacing:0.3px;
-`
-const CityStatsClose = styled.button`
-  display:flex;align-items:center;justify-content:center;
-  width:24px;height:24px;border-radius:${t.r.sm};
-  background:transparent;border:1px solid ${t.border};
-  color:${t.textDim};cursor:pointer;flex-shrink:0;transition:all ${t.tr};
-  &:hover{border-color:${t.goldBorder};color:${t.gold};}
-`
-
 /* ── Keyboard Shortcuts Dialog ── */
 const KbdBackdrop = styled.div<{$open:boolean}>`
   position:fixed;inset:0;z-index:${t.z.modal};
@@ -570,61 +448,6 @@ const CityPill = styled.button<{$active?:boolean}>`
   box-shadow:${t.sh.sm};
   &:hover{border-color:${t.gold};color:${t.gold};transform:translateY(-1px);}
   ${pr=>pr.$active && `box-shadow:0 0 12px rgba(212,168,75,0.2);`}
-`
-
-/* ── Market Temperature Gauge ── */
-const TempGauge = styled.div<{$c:string}>`
-  display:flex;align-items:center;gap:4px;
-`
-const TempBar = styled.div<{$pct:number;$c:string}>`
-  width:40px;height:5px;border-radius:3px;background:${t.bg};overflow:hidden;position:relative;
-  &::after{content:'';position:absolute;top:0;left:0;height:100%;
-    width:${pr=>pr.$pct}%;background:${pr=>pr.$c};border-radius:3px;
-    transition:width 0.8s ease;}
-`
-
-/* ── Top Pick Highlight Card ── */
-const topPickFloat = keyframes`0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}`
-const topPickEnter = keyframes`from{opacity:0;transform:translateY(12px) scale(0.95)}to{opacity:1;transform:translateY(0) scale(1)}`
-const TopPickWrap = styled.div`
-  position:absolute;bottom:48px;left:16px;z-index:${t.z.filter - 1};direction:rtl;
-  display:flex;align-items:stretch;gap:0;
-  background:${t.glass};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-  border:1px solid ${t.goldBorder};border-radius:${t.r.lg};box-shadow:${t.sh.lg};
-  overflow:hidden;max-width:320px;cursor:pointer;
-  animation:${topPickEnter} 0.4s cubic-bezier(0.32,0.72,0,1);
-  transition:all ${t.tr};
-  &:hover{box-shadow:${t.sh.glow};border-color:${t.gold};transform:translateY(-2px);}
-  ${mobile}{
-    bottom:62px;left:8px;right:auto;max-width:calc(100vw - 64px);
-  }
-  @media(max-width:400px){display:none;}
-`
-const TopPickBadge = styled.div`
-  display:flex;align-items:center;justify-content:center;padding:8px 10px;
-  background:linear-gradient(135deg,rgba(212,168,75,0.12),rgba(212,168,75,0.04));
-  border-left:1px solid ${t.border};flex-shrink:0;
-  animation:${topPickFloat} 3s ease-in-out infinite;
-`
-const TopPickBody = styled.div`
-  display:flex;flex-direction:column;gap:2px;padding:8px 12px;min-width:0;flex:1;
-`
-const TopPickTitle = styled.div`
-  font-size:10px;font-weight:700;color:${t.gold};text-transform:uppercase;letter-spacing:0.5px;
-  display:flex;align-items:center;gap:4px;
-`
-const TopPickName = styled.div`
-  font-size:13px;font-weight:800;color:${t.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-`
-const TopPickMeta = styled.div`
-  display:flex;align-items:center;gap:8px;font-size:11px;color:${t.textSec};
-`
-const TopPickClose = styled.button`
-  position:absolute;top:4px;left:4px;width:18px;height:18px;border-radius:${t.r.full};
-  background:transparent;border:1px solid ${t.border};color:${t.textDim};
-  display:flex;align-items:center;justify-content:center;cursor:pointer;
-  transition:all ${t.tr};font-size:10px;padding:0;
-  &:hover{border-color:${t.goldBorder};color:${t.gold};}
 `
 
 /* City emoji map — used by dynamic city pills */
@@ -1106,9 +929,8 @@ export default function Explore() {
       .slice(0, 5)
   }, [recentIds, plots])
 
-  // ── Market Insights (rotating) ──
-  const [insightIdx, setInsightIdx] = useState(0)
-  const insights = useMemo(() => {
+  // ── Market Insights (rotating) — rendered by InsightsTickerOverlay ──
+  const insights: InsightItem[] = useMemo(() => {
     if (!filtered.length) return []
     const items: { icon: string; text: string; val: string }[] = []
     // Best ROI plot
@@ -1149,12 +971,7 @@ export default function Explore() {
     return items
   }, [filtered])
 
-  useEffect(() => {
-    if (insights.length <= 1) return
-    if (!tabVisible) return // Pause ticker when tab is hidden — save CPU
-    const id = setInterval(() => setInsightIdx(i => (i + 1) % insights.length), 5000)
-    return () => clearInterval(id)
-  }, [insights.length, tabVisible])
+  // Note: insight ticker rotation is now handled inside InsightsTickerOverlay
 
   // OG, Twitter Card, and Canonical URL — complement the useDocumentTitle/useMetaDescription hooks
   useEffect(() => {
@@ -1313,7 +1130,7 @@ export default function Explore() {
   }, [selected, sortOpen, listOpen, shortcutsOpen, sorted, selectPlot])
 
   return (
-    <Wrap className="dark">
+    <Wrap className="dark" aria-label="מפת חלקות להשקעה">
       <ErrorBoundary>
         <NetworkBanner online={online} wasOffline={wasOffline} onRetry={() => window.location.reload()} />
         {dataSource === 'demo' && !isLoading && online && (
@@ -1682,145 +1499,33 @@ export default function Explore() {
 
         {/* City Statistics Card (appears when filtering by city) */}
         {!mapFullscreen && cityStats && !cityStatsDismissed && !selected && (
-          <CityStatsCard>
-            <CityStatsHeader>
-              <Building2 size={16} color={t.gold} />
-              <div>
-                <CityStatsName>{filters.city}</CityStatsName>
-                <CityStatsCount>{cityStats.count} חלקות · {fmt.dunam(cityStats.totalArea)} דונם</CityStatsCount>
-              </div>
-              <CityStatsClose onClick={() => setCityStatsDismissed(true)} aria-label="סגור"><X size={12} /></CityStatsClose>
-            </CityStatsHeader>
-            <CityStatsCells>
-              <CityStatCell>
-                <CityStatVal>{fmt.compact(cityStats.avgPrice)}</CityStatVal>
-                <CityStatLabel>מחיר ממוצע</CityStatLabel>
-              </CityStatCell>
-              <CityStatCell>
-                <CityStatVal>{fmt.num(cityStats.avgPps)}</CityStatVal>
-                <CityStatLabel>₪/דונם</CityStatLabel>
-              </CityStatCell>
-              <CityStatCell>
-                <CityStatVal $c={cityStats.avgRoi > 0 ? t.ok : t.textSec}>
-                  {cityStats.avgRoi > 0 ? <>+{cityStats.avgRoi}%</> : '—'}
-                </CityStatVal>
-                <CityStatLabel>תשואה ממוצעת</CityStatLabel>
-              </CityStatCell>
-              <CityStatCell>
-                <CityStatVal $c={t.text}>{fmt.compact(cityStats.minPrice)}–{fmt.compact(cityStats.maxPrice)}</CityStatVal>
-                <CityStatLabel>טווח מחירים</CityStatLabel>
-              </CityStatCell>
-              {/* Market Temperature for this city */}
-              {marketTemp && (
-                <CityStatCell title={`טמפרטורת שוק: ${marketTemp.label}`}>
-                  <TempGauge $c={marketTemp.color}>
-                    <TempBar $pct={marketTemp.pct} $c={marketTemp.color} />
-                    <CityStatVal $c={marketTemp.color} style={{fontSize:11}}>{marketTemp.emoji}</CityStatVal>
-                  </TempGauge>
-                  <CityStatLabel>{marketTemp.label}</CityStatLabel>
-                </CityStatCell>
-              )}
-              {/* Dominant zoning stage */}
-              {cityStats.dominantZoning && (
-                <CityStatCell>
-                  <CityStatVal style={{fontSize:11}}>{cityStats.dominantZoning}</CityStatVal>
-                  <CityStatLabel>שלב נפוץ</CityStatLabel>
-                </CityStatCell>
-              )}
-            </CityStatsCells>
-          </CityStatsCard>
+          <CityStatsOverlay
+            cityName={filters.city}
+            stats={cityStats}
+            marketTemp={marketTemp}
+            onDismiss={() => setCityStatsDismissed(true)}
+          />
         )}
 
         {/* Market Pulse Widget — investment at-a-glance (desktop only, when no plot/city selected) */}
         {!mapFullscreen && marketPulse && !selected && !cityStats && !listOpen && filtered.length >= 2 && (
-          <MarketPulseWrap>
-            {/* Market Temperature Gauge */}
-            {marketTemp.score > 0 && (
-              <PulseCell>
-                <PulseVal $c={marketTemp.color}>
-                  <TempGauge $c={marketTemp.color}>
-                    <span>{marketTemp.emoji}</span>
-                    <TempBar $pct={marketTemp.score} $c={marketTemp.color} />
-                  </TempGauge>
-                </PulseVal>
-                <PulseLabel>{marketTemp.label}</PulseLabel>
-              </PulseCell>
-            )}
-            <PulseCell>
-              <PulseVal>{fmt.compact(marketPulse.totalValue)}</PulseVal>
-              <PulseLabel><PieChart size={8} style={{marginLeft:3}} /> שווי כולל</PulseLabel>
-            </PulseCell>
-            {marketPulse.hotDeals > 0 && (
-              <PulseCell>
-                <PulseVal $c={t.ok}><PulseDot $c={t.ok} /> {marketPulse.hotDeals}</PulseVal>
-                <PulseLabel>עסקאות A/A+</PulseLabel>
-              </PulseCell>
-            )}
-            {marketPulse.belowAvgCount > 0 && (
-              <PulseCell>
-                <PulseVal $c="#3B82F6">{marketPulse.belowAvgCount}</PulseVal>
-                <PulseLabel>מתחת לממוצע</PulseLabel>
-              </PulseCell>
-            )}
-            {marketPulse.avgRoi > 0 && (
-              <PulseCell>
-                <PulseVal $c={marketPulse.avgRoi > 30 ? t.ok : t.warn}>+{marketPulse.avgRoi}%</PulseVal>
-                <PulseLabel>תשואה ממוצעת</PulseLabel>
-              </PulseCell>
-            )}
-          </MarketPulseWrap>
+          <MarketPulseOverlay pulse={marketPulse} marketTemp={marketTemp} />
         )}
 
         {/* Market Insights Ticker (show when no overlays active) */}
         {!mapFullscreen && insights.length > 0 && !selected && !listOpen && !cityStats && recentPlots.length === 0 && (
-          <InsightsTicker>
-            <InsightText key={insightIdx}>
-              <InsightIcon>{insights[insightIdx]?.icon}</InsightIcon>
-              {insights[insightIdx]?.text}
-              <InsightVal>{insights[insightIdx]?.val}</InsightVal>
-            </InsightText>
-          </InsightsTicker>
+          <InsightsTickerOverlay insights={insights} tabVisible={tabVisible} />
         )}
 
         {/* Recently Viewed Strip (show only when user has viewed plots and no sidebar is open) */}
         {!mapFullscreen && recentPlots.length > 0 && !selected && !listOpen && !cityStats && (
-          <RecentStrip>
-            <RecentLabel><Clock size={12} /> ראיתם לאחרונה</RecentLabel>
-            {recentPlots.map(pl => (
-              <RecentChip key={pl.id} onClick={() => selectPlot(pl)}>
-                {pl.city} · {pl.number}
-              </RecentChip>
-            ))}
-          </RecentStrip>
+          <RecentlyViewedStrip plots={recentPlots} onSelect={selectPlot} />
         )}
 
         {/* Top Investment Pick — floating highlight card */}
-        {!mapFullscreen && topPick && !topPickDismissed && !selected && !listOpen && !compareOpen && (() => {
-          const d = p(topPick), score = calcScore(topPick), grade = getGrade(score)
-          const r = roi(topPick)
-          return (
-            <TopPickWrap onClick={() => selectPlot(topPick)} title={`חלקה ${topPick.number} — לחץ לפרטים`}>
-              <TopPickBadge>
-                <span style={{ fontSize: 20 }}>🏆</span>
-              </TopPickBadge>
-              <TopPickBody>
-                <TopPickTitle>
-                  <Zap size={10} /> TOP PICK
-                  <span style={{ color: grade.color, fontWeight: 900 }}>{grade.grade}</span>
-                </TopPickTitle>
-                <TopPickName>{topPick.city} · גוש {d.block} · חלקה {topPick.number}</TopPickName>
-                <TopPickMeta>
-                  <span style={{ fontWeight: 800, color: t.gold }}>{fmt.compact(d.price)}</span>
-                  {r > 0 && <span style={{ color: t.ok, fontWeight: 700 }}>+{Math.round(r)}% ROI</span>}
-                  <span>{fmt.dunam(d.size)} דונם</span>
-                </TopPickMeta>
-              </TopPickBody>
-              <TopPickClose onClick={(e) => { e.stopPropagation(); setTopPickDismissed(true) }} aria-label="סגור">
-                <X size={10} />
-              </TopPickClose>
-            </TopPickWrap>
-          )
-        })()}
+        {!mapFullscreen && topPick && !topPickDismissed && !selected && !listOpen && !compareOpen && (
+          <TopPickOverlay plot={topPick} onSelect={selectPlot} onDismiss={() => setTopPickDismissed(true)} />
+        )}
 
         {/* WhatsApp Floating CTA */}
         {!mapFullscreen && <WhatsAppFab
