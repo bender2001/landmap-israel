@@ -15,7 +15,7 @@ export const getSimilarPlots = (id: string, limit = 4) => api.get(`/plots/${id}/
 export const getPlotsBatch = (ids: string[]) => ids.length ? api.get(`/plots/batch?ids=${ids.join(',')}`) : Promise.resolve([])
 export const trackView = (id: string) => api.post(`/plots/${id}/view`, {}).catch(() => {})
 // Leads
-export const createLead = (d: { plot_id: string; name: string; phone: string; email?: string }) => api.post('/leads', d)
+export const createLead = (d: { plot_id?: string; name: string; phone: string; email: string; message?: string }) => api.post('/leads', d)
 export const getLeads = (f?: Record<string, string>) => { const ps = new URLSearchParams(f); return api.get(`/leads?${ps}`) }
 export const updateLeadStatus = (id: string, status: string) => api.patch(`/leads/${id}`, { status })
 // Market

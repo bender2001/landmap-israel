@@ -101,6 +101,8 @@ export default function App() {
           <Route path="/about" element={<Public />} />
           <Route path="/contact" element={<Public />} />
           <Route path="/pricing" element={<Public />} />
+          <Route path="/terms" element={<Public />} />
+          <Route path="/privacy" element={<Public />} />
 
           {/* User */}
           <Route path="/dashboard" element={<RoleGuard role={['user', 'business', 'admin']}><UserDash /></RoleGuard>} />
