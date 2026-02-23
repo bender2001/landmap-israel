@@ -9,7 +9,7 @@ import MapArea from '../components/Map'
 import type { MapBounds } from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, useToast, NetworkBanner, AnimatedValue, DemoModeBanner, ExploreLoadingSkeleton } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcQuickInsight, pricePosition, findBestValueIds, calcAggregateStats, generateMarketInsights, plotCenter } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcQuickInsight, pricePosition, findBestValueIds, calcAggregateStats, generateMarketInsights, plotCenter, daysOnMarket } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -439,6 +439,58 @@ const PricePositionBadge = styled.div<{$color:string}>`
   background:${pr=>`${pr.$color}10`};border:1px solid ${pr=>`${pr.$color}25`};
   border-radius:${t.r.full};font-size:11px;font-weight:700;color:${pr=>pr.$color};
   direction:rtl;white-space:nowrap;
+`
+
+/* ── Area Bounds Chip (extracted from inline styles for perf) ── */
+const areaBoundsIn = keyframes`from{opacity:0;transform:translateX(-50%) translateY(-8px) scale(0.92)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}`
+const AreaBoundsChip = styled.div`
+  position:absolute;top:100px;left:50%;transform:translateX(-50%);z-index:${t.z.filter - 1};
+  display:flex;align-items:center;gap:8px;padding:6px 14px;direction:rtl;
+  background:${t.glass};backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid ${t.goldBorder};border-radius:${t.r.full};
+  box-shadow:${t.sh.sm};font-size:12px;font-family:${t.font};
+  animation:${areaBoundsIn} 0.25s ease-out;
+  ${mobile}{top:56px;font-size:11px;padding:5px 12px;gap:6px;}
+`
+const AreaBoundsLabel = styled.span`color:${t.gold};font-weight:700;`
+const AreaBoundsCount = styled.span`color:${t.textDim};font-weight:600;`
+const AreaBoundsClose = styled.button`
+  display:flex;align-items:center;justify-content:center;width:20px;height:20px;
+  border-radius:50%;background:transparent;border:1px solid ${t.border};
+  color:${t.textDim};cursor:pointer;transition:all ${t.tr};flex-shrink:0;
+  &:hover{border-color:${t.err};color:${t.err};background:rgba(239,68,68,0.08);}
+`
+
+/* ── Smart Suggestion Button (for empty state) ── */
+const SuggestionBtn = styled.button`
+  display:flex;align-items:center;gap:8px;padding:10px 14px;
+  background:${t.surfaceLight};border:1px solid ${t.border};
+  border-radius:${t.r.md};cursor:pointer;width:100%;
+  color:${t.textSec};font-size:13px;font-weight:600;font-family:${t.font};
+  direction:rtl;text-align:right;transition:all ${t.tr};
+  &:hover{border-color:${t.gold};color:${t.gold};}
+`
+
+/* ── Mobile Preview: vs City Average comparison ── */
+const PreviewCompareGrid = styled.div`
+  display:grid;grid-template-columns:repeat(3,1fr);gap:6px;
+`
+const PreviewCompareStat = styled.div<{$positive?:boolean}>`
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:6px 4px;background:${t.surfaceLight};border:1px solid ${t.border};
+  border-radius:${t.r.sm};transition:all ${t.tr};
+`
+const PreviewCompareVal = styled.span<{$c?:string}>`
+  font-size:12px;font-weight:800;color:${pr=>pr.$c||t.gold};line-height:1;
+`
+const PreviewCompareLabel = styled.span`
+  font-size:8px;font-weight:600;color:${t.textDim};text-align:center;line-height:1.2;
+`
+const DaysOnMarketBadge = styled.span<{$c:string}>`
+  display:inline-flex;align-items:center;gap:3px;padding:2px 8px;
+  background:${pr=>`${pr.$c}12`};border:1px solid ${pr=>`${pr.$c}25`};
+  border-radius:${t.r.full};font-size:10px;font-weight:700;color:${pr=>pr.$c};
+  white-space:nowrap;
 `
 
 /* ── Keyboard Shortcuts Dialog ── */
@@ -1139,34 +1191,14 @@ export default function Explore() {
 
         {/* Area bounds filter chip */}
         {!mapFullscreen && areaBounds && !isLoading && (
-          <div style={{
-            position: 'absolute', top: 100, left: '50%', transform: 'translateX(-50%)',
-            zIndex: t.z.filter - 1, display: 'flex', alignItems: 'center', gap: 8,
-            padding: '6px 14px', direction: 'rtl',
-            background: t.glass, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-            border: `1px solid ${t.goldBorder}`, borderRadius: t.r.full,
-            boxShadow: t.sh.sm, fontSize: 12, fontFamily: t.font,
-            animation: 'searchAreaFadeIn 0.25s ease-out',
-          }}>
+          <AreaBoundsChip>
             <MapPin size={12} color={t.gold} />
-            <span style={{ color: t.gold, fontWeight: 700 }}>חיפוש באזור המפה</span>
-            <span style={{ color: t.textDim, fontWeight: 600 }}>({filtered.length})</span>
-            <button
-              onClick={clearAreaBounds}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 20, height: 20, borderRadius: '50%',
-                background: 'transparent', border: `1px solid ${t.border}`,
-                color: t.textDim, cursor: 'pointer', transition: `all ${t.tr}`,
-                flexShrink: 0,
-              }}
-              aria-label="נקה חיפוש אזורי"
-              onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = t.err; (e.currentTarget as HTMLElement).style.color = t.err }}
-              onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = t.border; (e.currentTarget as HTMLElement).style.color = t.textDim }}
-            >
+            <AreaBoundsLabel>חיפוש באזור המפה</AreaBoundsLabel>
+            <AreaBoundsCount>({filtered.length})</AreaBoundsCount>
+            <AreaBoundsClose onClick={clearAreaBounds} aria-label="נקה חיפוש אזורי">
               <X size={10} />
-            </button>
-          </div>
+            </AreaBoundsClose>
+          </AreaBoundsChip>
         )}
 
         {/* City Market Summary Card (shown when filtering by city) */}
@@ -1312,21 +1344,9 @@ export default function Explore() {
               {suggestions.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
                   {suggestions.slice(0, 3).map((s, i) => (
-                    <button
-                      key={i}
-                      onClick={s.action}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
-                        background: t.surfaceLight, border: `1px solid ${t.border}`,
-                        borderRadius: t.r.md, cursor: 'pointer', width: '100%',
-                        color: t.textSec, fontSize: 13, fontWeight: 600, fontFamily: t.font,
-                        direction: 'rtl', textAlign: 'right', transition: `all ${t.tr}`,
-                      }}
-                      onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = t.gold; (e.currentTarget as HTMLElement).style.color = t.gold }}
-                      onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = t.border; (e.currentTarget as HTMLElement).style.color = t.textSec }}
-                    >
+                    <SuggestionBtn key={i} onClick={s.action}>
                       💡 {s.label}
-                    </button>
+                    </SuggestionBtn>
                   ))}
                 </div>
               )}
@@ -1344,15 +1364,27 @@ export default function Explore() {
                 ערים
               </CityCompBtn>
             )}
-            <SortBtn onClick={() => setSortOpen(o => !o)} $active={sortKey !== 'recommended'}>
+            <SortBtn
+              onClick={() => setSortOpen(o => !o)}
+              $active={sortKey !== 'recommended'}
+              aria-haspopup="listbox"
+              aria-expanded={sortOpen}
+              aria-label={`מיון: ${SORT_OPTIONS.find(o => o.key === sortKey)?.label || 'מומלץ'}`}
+            >
               <ArrowUpDown size={14} />
               {SORT_OPTIONS.find(o => o.key === sortKey)?.label || 'מיון'}
             </SortBtn>
           </div>
           {sortOpen && (
-            <SortDrop>
+            <SortDrop role="listbox" aria-label="אפשרויות מיון">
               {SORT_OPTIONS.map(o => (
-                <SortOption key={o.key} $active={o.key === sortKey} onClick={() => { setSortWithUrl(o.key); setSortOpen(false) }}>
+                <SortOption
+                  key={o.key}
+                  $active={o.key === sortKey}
+                  onClick={() => { setSortWithUrl(o.key); setSortOpen(false) }}
+                  role="option"
+                  aria-selected={o.key === sortKey}
+                >
                   {o.label}
                 </SortOption>
               ))}
@@ -1445,11 +1477,25 @@ export default function Explore() {
         <Suspense fallback={null}>
           {selected && <Sidebar plot={selected} open={isMobile ? mobileExpanded : true} onClose={() => { setSelected(null); setMobileExpanded(false) }} onLead={() => setLeadPlot(selected)} plots={sorted} onNavigate={selectPlot} isCompared={isCompared(selected.id)} onToggleCompare={toggleCompare} />}
         </Suspense>
-        {/* Mobile Plot Preview Bottom Card — simplified */}
+        {/* Mobile Plot Preview Bottom Card — enhanced with city comparison */}
         {selected && !mobileExpanded && (() => {
           const d = p(selected), score = calcScore(selected), grade = getGrade(score)
           const insight = calcQuickInsight(selected, sorted)
           const pp = pricePosition(selected, sorted)
+          const dom = daysOnMarket(d.created)
+          // Calculate "vs city average" stats for quick comparison
+          const cityPlots = sorted.filter(pl => pl.city === selected.city && pl.id !== selected.id)
+          const cityAvgPrice = cityPlots.length > 0 ? cityPlots.reduce((s, pl) => s + p(pl).price, 0) / cityPlots.length : 0
+          const cityAvgScore = cityPlots.length > 0 ? cityPlots.reduce((s, pl) => s + calcScore(pl), 0) / cityPlots.length : 0
+          const cityAvgPps = (() => {
+            const ppsList = cityPlots.map(pricePerSqm).filter(v => v > 0)
+            return ppsList.length > 0 ? ppsList.reduce((s, v) => s + v, 0) / ppsList.length : 0
+          })()
+          const plotPps = pricePerSqm(selected)
+          const priceDiffPct = cityAvgPrice > 0 ? Math.round(((d.price - cityAvgPrice) / cityAvgPrice) * 100) : 0
+          const ppsDiffPct = cityAvgPps > 0 && plotPps > 0 ? Math.round(((plotPps - cityAvgPps) / cityAvgPps) * 100) : 0
+          const scoreDiff = cityAvgScore > 0 ? Math.round((score - cityAvgScore) * 10) / 10 : 0
+
           return (
             <MobilePreview $show={true} ref={previewRef}>
               <PreviewHandle />
@@ -1459,6 +1505,7 @@ export default function Explore() {
                     <PreviewTitle>גוש {d.block} · חלקה {selected.number}</PreviewTitle>
                     <PreviewCity>
                       <MapIcon size={12} /> {selected.city}
+                      {dom && <DaysOnMarketBadge $c={dom.color}>🕐 {dom.label}</DaysOnMarketBadge>}
                       {pp && (
                         <PricePositionBadge $color={pp.color}>
                           {pp.direction === 'below' ? <TrendingDown size={10} /> : pp.direction === 'above' ? <TrendingUp size={10} /> : <Minus size={10} />}
@@ -1472,6 +1519,29 @@ export default function Explore() {
                 <PreviewScore $c={grade.color}>
                   ציון השקעה: {score}/10 — {grade.grade}
                 </PreviewScore>
+                {/* Vs City Average — compact comparison grid */}
+                {cityPlots.length >= 2 && (
+                  <PreviewCompareGrid>
+                    <PreviewCompareStat>
+                      <PreviewCompareVal $c={priceDiffPct <= 0 ? t.ok : t.err}>
+                        {priceDiffPct > 0 ? '+' : ''}{priceDiffPct}%
+                      </PreviewCompareVal>
+                      <PreviewCompareLabel>מחיר vs ממוצע</PreviewCompareLabel>
+                    </PreviewCompareStat>
+                    <PreviewCompareStat>
+                      <PreviewCompareVal $c={ppsDiffPct <= 0 ? t.ok : t.err}>
+                        {ppsDiffPct > 0 ? '+' : ''}{ppsDiffPct}%
+                      </PreviewCompareVal>
+                      <PreviewCompareLabel>₪/מ״ר vs ממוצע</PreviewCompareLabel>
+                    </PreviewCompareStat>
+                    <PreviewCompareStat>
+                      <PreviewCompareVal $c={scoreDiff >= 0 ? t.ok : t.err}>
+                        {scoreDiff > 0 ? '+' : ''}{scoreDiff}
+                      </PreviewCompareVal>
+                      <PreviewCompareLabel>ציון vs ממוצע</PreviewCompareLabel>
+                    </PreviewCompareStat>
+                  </PreviewCompareGrid>
+                )}
                 {/* Quick investment insight */}
                 {insight.priority >= 4 && (
                   <div style={{
