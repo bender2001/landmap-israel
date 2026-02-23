@@ -1,5 +1,5 @@
 import { memo, useState, useCallback, useMemo, useRef, useEffect } from 'react'
-import styled, { keyframes } from 'styled-components'
+import styled, { keyframes, css } from 'styled-components'
 import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download, Share2, MessageCircle, LayoutGrid, Table2, Eye } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
@@ -201,21 +201,41 @@ const GradeDistDot = styled.span<{ $c: string }>`
 `
 
 /* ── Toggle Button (always visible) ── */
+const togglePulse = keyframes`0%,100%{box-shadow:0 2px 12px rgba(212,168,75,0.15)}50%{box-shadow:0 2px 20px rgba(212,168,75,0.3)}`
 const ToggleBtn = styled.button<{ $open: boolean }>`
   position:fixed;top:50%;left:${pr => pr.$open ? '340px' : '0'};
   z-index:${t.z.sidebar - 1};transform:translateY(-50%);
-  width:28px;height:64px;
-  background:${t.surface};border:1px solid ${t.goldBorder};
+  width:${pr => pr.$open ? '28px' : '36px'};height:${pr => pr.$open ? '64px' : '80px'};
+  background:${pr => pr.$open ? t.surface : `linear-gradient(180deg,${t.surface},${t.surfaceLight})`};
+  border:1px solid ${t.goldBorder};
   border-left:${pr => pr.$open ? 'none' : `1px solid ${t.goldBorder}`};
-  border-radius:${pr => pr.$open ? `0 ${t.r.sm} ${t.r.sm} 0` : `0 ${t.r.sm} ${t.r.sm} 0`};
-  color:${t.gold};cursor:pointer;display:flex;align-items:center;justify-content:center;
+  border-radius:${pr => pr.$open ? `0 ${t.r.sm} ${t.r.sm} 0` : `0 ${t.r.md} ${t.r.md} 0`};
+  color:${t.gold};cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
   transition:all 0.35s cubic-bezier(0.32,0.72,0,1);
   box-shadow:${t.sh.md};
-  &:hover{background:${t.goldDim};width:32px;}
+  ${pr => !pr.$open ? css`animation:${togglePulse} 3s ease-in-out infinite;` : ''}
+  &:hover{background:${t.goldDim};width:${pr => pr.$open ? '32px' : '40px'};}
   ${mobile}{
-    top:auto;bottom:70px;left:8px;
+    top:auto;bottom:130px;left:8px;
     width:44px;height:44px;border-radius:${t.r.full};
     transform:none;border:1px solid ${t.goldBorder};
+    flex-direction:row;gap:0;
+  }
+`
+const ToggleBtnLabel = styled.span`
+  writing-mode:vertical-rl;text-orientation:mixed;
+  font-size:9px;font-weight:800;letter-spacing:0.8px;
+  color:${t.gold};font-family:${t.font};
+  ${mobile}{display:none;}
+`
+const ToggleBtnCount = styled.span`
+  display:flex;align-items:center;justify-content:center;
+  min-width:18px;height:16px;padding:0 4px;border-radius:${t.r.full};
+  background:${t.goldDim};color:${t.gold};
+  font-size:9px;font-weight:800;font-family:${t.font};line-height:1;
+  ${mobile}{
+    position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;
+    background:linear-gradient(135deg,${t.gold},${t.goldBright});color:${t.bg};
   }
 `
 
@@ -967,7 +987,13 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, u
     <>
       <Overlay $open={open} onClick={onToggle} />
       <ToggleBtn $open={open} onClick={onToggle} aria-label={open ? 'סגור רשימה' : 'פתח רשימה'}>
-        {open ? <ChevronLeft size={16} /> : <List size={18} />}
+        {open ? <ChevronLeft size={16} /> : (
+          <>
+            <List size={16} />
+            <ToggleBtnCount>{plots.length}</ToggleBtnCount>
+            <ToggleBtnLabel>רשימה</ToggleBtnLabel>
+          </>
+        )}
       </ToggleBtn>
       <Panel $open={open}>
         <GoldBar />

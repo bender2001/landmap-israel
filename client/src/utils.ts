@@ -1127,6 +1127,115 @@ export function calcGrowthTrajectory(plot: Plot): GrowthPoint[] | null {
   return points
 }
 
+// ── Market Insights Generator (for rotating ticker) ──
+export interface MarketInsight {
+  text: string
+  emoji: string
+  color: string
+  category: 'opportunity' | 'trend' | 'stat' | 'alert'
+}
+
+/** Generate an array of contextual market insights from the current plot set */
+export function generateMarketInsights(plots: Plot[], cityFilter?: string): MarketInsight[] {
+  if (!plots.length) return []
+  const insights: MarketInsight[] = []
+  const prices = plots.map(pl => p(pl).price).filter(v => v > 0)
+  const scores = plots.map(calcScore)
+  const rois = plots.map(roi).filter(v => v > 0)
+  const ppsList = plots.map(pricePerSqm).filter(v => v > 0)
+  const bestValueIds = findBestValueIds(plots)
+  const avgScore = scores.length ? scores.reduce((s, v) => s + v, 0) / scores.length : 0
+  const avgRoi = rois.length ? rois.reduce((s, v) => s + v, 0) / rois.length : 0
+  const avgPps = ppsList.length ? ppsList.reduce((s, v) => s + v, 0) / ppsList.length : 0
+
+  // Top scoring plot
+  const topPlot = plots.reduce((best, pl) => calcScore(pl) > calcScore(best) ? pl : best, plots[0])
+  const topScore = calcScore(topPlot)
+  const topGrade = getGrade(topScore)
+  if (topScore >= 8) {
+    insights.push({
+      text: `חלקה בציון ${topScore}/10 (${topGrade.grade}) ב${topPlot.city} — הזדמנות מובילה`,
+      emoji: '🏆', color: '#10B981', category: 'opportunity',
+    })
+  }
+
+  // Best value count
+  if (bestValueIds.size > 0) {
+    insights.push({
+      text: `${bestValueIds.size} חלקות Best Value — מחיר מתחת לממוצע עם ציון גבוה`,
+      emoji: '💎', color: '#D4A84B', category: 'opportunity',
+    })
+  }
+
+  // Average ROI
+  if (avgRoi > 0) {
+    const roiColor = avgRoi >= 200 ? '#10B981' : avgRoi >= 100 ? '#4ADE80' : '#F59E0B'
+    insights.push({
+      text: `תשואה ממוצעת צפויה: +${Math.round(avgRoi)}% על פני תקופת ההשקעה`,
+      emoji: '📈', color: roiColor, category: 'stat',
+    })
+  }
+
+  // Price per sqm insight
+  if (avgPps > 0) {
+    insights.push({
+      text: `ממוצע ₪${avgPps.toLocaleString('he-IL')}/מ״ר${cityFilter ? ` ב${cityFilter}` : ' בכל האזורים'}`,
+      emoji: '📊', color: '#3B82F6', category: 'stat',
+    })
+  }
+
+  // Near building permit plots
+  const nearPermit = plots.filter(pl => {
+    const tl = calcTimeline(pl)
+    return tl && tl.remaining <= 18 && tl.currentIdx >= 4
+  })
+  if (nearPermit.length > 0) {
+    insights.push({
+      text: `${nearPermit.length} חלקות קרובות להיתר בנייה — ערך צפוי לזנק`,
+      emoji: '🏗️', color: '#F59E0B', category: 'alert',
+    })
+  }
+
+  // Portfolio quality
+  if (avgScore >= 7) {
+    insights.push({
+      text: `ציון תיק ממוצע ${avgScore.toFixed(1)}/10 — איכות גבוהה`,
+      emoji: '⭐', color: '#10B981', category: 'trend',
+    })
+  } else if (avgScore >= 5) {
+    insights.push({
+      text: `ציון תיק ממוצע ${avgScore.toFixed(1)}/10 — סביר, יש הזדמנויות טובות יותר`,
+      emoji: '📋', color: '#F59E0B', category: 'trend',
+    })
+  }
+
+  // Cheapest plot callout
+  if (prices.length >= 3) {
+    const cheapest = plots.reduce((best, pl) => p(pl).price > 0 && p(pl).price < p(best).price ? pl : best,
+      plots.find(pl => p(pl).price > 0) || plots[0])
+    if (cheapest && p(cheapest).price > 0) {
+      insights.push({
+        text: `הכניסה הזולה ביותר: ${fmt.compact(p(cheapest).price)} ב${cheapest.city}`,
+        emoji: '🎯', color: '#8B5CF6', category: 'opportunity',
+      })
+    }
+  }
+
+  // Highest ROI plot
+  if (rois.length >= 2) {
+    const maxRoiPlot = plots.reduce((best, pl) => roi(pl) > roi(best) ? pl : best, plots[0])
+    const maxRoi = roi(maxRoiPlot)
+    if (maxRoi > 100) {
+      insights.push({
+        text: `תשואה מקסימלית: +${Math.round(maxRoi)}% — גוש ${p(maxRoiPlot).block}, ${maxRoiPlot.city}`,
+        emoji: '🚀', color: '#10B981', category: 'opportunity',
+      })
+    }
+  }
+
+  return insights
+}
+
 // ── Normalize ──
 export function normalizePlot(plot: Plot): Plot {
   return { ...plot, total_price: plot.totalPrice ?? plot.total_price, projected_value: plot.projectedValue ?? plot.projected_value,

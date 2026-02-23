@@ -24,18 +24,32 @@ export default defineConfig({
     proxy: {
       // SSE endpoint — long-lived connection, no timeout, no buffering.
       // http-proxy can strip Content-Type from chunked/streaming responses.
-      // We force the correct MIME type via proxyRes to prevent the browser
-      // from seeing application/octet-stream and aborting EventSource.
+      // We force the correct MIME type on the CLIENT response (res), not
+      // the upstream response (proxyRes), because proxyRes.headers mutation
+      // doesn't always propagate through http-proxy for streaming responses.
       '/api/events': {
         target: 'http://localhost:3001',
         changeOrigin: true,
         timeout: 0,
+        headers: {
+          'Accept': 'text/event-stream',
+        },
         configure: (proxy) => {
-          proxy.on('proxyRes', (proxyRes) => {
-            // Force text/event-stream — some http-proxy versions drop it
+          proxy.on('proxyRes', (proxyRes, _req, res) => {
+            // Force text/event-stream on the CLIENT-facing response object.
+            // This is the key fix — proxyRes.headers[] mutation doesn't work
+            // reliably with http-proxy for chunked/streaming responses.
+            if (res && 'setHeader' in res) {
+              ;(res as any).setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+              ;(res as any).setHeader('Cache-Control', 'no-cache, no-transform')
+              ;(res as any).setHeader('X-Accel-Buffering', 'no')
+            }
+            // Also set on proxyRes as a belt-and-suspenders approach
             proxyRes.headers['content-type'] = 'text/event-stream; charset=utf-8'
             proxyRes.headers['cache-control'] = 'no-cache, no-transform'
             proxyRes.headers['x-accel-buffering'] = 'no'
+            // Delete any transfer-encoding that could interfere
+            delete proxyRes.headers['transfer-encoding']
           })
           proxy.on('error', (_err, _req, res) => {
             if (res && 'writeHead' in res && !res.headersSent) {

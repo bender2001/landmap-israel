@@ -1,14 +1,15 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus, Home, BarChart3 } from 'lucide-react'
+import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus, Home, BarChart3, Building2, MapPin } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription, useRecentlyViewed } from '../hooks'
 // Note: dataFreshness and dataSource are computed locally in this component (not via hooks)
 import MapArea from '../components/Map'
+import type { MapBounds } from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, useToast, NetworkBanner, AnimatedValue, DemoModeBanner, ExploreLoadingSkeleton } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade, calcQuickInsight, pricePosition } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcQuickInsight, pricePosition, findBestValueIds, calcAggregateStats, generateMarketInsights, plotCenter } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -194,6 +195,94 @@ const SortOption = styled.button<{$active?:boolean}>`
   color:${pr=>pr.$active?t.gold:t.textSec};font-size:12px;font-weight:${pr=>pr.$active?700:500};
   font-family:${t.font};cursor:pointer;transition:all ${t.tr};
   &:hover{background:${t.hover};color:${t.gold};}
+`
+
+/* ── City Comparison Button ── */
+const CityCompBtn = styled.button<{$active?:boolean}>`
+  display:inline-flex;align-items:center;gap:6px;padding:8px 14px;
+  background:${pr=>pr.$active?t.goldDim:t.glass};backdrop-filter:blur(16px);
+  border:1px solid ${pr=>pr.$active?t.goldBorder:t.glassBorder};border-radius:${t.r.full};
+  color:${pr=>pr.$active?t.gold:t.textSec};font-size:12px;font-weight:600;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};box-shadow:${t.sh.sm};white-space:nowrap;
+  &:hover{border-color:${t.goldBorder};color:${t.gold};}
+  ${mobile}{padding:6px 10px;font-size:11px;}
+`
+
+/* ── City Comparison Overlay Panel ── */
+const cityCompSlide = keyframes`from{opacity:0;transform:translateY(12px) scale(0.96)}to{opacity:1;transform:translateY(0) scale(1)}`
+const CityCompPanel = styled.div`
+  position:absolute;top:16px;right:100px;z-index:${t.z.filter};
+  width:min(520px,calc(100vw - 32px));max-height:calc(100vh - 140px);overflow-y:auto;
+  background:${t.glass};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid ${t.glassBorder};border-radius:${t.r.lg};box-shadow:${t.sh.xl};
+  direction:rtl;animation:${cityCompSlide} 0.3s cubic-bezier(0.32,0.72,0,1);
+  &::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,transparent,${t.gold},${t.goldBright},${t.gold},transparent);
+    border-radius:${t.r.lg} ${t.r.lg} 0 0;}
+  scrollbar-width:thin;
+  &::-webkit-scrollbar{width:4px;}
+  &::-webkit-scrollbar-thumb{background:${t.surfaceLight};border-radius:2px;}
+  ${mobile}{right:8px;left:8px;width:auto;top:56px;max-height:calc(100vh - 180px);}
+`
+const CityCompHeader = styled.div`
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid ${t.border};
+  position:sticky;top:0;z-index:2;
+  background:${t.glass};backdrop-filter:blur(24px);
+`
+const CityCompTitle = styled.h3`
+  font-size:15px;font-weight:800;color:${t.text};margin:0;
+  display:flex;align-items:center;gap:8px;font-family:${t.font};
+`
+const CityCompGrid = styled.div`
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;
+  padding:14px 18px;
+  ${mobile}{grid-template-columns:1fr;}
+`
+const cityCardHover = keyframes`from{transform:translateY(0)}to{transform:translateY(-2px)}`
+const CityCompCard = styled.button<{$active?:boolean;$best?:boolean}>`
+  display:flex;flex-direction:column;gap:8px;padding:14px 16px;
+  background:${pr=>pr.$active?t.goldDim:t.surfaceLight};
+  border:1px solid ${pr=>pr.$active?t.goldBorder:pr.$best?'rgba(16,185,129,0.3)':t.border};
+  border-radius:${t.r.md};cursor:pointer;font-family:${t.font};
+  text-align:right;transition:all ${t.tr};position:relative;overflow:hidden;
+  ${pr=>pr.$best?`&::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#10B981,#4ADE80);}`:''};
+  &:hover{border-color:${t.goldBorder};transform:translateY(-2px);box-shadow:${t.sh.sm};}
+`
+const CityCompCardName = styled.div`
+  font-size:14px;font-weight:800;color:${t.text};
+  display:flex;align-items:center;justify-content:space-between;gap:6px;
+`
+const CityCompCardMetrics = styled.div`display:grid;grid-template-columns:1fr 1fr;gap:6px;`
+const CityCompMetric = styled.div`
+  display:flex;flex-direction:column;gap:1px;
+`
+const CityCompMetricVal = styled.span<{$c?:string}>`font-size:13px;font-weight:800;color:${pr=>pr.$c||t.gold};`
+const CityCompMetricLabel = styled.span`font-size:9px;font-weight:600;color:${t.textDim};`
+const CityCompScoreBar = styled.div`
+  display:flex;align-items:center;gap:6px;margin-top:2px;
+`
+const CityCompScoreTrack = styled.div`flex:1;height:4px;border-radius:2px;background:${t.bg};overflow:hidden;`
+const CityCompScoreFill = styled.div<{$w:number;$c:string}>`
+  height:100%;width:${pr=>pr.$w}%;background:${pr=>pr.$c};border-radius:2px;
+  transition:width 0.6s cubic-bezier(0.32,0.72,0,1);
+`
+
+/* ── Portfolio Quality Gauge (for stats bar) ── */
+const PortfolioGauge = styled.div`
+  display:flex;align-items:center;gap:6px;
+`
+const GaugeTrack = styled.div`
+  width:48px;height:5px;border-radius:3px;background:${t.surfaceLight};overflow:hidden;
+  border:1px solid ${t.border};
+`
+const GaugeFill = styled.div<{$w:number;$c:string}>`
+  height:100%;width:${pr=>pr.$w}%;
+  background:linear-gradient(90deg,${pr=>pr.$c}80,${pr=>pr.$c});border-radius:3px;
+  transition:width 0.5s cubic-bezier(0.32,0.72,0,1);
+`
+const GaugeLabel = styled.span<{$c:string}>`
+  font-size:10px;font-weight:800;color:${pr=>pr.$c};
 `
 
 /* ── Compare Bar (floating bottom tray) ── */
@@ -413,6 +502,46 @@ const ViewportStat = styled.span`
   transition:all 0.3s;
 `
 
+/* ── Market Insights Ticker ── */
+const insightSlideIn = keyframes`from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}`
+const insightSlideOut = keyframes`from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-8px)}`
+const insightPulse = keyframes`0%,100%{box-shadow:0 0 0 0 rgba(212,168,75,0)}50%{box-shadow:0 0 0 4px rgba(212,168,75,0.08)}`
+const InsightsTicker = styled.div`
+  position:absolute;bottom:36px;left:50%;transform:translateX(-50%);z-index:${t.z.filter - 1};
+  display:flex;align-items:center;gap:10px;padding:6px 16px;direction:rtl;
+  background:${t.glass};backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid ${t.glassBorder};border-radius:${t.r.full};
+  box-shadow:${t.sh.sm};font-size:12px;font-family:${t.font};
+  animation:${insightPulse} 4s ease-in-out infinite;
+  transition:all 0.3s;max-width:min(560px,calc(100vw - 120px));
+  overflow:hidden;cursor:pointer;user-select:none;
+  &:hover{border-color:${t.goldBorder};box-shadow:${t.sh.md};}
+  ${mobile}{bottom:96px;left:8px;right:8px;transform:none;max-width:none;
+    font-size:11px;padding:5px 12px;gap:6px;}
+`
+const InsightEmoji = styled.span`
+  font-size:16px;flex-shrink:0;line-height:1;
+  ${mobile}{font-size:14px;}
+`
+const InsightText = styled.span<{$entering:boolean}>`
+  color:${t.textSec};font-weight:600;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;
+  animation:${pr => pr.$entering ? insightSlideIn : insightSlideOut} 0.35s ease-out forwards;
+`
+const InsightCategory = styled.span<{$c:string}>`
+  display:inline-flex;align-items:center;justify-content:center;
+  width:6px;height:6px;border-radius:50%;background:${pr=>pr.$c};flex-shrink:0;
+  ${mobile}{width:5px;height:5px;}
+`
+const InsightNav = styled.button`
+  display:flex;align-items:center;justify-content:center;width:20px;height:20px;
+  border-radius:50%;border:1px solid ${t.border};background:transparent;
+  color:${t.textDim};cursor:pointer;flex-shrink:0;
+  font-size:10px;font-family:${t.font};transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
+  ${mobile}{width:18px;height:18px;font-size:9px;}
+`
+
 // ── URL ↔ Filters sync helpers ──
 const FILTER_PARAMS: (keyof Filters)[] = ['city', 'priceMin', 'priceMax', 'sizeMin', 'sizeMax', 'ripeness', 'minRoi', 'zoning', 'search', 'belowAvg']
 
@@ -457,9 +586,11 @@ export default function Explore() {
   const recentlyViewed = useRecentlyViewed()
   const [mobileExpanded, setMobileExpanded] = useState(false)
   const [mapFullscreen, setMapFullscreen] = useState(false)
+  const [cityCompOpen, setCityCompOpen] = useState(false)
   const toggleFullscreen = useCallback(() => setMapFullscreen(f => !f), [])
   const [visibleInViewport, setVisibleInViewport] = useState<number | null>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [areaBounds, setAreaBounds] = useState<MapBounds | null>(null)
 
   // API filters + data fetch — MUST come before any useMemo that depends on `plots`
   const apiFilters = useMemo(() => {
@@ -566,8 +697,17 @@ export default function Explore() {
         list = list.filter(pl => { const pps = pricePerSqm(pl); return pps > 0 && pps < avgPps })
       }
     }
+    // "Search in this area" — map bounds filter
+    if (areaBounds) {
+      list = list.filter(pl => {
+        const c = plotCenter(pl.coordinates)
+        if (!c) return false
+        return c.lat >= areaBounds.south && c.lat <= areaBounds.north &&
+               c.lng >= areaBounds.west && c.lng <= areaBounds.east
+      })
+    }
     return list
-  }, [plots, filters.sizeMin, filters.sizeMax, filters.belowAvg, filters.minRoi, filters.ripeness, dSearch])
+  }, [plots, filters.sizeMin, filters.sizeMax, filters.belowAvg, filters.minRoi, filters.ripeness, dSearch, areaBounds])
 
   const sorted = useMemo(() => sortPlots(filtered, sortKey, userGeo.location), [filtered, sortKey, userGeo.location])
 
@@ -585,6 +725,25 @@ export default function Explore() {
     const minPrice = prices.length ? Math.min(...prices) : 0
     const maxPrice = prices.length ? Math.max(...prices) : 0
     const avgSize = sizes.length ? sizes.reduce((s, v) => s + v, 0) / sizes.length : 0
+
+    // Price distribution histogram (5 buckets)
+    let priceBuckets: { label: string; count: number; pct: number }[] = []
+    if (prices.length >= 3 && maxPrice > minPrice) {
+      const range = maxPrice - minPrice
+      const bucketSize = range / 5
+      const buckets = [0, 0, 0, 0, 0]
+      for (const pr of prices) {
+        const idx = Math.min(4, Math.floor((pr - minPrice) / bucketSize))
+        buckets[idx]++
+      }
+      const maxBucket = Math.max(...buckets, 1)
+      priceBuckets = buckets.map((count, i) => ({
+        label: fmt.compact(Math.round(minPrice + bucketSize * i)),
+        count,
+        pct: Math.round((count / maxBucket) * 100),
+      }))
+    }
+
     return {
       city,
       count: filtered.length,
@@ -593,8 +752,74 @@ export default function Explore() {
       maxPrice,
       avgScore: Math.round(avgScore * 10) / 10,
       avgSize: Math.round(avgSize),
+      priceBuckets,
     }
   }, [filters.city, filtered, avg])
+
+  // City comparison data (all cities side-by-side for the comparison overlay)
+  const cityComparisonData = useMemo(() => {
+    if (plots.length < 2) return []
+    const byCity = new Map<string, Plot[]>()
+    for (const pl of plots) {
+      if (!pl.city) continue
+      const arr = byCity.get(pl.city) || []
+      arr.push(pl)
+      byCity.set(pl.city, arr)
+    }
+    const bestValueIds = findBestValueIds(plots)
+    return [...byCity.entries()]
+      .filter(([, pls]) => pls.length > 0)
+      .map(([city, pls]) => {
+        const prices = pls.map(pl => p(pl).price).filter(v => v > 0)
+        const scores = pls.map(calcScore)
+        const avgScore = scores.length ? scores.reduce((s, v) => s + v, 0) / scores.length : 0
+        const avgPrice = prices.length ? prices.reduce((s, v) => s + v, 0) / prices.length : 0
+        const ppsList = pls.map(pricePerSqm).filter(v => v > 0)
+        const avgPps = ppsList.length ? ppsList.reduce((s, v) => s + v, 0) / ppsList.length : 0
+        const ppdList = pls.map(pricePerDunam).filter(v => v > 0)
+        const avgPpd = ppdList.length ? ppdList.reduce((s, v) => s + v, 0) / ppdList.length : 0
+        const bestCount = pls.filter(pl => bestValueIds.has(pl.id)).length
+        return { city, count: pls.length, avgPrice, avgScore: Math.round(avgScore * 10) / 10, avgPps: Math.round(avgPps), avgPpd: Math.round(avgPpd), bestCount }
+      })
+      .sort((a, b) => b.avgScore - a.avgScore)
+  }, [plots])
+
+  // Portfolio quality score (weighted avg of all visible plot scores)
+  const portfolioQuality = useMemo(() => {
+    if (filtered.length === 0) return null
+    const scores = filtered.map(calcScore)
+    const avg = scores.reduce((s, v) => s + v, 0) / scores.length
+    const grade = getGrade(avg)
+    return { avg: Math.round(avg * 10) / 10, grade, pct: Math.round((avg / 10) * 100) }
+  }, [filtered])
+
+  // Market Insights for the ticker
+  const marketInsights = useMemo(() => {
+    const cityName = filters.city && filters.city !== 'all' ? filters.city : undefined
+    return generateMarketInsights(filtered, cityName)
+  }, [filtered, filters.city])
+
+  const [insightIdx, setInsightIdx] = useState(0)
+  const [insightEntering, setInsightEntering] = useState(true)
+
+  // Auto-rotate insights every 5s
+  useEffect(() => {
+    if (marketInsights.length <= 1) return
+    const interval = setInterval(() => {
+      setInsightEntering(false)
+      setTimeout(() => {
+        setInsightIdx(prev => (prev + 1) % marketInsights.length)
+        setInsightEntering(true)
+      }, 300)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [marketInsights.length])
+
+  // Reset insight index when insights change
+  useEffect(() => {
+    setInsightIdx(0)
+    setInsightEntering(true)
+  }, [marketInsights.length])
 
   // Dynamic document title + meta description based on active city filter
   const exploreTitle = useMemo(() => {
@@ -617,11 +842,21 @@ export default function Explore() {
     try { return sessionStorage.getItem('data_source') || 'demo' } catch { return 'demo' }
   }, [plots])
 
+  // "Search in this area" handler
+  const handleSearchInArea = useCallback((bounds: MapBounds) => {
+    setAreaBounds(bounds)
+  }, [])
+
+  const clearAreaBounds = useCallback(() => {
+    setAreaBounds(null)
+  }, [])
+
   const hasActiveFilters = useMemo(() =>
-    Object.entries(filters).some(([, v]) => v && v !== 'all'), [filters])
+    Object.entries(filters).some(([, v]) => v && v !== 'all') || !!areaBounds, [filters, areaBounds])
 
   const resetFilters = useCallback(() => {
     setFilters(DEFAULTS)
+    setAreaBounds(null)
   }, [setFilters])
 
   // Select plot + track recently viewed
@@ -879,6 +1114,8 @@ export default function Explore() {
           fullscreen={mapFullscreen}
           onToggleFullscreen={toggleFullscreen}
           onVisiblePlotsChange={setVisibleInViewport}
+          onSearchInArea={handleSearchInArea}
+          areaSearchActive={!!areaBounds}
         />
         {!mapFullscreen && <FilterBar filters={filters} onChange={setFilters} resultCount={filtered.length}
           plots={plots} onSelectPlot={(id) => { const pl = plots.find(pp => pp.id === id); if (pl) selectPlot(pl) }} />}
@@ -898,6 +1135,38 @@ export default function Explore() {
               <BreadcrumbCurrent>חלקות להשקעה ({filtered.length})</BreadcrumbCurrent>
             )}
           </BreadcrumbBar>
+        )}
+
+        {/* Area bounds filter chip */}
+        {!mapFullscreen && areaBounds && !isLoading && (
+          <div style={{
+            position: 'absolute', top: 100, left: '50%', transform: 'translateX(-50%)',
+            zIndex: t.z.filter - 1, display: 'flex', alignItems: 'center', gap: 8,
+            padding: '6px 14px', direction: 'rtl',
+            background: t.glass, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+            border: `1px solid ${t.goldBorder}`, borderRadius: t.r.full,
+            boxShadow: t.sh.sm, fontSize: 12, fontFamily: t.font,
+            animation: 'searchAreaFadeIn 0.25s ease-out',
+          }}>
+            <MapPin size={12} color={t.gold} />
+            <span style={{ color: t.gold, fontWeight: 700 }}>חיפוש באזור המפה</span>
+            <span style={{ color: t.textDim, fontWeight: 600 }}>({filtered.length})</span>
+            <button
+              onClick={clearAreaBounds}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 20, height: 20, borderRadius: '50%',
+                background: 'transparent', border: `1px solid ${t.border}`,
+                color: t.textDim, cursor: 'pointer', transition: `all ${t.tr}`,
+                flexShrink: 0,
+              }}
+              aria-label="נקה חיפוש אזורי"
+              onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = t.err; (e.currentTarget as HTMLElement).style.color = t.err }}
+              onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = t.border; (e.currentTarget as HTMLElement).style.color = t.textDim }}
+            >
+              <X size={10} />
+            </button>
+          </div>
         )}
 
         {/* City Market Summary Card (shown when filtering by city) */}
@@ -927,6 +1196,37 @@ export default function Explore() {
                 <CityMarketStatLabel>טווח מחירים</CityMarketStatLabel>
               </CityMarketStat>
             </CityMarketGrid>
+            {/* Price distribution mini-histogram */}
+            {cityMarketStats.priceBuckets.length > 0 && (
+              <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: t.textDim, marginBottom: 6, letterSpacing: 0.3 }}>
+                  📊 התפלגות מחירים
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 32 }}>
+                  {cityMarketStats.priceBuckets.map((b, i) => (
+                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                      <div style={{
+                        width: '100%', borderRadius: 2,
+                        height: Math.max(4, Math.round(b.pct * 0.3)),
+                        background: b.pct >= 80 ? `linear-gradient(0deg,${t.gold},${t.goldBright})` :
+                                    b.pct >= 40 ? `linear-gradient(0deg,${t.gold}80,${t.gold})` :
+                                    `${t.gold}50`,
+                        transition: 'height 0.5s cubic-bezier(0.32,0.72,0,1)',
+                      }} />
+                      {b.count > 0 && (
+                        <span style={{ fontSize: 7, fontWeight: 700, color: t.textDim, lineHeight: 1 }}>
+                          {b.count}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+                  <span style={{ fontSize: 7, color: t.textDim }}>{fmt.compact(cityMarketStats.minPrice)}</span>
+                  <span style={{ fontSize: 7, color: t.textDim }}>{fmt.compact(cityMarketStats.maxPrice)}</span>
+                </div>
+              </div>
+            )}
           </CityMarketCard>
         )}
 
@@ -1035,12 +1335,20 @@ export default function Explore() {
           )
         })()}
 
-        {/* Sort dropdown */}
+        {/* Sort dropdown + City Comparison button */}
         {!mapFullscreen && <SortWrap ref={sortRef}>
-          <SortBtn onClick={() => setSortOpen(o => !o)} $active={sortKey !== 'recommended'}>
-            <ArrowUpDown size={14} />
-            {SORT_OPTIONS.find(o => o.key === sortKey)?.label || 'מיון'}
-          </SortBtn>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {cityComparisonData.length > 1 && (
+              <CityCompBtn $active={cityCompOpen} onClick={() => setCityCompOpen(o => !o)} aria-label="השוואת ערים">
+                <Building2 size={14} />
+                ערים
+              </CityCompBtn>
+            )}
+            <SortBtn onClick={() => setSortOpen(o => !o)} $active={sortKey !== 'recommended'}>
+              <ArrowUpDown size={14} />
+              {SORT_OPTIONS.find(o => o.key === sortKey)?.label || 'מיון'}
+            </SortBtn>
+          </div>
           {sortOpen && (
             <SortDrop>
               {SORT_OPTIONS.map(o => (
@@ -1051,6 +1359,76 @@ export default function Explore() {
             </SortDrop>
           )}
         </SortWrap>}
+
+        {/* City Comparison Overlay Panel */}
+        {!mapFullscreen && cityCompOpen && cityComparisonData.length > 1 && (
+          <CityCompPanel>
+            <CityCompHeader>
+              <CityCompTitle><Building2 size={16} color={t.gold} /> השוואת ערים ({cityComparisonData.length})</CityCompTitle>
+              <button onClick={() => setCityCompOpen(false)} style={{
+                width: 28, height: 28, borderRadius: t.r.sm, border: `1px solid ${t.border}`,
+                background: 'transparent', color: t.textSec, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}><X size={14} /></button>
+            </CityCompHeader>
+            <CityCompGrid>
+              {cityComparisonData.map(cd => {
+                const scoreColor = cd.avgScore >= 7 ? t.ok : cd.avgScore >= 5 ? t.warn : t.err
+                const isActive = filters.city === cd.city
+                const isBest = cd.avgScore === Math.max(...cityComparisonData.map(c => c.avgScore))
+                return (
+                  <CityCompCard
+                    key={cd.city}
+                    $active={isActive}
+                    $best={isBest}
+                    onClick={() => {
+                      setFilters({ ...filters, city: isActive ? '' : cd.city })
+                      setCityCompOpen(false)
+                    }}
+                  >
+                    <CityCompCardName>
+                      <span>{cd.city}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: t.textDim }}>{cd.count} חלקות</span>
+                    </CityCompCardName>
+                    <CityCompCardMetrics>
+                      <CityCompMetric>
+                        <CityCompMetricVal>{fmt.compact(Math.round(cd.avgPrice))}</CityCompMetricVal>
+                        <CityCompMetricLabel>מחיר ממוצע</CityCompMetricLabel>
+                      </CityCompMetric>
+                      <CityCompMetric>
+                        <CityCompMetricVal $c={scoreColor}>{cd.avgScore}</CityCompMetricVal>
+                        <CityCompMetricLabel>ציון ממוצע</CityCompMetricLabel>
+                      </CityCompMetric>
+                      <CityCompMetric>
+                        <CityCompMetricVal style={{fontSize:11}}>{fmt.num(cd.avgPps)}</CityCompMetricVal>
+                        <CityCompMetricLabel>₪/מ״ר</CityCompMetricLabel>
+                      </CityCompMetric>
+                      <CityCompMetric>
+                        <CityCompMetricVal style={{fontSize:11}}>{fmt.num(cd.avgPpd)}</CityCompMetricVal>
+                        <CityCompMetricLabel>₪/דונם</CityCompMetricLabel>
+                      </CityCompMetric>
+                    </CityCompCardMetrics>
+                    <CityCompScoreBar>
+                      <CityCompScoreTrack>
+                        <CityCompScoreFill $w={cd.avgScore * 10} $c={scoreColor} />
+                      </CityCompScoreTrack>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: scoreColor }}>{getGrade(cd.avgScore).grade}</span>
+                    </CityCompScoreBar>
+                    {cd.bestCount > 0 && (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 3,
+                        fontSize: 9, fontWeight: 800, color: '#10B981',
+                        padding: '2px 8px', borderRadius: t.r.full,
+                        background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)',
+                        alignSelf: 'flex-start',
+                      }}>💎 {cd.bestCount} Best Value</span>
+                    )}
+                  </CityCompCard>
+                )
+              })}
+            </CityCompGrid>
+          </CityCompPanel>
+        )}
 
         <Suspense fallback={null}>
           <PlotListPanel
@@ -1200,11 +1578,53 @@ export default function Explore() {
           </KbDialog>
         </KbBackdrop>
 
+        {/* Market Insights Ticker — rotating contextual intelligence */}
+        {!mapFullscreen && !isLoading && marketInsights.length > 0 && (() => {
+          const insight = marketInsights[insightIdx % marketInsights.length]
+          if (!insight) return null
+          return (
+            <InsightsTicker
+              role="marquee"
+              aria-label="תובנות שוק"
+              title={`${insightIdx + 1}/${marketInsights.length} — לחץ לתובנה הבאה`}
+              onClick={() => {
+                setInsightEntering(false)
+                setTimeout(() => {
+                  setInsightIdx(prev => (prev + 1) % marketInsights.length)
+                  setInsightEntering(true)
+                }, 200)
+              }}
+            >
+              <InsightCategory $c={insight.color} />
+              <InsightEmoji>{insight.emoji}</InsightEmoji>
+              <InsightText $entering={insightEntering}>{insight.text}</InsightText>
+              <InsightNav
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setInsightEntering(false)
+                  setTimeout(() => {
+                    setInsightIdx(prev => (prev + 1) % marketInsights.length)
+                    setInsightEntering(true)
+                  }, 200)
+                }}
+                aria-label="תובנה הבאה"
+              >
+                ›
+              </InsightNav>
+              <span style={{ fontSize: 9, color: t.textDim, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                {insightIdx + 1}/{marketInsights.length}
+              </span>
+            </InsightsTicker>
+          )
+        })()}
+
         {/* Stats bar with viewport visible count */}
         {!mapFullscreen && (() => {
           const prices = filtered.map(pl => p(pl).price).filter(v => v > 0)
           const minPrice = prices.length ? Math.min(...prices) : 0
           const maxPrice = prices.length ? Math.max(...prices) : 0
+          const rois = filtered.map(pl => roi(pl)).filter(v => v > 0)
+          const avgRoi = rois.length ? Math.round(rois.reduce((s, v) => s + v, 0) / rois.length) : 0
           return (
             <Stats>
               <Stat><Val><AnimatedValue value={filtered.length} /></Val> חלקות</Stat>
@@ -1219,16 +1639,32 @@ export default function Explore() {
                   {fmt.short(minPrice)} – <Val>{fmt.short(maxPrice)}</Val>
                 </Stat>
               )}
+              {avgRoi > 0 && (
+                <Stat title={`תשואה ממוצעת צפויה: +${avgRoi}%`}>
+                  ROI <Val style={{ color: t.ok }}>+{avgRoi}%</Val>
+                </Stat>
+              )}
+              {portfolioQuality && (
+                <PortfolioGauge title={`ציון תיק השקעות ממוצע: ${portfolioQuality.avg}/10 — ${portfolioQuality.grade.grade}`}>
+                  <span style={{ fontSize: 10, color: t.textDim, fontWeight: 600 }}>איכות</span>
+                  <GaugeTrack>
+                    <GaugeFill $w={portfolioQuality.pct} $c={portfolioQuality.grade.color} />
+                  </GaugeTrack>
+                  <GaugeLabel $c={portfolioQuality.grade.color}>{portfolioQuality.avg}</GaugeLabel>
+                </PortfolioGauge>
+              )}
               {sse.status === 'connected' ? (
                 <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים מתעדכנים אוטומטית`}>
-                  <LiveDot $c={t.ok} /> עדכני
+                  <LiveDot $c={t.ok} /> עדכני {sse.updateCount > 0 && <span style={{ opacity: 0.6, fontSize: 9 }}>({sse.updateCount})</span>}
                 </LiveBadge>
               ) : dataSource === 'api' ? (
-                <LiveBadge $connected={false} title="נתונים מהשרת — חיבור חי לא פעיל">
-                  <LiveDot $c={t.warn} /> נתוני שרת
+                <LiveBadge $connected={false} title="נתונים מהשרת — לחץ לרענון" style={{ cursor: 'pointer' }}
+                  onClick={() => { window.location.reload() }}>
+                  <LiveDot $c={t.warn} /> נתוני שרת ↻
                 </LiveBadge>
               ) : (
-                <Demo title="נתונים לדוגמה — השרת לא זמין">נתוני דמו</Demo>
+                <Demo title="נתונים לדוגמה — לחץ לנסות שוב" style={{ cursor: 'pointer' }}
+                  onClick={() => { window.location.reload() }}>נתוני דמו ↻</Demo>
               )}
               <KbHintBtn onClick={() => setShortcutsOpen(true)} title="קיצורי מקלדת (?)">
                 <Keyboard size={10} /> ?

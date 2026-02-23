@@ -134,6 +134,16 @@ export const GlobalStyles = createGlobalStyle`
   .plot-popup-cta{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:12px;width:100%;padding:8px;background:linear-gradient(135deg,${t.gold},${t.goldBright});border:none;border-radius:${t.r.sm};color:${t.bg};font-weight:700;font-size:12px;cursor:pointer;font-family:${t.font};transition:all ${t.tr}}
   .plot-popup-cta:hover{transform:translateY(-1px);box-shadow:${t.sh.glow}}
 
+  /* Best Value diamond marker */
+  .plot-best-value-badge{background:none!important;border:none!important;pointer-events:none!important}
+  .pbv-inner{display:inline-flex;align-items:center;gap:3px;padding:2px 10px;
+    background:linear-gradient(135deg,${t.gold},${t.goldBright});border-radius:9999px;
+    font-size:9px;font-weight:900;color:#0B1120;font-family:${t.font};
+    box-shadow:0 2px 12px rgba(212,168,75,0.5),0 0 20px rgba(212,168,75,0.2);
+    white-space:nowrap;letter-spacing:0.5px;
+    animation:bestValueMarkerPulse 3s ease-in-out infinite;}
+  @keyframes bestValueMarkerPulse{0%,100%{transform:scale(1);box-shadow:0 2px 12px rgba(212,168,75,0.5),0 0 20px rgba(212,168,75,0.2)}50%{transform:scale(1.06);box-shadow:0 4px 20px rgba(212,168,75,0.7),0 0 32px rgba(212,168,75,0.35)}}
+
   /* Ruler / Distance measurement markers */
   .ruler-point-marker,.ruler-dist-label,.ruler-total-label{background:none!important;border:none!important;pointer-events:none!important}
 
@@ -152,6 +162,9 @@ export const GlobalStyles = createGlobalStyle`
   @keyframes userPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.3);opacity:0.7}}
 
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+  /* Search in area button animation */
+  @keyframes searchAreaFadeIn{from{opacity:0;transform:translateX(-50%) translateY(-8px) scale(0.92)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
 
   /* Performance: GPU-composited layers for animated elements */
   .gpu-layer{will-change:transform;transform:translateZ(0)}

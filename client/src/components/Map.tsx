@@ -2,8 +2,8 @@ import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker, Polyline, useMap, useMapEvents, WMSTileLayer } from 'react-leaflet'
 import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
-import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette, Ruler, Undo2, Trash2, LocateFixed, Copy, Check } from 'lucide-react'
-import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket, investmentRecommendation, estimatedYear, pricePosition } from '../utils'
+import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette, Ruler, Undo2, Trash2, LocateFixed, Copy, Check, Search } from 'lucide-react'
+import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket, investmentRecommendation, estimatedYear, pricePosition, calcPercentileRank, findBestValueIds } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
 import { israelAreas } from '../data'
@@ -113,6 +113,8 @@ function CityFitBounds({ plots, filterCity }: { plots: Plot[]; filterCity?: stri
 }
 
 // ── Props ──
+export interface MapBounds { north: number; south: number; east: number; west: number }
+
 interface MapProps {
   plots: Plot[]
   pois: Poi[]
@@ -126,6 +128,8 @@ interface MapProps {
   fullscreen?: boolean
   onToggleFullscreen?: () => void
   onVisiblePlotsChange?: (count: number) => void
+  onSearchInArea?: (bounds: MapBounds) => void
+  areaSearchActive?: boolean
 }
 
 // ── URL Sync ──
@@ -813,6 +817,24 @@ function ViewportPlotCounter({ plots, onChange }: { plots: Plot[]; onChange: (vi
   return null
 }
 
+// ── "Search In Area" Move Detector (inside MapContainer) ──
+function MapMoveDetector({ onUserPanned }: { onUserPanned: () => void }) {
+  const map = useMap()
+  const moveCount = useRef(0)
+
+  useEffect(() => {
+    const handler = () => {
+      moveCount.current++
+      // Skip first 3 moveend events (initial auto-fits, fly-to, etc.)
+      if (moveCount.current >= 3) onUserPanned()
+    }
+    map.on('moveend', handler)
+    return () => { map.off('moveend', handler) }
+  }, [map, onUserPanned])
+
+  return null
+}
+
 // ── Main Component ──
 // ── Persisted Map Preferences ──
 const MAP_PREFS_KEY = 'landmap_map_prefs'
@@ -824,7 +846,7 @@ function saveMapPrefs(prefs: MapPrefs) {
   try { localStorage.setItem(MAP_PREFS_KEY, JSON.stringify(prefs)) } catch {}
 }
 
-function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, darkMode = false, filterCity, fullscreen, onToggleFullscreen, onVisiblePlotsChange }: MapProps) {
+function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, darkMode = false, filterCity, fullscreen, onToggleFullscreen, onVisiblePlotsChange, onSearchInArea, areaSearchActive }: MapProps) {
   const navigate = useNavigate()
   const savedPrefs = useMemo(() => loadMapPrefs(), [])
   const [tileIdx, setTileIdxRaw] = useState(savedPrefs.tileIdx ?? 2)
@@ -896,6 +918,34 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
       radius: Math.max(15, Math.min(60, 15 + (Math.sqrt(d.size) / Math.sqrt(maxSize || 1)) * 45)),
     }))
   }, [plots, colorMode])
+
+  // Best value identification for golden star markers
+  const bestValueIds = useMemo(() => findBestValueIds(plots), [plots])
+
+  // "Search in area" state
+  const [showSearchAreaBtn, setShowSearchAreaBtn] = useState(false)
+  const handleUserPanned = useCallback(() => {
+    if (onSearchInArea && !areaSearchActive) setShowSearchAreaBtn(true)
+  }, [onSearchInArea, areaSearchActive])
+
+  const handleSearchInArea = useCallback(() => {
+    if (mapRef.current && onSearchInArea) {
+      const b = mapRef.current.getBounds()
+      onSearchInArea({ north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest() })
+      setShowSearchAreaBtn(false)
+    }
+  }, [onSearchInArea])
+
+  // Re-show the button when user pans after an active area search
+  useEffect(() => {
+    if (!areaSearchActive) return
+    const checkMove = () => setShowSearchAreaBtn(true)
+    const map = mapRef.current
+    if (map) {
+      map.on('moveend', checkMove)
+      return () => { map.off('moveend', checkMove) }
+    }
+  }, [areaSearchActive])
 
   const [copiedCoords, setCopiedCoords] = useState<string | null>(null)
   const copyCoordinates = useCallback((lat: number, lng: number, plotId: string) => {
@@ -1081,6 +1131,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         <PlotBoundsTracker plots={plots} />
         <ZoomTracker onChange={handleZoomChange} />
         {onVisiblePlotsChange && <ViewportPlotCounter plots={plots} onChange={onVisiblePlotsChange} />}
+        {onSearchInArea && <MapMoveDetector onUserPanned={handleUserPanned} />}
 
         {/* Distance ruler tool */}
         <RulerTool active={rulerActive} darkMode={darkMode} onPointsChange={setRulerPoints} />
@@ -1172,8 +1223,56 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
           )
         })}
 
-        {/* Plot polygons */}
-        {plots.map(plot => {
+        {/* City cluster bubbles at low zoom (when individual polygons are hidden) */}
+        {zoom <= 10 && (() => {
+          const byCity = new Map<string, { count: number; lat: number; lng: number; avgScore: number; avgPrice: number }>()
+          for (const pl of plots) {
+            if (!pl.city) continue
+            const c = plotCenter(pl.coordinates)
+            if (!c) continue
+            const existing = byCity.get(pl.city)
+            if (existing) {
+              existing.count++
+              existing.lat = (existing.lat * (existing.count - 1) + c.lat) / existing.count
+              existing.lng = (existing.lng * (existing.count - 1) + c.lng) / existing.count
+              existing.avgScore = (existing.avgScore * (existing.count - 1) + calcScore(pl)) / existing.count
+              existing.avgPrice = (existing.avgPrice * (existing.count - 1) + p(pl).price) / existing.count
+            } else {
+              byCity.set(pl.city, { count: 1, lat: c.lat, lng: c.lng, avgScore: calcScore(pl), avgPrice: p(pl).price })
+            }
+          }
+          return [...byCity.entries()].map(([city, data]) => {
+            const size = Math.max(40, Math.min(72, 34 + data.count * 5))
+            const scoreColor = data.avgScore >= 7 ? '#10B981' : data.avgScore >= 5 ? '#F59E0B' : '#EF4444'
+            const icon = L.divIcon({
+              className: 'city-cluster-marker',
+              html: `<div class="city-cluster-bubble" style="width:${size}px;height:${size}px;border-color:${scoreColor}50;background:radial-gradient(circle at 30% 30%,${scoreColor}90,${scoreColor}60)">
+                <span class="city-cluster-count" style="font-size:${Math.max(11, size / 4)}px">${data.count}</span>
+                <span class="city-cluster-city">${city}</span>
+              </div>`,
+              iconSize: [size, size],
+              iconAnchor: [size / 2, size / 2],
+            })
+            return (
+              <Marker key={`cluster-${city}`} position={[data.lat, data.lng]} icon={icon}
+                eventHandlers={{ click: () => {
+                  mapRef.current?.flyTo([data.lat, data.lng], 13, { duration: 0.8 })
+                }}}
+              >
+                <Tooltip className="price-tooltip" direction="top" offset={[0, -(size / 2 + 4)]} opacity={1}>
+                  <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                    <span style={{ fontWeight: 800 }}>{city}</span>
+                    <span style={{ fontSize: 10 }}>{data.count} חלקות · ממוצע {fmt.compact(Math.round(data.avgPrice))}</span>
+                    <span style={{ fontSize: 10, color: scoreColor, fontWeight: 700 }}>ציון {data.avgScore.toFixed(1)}/10</span>
+                  </span>
+                </Tooltip>
+              </Marker>
+            )
+          })
+        })()}
+
+        {/* Plot polygons — skip at very low zoom for performance (city clusters provide context) */}
+        {zoom >= 11 && plots.map(plot => {
           if (!plot.coordinates?.length) return null
           const d = p(plot), color = getPolygonColor(plot, colorMode), isSel = selected?.id === plot.id
           const isHov = hoveredPlotId === plot.id && !isSel
@@ -1194,6 +1293,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
               <Tooltip className="price-tooltip plot-tooltip-rich" direction="top" offset={[0, -8]} opacity={1}>
                 {(() => {
                   const reco = investmentRecommendation(plot)
+                  const pp = pricePosition(plot, plots)
                   return (
                     <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1202,6 +1302,27 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
                         <span style={{ fontSize: 10, opacity: 0.7 }}>{fmt.dunam(d.size)} ד׳</span>
                         <span style={{ fontSize: 10, fontWeight: 800, color: grade.color }}>{grade.grade}</span>
                       </span>
+                      {/* Price vs Market mini-bar */}
+                      {pp && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9 }}>
+                          <span style={{ opacity: 0.5, flexShrink: 0 }}>💰</span>
+                          <span style={{
+                            flex: 1, height: 4, borderRadius: 2, position: 'relative',
+                            background: 'rgba(128,128,128,0.2)', minWidth: 40, overflow: 'hidden',
+                          }}>
+                            <span style={{
+                              position: 'absolute', top: 0, bottom: 0, right: 0,
+                              width: `${Math.min(100, Math.max(5, 50 + pp.pct / 2))}%`,
+                              borderRadius: 2,
+                              background: `linear-gradient(90deg, ${pp.color}60, ${pp.color})`,
+                              transition: 'width 0.3s',
+                            }} />
+                          </span>
+                          <span style={{ color: pp.color, fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            {pp.direction === 'below' ? '↓' : pp.direction === 'above' ? '↑' : '–'} {pp.label}
+                          </span>
+                        </span>
+                      )}
                       <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9 }}>
                         {zoningStage && (
                           <span style={{ opacity: 0.65, display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -1281,6 +1402,20 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
           return <Marker key={`badge-${plot.id}`} position={[c.lat, c.lng]} icon={icon} interactive={false} />
         })}
 
+        {/* Best Value diamond markers — golden star for top value plots per city */}
+        {zoom >= 12 && plots.map(plot => {
+          if (!bestValueIds.has(plot.id)) return null
+          const c = plotCenter(plot.coordinates)
+          if (!c) return null
+          const icon = L.divIcon({
+            className: 'plot-best-value-badge',
+            html: `<div class="pbv-inner">💎 BEST VALUE</div>`,
+            iconSize: [80, 22],
+            iconAnchor: [40, -4],
+          })
+          return <Marker key={`bv-${plot.id}`} position={[c.lat, c.lng]} icon={icon} interactive={false} />
+        })}
+
         {/* POI markers */}
         {pois.map(poi => (
           <Marker key={poi.id} position={[poi.lat, poi.lng]} icon={poiIcon(poi.icon || '📍')}>
@@ -1291,6 +1426,28 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
 
       {/* Vignette overlay */}
       <div className="map-vignette" />
+
+      {/* "Search in this area" floating button — like Madlan's "חפש באזור זה" */}
+      {showSearchAreaBtn && onSearchInArea && !rulerActive && (
+        <button
+          onClick={handleSearchInArea}
+          style={{
+            position: 'absolute', top: fullscreen ? 16 : 52, left: '50%', transform: 'translateX(-50%)',
+            zIndex: t.z.controls + 2, display: 'flex', alignItems: 'center', gap: 8,
+            padding: '10px 20px', direction: 'rtl',
+            background: `linear-gradient(135deg, ${t.gold}, ${t.goldBright})`,
+            border: 'none', borderRadius: t.r.full,
+            boxShadow: `0 4px 20px rgba(212,168,75,0.4), 0 2px 8px rgba(0,0,0,0.25)`,
+            color: t.bg, fontSize: 13, fontWeight: 800, fontFamily: t.font,
+            cursor: 'pointer', whiteSpace: 'nowrap',
+            animation: 'searchAreaFadeIn 0.3s cubic-bezier(0.32,0.72,0,1)',
+          }}
+          aria-label="חפש באזור זה"
+        >
+          <Search size={15} />
+          חפש באזור זה
+        </button>
+      )}
 
       {/* Zoom Level Indicator */}
       {!fullscreen && <ZoomLevelIndicator zoom={zoom} plots={plots} darkMode={darkMode} />}
