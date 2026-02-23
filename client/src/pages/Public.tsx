@@ -118,10 +118,96 @@ const LegalFooter = styled.div`
 `
 
 const FEATURES = [
-  { icon: MapPin, title: 'מפה חכמה', desc: 'ניווט אינטואיטיבי על גבי מפה אינטראקטיבית' },
-  { icon: Zap, title: 'ניתוח AI', desc: 'תחזיות תשואה מבוססות בינה מלאכותית' },
-  { icon: BarChart3, title: 'נתוני שוק', desc: 'מידע עדכני על ועדות, שומות ומגמות' },
-  { icon: Shield, title: 'אבטחה', desc: 'פרטי המוכר מוגנים, כל הפניות דרך הפלטפורמה' },
+  { icon: MapPin, title: 'מפה חכמה', desc: 'ניווט אינטואיטיבי על גבי מפה אינטראקטיבית עם שכבות לוויין, מפת חום וצביעה לפי ציון' },
+  { icon: Zap, title: 'ניתוח AI', desc: 'ציון השקעה 1-10, תחזית תשואה, הערכת סיכון וניתוח תרחישי יציאה מבוסס בינה מלאכותית' },
+  { icon: BarChart3, title: 'נתוני שוק', desc: 'מידע עדכני על ועדות תכנון, שומות, מגמות מחירים ואזורי פיתוח' },
+  { icon: Shield, title: 'אבטחה ושקיפות', desc: 'שיטת הציון שלנו שקופה לחלוטין — כל גורם מוסבר, כל נתון ניתן לבדיקה' },
+]
+
+/* ── About Page: Methodology Section ── */
+const MethodWrap = styled.div`margin-top:64px;`
+const MethodTitle = styled.h2`font-size:clamp(20px,3vw,28px);font-weight:800;color:${t.lText};text-align:center;margin-bottom:8px;font-family:${t.font};`
+const MethodSub = styled.p`text-align:center;color:${t.lTextSec};font-size:14px;margin-bottom:36px;max-width:600px;margin-left:auto;margin-right:auto;line-height:1.7;`
+const MethodGrid = styled.div`display:grid;grid-template-columns:repeat(3,1fr);gap:20px;${md}{grid-template-columns:1fr;}margin-bottom:48px;`
+const MethodCard = styled(AnimatedCard)`
+  background:${t.lSurface};border:1px solid ${t.lBorder};border-radius:${t.r.lg};padding:24px 20px;
+  position:relative;overflow:hidden;transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};transform:translateY(-3px);box-shadow:${t.sh.lg};}
+  &::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,transparent,${t.gold},transparent);}
+`
+const MethodCardNum = styled.span`
+  display:inline-flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border-radius:50%;background:${t.goldDim};
+  border:1px solid ${t.goldBorder};color:${t.gold};font-size:13px;font-weight:800;
+  margin-bottom:10px;
+`
+const MethodCardTitle = styled.h4`font-size:15px;font-weight:700;color:${t.lText};margin-bottom:6px;`
+const MethodCardDesc = styled.p`font-size:13px;color:${t.lTextSec};line-height:1.7;`
+
+/* ── About: Scoring Breakdown ── */
+const ScoreSection = styled.div`margin-top:48px;`
+const ScoreGrid = styled.div`
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:680px;margin:0 auto;
+  ${md}{grid-template-columns:1fr;}
+`
+const ScoreRow = styled.div`
+  display:flex;align-items:center;gap:12px;padding:14px 16px;
+  background:${t.lSurface};border:1px solid ${t.lBorder};border-radius:${t.r.md};
+  transition:all ${t.tr};&:hover{border-color:${t.goldBorder};}
+`
+const ScoreEmoji = styled.span`font-size:20px;flex-shrink:0;`
+const ScoreInfo = styled.div`flex:1;min-width:0;`
+const ScoreFactor = styled.div`font-size:13px;font-weight:700;color:${t.lText};`
+const ScoreWeight = styled.div`font-size:11px;color:${t.lTextSec};`
+const ScoreBar = styled.div<{$pct:number}>`
+  width:48px;height:6px;border-radius:3px;background:${t.lBorder};overflow:hidden;flex-shrink:0;
+  position:relative;
+  &::after{content:'';position:absolute;top:0;left:0;height:100%;
+    width:${pr=>pr.$pct}%;background:linear-gradient(90deg,${t.gold},${t.goldBright});border-radius:3px;}
+`
+
+/* ── About: Data Sources ── */
+const SourcesGrid = styled.div`
+  display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:24px;
+`
+const SourceBadge = styled.div`
+  display:flex;align-items:center;gap:8px;padding:10px 18px;
+  background:${t.lSurface};border:1px solid ${t.lBorder};border-radius:${t.r.full};
+  font-size:13px;font-weight:600;color:${t.lText};transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};box-shadow:${t.sh.sm};}
+`
+const SourceIcon = styled.span`font-size:16px;`
+
+/* ── About: Stats Counter ── */
+const StatsRow = styled.div`
+  display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:48px auto 0;max-width:800px;
+  @media(max-width:640px){grid-template-columns:repeat(2,1fr);}
+`
+const StatBox = styled.div`text-align:center;padding:16px;`
+const StatNum = styled.div`font-size:clamp(28px,4vw,40px);font-weight:900;color:${t.gold};font-family:${t.font};`
+const StatLabel = styled.div`font-size:12px;font-weight:600;color:${t.lTextSec};margin-top:4px;`
+
+const METHODOLOGY = [
+  { num: '1', title: 'איסוף נתונים', desc: 'אנו אוספים נתונים ממקורות רשמיים: רשות המסים, ועדות תכנון, מנהל מקרקעי ישראל, תוכניות מתאר ונתוני עסקאות היסטוריות.' },
+  { num: '2', title: 'ניתוח ודירוג AI', desc: 'המערכת מנתחת כל חלקה לפי 3 גורמים מרכזיים: פוטנציאל תשואה (40%), שלב תכנוני (30%) וטווח זמן להפשרה (30%).' },
+  { num: '3', title: 'עדכון שוטף', desc: 'הנתונים מתעדכנים באופן שוטף — מחירים, שלבי תכנון והחלטות ועדות. כל שינוי מותאם לציון ההשקעה בזמן אמת.' },
+]
+
+const SCORE_FACTORS = [
+  { emoji: '📈', factor: 'פוטנציאל תשואה', weight: 'עד 4 נק׳ מתוך 10', pct: 40 },
+  { emoji: '📋', factor: 'שלב תכנוני', weight: 'עד 3 נק׳ מתוך 10', pct: 30 },
+  { emoji: '⏱️', factor: 'טווח זמן להפשרה', weight: 'עד 3 נק׳ מתוך 10', pct: 30 },
+  { emoji: '🏗️', factor: 'היתר בנייה = ציון מקסימלי', weight: 'שלב מתקדם ביותר', pct: 100 },
+]
+
+const DATA_SOURCES = [
+  { icon: '🏛️', label: 'רשות המסים — נדל״ן' },
+  { icon: '📋', label: 'ועדות תכנון ובנייה' },
+  { icon: '🗺️', label: 'מנהל מקרקעי ישראל' },
+  { icon: '📊', label: 'נתוני עסקאות היסטוריות' },
+  { icon: '🤖', label: 'ניתוח AI — Claude' },
+  { icon: '🛰️', label: 'תצלומי לוויין' },
 ]
 const TIERS = [
   { name: 'חינם', price: '₪0', featured: false, items: ['צפייה במפה', 'עד 5 מועדפים', 'ניתוח בסיסי'] },
@@ -134,10 +220,14 @@ const PHONE_RE = /^0[2-9]\d{7,8}$/
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function About() {
+  useDocumentTitle('אודות LandMap — שיטת הניתוח והדירוג שלנו')
+  useMetaDescription('למדו על שיטת ניתוח ההשקעות של LandMap Israel — ציון השקעה שקוף, מקורות נתונים רשמיים וניתוח AI מתקדם.')
   return (
     <Wrap>
       <Title>אודות LandMap</Title>
-      <Sub>הפלטפורמה המובילה להשקעות קרקע בישראל</Sub>
+      <Sub>הפלטפורמה המובילה להשקעות קרקע בישראל — שקיפות, נתונים אמינים ובינה מלאכותית</Sub>
+
+      {/* Feature Cards */}
       <Grid4>
         {FEATURES.map((f, i) => (
           <Card key={i} $delay={i * 0.1}>
@@ -147,9 +237,66 @@ function About() {
           </Card>
         ))}
       </Grid4>
+
+      {/* Platform Stats */}
+      <StatsRow>
+        <StatBox><StatNum>12+</StatNum><StatLabel>חלקות במערכת</StatLabel></StatBox>
+        <StatBox><StatNum>6</StatNum><StatLabel>מקורות נתונים</StatLabel></StatBox>
+        <StatBox><StatNum>24/7</StatNum><StatLabel>עדכון אוטומטי</StatLabel></StatBox>
+        <StatBox><StatNum>100%</StatNum><StatLabel>שקיפות ציון</StatLabel></StatBox>
+      </StatsRow>
+
+      {/* Methodology */}
+      <MethodWrap>
+        <MethodTitle>🔬 איך אנחנו מנתחים</MethodTitle>
+        <MethodSub>כל חלקה עוברת תהליך ניתוח רב-שלבי שמשלב נתונים רשמיים עם ניתוח AI. התוצאה — ציון השקעה שקוף ומוסבר.</MethodSub>
+        <MethodGrid>
+          {METHODOLOGY.map((m, i) => (
+            <MethodCard key={i} $delay={i * 0.12}>
+              <MethodCardNum>{m.num}</MethodCardNum>
+              <MethodCardTitle>{m.title}</MethodCardTitle>
+              <MethodCardDesc>{m.desc}</MethodCardDesc>
+            </MethodCard>
+          ))}
+        </MethodGrid>
+      </MethodWrap>
+
+      {/* Scoring Breakdown */}
+      <ScoreSection>
+        <MethodTitle>📊 פירוט ציון ההשקעה</MethodTitle>
+        <MethodSub>ציון ההשקעה (1-10) מורכב מ-3 גורמים מרכזיים. כל גורם מחושב באופן עצמאי ומוצג בשקיפות מלאה בדף החלקה.</MethodSub>
+        <ScoreGrid>
+          {SCORE_FACTORS.map((sf, i) => (
+            <ScoreRow key={i}>
+              <ScoreEmoji>{sf.emoji}</ScoreEmoji>
+              <ScoreInfo>
+                <ScoreFactor>{sf.factor}</ScoreFactor>
+                <ScoreWeight>{sf.weight}</ScoreWeight>
+              </ScoreInfo>
+              <ScoreBar $pct={sf.pct} />
+            </ScoreRow>
+          ))}
+        </ScoreGrid>
+      </ScoreSection>
+
+      {/* Data Sources */}
+      <MethodWrap>
+        <MethodTitle>🏛️ מקורות הנתונים שלנו</MethodTitle>
+        <MethodSub>אנו מסתמכים אך ורק על מקורות רשמיים ומוסדיים. הנתונים מצטלבים ומאומתים לפני כל עדכון.</MethodSub>
+        <SourcesGrid>
+          {DATA_SOURCES.map((ds, i) => (
+            <SourceBadge key={i}>
+              <SourceIcon>{ds.icon}</SourceIcon>
+              {ds.label}
+            </SourceBadge>
+          ))}
+        </SourcesGrid>
+      </MethodWrap>
+
+      {/* Values */}
       <Values>
         <ValTitle>הערכים שלנו</ValTitle>
-        <ValDesc>שקיפות מלאה, נתונים אמינים והנגשת שוק הקרקעות לכל משקיע. אנו מחויבים להגן על פרטיות המוכרים ולספק ניתוח מקצועי שמאפשר קבלת החלטות מושכלת.</ValDesc>
+        <ValDesc>שקיפות מלאה, נתונים אמינים והנגשת שוק הקרקעות לכל משקיע. אנו מחויבים להגן על פרטיות המוכרים ולספק ניתוח מקצועי שמאפשר קבלת החלטות מושכלת. המידע באתר אינו מהווה ייעוץ השקעות.</ValDesc>
       </Values>
     </Wrap>
   )
@@ -315,11 +462,80 @@ function ContactPage() {
   )
 }
 
+/* ── Pricing: Feature Comparison Table ── */
+const CompTable = styled.div`
+  max-width:780px;margin:48px auto 0;border:1px solid ${t.lBorder};border-radius:${t.r.xl};
+  overflow:hidden;background:${t.lSurface};
+`
+const CompRow = styled.div<{$header?:boolean}>`
+  display:grid;grid-template-columns:2fr 1fr 1fr 1fr;
+  border-bottom:1px solid ${t.lBorder};
+  ${pr=>pr.$header?`background:${t.lBg};font-weight:700;font-size:13px;color:${t.lText};`:''}
+  &:last-child{border-bottom:none;}
+  @media(max-width:640px){grid-template-columns:1.5fr 1fr 1fr 1fr;}
+`
+const CompCell = styled.div<{$highlight?:boolean}>`
+  padding:12px 16px;font-size:13px;color:${t.lTextSec};text-align:center;
+  display:flex;align-items:center;justify-content:center;
+  ${pr=>pr.$highlight?`background:rgba(212,168,75,0.04);`:''}
+  &:first-child{text-align:right;justify-content:flex-start;font-weight:600;color:${t.lText};}
+  @media(max-width:640px){padding:10px 8px;font-size:11px;}
+`
+const CompCheck = styled.span<{$yes:boolean}>`
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:50%;
+  background:${pr=>pr.$yes?'rgba(16,185,129,0.1)':'rgba(148,163,184,0.08)'};
+  color:${pr=>pr.$yes?t.ok:'#CBD5E1'};font-size:12px;
+`
+
+/* ── Pricing: FAQ ── */
+const FaqWrap = styled.div`max-width:680px;margin:56px auto 0;`
+const FaqItem = styled.details`
+  border:1px solid ${t.lBorder};border-radius:${t.r.md};margin-bottom:8px;
+  background:${t.lSurface};transition:all ${t.tr};overflow:hidden;
+  &[open]{border-color:${t.goldBorder};box-shadow:0 2px 8px rgba(212,168,75,0.08);}
+`
+const FaqSummary = styled.summary`
+  display:flex;align-items:center;gap:10px;padding:16px 20px;cursor:pointer;
+  font-size:14px;font-weight:700;color:${t.lText};font-family:${t.font};
+  list-style:none;&::-webkit-details-marker{display:none;}
+  &::after{content:'▾';margin-right:auto;color:${t.lTextSec};font-size:12px;transition:transform 0.2s;}
+  [open] > &::after{transform:rotate(180deg);}
+`
+const FaqAnswer = styled.div`
+  padding:0 20px 16px;font-size:13px;color:${t.lTextSec};line-height:1.8;
+`
+
+const COMPARISON_FEATURES = [
+  { feature: 'צפייה במפה אינטראקטיבית', free: true, investor: true, pro: true },
+  { feature: 'חיפוש וסינון מתקדם', free: true, investor: true, pro: true },
+  { feature: 'ציון השקעה + פירוט', free: true, investor: true, pro: true },
+  { feature: 'מועדפים', free: '5', investor: '∞', pro: '∞' },
+  { feature: 'השוואת חלקות', free: false, investor: true, pro: true },
+  { feature: 'ניתוח AI מלא', free: false, investor: true, pro: true },
+  { feature: 'התראות בזמן אמת', free: false, investor: true, pro: true },
+  { feature: 'דוח השקעה להורדה', free: false, investor: true, pro: true },
+  { feature: 'ניהול לידים ו-CRM', free: false, investor: false, pro: true },
+  { feature: 'אנליטיקס מתקדם', free: false, investor: false, pro: true },
+  { feature: 'גישת API', free: false, investor: false, pro: true },
+  { feature: 'תמיכה VIP', free: false, investor: false, pro: true },
+]
+
+const PRICING_FAQ = [
+  { q: 'האם אפשר לנסות בחינם?', a: 'בהחלט! התוכנית החינמית כוללת גישה מלאה למפה, חיפוש וסינון, ציון השקעה ועד 5 מועדפים. ניתן לשדרג בכל עת.' },
+  { q: 'האם ניתן לבטל בכל עת?', a: 'כן, ביטול חופשי בכל רגע ללא התחייבות. החשבון שלכם יעבור לתוכנית חינם בסיום תקופת החיוב.' },
+  { q: 'מה ההבדל בין ניתוח בסיסי לניתוח AI מלא?', a: 'הניתוח הבסיסי כולל ציון השקעה ופירוט גורמים. ניתוח AI מלא מוסיף תחזיות תשואה, הערכת סיכון, תרחישי יציאה, והשוואה לשוק בזמן אמת.' },
+  { q: 'האם המחירים כוללים מע״מ?', a: 'המחירים אינם כוללים מע״מ. חשבונית מס תופק אוטומטית בכל חידוש.' },
+  { q: 'מה כוללת גישת API?', a: 'גישה לממשק תכנות (REST API) לשליפת נתוני חלקות, ציונים ותחזיות. אידיאלי ליזמים שרוצים לשלב את הנתונים במערכות שלהם.' },
+]
+
 function Pricing() {
+  useDocumentTitle('מחירים — תוכניות LandMap Israel')
+  useMetaDescription('השוו בין תוכניות LandMap Israel — חינם, משקיע ומקצועי. מצאו את התוכנית המתאימה להשקעות הקרקע שלכם.')
   return (
     <Wrap>
       <Title>מחירים</Title>
-      <Sub>בחרו את התוכנית המתאימה לכם</Sub>
+      <Sub>בחרו את התוכנית המתאימה לכם — שדרוג או ביטול בכל עת</Sub>
       <Grid3>
         {TIERS.map((tier, i) => (
           <Tier key={i} $delay={i * 0.12} $featured={tier.featured}>
@@ -334,6 +550,35 @@ function Pricing() {
           </Tier>
         ))}
       </Grid3>
+
+      {/* Feature Comparison Table */}
+      <CompTable>
+        <CompRow $header>
+          <CompCell>תכונה</CompCell>
+          <CompCell>חינם</CompCell>
+          <CompCell $highlight>משקיע</CompCell>
+          <CompCell>מקצועי</CompCell>
+        </CompRow>
+        {COMPARISON_FEATURES.map((f, i) => (
+          <CompRow key={i}>
+            <CompCell>{f.feature}</CompCell>
+            <CompCell>{typeof f.free === 'string' ? f.free : <CompCheck $yes={!!f.free}>{f.free ? '✓' : '—'}</CompCheck>}</CompCell>
+            <CompCell $highlight>{typeof f.investor === 'string' ? f.investor : <CompCheck $yes={!!f.investor}>{f.investor ? '✓' : '—'}</CompCheck>}</CompCell>
+            <CompCell>{typeof f.pro === 'string' ? f.pro : <CompCheck $yes={!!f.pro}>{f.pro ? '✓' : '—'}</CompCheck>}</CompCell>
+          </CompRow>
+        ))}
+      </CompTable>
+
+      {/* FAQ */}
+      <FaqWrap>
+        <MethodTitle style={{marginBottom: 24}}>שאלות נפוצות</MethodTitle>
+        {PRICING_FAQ.map((faq, i) => (
+          <FaqItem key={i}>
+            <FaqSummary>{faq.q}</FaqSummary>
+            <FaqAnswer>{faq.a}</FaqAnswer>
+          </FaqItem>
+        ))}
+      </FaqWrap>
     </Wrap>
   )
 }

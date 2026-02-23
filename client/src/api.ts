@@ -1,10 +1,68 @@
 const BASE = '/api'
-async function req(path: string, opts: RequestInit & { timeoutMs?: number } = {}): Promise<unknown> {
+
+/**
+ * Smart retry with exponential backoff.
+ * Retries on network errors and 5xx status codes (server transient failures).
+ * Never retries 4xx (client errors — bad request, auth, not found).
+ * Uses jittered exponential backoff to avoid thundering herd.
+ */
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  { maxRetries = 2, baseDelay = 500, timeoutMs = 15000 }: { maxRetries?: number; baseDelay?: number; timeoutMs?: number } = {}
+): Promise<Response> {
+  let lastError: Error | null = null
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const ac = new AbortController()
+    const timer = setTimeout(() => ac.abort(), timeoutMs)
+    try {
+      const res = await fetch(url, { ...init, signal: ac.signal })
+      clearTimeout(timer)
+      // Don't retry client errors (4xx) — they won't succeed on retry
+      if (res.ok || (res.status >= 400 && res.status < 500)) return res
+      // Server error (5xx) — retry with backoff
+      if (attempt < maxRetries) {
+        const jitter = Math.random() * 200
+        await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, attempt) + jitter))
+        continue
+      }
+      return res // final attempt — return as-is
+    } catch (err) {
+      clearTimeout(timer)
+      lastError = err as Error
+      if (attempt < maxRetries && !ac.signal.aborted) {
+        // Network error — retry
+        const jitter = Math.random() * 200
+        await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, attempt) + jitter))
+        continue
+      }
+      if (attempt < maxRetries && (err as Error).name === 'AbortError') {
+        // Timeout — retry with slightly longer timeout
+        timeoutMs = Math.min(timeoutMs * 1.5, 30000)
+        continue
+      }
+      throw err
+    }
+  }
+  throw lastError || new Error('Request failed after retries')
+}
+
+async function req(path: string, opts: RequestInit & { timeoutMs?: number; retries?: number } = {}): Promise<unknown> {
   const token = localStorage.getItem('auth_token')
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(opts.headers as Record<string, string>) }
   if (token) headers.Authorization = `Bearer ${token}`
-  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), opts.timeoutMs ?? 15000)
-  try { const r = await fetch(`${BASE}${path}`, { ...opts, headers, signal: ac.signal }); if (!r.ok) { const b = await r.json().catch(() => ({})) as Record<string, unknown>; throw Object.assign(new Error((b.error as string) || `Error ${r.status}`), { status: r.status }) }; return r.json() } finally { clearTimeout(t) }
+  const { timeoutMs, retries, ...fetchOpts } = opts
+  const isGet = !opts.method || opts.method === 'GET'
+  const r = await fetchWithRetry(
+    `${BASE}${path}`,
+    { ...fetchOpts, headers },
+    { timeoutMs: timeoutMs ?? 15000, maxRetries: retries ?? (isGet ? 2 : 0) }
+  )
+  if (!r.ok) {
+    const b = await r.json().catch(() => ({})) as Record<string, unknown>
+    throw Object.assign(new Error((b.error as string) || `Error ${r.status}`), { status: r.status })
+  }
+  return r.json()
 }
 const api = { get: (p: string) => req(p), post: (p: string, d: unknown) => req(p, { method: 'POST', body: JSON.stringify(d) }), patch: (p: string, d: unknown) => req(p, { method: 'PATCH', body: JSON.stringify(d) }), delete: (p: string) => req(p, { method: 'DELETE' }) }
 
