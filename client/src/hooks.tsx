@@ -613,12 +613,15 @@ export function useInView(options?: IntersectionObserverInit) {
       setInView(true)
       return
     }
+    // Fallback: ensure visibility within 2.5s even if observer fails
+    // (content-visibility: auto or reduced-motion can prevent observer from firing)
+    const fallbackTimer = setTimeout(() => setInView(true), 2500)
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setInView(true); observer.disconnect() } },
-      { threshold: 0.05, rootMargin: '0px 0px -20px 0px', ...options }
+      ([entry]) => { if (entry.isIntersecting) { setInView(true); observer.disconnect(); clearTimeout(fallbackTimer) } },
+      { threshold: 0.01, rootMargin: '0px 0px 80px 0px', ...options }
     )
     observer.observe(el)
-    return () => observer.disconnect()
+    return () => { observer.disconnect(); clearTimeout(fallbackTimer) }
   }, [])
   return { ref, inView }
 }
@@ -641,4 +644,199 @@ export function useViewportPlots(plots: { id: string; coordinates?: [number, num
     }
     return { visible, total: plots.length }
   }, [plots, mapBounds])
+}
+
+// ── Server-Sent Events (real-time updates) ──
+
+export type SSEStatus = 'connecting' | 'connected' | 'disconnected'
+
+export interface SSEEvent {
+  type: string
+  data: Record<string, unknown>
+  id?: string
+}
+
+/**
+ * Connect to the server's SSE endpoint for real-time plot updates.
+ * Automatically reconnects on disconnect and invalidates React Query cache
+ * when relevant events arrive (plot updates, new listings, price changes).
+ */
+export function useSSE() {
+  const qc = useQueryClient()
+  const [status, setStatus] = useState<SSEStatus>('disconnected')
+  const [lastEvent, setLastEvent] = useState<SSEEvent | null>(null)
+  const [updateCount, setUpdateCount] = useState(0)
+  const esRef = useRef<EventSource | null>(null)
+  const retryCount = useRef(0)
+  const maxRetries = 5
+
+  useEffect(() => {
+    let mounted = true
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+    function connect() {
+      if (!mounted) return
+
+      try {
+        const es = new EventSource('/api/events')
+        esRef.current = es
+        setStatus('connecting')
+
+        es.onopen = () => {
+          if (!mounted) return
+          setStatus('connected')
+          retryCount.current = 0
+        }
+
+        es.onmessage = (e) => {
+          if (!mounted) return
+          try {
+            const parsed = JSON.parse(e.data) as Record<string, unknown>
+            const evt: SSEEvent = {
+              type: (parsed.type as string) || 'update',
+              data: parsed,
+              id: e.lastEventId || undefined,
+            }
+            setLastEvent(evt)
+            setUpdateCount(c => c + 1)
+
+            // Auto-invalidate React Query cache based on event type
+            const eventType = evt.type
+            if (eventType === 'plot_updated' || eventType === 'plot_created' || eventType === 'plot_deleted') {
+              qc.invalidateQueries({ queryKey: ['plots'] })
+              const plotId = parsed.plotId as string | undefined
+              if (plotId) {
+                qc.invalidateQueries({ queryKey: ['plot', plotId] })
+                qc.invalidateQueries({ queryKey: ['similar-plots', plotId] })
+              }
+            } else if (eventType === 'market_update') {
+              qc.invalidateQueries({ queryKey: ['market-overview'] })
+            } else if (eventType === 'price_change') {
+              qc.invalidateQueries({ queryKey: ['plots'] })
+            }
+          } catch {
+            // Ignore non-JSON messages (like keep-alive pings)
+          }
+        }
+
+        es.onerror = () => {
+          if (!mounted) return
+          es.close()
+          esRef.current = null
+          setStatus('disconnected')
+
+          // Exponential backoff reconnect
+          if (retryCount.current < maxRetries) {
+            const delay = Math.min(1000 * Math.pow(2, retryCount.current), 30000)
+            retryCount.current++
+            retryTimer = setTimeout(connect, delay)
+          }
+        }
+      } catch {
+        setStatus('disconnected')
+      }
+    }
+
+    connect()
+
+    return () => {
+      mounted = false
+      if (retryTimer) clearTimeout(retryTimer)
+      if (esRef.current) {
+        esRef.current.close()
+        esRef.current = null
+      }
+    }
+  }, [qc])
+
+  return { status, lastEvent, updateCount }
+}
+
+// ── Neighborhood/City Statistics (derived from plot data) ──
+
+export interface CityComparison {
+  city: string
+  plotCount: number
+  avgPrice: number
+  avgPricePerDunam: number
+  avgRoi: number
+  avgScore: number
+  minPrice: number
+  maxPrice: number
+  totalArea: number // sqm
+  dominantZoning: string
+}
+
+/**
+ * Calculate how a specific plot compares to others in the same city.
+ * Returns percentile rankings and delta values for key metrics.
+ */
+export function usePlotCityRanking(plot: Plot | null | undefined, allPlots: Plot[]) {
+  return useMemo(() => {
+    if (!plot || !allPlots.length) return null
+
+    const cityPlots = allPlots.filter(pl => pl.city === plot.city && pl.id !== plot.id)
+    if (cityPlots.length < 1) return null
+
+    const { price, size } = { price: plot.total_price ?? plot.totalPrice ?? 0, size: plot.size_sqm ?? plot.sizeSqM ?? 0 }
+    const plotRoi = (plot.projected_value ?? plot.projectedValue ?? 0) > 0 && price > 0
+      ? (((plot.projected_value ?? plot.projectedValue ?? 0) - price) / price) * 100
+      : 0
+    const plotPpd = price > 0 && size > 0 ? Math.round(price / (size / 1000)) : 0
+
+    // City averages
+    const cityPrices = cityPlots.map(pl => pl.total_price ?? pl.totalPrice ?? 0).filter(v => v > 0)
+    const cityRois = cityPlots.map(pl => {
+      const pr = pl.total_price ?? pl.totalPrice ?? 0
+      const pv = pl.projected_value ?? pl.projectedValue ?? 0
+      return pr > 0 && pv > 0 ? ((pv - pr) / pr) * 100 : 0
+    }).filter(v => v > 0)
+    const cityPpds = cityPlots.map(pl => {
+      const pr = pl.total_price ?? pl.totalPrice ?? 0
+      const sz = pl.size_sqm ?? pl.sizeSqM ?? 0
+      return pr > 0 && sz > 0 ? Math.round(pr / (sz / 1000)) : 0
+    }).filter(v => v > 0)
+
+    const avgPrice = cityPrices.length ? Math.round(cityPrices.reduce((s, v) => s + v, 0) / cityPrices.length) : 0
+    const avgRoi = cityRois.length ? Math.round(cityRois.reduce((s, v) => s + v, 0) / cityRois.length * 10) / 10 : 0
+    const avgPpd = cityPpds.length ? Math.round(cityPpds.reduce((s, v) => s + v, 0) / cityPpds.length) : 0
+
+    // Percentile calculation
+    function percentile(arr: number[], value: number): number {
+      if (arr.length === 0) return 50
+      const sorted = [...arr].sort((a, b) => a - b)
+      let below = 0
+      for (const v of sorted) {
+        if (v < value) below++
+        else break
+      }
+      return Math.round((below / sorted.length) * 100)
+    }
+
+    return {
+      city: plot.city,
+      plotCount: cityPlots.length + 1,
+      price: {
+        value: price,
+        cityAvg: avgPrice,
+        delta: avgPrice > 0 ? Math.round(((price - avgPrice) / avgPrice) * 100) : 0,
+        percentile: percentile(cityPrices, price),
+        isBelowAvg: price > 0 && avgPrice > 0 && price < avgPrice,
+      },
+      roi: {
+        value: plotRoi,
+        cityAvg: avgRoi,
+        delta: avgRoi > 0 ? Math.round((plotRoi - avgRoi) * 10) / 10 : 0,
+        percentile: percentile(cityRois, plotRoi),
+        isAboveAvg: plotRoi > avgRoi,
+      },
+      pricePerDunam: {
+        value: plotPpd,
+        cityAvg: avgPpd,
+        delta: avgPpd > 0 ? Math.round(((plotPpd - avgPpd) / avgPpd) * 100) : 0,
+        percentile: percentile(cityPpds, plotPpd),
+        isBelowAvg: plotPpd > 0 && avgPpd > 0 && plotPpd < avgPpd,
+      },
+    }
+  }, [plot, allPlots])
 }

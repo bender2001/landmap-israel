@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, TrendingDown, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon, MessageCircle, Compass, ClipboardCopy, Construction, Milestone } from 'lucide-react'
 import { t, sm, md, lg, fadeInUp } from '../theme'
-import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed } from '../hooks'
+import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed, useAllPlots, usePlotCityRanking } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard, ScrollToTop } from '../components/UI'
 import { PublicLayout } from '../components/Layout'
 import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, plotCenter, calcRisk, calcLocationScore, setOgMeta, removeOgMeta, SITE_CONFIG, calcExitScenarios } from '../utils'
@@ -207,6 +207,45 @@ const CalcResult = styled.div`
 const CalcResultItem = styled.div`text-align:center;`
 const CalcResultVal = styled.div<{$gold?:boolean}>`font-size:18px;font-weight:800;color:${pr => pr.$gold ? t.gold : t.lText};font-family:${t.font};`
 const CalcResultLabel = styled.div`font-size:11px;color:${t.lTextSec};margin-top:2px;`
+
+/* ── City Ranking Card ── */
+const RankGrid = styled.div`
+  display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
+  ${sm}{grid-template-columns:repeat(3,1fr);}
+  @media(max-width:479px){grid-template-columns:1fr;}
+`
+const RankCell = styled.div<{$highlight?:boolean}>`
+  display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 10px;
+  background:${pr=>pr.$highlight?'rgba(212,168,75,0.06)':t.lSurface};
+  border:1px solid ${pr=>pr.$highlight?t.goldBorder:t.lBorder};border-radius:${t.r.md};
+  text-align:center;transition:all 0.3s;
+  &:hover{transform:translateY(-2px);box-shadow:${t.sh.sm};}
+`
+const RankVal = styled.div<{$c?:string}>`font-size:20px;font-weight:900;color:${pr=>pr.$c||t.lText};font-family:${t.font};`
+const RankLabel = styled.div`font-size:11px;font-weight:600;color:${t.lTextSec};`
+const RankDelta = styled.span<{$positive:boolean}>`
+  display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:${t.r.full};
+  font-size:11px;font-weight:700;
+  background:${pr=>pr.$positive?'rgba(16,185,129,0.08)':'rgba(239,68,68,0.08)'};
+  color:${pr=>pr.$positive?t.ok:t.err};
+`
+const RankBar = styled.div`width:100%;height:6px;border-radius:3px;background:${t.lBorder};overflow:hidden;position:relative;`
+const RankBarFill = styled.div<{$pct:number;$c:string}>`
+  position:absolute;top:0;left:0;height:100%;width:${pr=>pr.$pct}%;
+  background:${pr=>pr.$c};border-radius:3px;transition:width 0.8s ease;
+`
+const RankBarMarker = styled.div<{$pct:number}>`
+  position:absolute;top:-4px;left:${pr=>pr.$pct}%;transform:translateX(-50%);
+  width:14px;height:14px;border-radius:50%;background:${t.gold};
+  border:2px solid ${t.lSurface};box-shadow:${t.sh.sm};z-index:1;
+  transition:left 0.8s ease;
+`
+const PercentileBar = styled.div`
+  width:100%;display:flex;flex-direction:column;gap:4px;margin-top:4px;
+`
+const PercentileLabel = styled.div`
+  display:flex;justify-content:space-between;font-size:9px;color:${t.lTextSec};font-weight:600;
+`
 
 /* ── Similar Plots ── */
 const SimilarGrid = styled.div`display:grid;grid-template-columns:1fr;gap:12px;${sm}{grid-template-columns:repeat(2,1fr);}`
@@ -929,6 +968,8 @@ export default function PlotDetail() {
   }, [plot])
 
   const { data: similarPlots = [] } = useSimilarPlots(id)
+  const { data: allPlots = [] } = useAllPlots()
+  const cityRanking = usePlotCityRanking(plot, allPlots)
 
   if (isLoading) return <PublicLayout><PlotDetailSkeleton /></PublicLayout>
   if (error || !plot) return (
@@ -969,6 +1010,7 @@ export default function PlotDetail() {
     if (locationScore.factors.length > 0) ids.push('location')
     if (hasDevContext) ids.push('neighborhood')
     if (similarPlots.length > 1) ids.push('vs-area')
+    if (cityRanking) ids.push('city-ranking')
     if (timeline) ids.push('timeline')
     if (d.price > 0) ids.push('mortgage')
     if (similarPlots.length > 0) ids.push('similar')
@@ -984,6 +1026,7 @@ export default function PlotDetail() {
     location: { icon: <Compass size={12} />, label: 'מיקום' },
     neighborhood: { icon: <Construction size={12} />, label: 'סביבה' },
     'vs-area': { icon: <BarChart3 size={12} />, label: 'vs ממוצע' },
+    'city-ranking': { icon: <MapPin size={12} />, label: 'דירוג בעיר' },
     timeline: { icon: <Clock size={12} />, label: 'ציר זמן' },
     mortgage: { icon: <Calculator size={12} />, label: 'מחשבון' },
     similar: { icon: <BarChart3 size={12} />, label: 'דומות' },
@@ -1379,6 +1422,78 @@ export default function PlotDetail() {
                 <div id="vs-area">
                   <PlotVsAreaComparison plot={plot} similarPlots={similarPlots} />
                 </div>
+              )}
+
+              {/* City Ranking — how this plot ranks in its city */}
+              {cityRanking && (
+                <Card $delay={0.24} id="city-ranking">
+                  <CardTitle><BarChart3 size={18} color={t.gold} /> דירוג ב{cityRanking.city}</CardTitle>
+                  <div style={{ fontSize: 12, color: t.lTextSec, marginBottom: 16, lineHeight: 1.6 }}>
+                    מיקום החלקה מתוך {cityRanking.plotCount} חלקות ב{cityRanking.city}
+                  </div>
+                  <RankGrid>
+                    <RankCell $highlight={cityRanking.price.isBelowAvg}>
+                      <RankLabel>מחיר</RankLabel>
+                      <RankVal $c={cityRanking.price.isBelowAvg ? t.ok : undefined}>
+                        {fmt.compact(cityRanking.price.value)}
+                      </RankVal>
+                      <RankDelta $positive={cityRanking.price.isBelowAvg}>
+                        {cityRanking.price.delta > 0 ? '+' : ''}{cityRanking.price.delta}% vs ממוצע
+                      </RankDelta>
+                      <PercentileBar>
+                        <RankBar>
+                          <RankBarFill $pct={100} $c={t.lBorder} />
+                          <RankBarMarker $pct={cityRanking.price.percentile} />
+                        </RankBar>
+                        <PercentileLabel>
+                          <span>זול</span>
+                          <span>אחוזון {cityRanking.price.percentile}</span>
+                          <span>יקר</span>
+                        </PercentileLabel>
+                      </PercentileBar>
+                    </RankCell>
+                    <RankCell $highlight={cityRanking.roi.isAboveAvg}>
+                      <RankLabel>תשואה</RankLabel>
+                      <RankVal $c={cityRanking.roi.isAboveAvg ? t.ok : undefined}>
+                        {cityRanking.roi.value > 0 ? `+${Math.round(cityRanking.roi.value)}%` : '—'}
+                      </RankVal>
+                      <RankDelta $positive={cityRanking.roi.isAboveAvg}>
+                        {cityRanking.roi.delta > 0 ? '+' : ''}{cityRanking.roi.delta}% vs ממוצע
+                      </RankDelta>
+                      <PercentileBar>
+                        <RankBar>
+                          <RankBarFill $pct={100} $c={t.lBorder} />
+                          <RankBarMarker $pct={cityRanking.roi.percentile} />
+                        </RankBar>
+                        <PercentileLabel>
+                          <span>נמוך</span>
+                          <span>אחוזון {cityRanking.roi.percentile}</span>
+                          <span>גבוה</span>
+                        </PercentileLabel>
+                      </PercentileBar>
+                    </RankCell>
+                    <RankCell $highlight={cityRanking.pricePerDunam.isBelowAvg}>
+                      <RankLabel>₪/דונם</RankLabel>
+                      <RankVal $c={cityRanking.pricePerDunam.isBelowAvg ? t.ok : undefined}>
+                        ₪{fmt.num(cityRanking.pricePerDunam.value)}
+                      </RankVal>
+                      <RankDelta $positive={cityRanking.pricePerDunam.isBelowAvg}>
+                        {cityRanking.pricePerDunam.delta > 0 ? '+' : ''}{cityRanking.pricePerDunam.delta}% vs ממוצע
+                      </RankDelta>
+                      <PercentileBar>
+                        <RankBar>
+                          <RankBarFill $pct={100} $c={t.lBorder} />
+                          <RankBarMarker $pct={cityRanking.pricePerDunam.percentile} />
+                        </RankBar>
+                        <PercentileLabel>
+                          <span>זול</span>
+                          <span>אחוזון {cityRanking.pricePerDunam.percentile}</span>
+                          <span>יקר</span>
+                        </PercentileLabel>
+                      </PercentileBar>
+                    </RankCell>
+                  </RankGrid>
+                </Card>
               )}
 
               {timeline && (

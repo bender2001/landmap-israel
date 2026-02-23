@@ -610,7 +610,7 @@ async function _getPublishedPlotsImpl(filters = {}) {
 
   let query = supabaseAdmin
     .from('plots')
-    .select(countOnly ? 'id' : '*, plot_images(id, url, alt)', countOnly ? { count: 'exact', head: true } : undefined)
+    .select(countOnly ? 'id' : '*, plot_images(id, url)', countOnly ? { count: 'exact', head: true } : undefined)
     .eq('is_published', true)
 
   if (filters.city && filters.city !== 'all') {
@@ -779,7 +779,7 @@ async function _getPublishedPlotsImpl(filters = {}) {
     delete filtersWithoutQ.q
     let allQuery = supabaseAdmin
       .from('plots')
-      .select('*, plot_images(id, url, alt)')
+      .select('*, plot_images(id, url)')
       .eq('is_published', true)
 
     if (filtersWithoutQ.city && filtersWithoutQ.city !== 'all') allQuery = allQuery.eq('city', filtersWithoutQ.city)
@@ -1076,7 +1076,7 @@ export async function getPlotsByIds(ids) {
 
   const { data, error } = await supabaseAdmin
     .from('plots')
-    .select('*, plot_images(id, url, alt)')
+    .select('*, plot_images(id, url)')
     .eq('is_published', true)
     .in('id', safeIds)
 

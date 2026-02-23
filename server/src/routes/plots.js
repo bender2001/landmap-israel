@@ -404,7 +404,7 @@ router.get('/popular', computeHeavyLimiter, requestAbortSignal, async (req, res,
     const popular = await plotCache.wrap(cacheKey, async () => {
       const { data, error } = await supabaseAdmin
         .from('plots')
-        .select('id, block_number, number, city, status, total_price, projected_value, size_sqm, readiness_estimate, views, created_at, plot_images(id, url, alt)')
+        .select('id, block_number, number, city, status, total_price, projected_value, size_sqm, readiness_estimate, views, created_at, plot_images(id, url)')
         .eq('is_published', true)
         .gt('views', 0)
         .order('views', { ascending: false })

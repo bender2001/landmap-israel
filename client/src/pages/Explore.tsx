@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { Map as MapIcon, Heart, Calculator, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, TrendingUp, ChevronLeft, DollarSign, Ruler, ExternalLink, MessageCircle, Clock, Building2, BarChart3, ArrowUpRight, ArrowDownRight, Zap, Target, PieChart, Share2, Check, Filter } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation, useOnlineStatus, useIsMobile, useFocusTrap } from '../hooks'
+import { useAllPlots, useFavorites, useCompare, useDebounce, useRecentlyViewed, useUserLocation, useOnlineStatus, useIsMobile, useFocusTrap, useSSE } from '../hooks'
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, Spinner, useToast, Badge, NetworkBanner, AnimatedValue, DemoModeBanner, ExploreLoadingSkeleton } from '../components/UI'
@@ -41,6 +41,18 @@ const Stats = styled.div`
 const Stat = styled.span`display:flex;align-items:center;gap:4px;`
 const Val = styled.span`color:${t.goldBright};font-weight:700;`
 const Demo = styled.span`padding:2px 8px;border-radius:${t.r.full};background:${t.goldDim};color:${t.gold};font-size:10px;font-weight:600;`
+const livePulse = keyframes`0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.3)}`
+const LiveDot = styled.span<{$c:string}>`
+  display:inline-block;width:6px;height:6px;border-radius:50%;background:${pr=>pr.$c};
+  animation:${livePulse} 2s ease-in-out infinite;flex-shrink:0;
+`
+const LiveBadge = styled.span<{$connected:boolean}>`
+  display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:${t.r.full};
+  background:${pr=>pr.$connected?'rgba(16,185,129,0.1)':'rgba(239,68,68,0.08)'};
+  color:${pr=>pr.$connected?t.ok:t.err};font-size:10px;font-weight:600;
+  border:1px solid ${pr=>pr.$connected?'rgba(16,185,129,0.2)':'rgba(239,68,68,0.15)'};
+  transition:all 0.3s;
+`
 const MobileNav = styled.nav`
   display:none;position:fixed;bottom:0;left:0;right:0;z-index:${t.z.nav};
   background:${t.surface};border-top:1px solid ${t.border};
@@ -618,6 +630,7 @@ export default function Explore() {
   const [cityStatsDismissed, setCityStatsDismissed] = useState(false)
   const userGeo = useUserLocation()
   const { online, wasOffline } = useOnlineStatus()
+  const sse = useSSE()
   const isMobile = useIsMobile()
   const [mobileExpanded, setMobileExpanded] = useState(false)
   const [mapFullscreen, setMapFullscreen] = useState(false)
@@ -655,6 +668,20 @@ export default function Explore() {
     }
     return pills
   }, [plots])
+
+  // SSE real-time update notifications
+  const lastSseEvent = sse.lastEvent
+  useEffect(() => {
+    if (!lastSseEvent) return
+    const eventType = lastSseEvent.type
+    if (eventType === 'plot_created') {
+      toast('🆕 חלקה חדשה נוספה למפה!', 'success')
+    } else if (eventType === 'price_change') {
+      toast('💰 עדכון מחיר — הנתונים מתעדכנים', 'info')
+    } else if (eventType === 'plot_updated') {
+      toast('🔄 נתוני חלקה עודכנו', 'info')
+    }
+  }, [lastSseEvent, toast])
 
   // Tab visibility — pause expensive intervals when tab is hidden
   const [tabVisible, setTabVisible] = useState(true)
@@ -1457,7 +1484,14 @@ export default function Explore() {
           {sortKey === 'nearest' && userGeo.loading && <Stat>📍 מאתר...</Stat>}
           {sortKey === 'nearest' && userGeo.error && <Stat style={{color:t.err}}>⚠️ שגיאה</Stat>}
           {dataFreshness && <Stat>🕐 <span style={{opacity:0.7}}>{dataFreshness}</span></Stat>}
-          <Demo>{dataSource === 'api' ? 'LIVE' : 'DEMO'}</Demo>
+          {sse.status === 'connected' ? (
+            <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים`}>
+              <LiveDot $c={t.ok} /> LIVE
+              {sse.updateCount > 0 && <span style={{opacity:0.7}}>({sse.updateCount})</span>}
+            </LiveBadge>
+          ) : (
+            <Demo>{dataSource === 'api' ? 'API' : 'DEMO'}</Demo>
+          )}
         </Stats>}
 
         {/* Mobile Favorites Overlay */}
