@@ -995,6 +995,137 @@ const StickyCta = styled.button`
   &:hover{box-shadow:${t.sh.glow};transform:scale(1.03);}
 `
 
+/* ── Price Thermometer Gauge (Madlan-style market position) ── */
+const ThermWrap = styled.div`
+  padding:14px;margin-bottom:16px;
+  background:${t.surfaceLight};border:1px solid ${t.border};border-radius:${t.r.md};
+  animation:${fadeSection} 0.5s 0.13s both;direction:rtl;
+`
+const ThermTitle = styled.div`
+  font-size:11px;font-weight:700;color:${t.textDim};margin-bottom:12px;
+  display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:0.3px;
+`
+const ThermTrack = styled.div`
+  position:relative;height:8px;border-radius:4px;overflow:visible;
+  background:linear-gradient(90deg,#10B981 0%,#F59E0B 50%,#EF4444 100%);
+  margin:16px 0 8px;
+`
+const ThermMarker = styled.div<{$pct:number}>`
+  position:absolute;top:50%;left:${pr=>Math.max(2,Math.min(98,pr.$pct))}%;
+  transform:translate(-50%,-50%);width:18px;height:18px;
+  border-radius:50%;background:${t.bg};border:3px solid ${t.gold};
+  box-shadow:0 0 0 3px rgba(212,168,75,0.25),0 2px 8px rgba(0,0,0,0.4);
+  transition:left 0.8s cubic-bezier(0.32,0.72,0,1);z-index:1;
+`
+const ThermMarkerLabel = styled.div<{$pct:number}>`
+  position:absolute;top:-22px;left:${pr=>Math.max(8,Math.min(92,pr.$pct))}%;
+  transform:translateX(-50%);
+  font-size:10px;font-weight:800;color:${t.gold};white-space:nowrap;
+  background:${t.bg};padding:1px 6px;border-radius:${t.r.sm};
+  border:1px solid ${t.goldBorder};
+  transition:left 0.8s cubic-bezier(0.32,0.72,0,1);
+`
+const ThermAvgMarker = styled.div<{$pct:number}>`
+  position:absolute;top:-4px;left:${pr=>Math.max(2,Math.min(98,pr.$pct))}%;
+  transform:translateX(-50%);width:2px;height:16px;
+  background:${t.text};border-radius:1px;opacity:0.6;z-index:0;
+`
+const ThermAvgLabel = styled.div<{$pct:number}>`
+  position:absolute;bottom:-18px;left:${pr=>Math.max(8,Math.min(92,pr.$pct))}%;
+  transform:translateX(-50%);
+  font-size:8px;font-weight:600;color:${t.textDim};white-space:nowrap;
+`
+const ThermLabels = styled.div`
+  display:flex;justify-content:space-between;font-size:9px;color:${t.textDim};margin-top:14px;
+`
+const ThermSummary = styled.div<{$c:string}>`
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  margin-top:10px;padding:6px 12px;
+  background:${pr=>pr.$c}0C;border:1px solid ${pr=>pr.$c}22;
+  border-radius:${t.r.sm};font-size:12px;font-weight:700;color:${pr=>pr.$c};
+`
+
+function PriceThermometer({ plot, allPlots }: { plot: Plot; allPlots: Plot[] }) {
+  const data = useMemo(() => {
+    const plotPpd = pricePerDunam(plot)
+    if (plotPpd <= 0) return null
+
+    // Get price-per-dunam for all plots in the same city
+    const cityPlots = allPlots.filter(pl => pl.city === plot.city)
+    const allPpd = allPlots.map(pricePerDunam).filter(v => v > 0)
+    const cityPpd = cityPlots.map(pricePerDunam).filter(v => v > 0)
+
+    if (allPpd.length < 3) return null
+
+    const allMin = Math.min(...allPpd)
+    const allMax = Math.max(...allPpd)
+    const allAvg = Math.round(allPpd.reduce((s, v) => s + v, 0) / allPpd.length)
+    const cityAvg = cityPpd.length >= 2
+      ? Math.round(cityPpd.reduce((s, v) => s + v, 0) / cityPpd.length)
+      : null
+
+    const range = allMax - allMin
+    if (range <= 0) return null
+
+    // Calculate percentile position (0-100)
+    const pct = ((plotPpd - allMin) / range) * 100
+
+    // Determine verdict
+    const diff = cityAvg ? ((plotPpd - cityAvg) / cityAvg) * 100 : ((plotPpd - allAvg) / allAvg) * 100
+    let verdict: { text: string; emoji: string; color: string }
+    if (diff < -15) verdict = { text: 'מחיר אטרקטיבי מאוד', emoji: '🟢', color: t.ok }
+    else if (diff < -5) verdict = { text: 'מתחת לממוצע', emoji: '✅', color: t.ok }
+    else if (diff <= 5) verdict = { text: 'סביב הממוצע', emoji: '⚖️', color: t.warn }
+    else if (diff <= 20) verdict = { text: 'מעל הממוצע', emoji: '⚠️', color: '#F97316' }
+    else verdict = { text: 'מחיר גבוה', emoji: '🔴', color: t.err }
+
+    return {
+      plotPpd, allMin, allMax, allAvg, cityAvg, pct,
+      avgPct: ((allAvg - allMin) / range) * 100,
+      cityAvgPct: cityAvg ? ((cityAvg - allMin) / range) * 100 : null,
+      verdict, diff: Math.round(diff),
+    }
+  }, [plot, allPlots])
+
+  if (!data) return null
+
+  return (
+    <ThermWrap>
+      <ThermTitle>
+        <TrendingUp size={12} color={t.gold} />
+        מדד מחיר לדונם — מיקום בשוק
+      </ThermTitle>
+      <div style={{ position: 'relative', margin: '20px 4px 22px' }}>
+        <ThermTrack />
+        <ThermMarkerLabel $pct={data.pct}>
+          ₪{fmt.num(data.plotPpd)}
+        </ThermMarkerLabel>
+        <ThermMarker $pct={data.pct} />
+        <ThermAvgMarker $pct={data.avgPct} />
+        <ThermAvgLabel $pct={data.avgPct}>ממוצע ₪{fmt.num(data.allAvg)}</ThermAvgLabel>
+        {data.cityAvgPct != null && data.cityAvg != null && Math.abs(data.cityAvgPct - data.avgPct) > 8 && (
+          <>
+            <ThermAvgMarker $pct={data.cityAvgPct} />
+            <ThermAvgLabel $pct={data.cityAvgPct} style={{ bottom: -28 }}>עיר ₪{fmt.num(data.cityAvg)}</ThermAvgLabel>
+          </>
+        )}
+      </div>
+      <ThermLabels>
+        <span>₪{fmt.num(data.allMin)} (זול)</span>
+        <span>₪{fmt.num(data.allMax)} (יקר)</span>
+      </ThermLabels>
+      <ThermSummary $c={data.verdict.color}>
+        {data.verdict.emoji} {data.verdict.text}
+        {data.diff !== 0 && (
+          <span style={{ fontWeight: 500, fontSize: 11 }}>
+            ({data.diff > 0 ? '+' : ''}{data.diff}% מהממוצע)
+          </span>
+        )}
+      </ThermSummary>
+    </ThermWrap>
+  )
+}
+
 /* ── Main Component ── */
 interface Props {
   plot: Plot | null; open: boolean; onClose: () => void; onLead?: () => void
@@ -1241,6 +1372,9 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
               )
             })()}
           </MetricsGrid>
+
+          {/* Price Thermometer Gauge — visual market position indicator (like Madlan) */}
+          {plots && plots.length >= 3 && <PriceThermometer plot={plot} allPlots={plots} />}
 
           {/* Score Breakdown — shows WHY the plot got its grade */}
           <ScoreBreakdown plot={plot} />

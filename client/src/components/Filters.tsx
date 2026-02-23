@@ -256,6 +256,7 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [suggestIdx, setSuggestIdx] = useState(-1)
   const suggestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [kbdHintVisible, setKbdHintVisible] = useState(true)
 
   // Cycle animated placeholder
   useEffect(() => { const id = setInterval(() => setPhIdx(i => (i + 1) % PLACEHOLDERS.length), 3000); return () => clearInterval(id) }, [])
@@ -376,8 +377,8 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
           <SIcon size={18} />
           <Input id="landmap-search-input" placeholder={PLACEHOLDERS[phIdx]} value={filters.search}
             onChange={e => { onChange({ ...filters, search: e.target.value }); setShowSuggestions(true) }}
-            onFocus={() => setShowSuggestions(true)}
-            onBlur={() => { suggestTimeoutRef.current = setTimeout(() => setShowSuggestions(false), 150) }}
+            onFocus={() => { setShowSuggestions(true); setKbdHintVisible(false) }}
+            onBlur={() => { suggestTimeoutRef.current = setTimeout(() => setShowSuggestions(false), 150); setKbdHintVisible(true) }}
             onKeyDown={handleSearchKeyDown}
             autoComplete="off"
             role="combobox"
@@ -385,6 +386,26 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
             aria-autocomplete="list"
             aria-label="חיפוש חלקות"
           />
+          {/* Keyboard shortcut hint — like Google/GitHub "/" badge */}
+          {!filters.search && kbdHintVisible && (
+            <kbd
+              aria-hidden="true"
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                minWidth: 22, height: 22, padding: '0 6px',
+                background: t.surfaceLight, border: `1px solid ${t.border}`,
+                borderRadius: t.r.sm, fontSize: 11, fontWeight: 700,
+                color: t.textDim, fontFamily: t.font, flexShrink: 0,
+                boxShadow: `inset 0 -1px 0 ${t.border}`,
+                transition: `all ${t.tr}`, cursor: 'pointer', userSelect: 'none',
+              }}
+              onClick={() => {
+                const el = document.getElementById('landmap-search-input') as HTMLInputElement | null
+                if (el) el.focus()
+              }}
+              title="לחצו / לחיפוש מהיר"
+            >/</kbd>
+          )}
           {resultCount != null && (
             <span
               role="status"

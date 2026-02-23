@@ -29,8 +29,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet" fetchpriority="high" />
 
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet CSS — deferred to avoid render-blocking on non-map pages -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /></noscript>
 
     <!-- Preconnect to data sources -->
     <link rel="preconnect" href="https://fivphcrtquxkxyxknzqc.supabase.co" crossorigin />
@@ -44,6 +45,9 @@
     <link rel="dns-prefetch" href="https://unpkg.com" />
 
     <link rel="preload" href="/api/plots" as="fetch" crossorigin="anonymous" fetchpriority="high" />
+
+    <!-- Performance: Prefetch key map tile for LCP improvement -->
+    <link rel="prefetch" href="https://a.basemaps.cartocdn.com/dark_all/8/154/102.png" as="image" />
 
     <!-- Structured data — WebSite + SoftwareApplication -->
     <script type="application/ld+json">{

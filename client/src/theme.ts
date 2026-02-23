@@ -153,6 +153,11 @@ export const GlobalStyles = createGlobalStyle`
 
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
+  /* Performance: GPU-composited layers for animated elements */
+  .gpu-layer{will-change:transform;transform:translateZ(0)}
+  /* Performance: content-visibility for below-fold sections (reduces initial paint) */
+  .cv-auto{content-visibility:auto;contain-intrinsic-size:auto 400px}
+
   /* Skip to content link */
   .skip-link{position:absolute;top:-100%;left:50%;transform:translateX(-50%);z-index:9999;
     padding:12px 24px;background:${t.gold};color:${t.bg};font-weight:700;font-family:${t.font};font-size:14px;
