@@ -9,3 +9,4 @@ scripts/enrich-next-plot.js
 scripts/enrich-plots.mjs
 server/scripts/.enrich-state.json
 server/scripts/enrich-plots.mjs
+*.bak
