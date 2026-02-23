@@ -492,7 +492,7 @@ function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCada
   })
 
   return (
-    <div style={{ position: 'absolute', bottom: 24, left: 16, zIndex: t.z.controls, display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ position: 'absolute', bottom: 24, left: 16, zIndex: t.z.controls, display: 'flex', flexDirection: 'column', gap: isMobileTouch ? 6 : 10 }}>
       {/* Fullscreen toggle */}
       {onToggleFullscreen && (
         <button
@@ -696,38 +696,46 @@ function ZoomLevelIndicator({ zoom, plots, darkMode }: { zoom: number; plots: Pl
     if (!map) return
 
     const updateArea = () => {
-      const center = map.getCenter()
-      // Find nearest area based on map center
-      for (const area of israelAreas) {
-        const [minLat, minLng] = area.bounds[0]
-        const [maxLat, maxLng] = area.bounds[2]
-        if (center.lat >= minLat && center.lat <= maxLat && center.lng >= minLng && center.lng <= maxLng) {
-          setAreaName(area.name)
-          return
+      // Guard: map must be fully loaded before accessing getCenter (avoids _leaflet_pos crash)
+      try {
+        if (!(map as any)._loaded || !(map as any)._mapPane) return
+        const center = map.getCenter()
+        if (!center) return
+        // Find nearest area based on map center
+        for (const area of israelAreas) {
+          const [minLat, minLng] = area.bounds[0]
+          const [maxLat, maxLng] = area.bounds[2]
+          if (center.lat >= minLat && center.lat <= maxLat && center.lng >= minLng && center.lng <= maxLng) {
+            setAreaName(area.name)
+            return
+          }
         }
-      }
-      // Fallback: find city from nearby plots
-      const nearPlots = plots.filter(pl => {
-        const c = plotCenter(pl.coordinates)
-        if (!c) return false
-        const dist = Math.abs(c.lat - center.lat) + Math.abs(c.lng - center.lng)
-        return dist < 0.05
-      })
-      if (nearPlots.length > 0) {
-        // Most common city in nearby plots
-        const cityMap = new Map<string, number>()
-        for (const pl of nearPlots) {
-          if (pl.city) cityMap.set(pl.city, (cityMap.get(pl.city) || 0) + 1)
+        // Fallback: find city from nearby plots
+        const nearPlots = plots.filter(pl => {
+          const c = plotCenter(pl.coordinates)
+          if (!c) return false
+          const dist = Math.abs(c.lat - center.lat) + Math.abs(c.lng - center.lng)
+          return dist < 0.05
+        })
+        if (nearPlots.length > 0) {
+          // Most common city in nearby plots
+          const cityMap = new Map<string, number>()
+          for (const pl of nearPlots) {
+            if (pl.city) cityMap.set(pl.city, (cityMap.get(pl.city) || 0) + 1)
+          }
+          const topCity = [...cityMap.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+          setAreaName(topCity || null)
+        } else {
+          setAreaName(null)
         }
-        const topCity = [...cityMap.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
-        setAreaName(topCity || null)
-      } else {
-        setAreaName(null)
+      } catch {
+        // Map not ready — ignore silently, will retry on next moveend
       }
     }
-    updateArea()
+    // Defer initial call to ensure map is fully mounted
+    const raf = requestAnimationFrame(updateArea)
     map.on('moveend', updateArea)
-    return () => { map.off('moveend', updateArea) }
+    return () => { cancelAnimationFrame(raf); map.off('moveend', updateArea) }
   }, [plots, zoom]) // zoom dependency triggers re-check on zoom change
 
   const zoomLabel = zoom <= 10 ? 'ארצי' : zoom <= 12 ? 'אזורי' : zoom <= 14 ? 'עירוני' : zoom <= 16 ? 'שכונתי' : 'חלקה'
@@ -772,18 +780,23 @@ function ViewportPlotCounter({ plots, onChange }: { plots: Plot[]; onChange: (vi
   const countRef = useRef(plots.length)
 
   const recount = useCallback(() => {
-    const bounds = map.getBounds()
-    let visible = 0
-    for (const pl of plots) {
-      if (!pl.coordinates?.length) continue
-      const inView = pl.coordinates.some(c =>
-        c.length >= 2 && bounds.contains([c[0], c[1]])
-      )
-      if (inView) visible++
-    }
-    if (visible !== countRef.current) {
-      countRef.current = visible
-      onChange(visible)
+    try {
+      if (!(map as any)._loaded) return
+      const bounds = map.getBounds()
+      let visible = 0
+      for (const pl of plots) {
+        if (!pl.coordinates?.length) continue
+        const inView = pl.coordinates.some(c =>
+          c.length >= 2 && bounds.contains([c[0], c[1]])
+        )
+        if (inView) visible++
+      }
+      if (visible !== countRef.current) {
+        countRef.current = visible
+        onChange(visible)
+      }
+    } catch {
+      // Map not ready
     }
   }, [map, plots, onChange])
 

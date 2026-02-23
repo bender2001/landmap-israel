@@ -1156,16 +1156,9 @@ export default function Explore() {
     return () => clearInterval(id)
   }, [insights.length, tabVisible])
 
-  // Dynamic document title + meta + OG tags based on active filters
+  // OG, Twitter Card, and Canonical URL — complement the useDocumentTitle/useMetaDescription hooks
   useEffect(() => {
     const cityLabel = filters.city && filters.city !== 'all' ? filters.city : ''
-    const parts = ['חלקות להשקעה']
-    if (cityLabel) parts.push(`ב${cityLabel}`)
-    if (filtered.length > 0) parts.push(`(${filtered.length})`)
-    parts.push('| LandMap Israel')
-    const title = parts.join(' ')
-    document.title = title
-    const desc = `${filtered.length} חלקות קרקע להשקעה${cityLabel ? ` ב${cityLabel}` : ' בישראל'} — מפה אינטראקטיבית, ניתוח AI, נתוני ועדות ותקן 22`
 
     // Helper to upsert meta tag
     const setMeta = (attr: string, key: string, content: string) => {
@@ -1174,11 +1167,9 @@ export default function Explore() {
       el.content = content
     }
 
-    setMeta('name', 'description', desc)
-
-    // Open Graph tags for social sharing
-    setMeta('property', 'og:title', title)
-    setMeta('property', 'og:description', desc)
+    // Open Graph tags for social sharing (title/desc managed by hooks above)
+    setMeta('property', 'og:title', exploreTitle)
+    setMeta('property', 'og:description', exploreDesc)
     setMeta('property', 'og:type', 'website')
     setMeta('property', 'og:url', window.location.href)
     setMeta('property', 'og:site_name', 'LandMap Israel')
@@ -1186,8 +1177,8 @@ export default function Explore() {
 
     // Twitter Card meta
     setMeta('name', 'twitter:card', 'summary_large_image')
-    setMeta('name', 'twitter:title', title)
-    setMeta('name', 'twitter:description', desc)
+    setMeta('name', 'twitter:title', exploreTitle)
+    setMeta('name', 'twitter:description', exploreDesc)
 
     // Canonical URL (clean — avoids duplicate content from various filter combos)
     let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null
@@ -1195,11 +1186,8 @@ export default function Explore() {
     if (!canonical) { canonical = document.createElement('link'); canonical.rel = 'canonical'; document.head.appendChild(canonical) }
     canonical.href = canonicalUrl
 
-    return () => {
-      document.title = 'LandMap Israel'
-      canonical?.remove()
-    }
-  }, [filters.city, filtered.length])
+    return () => { canonical?.remove() }
+  }, [filters.city, filtered.length, exploreTitle, exploreDesc])
 
   // JSON-LD structured data for SEO (RealEstateListing + ItemList)
   useEffect(() => {
