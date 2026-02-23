@@ -343,6 +343,18 @@ const CalcInput = styled.input`
   &::placeholder{color:${t.textDim};}
 `
 
+/* ── Mobile Preview Navigation Links ── */
+const PreviewNavRow = styled.div`display:flex;align-items:center;gap:6px;`
+const PreviewNavLink = styled.a<{$bg:string;$border:string;$color:string}>`
+  flex:1;display:flex;align-items:center;justify-content:center;gap:5px;
+  padding:8px 10px;background:${pr=>pr.$bg};
+  border:1px solid ${pr=>pr.$border};border-radius:${t.r.md};
+  font-size:11px;font-weight:700;color:${pr=>pr.$color};
+  text-decoration:none!important;white-space:nowrap;
+  transition:all ${t.tr};
+  &:hover{filter:brightness(1.15);transform:translateY(-1px);}
+`
+
 /* ── WhatsApp Floating CTA ── */
 const waPulse = keyframes`0%{box-shadow:0 0 0 0 rgba(37,211,102,0.45)}70%{box-shadow:0 0 0 14px rgba(37,211,102,0)}100%{box-shadow:0 0 0 0 rgba(37,211,102,0)}`
 const WhatsAppFab = styled.a`
@@ -1491,36 +1503,19 @@ export default function Explore() {
                 </PreviewMetrics>
                 {/* Navigation quick links */}
                 {navLinks && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <a href={navLinks.gmaps} target="_blank" rel="noopener noreferrer"
-                      style={{
-                        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                        padding: '8px 10px', background: 'rgba(66,133,244,0.08)',
-                        border: '1px solid rgba(66,133,244,0.2)', borderRadius: t.r.md,
-                        fontSize: 11, fontWeight: 700, color: '#4285F4',
-                        textDecoration: 'none', whiteSpace: 'nowrap',
-                      }}
-                    >🗺️ Google Maps</a>
-                    <a href={navLinks.waze} target="_blank" rel="noopener noreferrer"
-                      style={{
-                        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                        padding: '8px 10px', background: 'rgba(51,181,229,0.08)',
-                        border: '1px solid rgba(51,181,229,0.2)', borderRadius: t.r.md,
-                        fontSize: 11, fontWeight: 700, color: '#33B5E5',
-                        textDecoration: 'none', whiteSpace: 'nowrap',
-                      }}
-                    >🚗 Waze</a>
-                    <a href={`${SITE_CONFIG.waLink}?text=${encodeURIComponent(`היי, מתעניין/ת בחלקה ${selected.number} גוש ${d.block} ב${selected.city} (${fmt.compact(d.price)}). אשמח לפרטים.`)}`}
+                  <PreviewNavRow>
+                    <PreviewNavLink href={navLinks.gmaps} target="_blank" rel="noopener noreferrer"
+                      $bg="rgba(66,133,244,0.08)" $border="rgba(66,133,244,0.2)" $color="#4285F4"
+                    >🗺️ Google Maps</PreviewNavLink>
+                    <PreviewNavLink href={navLinks.waze} target="_blank" rel="noopener noreferrer"
+                      $bg="rgba(51,181,229,0.08)" $border="rgba(51,181,229,0.2)" $color="#33B5E5"
+                    >🚗 Waze</PreviewNavLink>
+                    <PreviewNavLink
+                      href={`${SITE_CONFIG.waLink}?text=${encodeURIComponent(`היי, מתעניין/ת בחלקה ${selected.number} גוש ${d.block} ב${selected.city} (${fmt.compact(d.price)}). אשמח לפרטים.`)}`}
                       target="_blank" rel="noopener noreferrer"
-                      style={{
-                        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                        padding: '8px 10px', background: 'rgba(37,211,102,0.08)',
-                        border: '1px solid rgba(37,211,102,0.2)', borderRadius: t.r.md,
-                        fontSize: 11, fontWeight: 700, color: '#25D366',
-                        textDecoration: 'none', whiteSpace: 'nowrap',
-                      }}
-                    >💬 WhatsApp</a>
-                  </div>
+                      $bg="rgba(37,211,102,0.08)" $border="rgba(37,211,102,0.2)" $color="#25D366"
+                    >💬 WhatsApp</PreviewNavLink>
+                  </PreviewNavRow>
                 )}
                 <PreviewActions>
                   <PreviewDetailBtn onClick={() => setMobileExpanded(true)}>
@@ -1576,10 +1571,7 @@ export default function Explore() {
           />
         </Suspense>
 
-        {/* Accessible live region for filter result count */}
-        <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-          {filtered.length > 0 ? `נמצאו ${filtered.length} חלקות` : 'לא נמצאו חלקות התואמות את הסינון'}
-        </div>
+        {/* Note: single aria-live region is declared above near the filter bar */}
 
         {!mapFullscreen && <Stats>
           <Stat><Val><AnimatedValue value={filtered.length} /></Val> חלקות{visibleInViewport != null && visibleInViewport < filtered.length && <span style={{ opacity: 0.5, fontSize: 10 }}> ({visibleInViewport} בתצוגה)</span>}</Stat>

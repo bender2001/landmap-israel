@@ -184,6 +184,7 @@ const TickerVal = styled.span<{$c?:string}>`
 const CitiesSection = styled.section`
   padding:56px 24px;direction:rtl;position:relative;overflow:hidden;
   background:${t.bg};
+  content-visibility:auto;contain-intrinsic-size:auto 420px;
 `
 const CitiesGrid = styled.div`
   max-width:1060px;margin:0 auto;display:grid;grid-template-columns:repeat(2,1fr);gap:16px;
@@ -323,6 +324,7 @@ const StatsStrip = styled.section`
   padding:48px 24px;direction:rtl;position:relative;
   background:linear-gradient(135deg,rgba(212,168,75,0.06),rgba(212,168,75,0.02));
   border-top:1px solid ${t.goldBorder};border-bottom:1px solid ${t.goldBorder};
+  content-visibility:auto;contain-intrinsic-size:auto 200px;
   &::before{content:'';position:absolute;inset:0;
     background:linear-gradient(90deg,transparent,rgba(212,168,75,0.06),transparent);
     background-size:200% 100%;animation:${shimmer} 4s linear infinite;}
@@ -341,6 +343,7 @@ const StatLabel = styled.div`font-size:14px;color:${t.textSec};font-weight:500;`
 const CompareSection = styled.section`
   padding:64px 24px;direction:rtl;position:relative;
   background:linear-gradient(180deg,transparent,rgba(212,168,75,0.02),transparent);
+  content-visibility:auto;contain-intrinsic-size:auto 500px;
 `
 const CompareTable = styled.div`
   max-width:780px;margin:0 auto;border-radius:${t.r.xl};overflow:hidden;
@@ -464,6 +467,7 @@ const TestQuote = styled.p`font-size:14px;color:${t.textSec};line-height:1.8;fon
 const WaSection = styled.section`
   padding:64px 24px;direction:rtl;text-align:center;
   background:${t.surface};border-top:1px solid ${t.border};border-bottom:1px solid ${t.border};
+  content-visibility:auto;contain-intrinsic-size:auto 250px;
 `
 const WaBtn = styled.a`
   display:inline-flex;align-items:center;gap:10px;padding:16px 40px;border-radius:${t.r.full};
@@ -482,6 +486,7 @@ const FinalCTA = styled.section`
   padding:80px 24px;direction:rtl;text-align:center;position:relative;overflow:hidden;
   background:linear-gradient(135deg,rgba(212,168,75,0.1),rgba(212,168,75,0.04));
   border-top:1px solid ${t.goldBorder};
+  content-visibility:auto;contain-intrinsic-size:auto 350px;
 `
 const FinalTitle = styled.h2`
   font-size:clamp(26px,4vw,40px);font-weight:900;color:${t.text};margin-bottom:12px;
@@ -542,6 +547,7 @@ const FaqA = styled.div<{$open:boolean}>`
 const RecentSection = styled.section`
   padding:48px 24px;direction:rtl;position:relative;
   background:linear-gradient(180deg,${t.bg},rgba(212,168,75,0.02),${t.bg});
+  content-visibility:auto;contain-intrinsic-size:auto 350px;
 `
 const RecentGrid = styled.div`
   max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:14px;
@@ -578,6 +584,7 @@ const NewsletterSection = styled.section`
   padding:56px 24px;direction:rtl;text-align:center;position:relative;overflow:hidden;
   background:linear-gradient(135deg,rgba(212,168,75,0.08),rgba(212,168,75,0.02));
   border-top:1px solid ${t.goldBorder};border-bottom:1px solid ${t.goldBorder};
+  content-visibility:auto;contain-intrinsic-size:auto 280px;
 `
 const NewsletterTitle = styled.h3`
   font-size:clamp(20px,3vw,28px);font-weight:800;color:${t.text};margin-bottom:8px;font-family:${t.font};

@@ -71,11 +71,22 @@ export function PublicNav() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  // Close mobile menu on route change
+  React.useEffect(() => { setMobileOpen(false) }, [pathname])
+
   React.useEffect(() => {
     const h = () => setScrolled(window.scrollY > 8)
     window.addEventListener('scroll', h, { passive: true })
     return () => window.removeEventListener('scroll', h)
   }, [])
+
+  // Lock body scroll when mobile menu is open
+  React.useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden'
+      return () => { document.body.style.overflow = '' }
+    }
+  }, [mobileOpen])
 
   return (
     <>
