@@ -163,6 +163,19 @@ export const GlobalStyles = createGlobalStyle`
 
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
+  /* Map popup navigation link pills */
+  .popup-nav-row{display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid ${t.border};}
+  .popup-nav-label{font-size:10px;font-weight:600;color:${t.textDim};white-space:nowrap;}
+  .popup-nav-link{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;
+    border-radius:${t.r.full};font-size:10px;font-weight:700;text-decoration:none;
+    white-space:nowrap;transition:all ${t.tr};cursor:pointer;font-family:${t.font};border:1px solid;}
+  .popup-nav-link:hover{transform:translateY(-1px);filter:brightness(1.1);}
+  .popup-nav-link--gmaps{background:rgba(66,133,244,0.1);border-color:rgba(66,133,244,0.2);color:#4285F4;}
+  .popup-nav-link--street{background:rgba(251,188,5,0.1);border-color:rgba(251,188,5,0.2);color:#FBBC05;}
+  .popup-nav-link--waze{background:rgba(51,181,229,0.1);border-color:rgba(51,181,229,0.2);color:#33B5E5;}
+  .popup-nav-link--coords{background:rgba(148,163,184,0.1);border-color:rgba(148,163,184,0.2);color:#94A3B8;}
+  .popup-nav-link--coords.copied{background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.3);color:#10B981;}
+
   /* Search in area button animation */
   @keyframes searchAreaFadeIn{from{opacity:0;transform:translateX(-50%) translateY(-8px) scale(0.92)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
 

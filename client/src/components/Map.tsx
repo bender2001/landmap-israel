@@ -1075,46 +1075,20 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
 
           {/* Navigation quick links row */}
           {navLinks && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
-              <span style={{ fontSize: 10, fontWeight: 600, color: t.textDim, whiteSpace: 'nowrap' }}>ניווט:</span>
+            <div className="popup-nav-row">
+              <span className="popup-nav-label">ניווט:</span>
               <a href={navLinks.gmaps} target="_blank" rel="noopener noreferrer"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 8px',
-                  background: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.2)',
-                  borderRadius: t.r.full, fontSize: 10, fontWeight: 700, color: '#4285F4',
-                  textDecoration: 'none', whiteSpace: 'nowrap', transition: `all ${t.tr}`,
-                }}
-                title="פתח בגוגל מפות"
+                className="popup-nav-link popup-nav-link--gmaps" title="פתח בגוגל מפות"
               >🗺️ Google</a>
               <a href={navLinks.streetView} target="_blank" rel="noopener noreferrer"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 8px',
-                  background: 'rgba(251,188,5,0.1)', border: '1px solid rgba(251,188,5,0.2)',
-                  borderRadius: t.r.full, fontSize: 10, fontWeight: 700, color: '#FBBC05',
-                  textDecoration: 'none', whiteSpace: 'nowrap', transition: `all ${t.tr}`,
-                }}
-                title="צפה ברחוב"
+                className="popup-nav-link popup-nav-link--street" title="צפה ברחוב"
               >👁️ Street View</a>
               <a href={navLinks.waze} target="_blank" rel="noopener noreferrer"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 8px',
-                  background: 'rgba(51,181,229,0.1)', border: '1px solid rgba(51,181,229,0.2)',
-                  borderRadius: t.r.full, fontSize: 10, fontWeight: 700, color: '#33B5E5',
-                  textDecoration: 'none', whiteSpace: 'nowrap', transition: `all ${t.tr}`,
-                }}
-                title="נווט עם Waze"
+                className="popup-nav-link popup-nav-link--waze" title="נווט עם Waze"
               >🚗 Waze</a>
               <button
                 onClick={() => copyCoordinates(center!.lat, center!.lng, plot.id)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 8px',
-                  background: copiedCoords === plot.id ? 'rgba(16,185,129,0.1)' : 'rgba(148,163,184,0.1)',
-                  border: `1px solid ${copiedCoords === plot.id ? 'rgba(16,185,129,0.3)' : 'rgba(148,163,184,0.2)'}`,
-                  borderRadius: t.r.full, fontSize: 10, fontWeight: 700,
-                  color: copiedCoords === plot.id ? '#10B981' : '#94A3B8',
-                  cursor: 'pointer', whiteSpace: 'nowrap', transition: `all ${t.tr}`,
-                  fontFamily: t.font,
-                }}
+                className={`popup-nav-link popup-nav-link--coords${copiedCoords === plot.id ? ' copied' : ''}`}
                 title={`${center!.lat.toFixed(6)}, ${center!.lng.toFixed(6)}`}
               >
                 {copiedCoords === plot.id ? <><Check size={10} /> הועתק!</> : <><Copy size={10} /> קואורדינטות</>}

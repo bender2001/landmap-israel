@@ -959,6 +959,31 @@ const TaxCompBarFill = styled.div<{$pct:number;$color:string}>`
 `
 const TaxCompVal = styled.span<{$color?:string}>`font-size:12px;font-weight:800;color:${pr=>pr.$color||t.lText};font-family:${t.font};min-width:60px;text-align:left;`
 
+/* ── Affordability Widget (side column) ── */
+const AffordWrap = styled.div`display:flex;flex-direction:column;gap:12px;`
+const AffordInputRow = styled.div`display:flex;align-items:center;gap:8px;direction:rtl;`
+const AffordInput = styled.input`
+  flex:1;padding:10px 14px;border:1px solid ${t.lBorder};border-radius:${t.r.md};
+  font-size:15px;font-weight:700;font-family:${t.font};color:${t.lText};
+  background:${t.lBg};direction:ltr;text-align:left;outline:none;
+  transition:all ${t.tr};
+  &:focus{border-color:${t.goldBorder};box-shadow:0 0 0 3px rgba(212,168,75,0.08);}
+  &::placeholder{color:${t.lBorder};font-weight:400;}
+`
+const AffordCurrency = styled.span`font-size:14px;font-weight:800;color:${t.lTextSec};flex-shrink:0;`
+const AffordResultGrid = styled.div`
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;
+`
+const AffordResultItem = styled.div<{$highlight?:boolean}>`
+  display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px;
+  background:${pr=>pr.$highlight?'rgba(16,185,129,0.06)':t.lBg};
+  border:1px solid ${pr=>pr.$highlight?'rgba(16,185,129,0.2)':t.lBorder};
+  border-radius:${t.r.md};text-align:center;transition:all ${t.tr};
+`
+const AffordResultVal = styled.div<{$c?:string}>`font-size:16px;font-weight:800;color:${pr=>pr.$c||t.lText};font-family:${t.font};`
+const AffordResultLabel = styled.div`font-size:10px;color:${t.lTextSec};font-weight:600;line-height:1.3;`
+const AffordNote = styled.div`font-size:11px;color:${t.lTextSec};line-height:1.5;text-align:center;`
+
 /* ── View on Map Button ── */
 const ViewOnMapBtn = styled(Link)`
   display:inline-flex;align-items:center;gap:6px;padding:8px 16px;
@@ -1099,6 +1124,7 @@ export default function PlotDetail() {
   const scoreBreakdown = useMemo(() => plot ? calcScoreBreakdown(plot) : { total: 0, factors: [] }, [plot])
   const exitScenarios = useMemo(() => plot ? calcExitScenarios(plot) : null, [plot])
   const [reportCopied, setReportCopied] = useState(false)
+  const [budgetInput, setBudgetInput] = useState('')
 
   // Pre-compute values safely (for hooks that depend on derived data)
   const _d = plot ? p(plot) : null
@@ -1898,6 +1924,80 @@ export default function PlotDetail() {
                       </CalcResult>
                     )}
                   </CalcWrap>
+                </Card>
+              )}
+              {/* Budget Affordability Widget */}
+              {d.price > 0 && (
+                <Card $delay={0.38}>
+                  <CardTitle><DollarSign size={18} color={t.gold} /> מתאים לתקציב שלך?</CardTitle>
+                  <AffordWrap>
+                    <AffordInputRow>
+                      <AffordCurrency>₪</AffordCurrency>
+                      <AffordInput
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="הכנס תקציב..."
+                        value={budgetInput}
+                        onChange={e => {
+                          const raw = e.target.value.replace(/[^\d]/g, '')
+                          setBudgetInput(raw ? Number(raw).toLocaleString('he-IL') : '')
+                        }}
+                        aria-label="תקציב השקעה"
+                      />
+                    </AffordInputRow>
+                    {(() => {
+                      const budget = Number((budgetInput || '0').replace(/[^\d]/g, ''))
+                      if (budget <= 0) return (
+                        <AffordNote>הכנס את סכום ההשקעה שלך לבדיקת כדאיות מהירה</AffordNote>
+                      )
+                      const canAfford = budget >= d.price
+                      const coveragePct = Math.min(100, Math.round((budget / d.price) * 100))
+                      const remaining = d.price - budget
+                      const projectedReturn = d.projected > 0 && canAfford
+                        ? Math.round(((d.projected - d.price) / d.price) * budget)
+                        : 0
+                      const ltvNeeded = !canAfford ? Math.round(((d.price - budget) / d.price) * 100) : 0
+                      return (
+                        <>
+                          <AffordResultGrid>
+                            <AffordResultItem $highlight={canAfford}>
+                              <AffordResultVal $c={canAfford ? t.ok : t.warn}>{coveragePct}%</AffordResultVal>
+                              <AffordResultLabel>{canAfford ? 'מכסה את המחיר' : 'כיסוי מהמחיר'}</AffordResultLabel>
+                            </AffordResultItem>
+                            {canAfford ? (
+                              <AffordResultItem $highlight>
+                                <AffordResultVal $c={t.ok}>+{fmt.compact(projectedReturn)}</AffordResultVal>
+                                <AffordResultLabel>רווח צפוי על ההשקעה</AffordResultLabel>
+                              </AffordResultItem>
+                            ) : (
+                              <AffordResultItem>
+                                <AffordResultVal $c={t.err}>{fmt.compact(remaining)}</AffordResultVal>
+                                <AffordResultLabel>חסר למחיר מלא</AffordResultLabel>
+                              </AffordResultItem>
+                            )}
+                            {!canAfford && (
+                              <AffordResultItem>
+                                <AffordResultVal>{ltvNeeded}%</AffordResultVal>
+                                <AffordResultLabel>מימון נדרש (LTV)</AffordResultLabel>
+                              </AffordResultItem>
+                            )}
+                            {!canAfford && mortgage && (
+                              <AffordResultItem>
+                                <AffordResultVal $c={t.gold}>{fmt.compact(calcMonthly(d.price, ltvNeeded / 100, interestRate / 100, loanYears)?.monthly || 0)}</AffordResultVal>
+                                <AffordResultLabel>החזר חודשי משוער</AffordResultLabel>
+                              </AffordResultItem>
+                            )}
+                          </AffordResultGrid>
+                          <AffordNote>
+                            {canAfford
+                              ? `✅ התקציב שלך מכסה את מחיר החלקה${projectedReturn > 0 ? ` עם רווח צפוי של ${fmt.compact(projectedReturn)}` : ''}`
+                              : `💡 עם הון עצמי של ${fmt.compact(budget)} תצטרך מימון של ${ltvNeeded}%`
+                            }
+                          </AffordNote>
+                        </>
+                      )
+                    })()}
+                  </AffordWrap>
                 </Card>
               )}
             </div>

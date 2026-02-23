@@ -19,6 +19,7 @@ const LeadModal = lazy(() => import('../components/LeadModal'))
 const Chat = lazy(() => import('../components/Chat'))
 const PlotListPanel = lazy(() => import('../components/PlotListPanel'))
 const CompareDrawer = lazy(() => import('../components/CompareDrawer'))
+const MortgageCalculator = lazy(() => import('../components/MortgageCalculator'))
 
 const DEFAULTS: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '', belowAvg: '' }
 
@@ -777,6 +778,65 @@ function filtersToParams(f: Filters): URLSearchParams {
   return sp
 }
 
+/* ── Extracted: InsightsTickerWidget (memoized to prevent re-render cascades from parent state) ── */
+interface InsightsTickerProps {
+  insights: { emoji: string; text: string; color: string }[]
+  hasCompare: boolean
+}
+
+const InsightsTickerWidget = memo(function InsightsTickerWidget({ insights, hasCompare }: InsightsTickerProps) {
+  const [idx, setIdx] = useState(0)
+  const [entering, setEntering] = useState(true)
+
+  // Auto-rotate insights every 5s
+  useEffect(() => {
+    if (insights.length <= 1) return
+    const interval = setInterval(() => {
+      setEntering(false)
+      setTimeout(() => {
+        setIdx(prev => (prev + 1) % insights.length)
+        setEntering(true)
+      }, 300)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [insights.length])
+
+  // Reset index when insights change
+  useEffect(() => {
+    setIdx(0)
+    setEntering(true)
+  }, [insights.length])
+
+  if (insights.length === 0) return null
+  const current = insights[idx % insights.length]
+  if (!current) return null
+
+  const advance = (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    setEntering(false)
+    setTimeout(() => {
+      setIdx(prev => (prev + 1) % insights.length)
+      setEntering(true)
+    }, 200)
+  }
+
+  return (
+    <InsightsTicker
+      $hasCompare={hasCompare}
+      role="marquee"
+      aria-label="תובנות שוק"
+      title={`${idx + 1}/${insights.length} — לחץ לתובנה הבאה`}
+      onClick={() => advance()}
+    >
+      <InsightCategory $c={current.color} />
+      <InsightEmoji>{current.emoji}</InsightEmoji>
+      <InsightText $entering={entering}>{current.text}</InsightText>
+      <InsightNav onClick={advance} aria-label="תובנה הבאה">›</InsightNav>
+      <InsightCounter>{idx + 1}/{insights.length}</InsightCounter>
+    </InsightsTicker>
+  )
+})
+
 /* ── Extracted: MobilePreviewCard (memoized to avoid re-renders when parent state changes) ── */
 interface MobilePreviewProps {
   plot: Plot
@@ -1211,27 +1271,7 @@ export default function Explore() {
     return generateMarketInsights(filtered, cityName)
   }, [filtered, filters.city])
 
-  const [insightIdx, setInsightIdx] = useState(0)
-  const [insightEntering, setInsightEntering] = useState(true)
-
-  // Auto-rotate insights every 5s
-  useEffect(() => {
-    if (marketInsights.length <= 1) return
-    const interval = setInterval(() => {
-      setInsightEntering(false)
-      setTimeout(() => {
-        setInsightIdx(prev => (prev + 1) % marketInsights.length)
-        setInsightEntering(true)
-      }, 300)
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [marketInsights.length])
-
-  // Reset insight index when insights change
-  useEffect(() => {
-    setInsightIdx(0)
-    setInsightEntering(true)
-  }, [marketInsights.length])
+  // InsightsTicker state is now managed inside InsightsTickerWidget (memoized)
 
   // Dynamic document title + meta description based on active city filter
   const exploreTitle = useMemo(() => {
@@ -1345,10 +1385,8 @@ export default function Explore() {
     }
   }, [selected, mobileExpanded])
 
-  // OG, Twitter Card, and Canonical URL — complement the useDocumentTitle/useMetaDescription hooks
+  // OG + Twitter meta — updates on every title/desc change
   useEffect(() => {
-    const cityLabel = filters.city && filters.city !== 'all' ? filters.city : ''
-
     // Helper to upsert meta tag
     const setMeta = (attr: string, key: string, content: string) => {
       let el = document.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null
@@ -1368,15 +1406,18 @@ export default function Explore() {
     setMeta('name', 'twitter:card', 'summary_large_image')
     setMeta('name', 'twitter:title', exploreTitle)
     setMeta('name', 'twitter:description', exploreDesc)
+  }, [exploreTitle, exploreDesc])
 
-    // Canonical URL (clean — avoids duplicate content from various filter combos)
+  // Canonical URL — only depends on city filter, stable across result count changes
+  useEffect(() => {
+    const cityLabel = filters.city && filters.city !== 'all' ? filters.city : ''
     let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null
     const canonicalUrl = `${window.location.origin}/explore${cityLabel ? `?city=${encodeURIComponent(cityLabel)}` : ''}`
     if (!canonical) { canonical = document.createElement('link'); canonical.rel = 'canonical'; document.head.appendChild(canonical) }
     canonical.href = canonicalUrl
 
     return () => { canonical?.remove() }
-  }, [filters.city, filtered.length, exploreTitle, exploreDesc])
+  }, [filters.city])
 
   // JSON-LD structured data for SEO (RealEstateListing + ItemList)
   useEffect(() => {
@@ -1854,6 +1895,16 @@ export default function Explore() {
         </Suspense>
         <Suspense fallback={null}><Chat plotId={selected?.id ?? null} /></Suspense>
 
+        {/* Mortgage Calculator — interactive investment modeling widget */}
+        {!mapFullscreen && (
+          <Suspense fallback={null}>
+            <MortgageCalculator
+              plotPrice={selected ? p(selected).price : undefined}
+              plotLabel={selected ? `גוש ${p(selected).block} · חלקה ${selected.number} — ${selected.city}` : undefined}
+            />
+          </Suspense>
+        )}
+
         {/* Floating Compare Bar — simplified */}
         {!mapFullscreen && compareIds.length > 0 && (
           <CompareBar>
@@ -1904,41 +1955,9 @@ export default function Explore() {
           </KbDialog>
         </KbBackdrop>
 
-        {/* Market Insights Ticker — rotating contextual intelligence */}
-        {!mapFullscreen && !isLoading && marketInsights.length > 0 && marketInsights[insightIdx % marketInsights.length] && (
-          <InsightsTicker
-            $hasCompare={compareIds.length > 0}
-            role="marquee"
-            aria-label="תובנות שוק"
-            title={`${insightIdx + 1}/${marketInsights.length} — לחץ לתובנה הבאה`}
-            onClick={() => {
-              setInsightEntering(false)
-              setTimeout(() => {
-                setInsightIdx(prev => (prev + 1) % marketInsights.length)
-                setInsightEntering(true)
-              }, 200)
-            }}
-          >
-            <InsightCategory $c={marketInsights[insightIdx % marketInsights.length].color} />
-            <InsightEmoji>{marketInsights[insightIdx % marketInsights.length].emoji}</InsightEmoji>
-            <InsightText $entering={insightEntering}>{marketInsights[insightIdx % marketInsights.length].text}</InsightText>
-            <InsightNav
-              onClick={(e) => {
-                e.stopPropagation()
-                setInsightEntering(false)
-                setTimeout(() => {
-                  setInsightIdx(prev => (prev + 1) % marketInsights.length)
-                  setInsightEntering(true)
-                }, 200)
-              }}
-              aria-label="תובנה הבאה"
-            >
-              ›
-            </InsightNav>
-            <InsightCounter>
-              {insightIdx + 1}/{marketInsights.length}
-            </InsightCounter>
-          </InsightsTicker>
+        {/* Market Insights Ticker — extracted memoized widget to prevent re-render cascades */}
+        {!mapFullscreen && !isLoading && (
+          <InsightsTickerWidget insights={marketInsights} hasCompare={compareIds.length > 0} />
         )}
 
         {/* Stats bar with viewport visible count, total value, market momentum */}
