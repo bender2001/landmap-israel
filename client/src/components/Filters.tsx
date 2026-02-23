@@ -3,7 +3,7 @@ import styled, { keyframes, css } from 'styled-components'
 import { Search, SlidersHorizontal, X, Sparkles, MapPin, Bookmark, BookmarkCheck, Trash2 } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { Select, RangeInput } from './UI'
-import { p, fmt } from '../utils'
+import { p, fmt, calcScore, roi, pricePerSqm } from '../utils'
 import { useSavedSearches, useFocusTrap } from '../hooks'
 import type { Filters, Plot } from '../types'
 
@@ -82,6 +82,13 @@ const QuickChip = styled.button<{ $active: boolean }>`
   background:${p => p.$active ? t.goldDim : t.glass};color:${p => p.$active ? t.gold : t.textSec};
   backdrop-filter:blur(12px);transition:all ${t.tr};animation:${chipIn} 0.2s ease-out;white-space:nowrap;flex-shrink:0;
   &:hover{border-color:${t.gold};color:${t.gold};transform:translateY(-1px);box-shadow:${t.sh.sm};}
+`
+const QuickChipCount = styled.span`
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:18px;height:16px;padding:0 4px;border-radius:${t.r.full};
+  font-size:9px;font-weight:800;line-height:1;
+  background:rgba(255,255,255,0.06);color:${t.textDim};
+  transition:all ${t.tr};
 `
 
 /* ── Backdrop & Drawer ── */
@@ -257,6 +264,31 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
   const [suggestIdx, setSuggestIdx] = useState(-1)
   const suggestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [kbdHintVisible, setKbdHintVisible] = useState(true)
+
+  // Quick filter result count preview — how many plots each filter would return
+  const quickFilterCounts = useMemo(() => {
+    if (!plots?.length) return {} as Record<string, number>
+    const counts: Record<string, number> = {}
+    for (const qf of QUICK_FILTERS) {
+      const applied = qf.apply(EMPTY) // apply the quick filter to empty base
+      let count = plots.length
+      if (applied.ripeness === 'high') count = plots.filter(pl => calcScore(pl) >= 7).length
+      else if (applied.ripeness === 'medium') count = plots.filter(pl => { const s = calcScore(pl); return s >= 4 && s <= 6 }).length
+      else if (applied.ripeness === 'low') count = plots.filter(pl => calcScore(pl) < 4).length
+      if (applied.priceMax) count = plots.filter(pl => p(pl).price > 0 && p(pl).price <= Number(applied.priceMax)).length
+      if (applied.minRoi) count = plots.filter(pl => roi(pl) >= Number(applied.minRoi)).length
+      if (applied.zoning) count = plots.filter(pl => pl.zoning_stage === applied.zoning || pl.zoningStage === applied.zoning).length
+      if (applied.belowAvg === 'true') {
+        const ppsList = plots.map(pricePerSqm).filter(v => v > 0)
+        if (ppsList.length > 0) {
+          const avgPps = ppsList.reduce((s, v) => s + v, 0) / ppsList.length
+          count = plots.filter(pl => { const pps = pricePerSqm(pl); return pps > 0 && pps < avgPps }).length
+        }
+      }
+      counts[qf.key] = count
+    }
+    return counts
+  }, [plots])
 
   // Cycle animated placeholder
   useEffect(() => { const id = setInterval(() => setPhIdx(i => (i + 1) % PLACEHOLDERS.length), 3000); return () => clearInterval(id) }, [])
@@ -483,13 +515,17 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
           )}
         </Bar>
 
-        {/* Quick Filters */}
+        {/* Quick Filters with result count preview */}
         <QuickRow>
-          {QUICK_FILTERS.map(qf => (
-            <QuickChip key={qf.key} $active={activeQuick.has(qf.key)} onClick={() => toggleQuick(qf)}>
-              {qf.label}
-            </QuickChip>
-          ))}
+          {QUICK_FILTERS.map(qf => {
+            const count = quickFilterCounts[qf.key]
+            return (
+              <QuickChip key={qf.key} $active={activeQuick.has(qf.key)} onClick={() => toggleQuick(qf)}>
+                {qf.label}
+                {count != null && <QuickChipCount>{count}</QuickChipCount>}
+              </QuickChip>
+            )
+          })}
         </QuickRow>
 
         {chips.length > 0 && (

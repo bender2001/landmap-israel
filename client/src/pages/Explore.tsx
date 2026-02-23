@@ -123,6 +123,33 @@ const CityMarketCard = styled.div`
     border-radius:${t.r.lg} ${t.r.lg} 0 0;}
   ${mobile}{display:none;}
 `
+
+/* ── Mobile City Market Strip (compact horizontal summary for mobile) ── */
+const mobileCitySlide = keyframes`from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}`
+const MobileCityStrip = styled.div`
+  display:none;
+  ${mobile}{
+    display:flex;align-items:center;gap:10px;
+    position:absolute;top:100px;left:8px;right:8px;z-index:${t.z.filter - 1};
+    padding:8px 14px;direction:rtl;overflow-x:auto;
+    background:${t.glass};backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid ${t.glassBorder};border-radius:${t.r.full};
+    box-shadow:${t.sh.sm};
+    animation:${mobileCitySlide} 0.3s cubic-bezier(0.32,0.72,0,1);
+    scrollbar-width:none;-webkit-overflow-scrolling:touch;
+    &::-webkit-scrollbar{display:none;}
+    &::before{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;
+      background:linear-gradient(90deg,transparent,${t.gold},${t.goldBright},${t.gold},transparent);
+      border-radius:${t.r.full} ${t.r.full} 0 0;}
+  }
+`
+const MobileCityStat = styled.div`
+  display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;
+`
+const MobileCityLabel = styled.span`font-size:10px;font-weight:600;color:${t.textDim};`
+const MobileCityVal = styled.span<{$c?:string}>`font-size:11px;font-weight:800;color:${pr=>pr.$c||t.gold};`
+const MobileCitySep = styled.span`width:1px;height:16px;background:${t.border};flex-shrink:0;`
+
 const CityMarketTitle = styled.div`
   font-size:14px;font-weight:800;color:${t.text};margin-bottom:10px;
   display:flex;align-items:center;gap:6px;
@@ -903,6 +930,37 @@ export default function Explore() {
           </CityMarketCard>
         )}
 
+        {/* Mobile City Market Strip — compact horizontal summary for mobile users */}
+        {!mapFullscreen && cityMarketStats && !isLoading && (
+          <MobileCityStrip aria-label={`סיכום שוק ${cityMarketStats.city}`}>
+            <MobileCityStat>
+              <BarChart3 size={12} color={t.gold} />
+              <MobileCityVal>{cityMarketStats.city}</MobileCityVal>
+            </MobileCityStat>
+            <MobileCitySep />
+            <MobileCityStat>
+              <MobileCityVal>{cityMarketStats.count}</MobileCityVal>
+              <MobileCityLabel>חלקות</MobileCityLabel>
+            </MobileCityStat>
+            <MobileCitySep />
+            <MobileCityStat>
+              <MobileCityLabel>ממוצע</MobileCityLabel>
+              <MobileCityVal>{fmt.compact(Math.round(cityMarketStats.avgPrice))}</MobileCityVal>
+            </MobileCityStat>
+            <MobileCitySep />
+            <MobileCityStat>
+              <MobileCityLabel>ציון</MobileCityLabel>
+              <MobileCityVal $c={cityMarketStats.avgScore >= 7 ? t.ok : cityMarketStats.avgScore >= 5 ? t.warn : t.err}>
+                {cityMarketStats.avgScore}
+              </MobileCityVal>
+            </MobileCityStat>
+            <MobileCitySep />
+            <MobileCityStat>
+              <MobileCityVal style={{fontSize:10}}>{fmt.compact(cityMarketStats.minPrice)}–{fmt.compact(cityMarketStats.maxPrice)}</MobileCityVal>
+            </MobileCityStat>
+          </MobileCityStrip>
+        )}
+
         {/* Accessibility: aria-live announcer for screen readers when filter results change */}
         <div aria-live="polite" aria-atomic="true" role="status" className="sr-only">
           {!isLoading && (filtered.length > 0
@@ -911,15 +969,71 @@ export default function Explore() {
           )}
         </div>
 
-        {/* Empty state when no plots match filters */}
-        {!mapFullscreen && !isLoading && filtered.length === 0 && hasActiveFilters && (
-          <EmptyWrap>
-            <EmptyIcon><SearchX size={28} color={t.gold} /></EmptyIcon>
-            <EmptyTitle>לא נמצאו חלקות</EmptyTitle>
-            <EmptyDesc>לא נמצאו חלקות התואמות את הסינון שבחרת. נסו להרחיב את הקריטריונים או לאפס את הסינון.</EmptyDesc>
-            <EmptyResetBtn onClick={resetFilters}><RotateCcw size={14} /> אפס סינון</EmptyResetBtn>
-          </EmptyWrap>
-        )}
+        {/* Empty state with smart filter suggestions (like Madlan) */}
+        {!mapFullscreen && !isLoading && filtered.length === 0 && hasActiveFilters && (() => {
+          // Build smart suggestions: tell user which filter to relax
+          const suggestions: { label: string; action: () => void }[] = []
+          if (filters.priceMax && Number(filters.priceMax) > 0) {
+            const relaxedMax = Number(filters.priceMax) * 2
+            suggestions.push({
+              label: `הרחב מחיר עד ${fmt.compact(relaxedMax)}`,
+              action: () => setFilters({ ...filters, priceMax: String(relaxedMax) }),
+            })
+          }
+          if (filters.priceMin && Number(filters.priceMin) > 0) {
+            suggestions.push({
+              label: 'הסר מחיר מינימום',
+              action: () => setFilters({ ...filters, priceMin: '' }),
+            })
+          }
+          if (filters.city && filters.city !== 'all') {
+            suggestions.push({
+              label: `הצג כל הערים (לא רק ${filters.city})`,
+              action: () => setFilters({ ...filters, city: '' }),
+            })
+          }
+          if (filters.zoning) {
+            suggestions.push({
+              label: 'הצג כל שלבי התכנון',
+              action: () => setFilters({ ...filters, zoning: '' }),
+            })
+          }
+          if (filters.sizeMin && Number(filters.sizeMin) > 0) {
+            suggestions.push({
+              label: 'הסר מינימום שטח',
+              action: () => setFilters({ ...filters, sizeMin: '' }),
+            })
+          }
+          return (
+            <EmptyWrap>
+              <EmptyIcon><SearchX size={28} color={t.gold} /></EmptyIcon>
+              <EmptyTitle>לא נמצאו חלקות</EmptyTitle>
+              <EmptyDesc>לא נמצאו חלקות התואמות את הסינון שבחרת. נסו אחת מהאפשרויות:</EmptyDesc>
+              {suggestions.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+                  {suggestions.slice(0, 3).map((s, i) => (
+                    <button
+                      key={i}
+                      onClick={s.action}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
+                        background: t.surfaceLight, border: `1px solid ${t.border}`,
+                        borderRadius: t.r.md, cursor: 'pointer', width: '100%',
+                        color: t.textSec, fontSize: 13, fontWeight: 600, fontFamily: t.font,
+                        direction: 'rtl', textAlign: 'right', transition: `all ${t.tr}`,
+                      }}
+                      onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = t.gold; (e.currentTarget as HTMLElement).style.color = t.gold }}
+                      onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = t.border; (e.currentTarget as HTMLElement).style.color = t.textSec }}
+                    >
+                      💡 {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <EmptyResetBtn onClick={resetFilters}><RotateCcw size={14} /> אפס הכל</EmptyResetBtn>
+            </EmptyWrap>
+          )
+        })()}
 
         {/* Sort dropdown */}
         {!mapFullscreen && <SortWrap ref={sortRef}>
