@@ -321,6 +321,45 @@ export const DemoModeBanner = ({ onRetry, onDismiss }: { onRetry?: () => void; o
   )
 }
 
+/* ── StaleDataBanner — shows when fetched data is older than threshold ── */
+const staleSlideIn = keyframes`from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}`
+const stalePulse = keyframes`0%,100%{opacity:0.7}50%{opacity:1}`
+const StaleBannerWrap = styled.div`
+  position:fixed;top:0;left:0;right:0;z-index:${t.z.toast + 4};
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:6px 20px;direction:rtl;
+  background:linear-gradient(135deg, rgba(59,130,246,0.92), rgba(37,99,235,0.92));
+  color:#fff;font-size:12px;font-weight:600;font-family:${t.font};
+  box-shadow:0 2px 12px rgba(59,130,246,0.25);
+  animation:${staleSlideIn} 0.35s cubic-bezier(0.32,0.72,0,1);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+`
+const StaleBannerDot = styled.span`
+  width:6px;height:6px;border-radius:50%;background:#93C5FD;flex-shrink:0;
+  animation:${stalePulse} 2s ease-in-out infinite;
+`
+const StaleBannerBtn = styled.button`
+  padding:2px 10px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);
+  border-radius:${t.r.full};color:#fff;font-size:11px;font-weight:600;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};
+  &:hover{background:rgba(255,255,255,0.35);}
+`
+
+export const StaleDataBanner = ({ age, onRefresh, onDismiss }: {
+  age: string | null; onRefresh?: () => void; onDismiss?: () => void
+}) => {
+  const [dismissed, setDismissed] = useState(false)
+  if (dismissed || !age) return null
+  return (
+    <StaleBannerWrap>
+      <StaleBannerDot />
+      <span>📡 נתונים מ{age} — ייתכן שיש עדכונים חדשים</span>
+      {onRefresh && <StaleBannerBtn onClick={onRefresh}>🔄 רענן</StaleBannerBtn>}
+      <StaleBannerBtn onClick={() => { setDismissed(true); onDismiss?.() }}>✕</StaleBannerBtn>
+    </StaleBannerWrap>
+  )
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    CUSTOM FORM COMPONENTS
    ═══════════════════════════════════════════════════════════════════ */

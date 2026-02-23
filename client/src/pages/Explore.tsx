@@ -3,12 +3,12 @@ import { useSearchParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus, Home, BarChart3, Building2, MapPin } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription, useRecentlyViewed } from '../hooks'
+import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription, useRecentlyViewed, useDataFreshness } from '../hooks'
 // Note: dataFreshness and dataSource are computed locally in this component (not via hooks)
 import MapArea from '../components/Map'
 import type { MapBounds } from '../components/Map'
 import FilterBar from '../components/Filters'
-import { ErrorBoundary, useToast, NetworkBanner, AnimatedValue, DemoModeBanner, ExploreLoadingSkeleton } from '../components/UI'
+import { ErrorBoundary, useToast, NetworkBanner, AnimatedValue, DemoModeBanner, StaleDataBanner, ExploreLoadingSkeleton } from '../components/UI'
 import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcQuickInsight, pricePosition, findBestValueIds, calcAggregateStats, generateMarketInsights, plotCenter, daysOnMarket } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
@@ -266,6 +266,91 @@ const CityCompScoreTrack = styled.div`flex:1;height:4px;border-radius:2px;backgr
 const CityCompScoreFill = styled.div<{$w:number;$c:string}>`
   height:100%;width:${pr=>pr.$w}%;background:${pr=>pr.$c};border-radius:2px;
   transition:width 0.6s cubic-bezier(0.32,0.72,0,1);
+`
+
+/* ── CityComp Close Button (extracted from inline) ── */
+const CityCompClose = styled.button`
+  width:28px;height:28px;border-radius:${t.r.sm};border:1px solid ${t.border};
+  background:transparent;color:${t.textSec};cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
+`
+
+/* ── Histogram styles (extracted from CityMarketCard inline) ── */
+const HistogramWrap = styled.div`
+  margin-top:10px;padding-top:8px;border-top:1px solid ${t.border};
+`
+const HistogramTitle = styled.div`
+  font-size:9px;font-weight:700;color:${t.textDim};margin-bottom:6px;letter-spacing:0.3px;
+`
+const HistogramBars = styled.div`
+  display:flex;align-items:flex-end;gap:3px;height:32px;
+`
+const HistogramBarCol = styled.div`
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+`
+const HistogramBar = styled.div<{$h:number;$intensity:'high'|'mid'|'low'}>`
+  width:100%;border-radius:2px;
+  height:${pr=>Math.max(4, Math.round(pr.$h * 0.3))}px;
+  background:${pr=>pr.$intensity === 'high' ? `linear-gradient(0deg,${t.gold},${t.goldBright})` :
+    pr.$intensity === 'mid' ? `linear-gradient(0deg,${t.gold}80,${t.gold})` : `${t.gold}50`};
+  transition:height 0.5s cubic-bezier(0.32,0.72,0,1);
+`
+const HistogramBarCount = styled.span`
+  font-size:7px;font-weight:700;color:${t.textDim};line-height:1;
+`
+const HistogramLabels = styled.div`
+  display:flex;justify-content:space-between;margin-top:2px;
+`
+const HistogramLabel = styled.span`
+  font-size:7px;color:${t.textDim};
+`
+
+/* ── City Comp Best Value Badge (extracted from inline) ── */
+const CityCompBestBadge = styled.span`
+  display:inline-flex;align-items:center;gap:3px;
+  font-size:9px;font-weight:800;color:#10B981;
+  padding:2px 8px;border-radius:${t.r.full};
+  background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);
+  align-self:flex-start;
+`
+
+/* ── Inline insight chip in mobile preview (extracted) ── */
+const PreviewInsightChip = styled.div<{$c:string}>`
+  display:flex;align-items:center;gap:6px;padding:6px 12px;
+  background:${pr=>`${pr.$c}10`};border:1px solid ${pr=>`${pr.$c}25`};
+  border-radius:${t.r.full};font-size:11px;font-weight:700;color:${pr=>pr.$c};
+  direction:rtl;
+`
+
+/* ── Sort + City Compare row wrapper ── */
+const SortActionsRow = styled.div`
+  display:flex;align-items:center;gap:8px;
+`
+
+/* ── Compare bar label ── */
+const CompareLabel = styled.span`
+  font-size:13px;font-weight:700;color:${t.text};white-space:nowrap;
+`
+
+/* ── InsightsTicker counter ── */
+const InsightCounter = styled.span`
+  font-size:9px;color:${t.textDim};font-weight:600;white-space:nowrap;
+`
+
+/* ── Stats bar quality label ── */
+const QualityLabel = styled.span`
+  font-size:10px;color:${t.textDim};font-weight:600;
+`
+
+/* ── SSE update count sub-text ── */
+const SseUpdateCount = styled.span`
+  opacity:0.6;font-size:9px;
+`
+
+/* ── Empty state suggestions container ── */
+const SuggestionsCol = styled.div`
+  display:flex;flex-direction:column;gap:6px;width:100%;
 `
 
 /* ── Portfolio Quality Gauge (for stats bar) ── */
@@ -558,7 +643,7 @@ const ViewportStat = styled.span`
 const insightSlideIn = keyframes`from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}`
 const insightSlideOut = keyframes`from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-8px)}`
 const insightPulse = keyframes`0%,100%{box-shadow:0 0 0 0 rgba(212,168,75,0)}50%{box-shadow:0 0 0 4px rgba(212,168,75,0.08)}`
-const InsightsTicker = styled.div`
+const InsightsTicker = styled.div<{$hasCompare?:boolean}>`
   position:absolute;bottom:36px;left:50%;transform:translateX(-50%);z-index:${t.z.filter - 1};
   display:flex;align-items:center;gap:10px;padding:6px 16px;direction:rtl;
   background:${t.glass};backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
@@ -568,7 +653,7 @@ const InsightsTicker = styled.div`
   transition:all 0.3s;max-width:min(560px,calc(100vw - 120px));
   overflow:hidden;cursor:pointer;user-select:none;
   &:hover{border-color:${t.goldBorder};box-shadow:${t.sh.md};}
-  ${mobile}{bottom:96px;left:8px;right:8px;transform:none;max-width:none;
+  ${mobile}{bottom:${pr=>pr.$hasCompare ? '148px' : '96px'};left:8px;right:8px;transform:none;max-width:none;
     font-size:11px;padding:5px 12px;gap:6px;}
 `
 const InsightEmoji = styled.span`
@@ -636,6 +721,7 @@ export default function Explore() {
   const sse = useSSE()
   const isMobile = useIsMobile()
   const recentlyViewed = useRecentlyViewed()
+  const dataFreshness = useDataFreshness()
   const [mobileExpanded, setMobileExpanded] = useState(false)
   const [mapFullscreen, setMapFullscreen] = useState(false)
   const [cityCompOpen, setCityCompOpen] = useState(false)
@@ -1155,6 +1241,14 @@ export default function Explore() {
         {dataSource === 'demo' && !isLoading && online && (
           <DemoModeBanner onRetry={() => window.location.reload()} />
         )}
+        {/* Stale data banner — show when data is > 5 min old and not in demo mode */}
+        {!isLoading && dataSource === 'api' && dataFreshness.lastFetched &&
+         (Date.now() - dataFreshness.lastFetched > 5 * 60 * 1000) && (
+          <StaleDataBanner
+            age={dataFreshness.relativeTime}
+            onRefresh={() => window.location.reload()}
+          />
+        )}
         <TopProgress $show={isLoading} />
         {isLoading && <ExploreLoadingSkeleton />}
         <MapArea
@@ -1230,34 +1324,21 @@ export default function Explore() {
             </CityMarketGrid>
             {/* Price distribution mini-histogram */}
             {cityMarketStats.priceBuckets.length > 0 && (
-              <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: t.textDim, marginBottom: 6, letterSpacing: 0.3 }}>
-                  📊 התפלגות מחירים
-                </div>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 32 }}>
+              <HistogramWrap>
+                <HistogramTitle>📊 התפלגות מחירים</HistogramTitle>
+                <HistogramBars>
                   {cityMarketStats.priceBuckets.map((b, i) => (
-                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                      <div style={{
-                        width: '100%', borderRadius: 2,
-                        height: Math.max(4, Math.round(b.pct * 0.3)),
-                        background: b.pct >= 80 ? `linear-gradient(0deg,${t.gold},${t.goldBright})` :
-                                    b.pct >= 40 ? `linear-gradient(0deg,${t.gold}80,${t.gold})` :
-                                    `${t.gold}50`,
-                        transition: 'height 0.5s cubic-bezier(0.32,0.72,0,1)',
-                      }} />
-                      {b.count > 0 && (
-                        <span style={{ fontSize: 7, fontWeight: 700, color: t.textDim, lineHeight: 1 }}>
-                          {b.count}
-                        </span>
-                      )}
-                    </div>
+                    <HistogramBarCol key={i}>
+                      <HistogramBar $h={b.pct} $intensity={b.pct >= 80 ? 'high' : b.pct >= 40 ? 'mid' : 'low'} />
+                      {b.count > 0 && <HistogramBarCount>{b.count}</HistogramBarCount>}
+                    </HistogramBarCol>
                   ))}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
-                  <span style={{ fontSize: 7, color: t.textDim }}>{fmt.compact(cityMarketStats.minPrice)}</span>
-                  <span style={{ fontSize: 7, color: t.textDim }}>{fmt.compact(cityMarketStats.maxPrice)}</span>
-                </div>
-              </div>
+                </HistogramBars>
+                <HistogramLabels>
+                  <HistogramLabel>{fmt.compact(cityMarketStats.minPrice)}</HistogramLabel>
+                  <HistogramLabel>{fmt.compact(cityMarketStats.maxPrice)}</HistogramLabel>
+                </HistogramLabels>
+              </HistogramWrap>
             )}
           </CityMarketCard>
         )}
@@ -1342,13 +1423,13 @@ export default function Explore() {
               <EmptyTitle>לא נמצאו חלקות</EmptyTitle>
               <EmptyDesc>לא נמצאו חלקות התואמות את הסינון שבחרת. נסו אחת מהאפשרויות:</EmptyDesc>
               {suggestions.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+                <SuggestionsCol>
                   {suggestions.slice(0, 3).map((s, i) => (
                     <SuggestionBtn key={i} onClick={s.action}>
                       💡 {s.label}
                     </SuggestionBtn>
                   ))}
-                </div>
+                </SuggestionsCol>
               )}
               <EmptyResetBtn onClick={resetFilters}><RotateCcw size={14} /> אפס הכל</EmptyResetBtn>
             </EmptyWrap>
@@ -1357,7 +1438,7 @@ export default function Explore() {
 
         {/* Sort dropdown + City Comparison button */}
         {!mapFullscreen && <SortWrap ref={sortRef}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SortActionsRow>
             {cityComparisonData.length > 1 && (
               <CityCompBtn $active={cityCompOpen} onClick={() => setCityCompOpen(o => !o)} aria-label="השוואת ערים">
                 <Building2 size={14} />
@@ -1374,7 +1455,7 @@ export default function Explore() {
               <ArrowUpDown size={14} />
               {SORT_OPTIONS.find(o => o.key === sortKey)?.label || 'מיון'}
             </SortBtn>
-          </div>
+          </SortActionsRow>
           {sortOpen && (
             <SortDrop role="listbox" aria-label="אפשרויות מיון">
               {SORT_OPTIONS.map(o => (
@@ -1397,11 +1478,7 @@ export default function Explore() {
           <CityCompPanel>
             <CityCompHeader>
               <CityCompTitle><Building2 size={16} color={t.gold} /> השוואת ערים ({cityComparisonData.length})</CityCompTitle>
-              <button onClick={() => setCityCompOpen(false)} style={{
-                width: 28, height: 28, borderRadius: t.r.sm, border: `1px solid ${t.border}`,
-                background: 'transparent', color: t.textSec, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}><X size={14} /></button>
+              <CityCompClose onClick={() => setCityCompOpen(false)} aria-label="סגור השוואת ערים"><X size={14} /></CityCompClose>
             </CityCompHeader>
             <CityCompGrid>
               {cityComparisonData.map(cd => {
@@ -1447,13 +1524,7 @@ export default function Explore() {
                       <span style={{ fontSize: 10, fontWeight: 800, color: scoreColor }}>{getGrade(cd.avgScore).grade}</span>
                     </CityCompScoreBar>
                     {cd.bestCount > 0 && (
-                      <span style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 3,
-                        fontSize: 9, fontWeight: 800, color: '#10B981',
-                        padding: '2px 8px', borderRadius: t.r.full,
-                        background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)',
-                        alignSelf: 'flex-start',
-                      }}>💎 {cd.bestCount} Best Value</span>
+                      <CityCompBestBadge>💎 {cd.bestCount} Best Value</CityCompBestBadge>
                     )}
                   </CityCompCard>
                 )
@@ -1544,14 +1615,9 @@ export default function Explore() {
                 )}
                 {/* Quick investment insight */}
                 {insight.priority >= 4 && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-                    background: `${insight.color}10`, border: `1px solid ${insight.color}25`,
-                    borderRadius: t.r.full, fontSize: 11, fontWeight: 700, color: insight.color,
-                    direction: 'rtl',
-                  }}>
+                  <PreviewInsightChip $c={insight.color}>
                     {insight.emoji} {insight.text}
-                  </div>
+                  </PreviewInsightChip>
                 )}
                 <PreviewActions>
                   <PreviewDetailBtn onClick={() => setMobileExpanded(true)}>
@@ -1602,7 +1668,7 @@ export default function Explore() {
         {!mapFullscreen && compareIds.length > 0 && (
           <CompareBar>
             <GitCompareArrows size={16} color={t.gold} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>השוואה ({compareIds.length})</span>
+            <CompareLabel>השוואה ({compareIds.length})</CompareLabel>
             {compareIds.length >= 2 && (
               <CompareAction onClick={() => setCompareOpen(true)}>
                 <GitCompareArrows size={14} /> השווה
@@ -1654,6 +1720,7 @@ export default function Explore() {
           if (!insight) return null
           return (
             <InsightsTicker
+              $hasCompare={compareIds.length > 0}
               role="marquee"
               aria-label="תובנות שוק"
               title={`${insightIdx + 1}/${marketInsights.length} — לחץ לתובנה הבאה`}
@@ -1681,9 +1748,9 @@ export default function Explore() {
               >
                 ›
               </InsightNav>
-              <span style={{ fontSize: 9, color: t.textDim, fontWeight: 600, whiteSpace: 'nowrap' }}>
+              <InsightCounter>
                 {insightIdx + 1}/{marketInsights.length}
-              </span>
+              </InsightCounter>
             </InsightsTicker>
           )
         })()}
@@ -1716,7 +1783,7 @@ export default function Explore() {
               )}
               {portfolioQuality && (
                 <PortfolioGauge title={`ציון תיק השקעות ממוצע: ${portfolioQuality.avg}/10 — ${portfolioQuality.grade.grade}`}>
-                  <span style={{ fontSize: 10, color: t.textDim, fontWeight: 600 }}>איכות</span>
+                  <QualityLabel>איכות</QualityLabel>
                   <GaugeTrack>
                     <GaugeFill $w={portfolioQuality.pct} $c={portfolioQuality.grade.color} />
                   </GaugeTrack>
@@ -1725,7 +1792,7 @@ export default function Explore() {
               )}
               {sse.status === 'connected' ? (
                 <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים מתעדכנים אוטומטית`}>
-                  <LiveDot $c={t.ok} /> עדכני {sse.updateCount > 0 && <span style={{ opacity: 0.6, fontSize: 9 }}>({sse.updateCount})</span>}
+                  <LiveDot $c={t.ok} /> עדכני {sse.updateCount > 0 && <SseUpdateCount>({sse.updateCount})</SseUpdateCount>}
                 </LiveBadge>
               ) : dataSource === 'api' ? (
                 <LiveBadge $connected={false} title="נתונים מהשרת — לחץ לרענון" style={{ cursor: 'pointer' }}
