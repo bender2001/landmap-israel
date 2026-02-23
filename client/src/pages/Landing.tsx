@@ -1,12 +1,12 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { MapPin, Zap, TrendingUp, ChevronLeft, ChevronDown, Phone, Bell, Smartphone, Briefcase, Star, Shield, FileText, Building2, MessageCircle, HelpCircle, AlertTriangle, Search, ArrowDown } from 'lucide-react'
+import { MapPin, Zap, TrendingUp, ChevronLeft, ChevronDown, Phone, Bell, Smartphone, Briefcase, Star, Shield, FileText, Building2, MessageCircle, HelpCircle, AlertTriangle, Search, ArrowDown, ArrowUpRight, Eye, Flame } from 'lucide-react'
 import { t, fadeInUp, fadeInScale, shimmer, float, gradientShift, sm, md, lg, mobile } from '../theme'
 import { PublicLayout } from '../components/Layout'
 import { GoldButton, GhostButton, AnimatedCard, CountUpNumber, ScrollToTop } from '../components/UI'
-import { SITE_CONFIG, p, roi, fmt, pricePerDunam } from '../utils'
-import { useAllPlots, useInView } from '../hooks'
+import { SITE_CONFIG, p, roi, fmt, pricePerDunam, calcScore, getGrade, zoningLabels, statusColors } from '../utils'
+import { useAllPlots, useInView, usePrefetchPlotsByCity } from '../hooks'
 
 /* ── extra keyframes ── */
 const glow = keyframes`0%,100%{box-shadow:0 0 20px rgba(212,168,75,0.15)}50%{box-shadow:0 0 50px rgba(212,168,75,0.35)}`
@@ -155,6 +155,30 @@ const ScrollIndicator = styled.div`
   ${mobile}{bottom:20px;}
 `
 
+/* ══════ MARKET TICKER ══════ */
+const tickerScroll = keyframes`0%{transform:translateX(100%)}100%{transform:translateX(-100%)}`
+const TickerStrip = styled.div`
+  width:100%;overflow:hidden;padding:10px 0;
+  background:linear-gradient(90deg,rgba(212,168,75,0.06),rgba(212,168,75,0.02),rgba(212,168,75,0.06));
+  border-top:1px solid ${t.goldBorder};border-bottom:1px solid ${t.goldBorder};
+  direction:rtl;position:relative;
+`
+const TickerTrack = styled.div<{$dur:number}>`
+  display:flex;align-items:center;gap:32px;white-space:nowrap;
+  animation:${tickerScroll} ${p=>p.$dur}s linear infinite;
+  &:hover{animation-play-state:paused;}
+`
+const TickerItem = styled.span`
+  display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;
+  color:${t.textSec};font-family:${t.font};flex-shrink:0;
+`
+const TickerDot = styled.span<{$c:string}>`
+  width:6px;height:6px;border-radius:50%;background:${p=>p.$c};flex-shrink:0;
+`
+const TickerVal = styled.span<{$c?:string}>`
+  font-weight:800;color:${pr=>pr.$c||t.goldBright};
+`
+
 /* ══════ POPULAR CITIES ══════ */
 const CitiesSection = styled.section`
   padding:56px 24px;direction:rtl;position:relative;overflow:hidden;
@@ -197,6 +221,88 @@ const CitiesSectionHead = styled.h2`
   text-align:center;font-size:clamp(22px,3.5vw,32px);font-weight:800;color:${t.text};
   margin-bottom:32px;font-family:${t.font};
   & span{color:${t.gold};}
+`
+
+/* ══════ FEATURED PLOTS ══════ */
+const FeaturedSection = styled.section`
+  padding:64px 24px;direction:rtl;position:relative;overflow:hidden;
+  background:linear-gradient(180deg,${t.bg},rgba(212,168,75,0.03),${t.bg});
+`
+const FeaturedGrid = styled.div`
+  max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:20px;
+  ${sm}{grid-template-columns:repeat(2,1fr);}
+  ${lg}{grid-template-columns:repeat(3,1fr);}
+`
+const FeaturedCard = styled(Link)<{$delay:number}>`
+  position:relative;display:flex;flex-direction:column;gap:0;
+  background:${t.surface};border:1px solid ${t.border};border-radius:${t.r.xl};
+  overflow:hidden;text-decoration:none!important;
+  transition:all 0.35s cubic-bezier(0.32,0.72,0,1);
+  animation:${fadeInUp} 0.5s ease-out ${p=>p.$delay}s both;
+  &:hover{border-color:${t.goldBorder};transform:translateY(-6px);
+    box-shadow:0 16px 48px rgba(212,168,75,0.15);}
+`
+const FeaturedHeader = styled.div<{$hue:number}>`
+  position:relative;padding:20px 20px 16px;
+  background:linear-gradient(135deg,hsl(${p=>p.$hue},25%,12%),hsl(${p=>p.$hue},30%,8%));
+  border-bottom:1px solid ${t.border};
+`
+const FeaturedBadges = styled.div`
+  position:absolute;top:12px;left:12px;display:flex;gap:6px;
+`
+const FeaturedBadge = styled.span<{$bg:string;$c:string}>`
+  display:inline-flex;align-items:center;gap:4px;padding:3px 10px;
+  background:${pr=>pr.$bg};color:${pr=>pr.$c};
+  border-radius:${t.r.full};font-size:10px;font-weight:800;
+  backdrop-filter:blur(8px);border:1px solid ${pr=>pr.$c}33;
+`
+const FeaturedTitle = styled.h3`
+  font-size:17px;font-weight:800;color:${t.text};margin:0;
+  display:flex;align-items:center;gap:8px;
+`
+const FeaturedCity = styled.span`
+  font-size:13px;color:${t.textSec};display:flex;align-items:center;gap:4px;margin-top:4px;
+`
+const FeaturedBody = styled.div`padding:16px 20px;display:flex;flex-direction:column;gap:12px;`
+const FeaturedPrice = styled.div`
+  font-size:24px;font-weight:900;color:${t.gold};font-family:${t.font};
+`
+const FeaturedMetrics = styled.div`
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+`
+const FeaturedMetric = styled.div`
+  display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;
+  background:${t.surfaceLight};border:1px solid ${t.border};border-radius:${t.r.md};
+`
+const FeaturedMetricVal = styled.span<{$c?:string}>`
+  font-size:13px;font-weight:800;color:${pr=>pr.$c||t.text};
+`
+const FeaturedMetricLabel = styled.span`
+  font-size:9px;font-weight:600;color:${t.textDim};white-space:nowrap;
+`
+const FeaturedFooter = styled.div`
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;border-top:1px solid ${t.border};
+`
+const FeaturedCta = styled.span`
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:13px;font-weight:700;color:${t.gold};
+  transition:gap 0.2s;
+  ${FeaturedCard}:hover &{gap:10px;}
+`
+const FeaturedScore = styled.div<{$c:string}>`
+  display:inline-flex;align-items:center;gap:4px;
+  padding:4px 12px;border-radius:${t.r.full};
+  background:${pr=>pr.$c}18;border:1px solid ${pr=>pr.$c}33;
+  font-size:12px;font-weight:800;color:${pr=>pr.$c};
+`
+const ViewAllBtn = styled(Link)`
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  margin:32px auto 0;padding:14px 36px;width:fit-content;
+  background:transparent;border:1px solid ${t.goldBorder};border-radius:${t.r.full};
+  color:${t.gold};font-size:15px;font-weight:700;font-family:${t.font};
+  text-decoration:none!important;transition:all ${t.tr};
+  &:hover{background:${t.goldDim};border-color:${t.gold};transform:translateY(-2px);box-shadow:${t.sh.glow};}
 `
 
 const POPULAR_CITIES = [
@@ -533,6 +639,7 @@ export default function Landing(){
   const [heroFocusIdx, setHeroFocusIdx] = useState(-1)
   const heroTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const navigate = useNavigate()
+  const prefetchCity = usePrefetchPlotsByCity()
   useEffect(()=>{setVis(true)},[])
 
   // Fetch live market data for stats
@@ -595,6 +702,38 @@ export default function Landing(){
 
   // Reset focus index when search changes
   useEffect(() => { setHeroFocusIdx(-1) }, [heroSearch])
+
+  // Market ticker items — build from real plot data
+  const tickerItems = useMemo(() => {
+    if (!plots || plots.length === 0) return []
+    return plots
+      .filter(pl => p(pl).price > 0)
+      .map(pl => {
+        const d = p(pl)
+        const r = roi(pl)
+        const score = calcScore(pl)
+        const grade = getGrade(score)
+        return {
+          city: pl.city,
+          block: d.block,
+          price: fmt.compact(d.price),
+          roi: r > 0 ? `+${Math.round(r)}%` : null,
+          grade: grade.grade,
+          color: grade.color,
+          status: pl.status,
+        }
+      })
+      .sort(() => Math.random() - 0.5) // shuffle for variety
+  }, [plots])
+
+  // Featured plots — top investment-scored plots for the showcase
+  const featuredPlots = useMemo(() => {
+    if (!plots || plots.length === 0) return []
+    return [...plots]
+      .filter(pl => p(pl).price > 0 && roi(pl) > 0)
+      .sort((a, b) => calcScore(b) - calcScore(a) || roi(b) - roi(a))
+      .slice(0, 3)
+  }, [plots])
 
   const liveStats = useMemo(() => {
     if (!plots || plots.length === 0) return FALLBACK_STATS
@@ -695,6 +834,29 @@ export default function Landing(){
           </ScrollIndicator>
         </Hero>
 
+        {/* ── Market Ticker ── */}
+        {tickerItems.length > 0 && (
+          <TickerStrip>
+            <TickerTrack $dur={Math.max(20, tickerItems.length * 4)}>
+              {[...tickerItems, ...tickerItems].map((item, i) => (
+                <TickerItem key={i}>
+                  <TickerDot $c={item.color} />
+                  📍 {item.city} · גוש {item.block} ·{' '}
+                  <TickerVal>{item.price}</TickerVal>
+                  {item.roi && (
+                    <>
+                      {' · תשואה '}
+                      <TickerVal $c={t.ok}>{item.roi}</TickerVal>
+                    </>
+                  )}
+                  {' · '}
+                  <TickerVal $c={item.color}>{item.grade}</TickerVal>
+                </TickerItem>
+              ))}
+            </TickerTrack>
+          </TickerStrip>
+        )}
+
         {/* ── Popular Cities ── */}
         <Reveal>
         <CitiesSection id="cities">
@@ -703,7 +865,7 @@ export default function Landing(){
             {POPULAR_CITIES.map((c,i)=>{
               const cd = cityData.get(c.name)
               return (
-              <CityCard key={c.name} to={`/explore?city=${encodeURIComponent(c.name)}`} $hue={c.hue} $delay={i*0.06}>
+              <CityCard key={c.name} to={`/explore?city=${encodeURIComponent(c.name)}`} $hue={c.hue} $delay={i*0.06} onMouseEnter={() => prefetchCity(c.name)}>
                 <CityEmoji>{c.emoji}</CityEmoji>
                 <CityName>{c.name}</CityName>
                 {cd ? (
@@ -721,6 +883,70 @@ export default function Landing(){
           </CitiesGrid>
         </CitiesSection>
         </Reveal>
+
+        {/* ── Featured Plots ── */}
+        {featuredPlots.length > 0 && (
+          <Reveal><FeaturedSection id="featured">
+            <CitiesSectionHead>🔥 חלקות <span>מומלצות</span> להשקעה</CitiesSectionHead>
+            <FeaturedGrid>
+              {featuredPlots.map((pl, i) => {
+                const d = p(pl)
+                const score = calcScore(pl)
+                const grade = getGrade(score)
+                const plotRoi = roi(pl)
+                const ppd = pricePerDunam(pl)
+                const cityEmoji = POPULAR_CITIES.find(c => c.name === pl.city)?.emoji || '📍'
+                const cityHue = POPULAR_CITIES.find(c => c.name === pl.city)?.hue ?? 200
+                return (
+                  <FeaturedCard key={pl.id} to={`/plot/${pl.id}`} $delay={i * 0.1}>
+                    <FeaturedHeader $hue={cityHue}>
+                      <FeaturedBadges>
+                        {score >= 8 && (
+                          <FeaturedBadge $bg="rgba(239,68,68,0.15)" $c="#EF4444">
+                            <Flame size={11}/> חם
+                          </FeaturedBadge>
+                        )}
+                        <FeaturedBadge $bg={`${grade.color}18`} $c={grade.color}>
+                          {grade.grade}
+                        </FeaturedBadge>
+                      </FeaturedBadges>
+                      <FeaturedTitle>{cityEmoji} גוש {d.block} חלקה {pl.number}</FeaturedTitle>
+                      <FeaturedCity><MapPin size={13}/> {pl.city} · {zoningLabels[d.zoning] || d.zoning}</FeaturedCity>
+                    </FeaturedHeader>
+                    <FeaturedBody>
+                      <FeaturedPrice>{fmt.compact(d.price)}</FeaturedPrice>
+                      <FeaturedMetrics>
+                        <FeaturedMetric>
+                          <FeaturedMetricVal $c={t.ok}>+{Math.round(plotRoi)}%</FeaturedMetricVal>
+                          <FeaturedMetricLabel>תשואה צפויה</FeaturedMetricLabel>
+                        </FeaturedMetric>
+                        <FeaturedMetric>
+                          <FeaturedMetricVal>{fmt.dunam(d.size)} דונם</FeaturedMetricVal>
+                          <FeaturedMetricLabel>שטח</FeaturedMetricLabel>
+                        </FeaturedMetric>
+                        <FeaturedMetric>
+                          <FeaturedMetricVal>{ppd > 0 ? `₪${(ppd / 1000).toFixed(0)}K` : '—'}</FeaturedMetricVal>
+                          <FeaturedMetricLabel>מחיר/דונם</FeaturedMetricLabel>
+                        </FeaturedMetric>
+                      </FeaturedMetrics>
+                    </FeaturedBody>
+                    <FeaturedFooter>
+                      <FeaturedScore $c={grade.color}>
+                        <TrendingUp size={13}/> ציון {score}/10
+                      </FeaturedScore>
+                      <FeaturedCta>
+                        צפו בפרטים <ArrowUpRight size={14}/>
+                      </FeaturedCta>
+                    </FeaturedFooter>
+                  </FeaturedCard>
+                )
+              })}
+            </FeaturedGrid>
+            <ViewAllBtn to="/explore">
+              <Eye size={18}/> צפו בכל החלקות על המפה
+            </ViewAllBtn>
+          </FeaturedSection></Reveal>
+        )}
 
         {/* ── Stats (live market data) ── */}
         <Reveal><StatsStrip>

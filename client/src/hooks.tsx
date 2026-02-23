@@ -95,6 +95,26 @@ export function usePrefetchPlot() {
   }, [qc])
 }
 
+/** Prefetch plots for a city — use on hover for instant navigation */
+export function usePrefetchPlotsByCity() {
+  const qc = useQueryClient()
+  return useCallback((city: string) => {
+    qc.prefetchQuery({
+      queryKey: ['plots', { city }],
+      queryFn: async () => {
+        try {
+          const data = await api.getPlots({ city }) as Plot[]
+          try { sessionStorage.setItem('data_last_fetched', String(Date.now())); sessionStorage.setItem('data_source', 'api') } catch {}
+          return data.map(normalizePlot)
+        } catch {
+          return mockPlots.filter(p => p.city === city).map(normalizePlot)
+        }
+      },
+      staleTime: 120_000,
+    })
+  }, [qc])
+}
+
 // ── Leads ──
 
 export function useCreateLead() {
