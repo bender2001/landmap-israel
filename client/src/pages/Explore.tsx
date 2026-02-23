@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense, memo, forwardRef } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus, Home, BarChart3, Building2, MapPin, Clock } from 'lucide-react'
+import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus, Home, BarChart3, Building2, MapPin, Clock, TrainFront, Route } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription, useRecentlyViewed, useDataFreshness } from '../hooks'
 // Note: dataFreshness and dataSource are computed locally in this component (not via hooks)
@@ -9,7 +9,7 @@ import MapArea from '../components/Map'
 import type { MapBounds } from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, useToast, NetworkBanner, AnimatedValue, DemoModeBanner, StaleDataBanner, ExploreLoadingSkeleton, SidebarFallback, CompareDrawerFallback, InlineFallback } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcQuickInsight, pricePosition, findBestValueIds, calcAggregateStats, generateMarketInsights, plotCenter, daysOnMarket, estimateDemand } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcQuickInsight, pricePosition, findBestValueIds, calcAggregateStats, generateMarketInsights, plotCenter, daysOnMarket, estimateDemand, nearestTrainStation, nearestHighway, fmtDistance } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -334,6 +334,40 @@ const SortActionsRow = styled.div`
 /* ── Compare bar label ── */
 const CompareLabel = styled.span`
   font-size:13px;font-weight:700;color:${t.text};white-space:nowrap;
+`
+
+/* ── Infrastructure Proximity Row (mobile preview) ── */
+const InfraRow = styled.div`
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+`
+const InfraBadge = styled.span<{$c:string}>`
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:10px;font-weight:700;color:${pr=>pr.$c};
+  padding:3px 10px;border-radius:${t.r.full};
+  background:${pr=>`${pr.$c}10`};border:1px solid ${pr=>`${pr.$c}20`};
+  white-space:nowrap;
+`
+
+/* ── CityComp inline style replacements ── */
+const CityCompCardCount = styled.span`
+  font-size:11px;font-weight:700;color:${t.textDim};
+`
+const CityCompMetricValSm = styled(CityCompMetricVal)`font-size:11px;`
+const CityCompScoreGrade = styled.span<{$c:string}>`
+  font-size:10px;font-weight:800;color:${pr=>pr.$c};
+`
+
+/* ── Stats bar ₪/dunam average ── */
+const DunamStat = styled.span`
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:10px;font-weight:600;color:${t.textDim};
+  padding:2px 8px;border-radius:${t.r.full};
+  background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.12);
+  transition:all 0.3s;white-space:nowrap;
+  ${mobile}{display:none;}
+`
+const DunamStatVal = styled.span`
+  font-weight:800;color:#A78BFA;
 `
 
 /* ── InsightsTicker counter ── */
@@ -919,6 +953,9 @@ const MobilePreviewCard = memo(forwardRef<HTMLDivElement, MobilePreviewProps>(
     const pp = pricePosition(plot, allSorted)
     const dom = daysOnMarket(d.created)
     const demand = estimateDemand(plot, allSorted)
+    // Infrastructure proximity
+    const station = nearestTrainStation(plot)
+    const highway = nearestHighway(plot)
 
     // Calculate "vs city average" stats for quick comparison
     const cityPlots = allSorted.filter(pl => pl.city === plot.city && pl.id !== plot.id)
@@ -998,6 +1035,21 @@ const MobilePreviewCard = memo(forwardRef<HTMLDivElement, MobilePreviewProps>(
                 <PreviewCompareLabel>ציון vs ממוצע</PreviewCompareLabel>
               </PreviewCompareStat>
             </PreviewCompareGrid>
+          )}
+          {/* Infrastructure proximity badges */}
+          {(station || highway) && (
+            <InfraRow>
+              {station && (
+                <InfraBadge $c="#3B82F6" title={station.name}>
+                  <TrainFront size={10} /> {station.name.split(' ')[0]} · {fmtDistance(station.distance)}
+                </InfraBadge>
+              )}
+              {highway && (
+                <InfraBadge $c="#8B5CF6" title={highway.name}>
+                  <Route size={10} /> {fmtDistance(highway.distance)}
+                </InfraBadge>
+              )}
+            </InfraRow>
           )}
           {/* Quick investment insight */}
           {insight.priority >= 4 && (
@@ -1313,7 +1365,10 @@ export default function Explore() {
     const maxPrice = prices.length ? Math.max(...prices) : 0
     const rois = filtered.map(pl => roi(pl)).filter(v => v > 0)
     const avgRoi = rois.length ? Math.round(rois.reduce((s, v) => s + v, 0) / rois.length) : 0
-    return { prices, minPrice, maxPrice, avgRoi }
+    // Average ₪/dunam — the standard Israeli land pricing metric
+    const ppdList = filtered.map(pricePerDunam).filter(v => v > 0)
+    const avgPpd = ppdList.length ? Math.round(ppdList.reduce((s, v) => s + v, 0) / ppdList.length) : 0
+    return { prices, minPrice, maxPrice, avgRoi, avgPpd }
   }, [filtered])
 
   // Total portfolio value — aggregate of all visible plots
@@ -1923,7 +1978,7 @@ export default function Explore() {
                   >
                     <CityCompCardName>
                       <span>{cd.city}</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: t.textDim }}>{cd.count} חלקות</span>
+                      <CityCompCardCount>{cd.count} חלקות</CityCompCardCount>
                     </CityCompCardName>
                     <CityCompCardMetrics>
                       <CityCompMetric>
@@ -1935,11 +1990,11 @@ export default function Explore() {
                         <CityCompMetricLabel>ציון ממוצע</CityCompMetricLabel>
                       </CityCompMetric>
                       <CityCompMetric>
-                        <CityCompMetricVal style={{fontSize:11}}>{fmt.num(cd.avgPps)}</CityCompMetricVal>
+                        <CityCompMetricValSm>{fmt.num(cd.avgPps)}</CityCompMetricValSm>
                         <CityCompMetricLabel>₪/מ״ר</CityCompMetricLabel>
                       </CityCompMetric>
                       <CityCompMetric>
-                        <CityCompMetricVal style={{fontSize:11}}>{fmt.num(cd.avgPpd)}</CityCompMetricVal>
+                        <CityCompMetricValSm>{fmt.num(cd.avgPpd)}</CityCompMetricValSm>
                         <CityCompMetricLabel>₪/דונם</CityCompMetricLabel>
                       </CityCompMetric>
                     </CityCompCardMetrics>
@@ -1947,7 +2002,7 @@ export default function Explore() {
                       <CityCompScoreTrack>
                         <CityCompScoreFill $w={cd.avgScore * 10} $c={scoreColor} />
                       </CityCompScoreTrack>
-                      <span style={{ fontSize: 10, fontWeight: 800, color: scoreColor }}>{getGrade(cd.avgScore).grade}</span>
+                      <CityCompScoreGrade $c={scoreColor}>{getGrade(cd.avgScore).grade}</CityCompScoreGrade>
                     </CityCompScoreBar>
                     {cd.bestCount > 0 && (
                       <CityCompBestBadge>💎 {cd.bestCount} Best Value</CityCompBestBadge>
@@ -2076,6 +2131,12 @@ export default function Explore() {
               <TotalValueStat title={`סך שווי כל החלקות המוצגות: ${fmt.price(totalPortfolioValue)}`}>
                 💰 סה״כ <TotalValueAmount>{fmt.compact(totalPortfolioValue)}</TotalValueAmount>
               </TotalValueStat>
+            )}
+            {/* Average ₪/dunam — the Israeli standard land pricing metric */}
+            {statsBarData.avgPpd > 0 && (
+              <DunamStat title={`מחיר ממוצע לדונם: ${fmt.price(statsBarData.avgPpd)}`}>
+                📐 <DunamStatVal>{fmt.compact(statsBarData.avgPpd)}</DunamStatVal>/דונם
+              </DunamStat>
             )}
             {statsBarData.prices.length >= 2 && (
               <Stat title={`טווח: ${fmt.compact(statsBarData.minPrice)} – ${fmt.compact(statsBarData.maxPrice)}`}>

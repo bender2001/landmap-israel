@@ -56,6 +56,7 @@ const CityStatVal = styled.div<{$c?:string}>`
   ${mobile}{font-size:12px;}
 `
 const CityStatLabel = styled.div`font-size:9px;font-weight:600;color:${t.textDim};text-transform:uppercase;white-space:nowrap;letter-spacing:0.3px;`
+const CityStatValSm = styled(CityStatVal)`font-size:11px;${mobile}{font-size:10px;}`
 const CityStatsClose = styled.button`
   display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:${t.r.sm};
   background:transparent;border:1px solid ${t.border};color:${t.textDim};cursor:pointer;flex-shrink:0;
@@ -107,14 +108,14 @@ export const CityStatsOverlay = memo(function CityStatsOverlay({
           <CityStatCell title={`טמפרטורת שוק: ${marketTemp.label}`}>
             <TempGauge $c={marketTemp.color}>
               <TempBar $pct={marketTemp.pct} $c={marketTemp.color} />
-              <CityStatVal $c={marketTemp.color} style={{fontSize:11}}>{marketTemp.emoji}</CityStatVal>
+              <CityStatValSm $c={marketTemp.color}>{marketTemp.emoji}</CityStatValSm>
             </TempGauge>
             <CityStatLabel>{marketTemp.label}</CityStatLabel>
           </CityStatCell>
         )}
         {stats.dominantZoning && (
           <CityStatCell>
-            <CityStatVal style={{fontSize:11}}>{stats.dominantZoning}</CityStatVal>
+            <CityStatValSm>{stats.dominantZoning}</CityStatValSm>
             <CityStatLabel>שלב נפוץ</CityStatLabel>
           </CityStatCell>
         )}
@@ -147,6 +148,7 @@ const PulseDot = styled.span<{$c:string}>`
   display:inline-block;width:6px;height:6px;border-radius:50%;background:${pr=>pr.$c};
   animation:${pulseGlow} 2s ease-in-out infinite;flex-shrink:0;
 `
+const PulseLabelIcon = styled.span`display:inline-flex;margin-left:3px;`
 
 export interface MarketPulseData { totalValue: number; hotDeals: number; belowAvgCount: number; avgRoi: number }
 
@@ -171,7 +173,7 @@ export const MarketPulseOverlay = memo(function MarketPulseOverlay({
       )}
       <PulseCell>
         <PulseVal>{fmt.compact(pulse.totalValue)}</PulseVal>
-        <PulseLabel><PieChart size={8} style={{marginLeft:3}} /> שווי כולל</PulseLabel>
+        <PulseLabel><PulseLabelIcon><PieChart size={8} /></PulseLabelIcon> שווי כולל</PulseLabel>
       </PulseCell>
       {pulse.hotDeals > 0 && (
         <PulseCell>
@@ -299,6 +301,10 @@ const TopPickBody = styled.div`display:flex;flex-direction:column;gap:2px;paddin
 const TopPickTitle = styled.div`font-size:10px;font-weight:700;color:${t.gold};text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:4px;`
 const TopPickName = styled.div`font-size:13px;font-weight:800;color:${t.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`
 const TopPickMeta = styled.div`display:flex;align-items:center;gap:8px;font-size:11px;color:${t.textSec};`
+const TopPickEmoji = styled.span`font-size:20px;`
+const TopPickGrade = styled.span<{$c:string}>`color:${pr=>pr.$c};font-weight:900;`
+const TopPickPrice = styled.span`font-weight:800;color:${t.gold};`
+const TopPickRoi = styled.span`color:${t.ok};font-weight:700;`
 const TopPickCloseBtn = styled.button`
   position:absolute;top:4px;left:4px;width:18px;height:18px;border-radius:${t.r.full};
   background:transparent;border:1px solid ${t.border};color:${t.textDim};
@@ -315,13 +321,13 @@ export const TopPickOverlay = memo(function TopPickOverlay({
   const d = p(plot), score = calcScore(plot), grade = getGrade(score), r = roi(plot)
   return (
     <TopPickWrap onClick={() => onSelect(plot)} title={`חלקה ${plot.number} — לחץ לפרטים`}>
-      <TopPickBadge><span style={{ fontSize: 20 }}>🏆</span></TopPickBadge>
+      <TopPickBadge><TopPickEmoji>🏆</TopPickEmoji></TopPickBadge>
       <TopPickBody>
-        <TopPickTitle><Zap size={10} /> TOP PICK <span style={{ color: grade.color, fontWeight: 900 }}>{grade.grade}</span></TopPickTitle>
+        <TopPickTitle><Zap size={10} /> TOP PICK <TopPickGrade $c={grade.color}>{grade.grade}</TopPickGrade></TopPickTitle>
         <TopPickName>{plot.city} · גוש {d.block} · חלקה {plot.number}</TopPickName>
         <TopPickMeta>
-          <span style={{ fontWeight: 800, color: t.gold }}>{fmt.compact(d.price)}</span>
-          {r > 0 && <span style={{ color: t.ok, fontWeight: 700 }}>+{Math.round(r)}% ROI</span>}
+          <TopPickPrice>{fmt.compact(d.price)}</TopPickPrice>
+          {r > 0 && <TopPickRoi>+{Math.round(r)}% ROI</TopPickRoi>}
           <span>{fmt.dunam(d.size)} דונם</span>
         </TopPickMeta>
       </TopPickBody>
