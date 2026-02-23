@@ -3,12 +3,12 @@ import { useSearchParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription } from '../hooks'
+import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription, useRecentlyViewed } from '../hooks'
 // Note: dataFreshness and dataSource are computed locally in this component (not via hooks)
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, useToast, NetworkBanner, AnimatedValue, DemoModeBanner, ExploreLoadingSkeleton } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade, calcQuickInsight } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -350,6 +350,7 @@ export default function Explore() {
   const { online, wasOffline } = useOnlineStatus()
   const sse = useSSE()
   const isMobile = useIsMobile()
+  const recentlyViewed = useRecentlyViewed()
   const [mobileExpanded, setMobileExpanded] = useState(false)
   const [mapFullscreen, setMapFullscreen] = useState(false)
   const toggleFullscreen = useCallback(() => setMapFullscreen(f => !f), [])
@@ -497,11 +498,12 @@ export default function Explore() {
     setFilters(DEFAULTS)
   }, [setFilters])
 
-  // Select plot
+  // Select plot + track recently viewed
   const selectPlot = useCallback((pl: Plot | null) => {
     setSelected(pl)
     setMobileExpanded(false) // Reset to preview mode on new selection
-  }, [])
+    if (pl) recentlyViewed.add(pl.id)
+  }, [recentlyViewed])
 
   // Mobile preview swipe-to-dismiss
   const previewRef = useRef<HTMLDivElement>(null)
@@ -768,6 +770,7 @@ export default function Explore() {
             onToggle={() => setListOpen(o => !o)}
             isLoading={isLoading}
             userLocation={sortKey === 'nearest' ? userGeo.location : null}
+            recentlyViewedIds={recentlyViewed.ids}
           />
         </Suspense>
         <Suspense fallback={null}>
@@ -776,6 +779,7 @@ export default function Explore() {
         {/* Mobile Plot Preview Bottom Card — simplified */}
         {selected && !mobileExpanded && (() => {
           const d = p(selected), score = calcScore(selected), grade = getGrade(score)
+          const insight = calcQuickInsight(selected, sorted)
           return (
             <MobilePreview $show={true} ref={previewRef}>
               <PreviewHandle />
@@ -792,6 +796,17 @@ export default function Explore() {
                 <PreviewScore $c={grade.color}>
                   ציון השקעה: {score}/10 — {grade.grade}
                 </PreviewScore>
+                {/* Quick investment insight */}
+                {insight.priority >= 4 && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+                    background: `${insight.color}10`, border: `1px solid ${insight.color}25`,
+                    borderRadius: t.r.full, fontSize: 11, fontWeight: 700, color: insight.color,
+                    direction: 'rtl',
+                  }}>
+                    {insight.emoji} {insight.text}
+                  </div>
+                )}
                 <PreviewActions>
                   <PreviewDetailBtn onClick={() => setMobileExpanded(true)}>
                     <ChevronLeft size={16} /> פרטים מלאים

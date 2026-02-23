@@ -472,6 +472,17 @@ const RecoChip = styled.span<{$c:string}>`
   white-space:nowrap;letter-spacing:0.2px;
 `
 
+/* ── Quick Insight Chip (high-priority contextual one-liner) ── */
+const insightGlow = keyframes`0%,100%{opacity:1}50%{opacity:0.85}`
+const InsightChip = styled.span<{$c:string}>`
+  display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;
+  padding:3px 10px;border-radius:${t.r.full};color:${pr=>pr.$c};
+  background:${pr=>pr.$c}14;border:1px solid ${pr=>pr.$c}30;
+  white-space:nowrap;letter-spacing:0.2px;max-width:220px;
+  overflow:hidden;text-overflow:ellipsis;
+  animation:${insightGlow} 3s ease-in-out infinite;
+`
+
 /* ── WhatsApp Quick CTA ── */
 const WaCta = styled.a`
   display:flex;align-items:center;justify-content:center;width:28px;height:28px;
@@ -528,6 +539,31 @@ const ZoningLabel = styled.div`
   display:flex;align-items:center;justify-content:space-between;margin-top:3px;
   font-size:9px;color:${t.textDim};
 `
+
+/* ── Recently Viewed Section ── */
+const RecentWrap = styled.div`
+  padding:8px 12px;border-bottom:1px solid ${t.border};flex-shrink:0;direction:rtl;
+`
+const RecentTitle = styled.div`
+  display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:${t.textDim};
+  margin-bottom:8px;letter-spacing:0.3px;
+`
+const RecentScroll = styled.div`
+  display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;
+  scrollbar-width:none;&::-webkit-scrollbar{display:none;}
+`
+const RecentCard = styled.button<{$active?:boolean}>`
+  flex-shrink:0;display:flex;flex-direction:column;gap:3px;
+  padding:8px 12px;min-width:120px;max-width:160px;
+  background:${pr=>pr.$active?t.goldDim:t.bg};
+  border:1px solid ${pr=>pr.$active?t.goldBorder:t.border};
+  border-radius:${t.r.md};cursor:pointer;font-family:${t.font};
+  text-align:right;transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};background:${t.hover};transform:translateY(-1px);}
+`
+const RecentCity = styled.div`font-size:11px;font-weight:700;color:${t.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`
+const RecentBlock = styled.div`font-size:9px;color:${t.textDim};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`
+const RecentPrice = styled.div`font-size:12px;font-weight:800;color:${t.gold};white-space:nowrap;`
 
 /* ── Load More Button ── */
 const LoadMoreBtn = styled.button`
@@ -673,6 +709,7 @@ interface Props {
   onToggle: () => void
   isLoading?: boolean
   userLocation?: { lat: number; lng: number } | null
+  recentlyViewedIds?: string[]
 }
 
 const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots, onDetailClick, userLocation, isBestValue }: {
@@ -814,9 +851,18 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
           </ZoningLabel>
         </>
       )}
-      {/* Investment recommendation chip */}
+      {/* Quick investment insight + recommendation chip */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-        <RecoChip $c={reco.color}>{reco.emoji} {reco.text}</RecoChip>
+        {(() => {
+          const insight = calcQuickInsight(plot, allPlots)
+          return insight.priority >= 5 ? (
+            <InsightChip $c={insight.color} title={insight.text}>
+              {insight.emoji} {insight.text}
+            </InsightChip>
+          ) : (
+            <RecoChip $c={reco.color}>{reco.emoji} {reco.text}</RecoChip>
+          )
+        })()}
         {/* Location proximity tags (like Madlan) */}
         {(() => {
           const tags = getLocationTags(plot)
@@ -829,7 +875,7 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
   )
 })
 
-function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, userLocation }: Props) {
+function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, userLocation, recentlyViewedIds = [] }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const [cityFilter, setCityFilter] = useState<string | null>(null)
@@ -982,6 +1028,33 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, u
         <GradeDistribution plots={allVisiblePlots} />
         {/* Price distribution histogram */}
         <PriceDistribution plots={visiblePlots} selectedPlot={selected} />
+        {/* Recently Viewed carousel */}
+        {recentlyViewedIds.length > 0 && (() => {
+          const recentPlots = recentlyViewedIds
+            .map(id => plots.find(pl => pl.id === id))
+            .filter((pl): pl is Plot => !!pl)
+            .slice(0, 8)
+          return recentPlots.length > 0 ? (
+            <RecentWrap>
+              <RecentTitle>🕐 נצפו לאחרונה ({recentPlots.length})</RecentTitle>
+              <RecentScroll>
+                {recentPlots.map(rp => {
+                  const d = p(rp), grade = getGrade(calcScore(rp))
+                  return (
+                    <RecentCard key={rp.id} $active={selected?.id === rp.id} onClick={() => onSelect(rp)}>
+                      <RecentCity>{rp.city}</RecentCity>
+                      <RecentBlock>גוש {d.block} · חלקה {rp.number}</RecentBlock>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                        <RecentPrice>{d.price > 0 ? fmt.compact(d.price) : '—'}</RecentPrice>
+                        <span style={{ fontSize: 9, fontWeight: 800, color: grade.color }}>{grade.grade}</span>
+                      </div>
+                    </RecentCard>
+                  )
+                })}
+              </RecentScroll>
+            </RecentWrap>
+          ) : null
+        })()}
         <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
           <Body ref={bodyRef}>
             {isLoading ? (
