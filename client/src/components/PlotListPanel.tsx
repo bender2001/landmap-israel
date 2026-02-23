@@ -430,15 +430,38 @@ const BestValueBadge = styled.span`
   animation:${bestValueGlow} 3s ease-in-out infinite;
 `
 
-/* ── Satellite Thumbnail ── */
-const SatThumb = styled.div<{ $url: string }>`
+/* ── Satellite Thumbnail (lazy-loaded) ── */
+const SatThumbInner = styled.div<{ $url: string; $loaded: boolean }>`
   width:56px;height:56px;border-radius:${t.r.md};flex-shrink:0;
-  background-image:url(${pr => pr.$url});background-size:cover;background-position:center;
+  background-image:${pr => pr.$loaded ? `url(${pr.$url})` : 'none'};
+  background-size:cover;background-position:center;
+  background-color:${t.surfaceLight};
   border:1px solid ${t.border};position:relative;overflow:hidden;
   transition:all ${t.tr};
-  &::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 60%,rgba(0,0,0,0.3));border-radius:inherit;}
+  &::after{content:'';position:absolute;inset:0;
+    background:${pr => pr.$loaded
+      ? 'linear-gradient(135deg,transparent 60%,rgba(0,0,0,0.3))'
+      : `linear-gradient(90deg,${t.surfaceLight} 25%,${t.bg} 50%,${t.surfaceLight} 75%)`};
+    background-size:${pr => pr.$loaded ? '100% 100%' : '200% 100%'};
+    ${pr => !pr.$loaded && `animation:satThumbShimmer 1.5s infinite;`}
+    border-radius:inherit;}
   &:hover{border-color:${t.goldBorder};transform:scale(1.05);box-shadow:${t.sh.sm};}
+  @keyframes satThumbShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 `
+function SatThumb({ $url, title }: { $url: string; title?: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [loaded, setLoaded] = useState(false)
+  useEffect(() => {
+    if (!ref.current || loaded) return
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setLoaded(true); observer.disconnect() } },
+      { rootMargin: '100px' }
+    )
+    observer.observe(ref.current)
+    return () => observer.disconnect()
+  }, [loaded])
+  return <SatThumbInner ref={ref} $url={$url} $loaded={loaded} title={title} />
+}
 
 /* ── Investment Recommendation Chip ── */
 const RecoChip = styled.span<{$c:string}>`

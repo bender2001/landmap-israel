@@ -5,6 +5,10 @@ import { plots as mockPlots } from './data'
 import { normalizePlot } from './utils'
 import * as api from './api'
 
+// ── Helpers ──
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function isValidUUID(id: string | undefined): boolean { return !!id && UUID_RE.test(id) }
+
 // ── Plot Queries ──
 
 export function useAllPlots(filters: Partial<Filters> = {}) {
@@ -30,17 +34,20 @@ export function usePlot(id: string | undefined) {
   return useQuery<Plot>({
     queryKey: ['plot', id],
     queryFn: async () => {
-      try {
-        const data = await api.getPlot(id!) as Plot
-        return normalizePlot(data)
-      } catch {
-        const found = mockPlots.find(p => p.id === id)
-        if (found) return normalizePlot(found)
-        throw new Error('Plot not found')
+      // Only call API for valid UUIDs — skip numeric/garbage IDs
+      if (isValidUUID(id)) {
+        try {
+          const data = await api.getPlot(id!) as Plot
+          return normalizePlot(data)
+        } catch { /* fall through to mock lookup */ }
       }
+      const found = mockPlots.find(p => p.id === id)
+      if (found) return normalizePlot(found)
+      throw new Error('Plot not found')
     },
     enabled: !!id,
     staleTime: 120_000,
+    retry: isValidUUID(id) ? 2 : 0,
   })
 }
 
@@ -48,12 +55,13 @@ export function useSimilarPlots(id: string | undefined) {
   return useQuery<Plot[]>({
     queryKey: ['similar-plots', id],
     queryFn: async () => {
-      try {
-        const data = await api.getSimilarPlots(id!) as Plot[]
-        return data.map(normalizePlot)
-      } catch {
-        return mockPlots.filter(p => p.id !== id).map(normalizePlot)
+      if (isValidUUID(id)) {
+        try {
+          const data = await api.getSimilarPlots(id!) as Plot[]
+          return data.map(normalizePlot)
+        } catch { /* fall through to mock */ }
       }
+      return mockPlots.filter(p => p.id !== id).map(normalizePlot)
     },
     enabled: !!id,
     staleTime: 120_000,
@@ -688,7 +696,7 @@ export function useSSE() {
   const [updateCount, setUpdateCount] = useState(0)
   const esRef = useRef<EventSource | null>(null)
   const retryCount = useRef(0)
-  const maxRetries = 5
+  const maxRetries = 8
 
   useEffect(() => {
     let mounted = true
@@ -700,7 +708,8 @@ export function useSSE() {
       try {
         const es = new EventSource('/api/events')
         esRef.current = es
-        setStatus('connecting')
+        // Only log connecting on first attempt to avoid console noise
+        if (retryCount.current === 0) setStatus('connecting')
 
         es.onopen = () => {
           if (!mounted) return
@@ -745,9 +754,10 @@ export function useSSE() {
           esRef.current = null
           setStatus('disconnected')
 
-          // Exponential backoff reconnect
+          // Exponential backoff reconnect with longer delays to reduce 503 spam
           if (retryCount.current < maxRetries) {
-            const delay = Math.min(1000 * Math.pow(2, retryCount.current), 30000)
+            // Start with 5s, then double: 5s, 10s, 20s, 40s, 60s, 60s...
+            const delay = Math.min(5000 * Math.pow(2, retryCount.current), 60000)
             retryCount.current++
             retryTimer = setTimeout(connect, delay)
           }

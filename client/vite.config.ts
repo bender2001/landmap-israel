@@ -22,11 +22,29 @@ export default defineConfig({
     port: 5173,
     open: true,
     proxy: {
+      // SSE endpoint needs special handling — no timeout, no buffering
+      '/api/events': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        timeout: 0,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (_proxyReq, _req, res) => {
+            // Prevent proxy from buffering SSE responses
+            (res as any).flushHeaders?.()
+          })
+          proxy.on('error', (_err, _req, res) => {
+            if (res && 'writeHead' in res && !res.headersSent) {
+              res.writeHead(503, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' })
+              res.end('data: {"type":"proxy_error"}\n\n')
+            }
+          })
+        },
+      },
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
         configure: (proxy) => {
-          proxy.on('error', (err, _req, res) => {
+          proxy.on('error', (_err, _req, res) => {
             if (res && 'writeHead' in res && !res.headersSent) {
               res.writeHead(503, { 'Content-Type': 'application/json' })
               res.end(JSON.stringify({ error: 'Backend unavailable', demo: true }))

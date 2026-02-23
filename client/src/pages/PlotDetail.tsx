@@ -6,7 +6,7 @@ import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed, useAllPlots, usePlotCityRanking } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard, ScrollToTop } from '../components/UI'
 import { PublicLayout } from '../components/Layout'
-import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, plotCenter, calcRisk, calcLocationScore, setOgMeta, removeOgMeta, SITE_CONFIG, calcExitScenarios } from '../utils'
+import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, plotCenter, calcRisk, calcLocationScore, setOgMeta, removeOgMeta, SITE_CONFIG, calcExitScenarios, estimatedYear, satelliteTileUrl } from '../utils'
 import type { RiskAssessment } from '../utils'
 import type { Plot } from '../types'
 
@@ -288,15 +288,43 @@ const PercentileLabel = styled.div`
 /* ── Similar Plots ── */
 const SimilarGrid = styled.div`display:grid;grid-template-columns:1fr;gap:12px;${sm}{grid-template-columns:repeat(2,1fr);}`
 const SimilarCard = styled(Link)`
-  display:flex;flex-direction:column;gap:8px;padding:14px;
-  background:${t.lBg};border:1px solid ${t.lBorder};border-radius:${t.r.md};
+  display:flex;flex-direction:column;gap:0;overflow:hidden;
+  background:${t.lBg};border:1px solid ${t.lBorder};border-radius:${t.r.lg};
   text-decoration:none!important;color:inherit;transition:all ${t.tr};
-  &:hover{border-color:${t.goldBorder};box-shadow:${t.sh.sm};transform:translateY(-2px);}
+  &:hover{border-color:${t.goldBorder};box-shadow:${t.sh.md};transform:translateY(-3px);}
 `
+const SimilarThumb = styled.div<{$url:string}>`
+  width:100%;height:80px;background-image:url(${pr=>pr.$url});background-size:cover;background-position:center;
+  position:relative;
+  &::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,0.45));}
+`
+const SimilarThumbOverlay = styled.div`
+  position:absolute;bottom:6px;left:8px;right:8px;z-index:1;
+  display:flex;align-items:center;justify-content:space-between;
+`
+const SimilarThumbPrice = styled.span`
+  font-size:14px;font-weight:800;color:#fff;font-family:${t.font};
+  text-shadow:0 1px 4px rgba(0,0,0,0.5);
+`
+const SimilarThumbGrade = styled.span<{$c:string}>`
+  display:inline-flex;align-items:center;padding:2px 8px;border-radius:${t.r.full};
+  background:${pr=>pr.$c}28;backdrop-filter:blur(6px);
+  font-size:10px;font-weight:800;color:${pr=>pr.$c};border:1px solid ${pr=>pr.$c}40;
+`
+const SimilarBody = styled.div`padding:12px 14px;display:flex;flex-direction:column;gap:6px;`
 const SimilarTop = styled.div`display:flex;align-items:center;justify-content:space-between;gap:8px;`
 const SimilarCity = styled.span`font-size:13px;font-weight:700;color:${t.lText};`
 const SimilarBlock = styled.span`font-size:11px;color:${t.lTextSec};`
 const SimilarMetrics = styled.div`display:flex;align-items:center;gap:10px;flex-wrap:wrap;`
+const SimilarCompareBar = styled.div`
+  display:flex;align-items:center;gap:6px;margin-top:2px;
+`
+const SimilarCompareSegment = styled.div<{$pct:number;$c:string}>`
+  height:4px;border-radius:2px;background:${pr=>pr.$c};
+  width:${pr=>Math.max(8,Math.min(100,pr.$pct))}%;
+  transition:width 0.6s ease;
+`
+const SimilarCompareLabel = styled.span`font-size:9px;color:${t.lTextSec};font-weight:600;white-space:nowrap;`
 const SimilarMetric = styled.span`font-size:12px;color:${t.lTextSec};display:flex;align-items:center;gap:3px;`
 const SimilarVal = styled.span<{$gold?:boolean}>`font-weight:700;color:${pr => pr.$gold ? t.gold : t.lText};`
 
@@ -1009,6 +1037,64 @@ export default function PlotDetail() {
   const { data: allPlots = [] } = useAllPlots()
   const cityRanking = usePlotCityRanking(plot, allPlots)
 
+  // ALL hooks MUST be before conditional returns (React rules of hooks)
+  const risk = useMemo(() => plot ? calcRisk(plot, similarPlots.length > 0 ? [plot, ...similarPlots] : undefined) : { score: 0, level: 'low' as const, label: '', factors: [] }, [plot, similarPlots])
+  const locationScore = useMemo(() => plot ? calcLocationScore(plot) : { score: 0, label: '', color: '', factors: [], tags: [] }, [plot])
+  const scoreBreakdown = useMemo(() => plot ? calcScoreBreakdown(plot) : { total: 0, factors: [] }, [plot])
+  const exitScenarios = useMemo(() => plot ? calcExitScenarios(plot) : null, [plot])
+  const [reportCopied, setReportCopied] = useState(false)
+
+  // Pre-compute values safely (for hooks that depend on derived data)
+  const _d = plot ? p(plot) : null
+  const _r = plot ? roi(plot) : 0
+  const _timeline = plot ? calcTimeline(plot) : null
+  const _hasDevContext = plot ? !!(plot.area_context || plot.nearby_development || plot.nearbyDevelopment) : false
+
+  const sectionIds = useMemo(() => {
+    if (!plot || !_d) return ['investment', 'risk']
+    const ids = ['investment', 'risk']
+    if (exitScenarios) ids.push('exit-strategy')
+    if (locationScore.factors.length > 0) ids.push('location')
+    if (_hasDevContext) ids.push('neighborhood')
+    if (similarPlots.length > 1) ids.push('vs-area')
+    if (cityRanking) ids.push('city-ranking')
+    if (_timeline) ids.push('timeline')
+    if (_d.price > 0) ids.push('mortgage')
+    if (similarPlots.length > 0) ids.push('similar')
+    return ids
+  }, [plot, _d, locationScore.factors.length, similarPlots.length, _timeline, _hasDevContext, exitScenarios, cityRanking])
+  const { activeId, showSticky } = useScrollSpy(sectionIds)
+
+  const investmentSummary = useMemo(() => {
+    if (!plot || !_d) return ''
+    const cagr = calcCAGR(_r, _d.readiness)
+    const parts: string[] = []
+    const zoningLabel = zoningLabels[_d.zoning] || ''
+    if (zoningLabel) parts.push(zoningLabel)
+    if (_d.size > 0) parts.push(`${fmt.dunam(_d.size)} דונם`)
+    if (_d.price > 0) parts.push(`ב-${fmt.compact(_d.price)}`)
+    const summaryParts: string[] = []
+    if (parts.length) summaryParts.push(`קרקע ${parts.join(', ')} ב${plot.city}`)
+    if (_r > 0) summaryParts.push(`תשואה צפויה ${Math.round(_r)}%`)
+    if (cagr) summaryParts.push(`צמיחה ${cagr.cagr}% שנתי על פני ${cagr.years} שנים`)
+    return summaryParts.join(' · ')
+  }, [plot, _d, _r])
+
+  const waLink = useMemo(() => {
+    if (!plot || !_d) return SITE_CONFIG.waLink
+    const msg = `היי, מתעניין/ת בחלקה ${plot.number} גוש ${_d.block} ב${plot.city} (${fmt.compact(_d.price)}). אשמח לפרטים נוספים.`
+    return `${SITE_CONFIG.waLink}?text=${encodeURIComponent(msg)}`
+  }, [plot, _d])
+
+  const taxComparison = useMemo(() => {
+    if (!plot || !_d) return null
+    const taxVal = (plot.tax_authority_value ?? plot.taxAuthorityValue) as number | undefined
+    if (!taxVal || taxVal <= 0 || _d.price <= 0) return null
+    const delta = ((_d.price - taxVal) / taxVal) * 100
+    const maxVal = Math.max(_d.price, taxVal)
+    return { taxVal, delta, pricePct: (_d.price / maxVal) * 100, taxPct: (taxVal / maxVal) * 100 }
+  }, [plot, _d])
+
   if (isLoading) return <PublicLayout><PlotDetailSkeleton /></PublicLayout>
   if (error || !plot) return (
     <PublicLayout>
@@ -1035,26 +1121,7 @@ export default function PlotDetail() {
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
   const cagr = calcCAGR(r, d.readiness), timeline = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot), ppd = pricePerDunam(plot)
   const mortgage = d.price > 0 ? calcMonthly(d.price, ltvPct / 100, interestRate / 100, loanYears) : null
-  const risk = useMemo(() => calcRisk(plot, similarPlots.length > 0 ? [plot, ...similarPlots] : undefined), [plot, similarPlots])
-  const locationScore = useMemo(() => calcLocationScore(plot), [plot])
-  const scoreBreakdown = useMemo(() => calcScoreBreakdown(plot), [plot])
-  const exitScenarios = useMemo(() => calcExitScenarios(plot), [plot])
-
-  // Section IDs for scroll-spy
   const hasDevContext = !!(plot.area_context || plot.nearby_development || plot.nearbyDevelopment)
-  const sectionIds = useMemo(() => {
-    const ids = ['investment', 'risk']
-    if (exitScenarios) ids.push('exit-strategy')
-    if (locationScore.factors.length > 0) ids.push('location')
-    if (hasDevContext) ids.push('neighborhood')
-    if (similarPlots.length > 1) ids.push('vs-area')
-    if (cityRanking) ids.push('city-ranking')
-    if (timeline) ids.push('timeline')
-    if (d.price > 0) ids.push('mortgage')
-    if (similarPlots.length > 0) ids.push('similar')
-    return ids
-  }, [locationScore.factors.length, similarPlots.length, timeline, d.price, hasDevContext, exitScenarios])
-  const { activeId, showSticky } = useScrollSpy(sectionIds)
 
   // Section labels for nav
   const sectionLabels: Record<string, { icon: React.ReactNode; label: string }> = {
@@ -1070,28 +1137,7 @@ export default function PlotDetail() {
     similar: { icon: <BarChart3 size={12} />, label: 'דומות' },
   }
 
-  // Investment summary text
-  const investmentSummary = useMemo(() => {
-    const parts: string[] = []
-    const zoningLabel = zoningLabels[d.zoning] || ''
-    if (zoningLabel) parts.push(zoningLabel)
-    if (d.size > 0) parts.push(`${fmt.dunam(d.size)} דונם`)
-    if (d.price > 0) parts.push(`ב-${fmt.compact(d.price)}`)
-    const summaryParts: string[] = []
-    if (parts.length) summaryParts.push(`קרקע ${parts.join(', ')} ב${plot.city}`)
-    if (r > 0) summaryParts.push(`תשואה צפויה ${Math.round(r)}%`)
-    if (cagr) summaryParts.push(`צמיחה ${cagr.cagr}% שנתי על פני ${cagr.years} שנים`)
-    return summaryParts.join(' · ')
-  }, [plot, d, r, cagr])
-
-  // WhatsApp link with plot context
-  const waLink = useMemo(() => {
-    const msg = `היי, מתעניין/ת בחלקה ${plot.number} גוש ${d.block} ב${plot.city} (${fmt.compact(d.price)}). אשמח לפרטים נוספים.`
-    return `${SITE_CONFIG.waLink}?text=${encodeURIComponent(msg)}`
-  }, [plot, d])
-
   // Copy investment report to clipboard
-  const [reportCopied, setReportCopied] = useState(false)
   const copyInvestmentReport = async () => {
     const lines: string[] = [
       `📊 דו"ח השקעה — LandMap Israel`,
@@ -1126,15 +1172,6 @@ export default function PlotDetail() {
       setTimeout(() => setReportCopied(false), 2500)
     } catch { /* silently fail */ }
   }
-
-  // Tax authority value comparison data
-  const taxComparison = useMemo(() => {
-    const taxVal = (plot.tax_authority_value ?? plot.taxAuthorityValue) as number | undefined
-    if (!taxVal || taxVal <= 0 || d.price <= 0) return null
-    const delta = ((d.price - taxVal) / taxVal) * 100
-    const maxVal = Math.max(d.price, taxVal)
-    return { taxVal, delta, pricePct: (d.price / maxVal) * 100, taxPct: (taxVal / maxVal) * 100 }
-  }, [plot, d.price])
 
   return (
     <PublicLayout>
@@ -1790,21 +1827,42 @@ export default function PlotDetail() {
                 <SimilarGrid>
                   {similarPlots.slice(0, 4).map(sp => {
                     const sd = p(sp), sr = roi(sp), sg = getGrade(calcScore(sp)), spps = pricePerSqm(sp)
+                    const spCenter = plotCenter(sp.coordinates)
+                    const spThumb = spCenter ? satelliteTileUrl(spCenter.lat, spCenter.lng) : null
+                    // Price comparison: this plot vs current plot
+                    const pricePct = d.price > 0 && sd.price > 0 ? Math.round((sd.price / d.price) * 100) : 0
+                    const isPriceLower = sd.price < d.price && sd.price > 0 && d.price > 0
                     return (
                       <SimilarCard key={sp.id} to={`/plot/${sp.id}`}>
+                        {spThumb && (
+                          <SimilarThumb $url={spThumb}>
+                            <SimilarThumbOverlay>
+                              <SimilarThumbPrice>{fmt.compact(sd.price)}</SimilarThumbPrice>
+                              <SimilarThumbGrade $c={sg.color}>{sg.grade}</SimilarThumbGrade>
+                            </SimilarThumbOverlay>
+                          </SimilarThumb>
+                        )}
+                        <SimilarBody>
                         <SimilarTop>
                           <div>
                             <SimilarCity>{sp.city}</SimilarCity>
                             <SimilarBlock>גוש {sd.block} · חלקה {sp.number}</SimilarBlock>
                           </div>
-                          <Badge $color={sg.color} style={{ fontSize: 11 }}>{sg.grade}</Badge>
+                          {!spThumb && <Badge $color={sg.color} style={{ fontSize: 11 }}>{sg.grade}</Badge>}
                         </SimilarTop>
                         <SimilarMetrics>
-                          <SimilarMetric><DollarSign size={11} /><SimilarVal $gold>{fmt.compact(sd.price)}</SimilarVal></SimilarMetric>
+                          {!spThumb && <SimilarMetric><DollarSign size={11} /><SimilarVal $gold>{fmt.compact(sd.price)}</SimilarVal></SimilarMetric>}
                           <SimilarMetric><Ruler size={11} /><SimilarVal>{fmt.num(sd.size)} מ״ר</SimilarVal></SimilarMetric>
                           {sr > 0 && <SimilarMetric><TrendingUp size={11} /><SimilarVal style={{ color: t.ok }}>{Math.round(sr)}%</SimilarVal></SimilarMetric>}
                           {spps > 0 && <SimilarMetric>₪/מ״ר <SimilarVal>{fmt.num(spps)}</SimilarVal></SimilarMetric>}
                         </SimilarMetrics>
+                        {pricePct > 0 && (
+                          <SimilarCompareBar title={`${pricePct}% ממחיר חלקה זו`}>
+                            <SimilarCompareSegment $pct={pricePct} $c={isPriceLower ? t.ok : t.warn} />
+                            <SimilarCompareLabel>{isPriceLower ? `${100 - pricePct}% זול יותר` : pricePct > 100 ? `${pricePct - 100}% יקר יותר` : 'מחיר דומה'}</SimilarCompareLabel>
+                          </SimilarCompareBar>
+                        )}
+                        </SimilarBody>
                       </SimilarCard>
                     )
                   })}

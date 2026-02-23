@@ -32,11 +32,13 @@ const Stats = styled.div`
   display:flex;align-items:center;justify-content:center;gap:24px;padding:8px 16px;
   background:${t.glass};backdrop-filter:blur(12px);border-top:1px solid ${t.border};
   font-size:12px;color:${t.textSec};direction:rtl;
-  ${mobile}{bottom:56px;gap:10px;font-size:10px;padding:6px 12px;
+  ${mobile}{bottom:56px;gap:8px;font-size:10px;padding:6px 10px;
     justify-content:flex-start;overflow-x:auto;scrollbar-width:none;
     -webkit-overflow-scrolling:touch;&::-webkit-scrollbar{display:none;}
-    mask-image:linear-gradient(to left,transparent 0px,black 20px,black calc(100% - 20px),transparent 100%);
-    -webkit-mask-image:linear-gradient(to left,transparent 0px,black 20px,black calc(100% - 20px),transparent 100%);}
+    mask-image:linear-gradient(to left,transparent 0px,black 16px,black calc(100% - 16px),transparent 100%);
+    -webkit-mask-image:linear-gradient(to left,transparent 0px,black 16px,black calc(100% - 16px),transparent 100%);
+    /* Divider between stat groups */
+    & > span:nth-child(4)::before{content:'';width:1px;height:14px;background:${t.border};margin-left:4px;display:inline-block;vertical-align:middle;}}
 `
 const Stat = styled.span`display:flex;align-items:center;gap:4px;`
 const Val = styled.span`color:${t.goldBright};font-weight:700;`
@@ -568,6 +570,50 @@ const TempBar = styled.div<{$pct:number;$c:string}>`
     transition:width 0.8s ease;}
 `
 
+/* ── Top Pick Highlight Card ── */
+const topPickFloat = keyframes`0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}`
+const topPickEnter = keyframes`from{opacity:0;transform:translateY(12px) scale(0.95)}to{opacity:1;transform:translateY(0) scale(1)}`
+const TopPickWrap = styled.div`
+  position:absolute;bottom:48px;left:16px;z-index:${t.z.filter - 1};direction:rtl;
+  display:flex;align-items:stretch;gap:0;
+  background:${t.glass};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid ${t.goldBorder};border-radius:${t.r.lg};box-shadow:${t.sh.lg};
+  overflow:hidden;max-width:320px;cursor:pointer;
+  animation:${topPickEnter} 0.4s cubic-bezier(0.32,0.72,0,1);
+  transition:all ${t.tr};
+  &:hover{box-shadow:${t.sh.glow};border-color:${t.gold};transform:translateY(-2px);}
+  ${mobile}{
+    bottom:62px;left:8px;right:auto;max-width:calc(100vw - 64px);
+  }
+  @media(max-width:400px){display:none;}
+`
+const TopPickBadge = styled.div`
+  display:flex;align-items:center;justify-content:center;padding:8px 10px;
+  background:linear-gradient(135deg,rgba(212,168,75,0.12),rgba(212,168,75,0.04));
+  border-left:1px solid ${t.border};flex-shrink:0;
+  animation:${topPickFloat} 3s ease-in-out infinite;
+`
+const TopPickBody = styled.div`
+  display:flex;flex-direction:column;gap:2px;padding:8px 12px;min-width:0;flex:1;
+`
+const TopPickTitle = styled.div`
+  font-size:10px;font-weight:700;color:${t.gold};text-transform:uppercase;letter-spacing:0.5px;
+  display:flex;align-items:center;gap:4px;
+`
+const TopPickName = styled.div`
+  font-size:13px;font-weight:800;color:${t.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+`
+const TopPickMeta = styled.div`
+  display:flex;align-items:center;gap:8px;font-size:11px;color:${t.textSec};
+`
+const TopPickClose = styled.button`
+  position:absolute;top:4px;left:4px;width:18px;height:18px;border-radius:${t.r.full};
+  background:transparent;border:1px solid ${t.border};color:${t.textDim};
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  transition:all ${t.tr};font-size:10px;padding:0;
+  &:hover{border-color:${t.goldBorder};color:${t.gold};}
+`
+
 /* City emoji map — used by dynamic city pills */
 const CITY_EMOJI: Record<string, string> = {
   'חדרה': '🏗️', 'נתניה': '🌊', 'קיסריה': '🏛️', 'הרצליה': '💎',
@@ -880,6 +926,40 @@ export default function Explore() {
 
   // Market temperature
   const marketTemp = useMemo(() => calcMarketTemperature(filtered), [filtered])
+
+  // Top investment pick — highest score plot from currently visible set
+  const [topPickDismissed, setTopPickDismissed] = useState(false)
+  const topPick = useMemo(() => {
+    if (!filtered.length || filtered.length < 2) return null
+    let best: Plot | null = null, bestScore = 0
+    for (const pl of filtered) {
+      const s = calcScore(pl)
+      const r = roi(pl)
+      // Combined ranking: score * 10 + ROI weight (prefer high score + high ROI)
+      const combined = s * 10 + Math.min(r, 100) * 0.3
+      if (combined > bestScore && p(pl).price > 0) {
+        bestScore = combined
+        best = pl
+      }
+    }
+    return best
+  }, [filtered])
+
+  // Average days on market
+  const avgDom = useMemo(() => {
+    if (!filtered.length) return null
+    const doms = filtered
+      .map(pl => p(pl).created)
+      .filter((c): c is string => !!c)
+      .map(c => Math.floor((Date.now() - new Date(c).getTime()) / 864e5))
+      .filter(d => d >= 0 && d < 3650) // exclude outliers (>10 years)
+    if (!doms.length) return null
+    const avg = Math.round(doms.reduce((s, d) => s + d, 0) / doms.length)
+    return avg
+  }, [filtered])
+
+  // Reset top pick dismissed when filters change
+  useEffect(() => { setTopPickDismissed(false) }, [filters.city, filters.ripeness, filters.zoning])
 
   // Reset city stats dismissed state when city changes
   useEffect(() => { setCityStatsDismissed(false) }, [filters.city])
@@ -1488,6 +1568,7 @@ export default function Explore() {
           {cityCount > 1 && <Stat>🏘️ <Val>{cityCount}</Val> ערים</Stat>}
           {favIds.length > 0 && <Stat><Heart size={12} color={t.gold} /><Val>{favIds.length}</Val></Stat>}
           {compareIds.length > 0 && <Stat><GitCompareArrows size={12} color={t.gold} /><Val>{compareIds.length}</Val></Stat>}
+          {avgDom != null && <Stat>📅 <Val>{avgDom}</Val> ימים ממוצע</Stat>}
           {sortKey === 'nearest' && userGeo.location && <Stat>📍 <Val>לפי קרבה</Val></Stat>}
           {sortKey === 'nearest' && userGeo.loading && <Stat>📍 מאתר...</Stat>}
           {sortKey === 'nearest' && userGeo.error && <Stat style={{color:t.err}}>⚠️ שגיאה</Stat>}
@@ -1600,7 +1681,7 @@ export default function Explore() {
               <Building2 size={16} color={t.gold} />
               <div>
                 <CityStatsName>{filters.city}</CityStatsName>
-                <CityStatsCount>{cityStats.count} חלקות</CityStatsCount>
+                <CityStatsCount>{cityStats.count} חלקות · {fmt.dunam(cityStats.totalArea)} דונם</CityStatsCount>
               </div>
               <CityStatsClose onClick={() => setCityStatsDismissed(true)} aria-label="סגור"><X size={12} /></CityStatsClose>
             </CityStatsHeader>
@@ -1623,6 +1704,23 @@ export default function Explore() {
                 <CityStatVal $c={t.text}>{fmt.compact(cityStats.minPrice)}–{fmt.compact(cityStats.maxPrice)}</CityStatVal>
                 <CityStatLabel>טווח מחירים</CityStatLabel>
               </CityStatCell>
+              {/* Market Temperature for this city */}
+              {marketTemp && (
+                <CityStatCell title={`טמפרטורת שוק: ${marketTemp.label}`}>
+                  <TempGauge $c={marketTemp.color}>
+                    <TempBar $pct={marketTemp.pct} $c={marketTemp.color} />
+                    <CityStatVal $c={marketTemp.color} style={{fontSize:11}}>{marketTemp.emoji}</CityStatVal>
+                  </TempGauge>
+                  <CityStatLabel>{marketTemp.label}</CityStatLabel>
+                </CityStatCell>
+              )}
+              {/* Dominant zoning stage */}
+              {cityStats.dominantZoning && (
+                <CityStatCell>
+                  <CityStatVal style={{fontSize:11}}>{cityStats.dominantZoning}</CityStatVal>
+                  <CityStatLabel>שלב נפוץ</CityStatLabel>
+                </CityStatCell>
+              )}
             </CityStatsCells>
           </CityStatsCard>
         )}
@@ -1689,6 +1787,34 @@ export default function Explore() {
             ))}
           </RecentStrip>
         )}
+
+        {/* Top Investment Pick — floating highlight card */}
+        {!mapFullscreen && topPick && !topPickDismissed && !selected && !listOpen && !compareOpen && (() => {
+          const d = p(topPick), score = calcScore(topPick), grade = getGrade(score)
+          const r = roi(topPick)
+          return (
+            <TopPickWrap onClick={() => selectPlot(topPick)} title={`חלקה ${topPick.number} — לחץ לפרטים`}>
+              <TopPickBadge>
+                <span style={{ fontSize: 20 }}>🏆</span>
+              </TopPickBadge>
+              <TopPickBody>
+                <TopPickTitle>
+                  <Zap size={10} /> TOP PICK
+                  <span style={{ color: grade.color, fontWeight: 900 }}>{grade.grade}</span>
+                </TopPickTitle>
+                <TopPickName>{topPick.city} · גוש {d.block} · חלקה {topPick.number}</TopPickName>
+                <TopPickMeta>
+                  <span style={{ fontWeight: 800, color: t.gold }}>{fmt.compact(d.price)}</span>
+                  {r > 0 && <span style={{ color: t.ok, fontWeight: 700 }}>+{Math.round(r)}% ROI</span>}
+                  <span>{fmt.dunam(d.size)} דונם</span>
+                </TopPickMeta>
+              </TopPickBody>
+              <TopPickClose onClick={(e) => { e.stopPropagation(); setTopPickDismissed(true) }} aria-label="סגור">
+                <X size={10} />
+              </TopPickClose>
+            </TopPickWrap>
+          )
+        })()}
 
         {/* WhatsApp Floating CTA */}
         {!mapFullscreen && <WhatsAppFab
