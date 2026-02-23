@@ -39,6 +39,7 @@ const Stats = styled.div`
 `
 const Stat = styled.span`display:flex;align-items:center;gap:4px;`
 const Val = styled.span`color:${t.goldBright};font-weight:700;`
+const ValOk = styled(Val)`color:${t.ok};`
 const Demo = styled.span`padding:2px 8px;border-radius:${t.r.full};background:${t.goldDim};color:${t.gold};font-size:10px;font-weight:600;`
 const livePulse = keyframes`0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.3)}`
 const LiveDot = styled.span<{$c:string}>`
@@ -217,6 +218,7 @@ const CityCompPanel = styled.div`
   background:${t.glass};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
   border:1px solid ${t.glassBorder};border-radius:${t.r.lg};box-shadow:${t.sh.xl};
   direction:rtl;animation:${cityCompSlide} 0.3s cubic-bezier(0.32,0.72,0,1);
+  contain:layout style;
   &::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
     background:linear-gradient(90deg,transparent,${t.gold},${t.goldBright},${t.gold},transparent);
     border-radius:${t.r.lg} ${t.r.lg} 0 0;}
@@ -546,6 +548,7 @@ const MobilePreview = styled.div<{$show:boolean}>`
   background:${t.surface};border-top:1px solid ${t.goldBorder};border-radius:${t.r.xl} ${t.r.xl} 0 0;
   box-shadow:0 -8px 32px rgba(0,0,0,0.35);direction:rtl;overflow:hidden;
   animation:${previewSlide} 0.3s cubic-bezier(0.32,0.72,0,1);
+  will-change:transform,opacity;transform:translateZ(0);
   ${mobile}{display:${pr=>pr.$show?'block':'none'};}
 `
 const PreviewHandle = styled.div`
@@ -582,6 +585,15 @@ const PreviewCloseBtn = styled.button`
   color:${t.textSec};cursor:pointer;
   display:flex;align-items:center;justify-content:center;transition:all ${t.tr};flex-shrink:0;
   &:hover{border-color:${t.goldBorder};color:${t.gold};}
+`
+
+/* ── Preview Score + Demand Row ── */
+const PreviewMetaRow = styled.div`display:flex;align-items:center;gap:8px;flex-wrap:wrap;`
+const DemandBadge = styled.span<{$c:string}>`
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:10px;font-weight:700;color:${pr=>pr.$c};
+  padding:4px 10px;border-radius:${t.r.full};
+  background:${pr=>`${pr.$c}10`};border:1px solid ${pr=>`${pr.$c}22`};
 `
 
 /* ── Preview Quick Actions ── */
@@ -667,7 +679,7 @@ const KbBackdrop = styled.div<{$open:boolean}>`
 const KbDialog = styled.div`
   background:${t.surface};border:1px solid ${t.goldBorder};border-radius:${t.r.xl};
   box-shadow:${t.sh.xl};padding:28px 32px;max-width:440px;width:calc(100vw - 32px);
-  direction:rtl;position:relative;overflow:hidden;
+  direction:rtl;position:relative;overflow:hidden;contain:layout style;
   &::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;
     background:linear-gradient(90deg,transparent,${t.gold},${t.goldBright},${t.gold},transparent);}
 `
@@ -891,22 +903,17 @@ const MobilePreviewCard = memo(forwardRef<HTMLDivElement, MobilePreviewProps>(
             </PreviewInfo>
             <PreviewPrice>{fmt.compact(d.price)}</PreviewPrice>
           </PreviewTopRow>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <PreviewMetaRow>
             <PreviewScore $c={grade.color}>
               ציון השקעה: {score}/10 — {grade.grade}
             </PreviewScore>
             {demand.viewers >= 15 && (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 10, fontWeight: 700, color: demand.color,
-                padding: '4px 10px', borderRadius: t.r.full,
-                background: `${demand.color}10`, border: `1px solid ${demand.color}22`,
-              }}>
+              <DemandBadge $c={demand.color}>
                 👁 ~{demand.label}
                 {demand.intensity === 'hot' && ' 🔥'}
-              </span>
+              </DemandBadge>
             )}
-          </div>
+          </PreviewMetaRow>
           {/* Vs City Average — compact comparison grid */}
           {cityPlots.length >= 2 && (
             <PreviewCompareGrid>
@@ -1983,7 +1990,7 @@ export default function Explore() {
             )}
             {statsBarData.avgRoi > 0 && (
               <Stat title={`תשואה ממוצעת צפויה: +${statsBarData.avgRoi}%`}>
-                ROI <Val style={{color:t.ok}}>+{statsBarData.avgRoi}%</Val>
+                ROI <ValOk>+{statsBarData.avgRoi}%</ValOk>
               </Stat>
             )}
             {/* Market momentum — buyer's/seller's market indicator */}

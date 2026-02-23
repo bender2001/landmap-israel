@@ -46,7 +46,7 @@ const Wrap = styled.div`position:absolute;top:16px;left:50%;transform:translateX
   ${mobile}{top:8px;left:8px;right:8px;transform:none;width:auto;}
 `
 const Bar = styled.div`
-  display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;
+  position:relative;display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;
   background:${t.glass};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
   border:1px solid ${t.glassBorder};border-radius:${t.r.xl};box-shadow:${t.sh.lg};direction:rtl;
   transition:all ${t.tr};&:focus-within{border-color:${t.goldBorder};box-shadow:${t.sh.glow};}
@@ -234,6 +234,58 @@ const SuggestIconWrap = styled.span<{$c?:string}>`
 const SuggestLabel = styled.span`flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;`
 const SuggestMeta = styled.span`font-size:11px;color:${t.textDim};white-space:nowrap;`
 
+/* ── Extracted inline styles → styled components (avoid re-alloc on every render) ── */
+const KbdHint = styled.kbd`
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:22px;height:22px;padding:0 6px;
+  background:${t.surfaceLight};border:1px solid ${t.border};
+  border-radius:${t.r.sm};font-size:11px;font-weight:700;
+  color:${t.textDim};font-family:${t.font};flex-shrink:0;
+  box-shadow:inset 0 -1px 0 ${t.border};
+  transition:all ${t.tr};cursor:pointer;user-select:none;
+`
+const ResultCountBadge = styled.span<{$empty:boolean}>`
+  display:inline-flex;align-items:center;gap:3px;
+  font-size:11px;font-weight:700;white-space:nowrap;
+  padding:3px 10px;border-radius:${t.r.full};flex-shrink:0;
+  background:${pr=>pr.$empty?'rgba(239,68,68,0.08)':t.goldDim};
+  color:${pr=>pr.$empty?t.err:t.gold};
+  border:1px solid ${pr=>pr.$empty?'rgba(239,68,68,0.2)':t.goldBorder};
+  transition:all ${t.tr};
+`
+const SearchClearBtn = styled.button`
+  display:flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border-radius:${t.r.sm};border:1px solid ${t.border};
+  background:transparent;color:${t.textDim};cursor:pointer;flex-shrink:0;
+  transition:all ${t.tr};
+  &:hover{color:${t.gold};border-color:${t.goldBorder};}
+`
+const RoiSliderWrap = styled.div`display:flex;align-items:center;gap:10px;`
+const RoiSlider = styled.input.attrs({ type: 'range' })<{$pct:number}>`
+  flex:1;height:6px;-webkit-appearance:none;appearance:none;
+  border-radius:3px;outline:none;cursor:pointer;
+  background:linear-gradient(90deg,${t.gold} 0%,${t.gold} ${pr=>pr.$pct}%,${t.surfaceLight} ${pr=>pr.$pct}%,${t.surfaceLight} 100%);
+  &::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+    background:linear-gradient(135deg,${t.gold},${t.goldBright});cursor:pointer;
+    border:2px solid ${t.bg};box-shadow:0 2px 6px rgba(212,168,75,0.35);}
+  &::-moz-range-thumb{width:16px;height:16px;border-radius:50%;
+    background:linear-gradient(135deg,${t.gold},${t.goldBright});cursor:pointer;border:2px solid ${t.bg};}
+`
+const RoiValue = styled.span<{$active:boolean}>`
+  font-size:14px;font-weight:800;color:${pr=>pr.$active?t.gold:t.textDim};
+  min-width:44px;text-align:center;
+`
+const RipenessColumn = styled.div`display:flex;flex-direction:column;gap:6px;`
+const RipenessOption = styled.label<{$active:boolean;$c:string}>`
+  display:flex;align-items:center;gap:8px;padding:8px 12px;
+  background:${pr=>pr.$active?`${pr.$c}12`:t.surfaceLight};
+  border:1px solid ${pr=>pr.$active?`${pr.$c}40`:t.border};
+  border-radius:${t.r.md};cursor:pointer;transition:all ${t.tr};
+  font-size:13px;font-weight:${pr=>pr.$active?700:500};
+  color:${pr=>pr.$active?pr.$c:t.textSec};
+  &:hover{border-color:${pr=>`${pr.$c}60`};}
+`
+
 /* ── Component ── */
 interface Props { filters: Filters; onChange: (f: Filters) => void; resultCount?: number; plots?: Plot[]; onSelectPlot?: (id: string) => void }
 
@@ -405,7 +457,7 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
     <>
       <Backdrop $open={open} onClick={() => setOpen(false)} />
       <Wrap>
-        <Bar style={{ position: 'relative' }}>
+        <Bar>
           <SIcon size={18} />
           <Input id="landmap-search-input" placeholder={PLACEHOLDERS[phIdx]} value={filters.search}
             onChange={e => { onChange({ ...filters, search: e.target.value }); setShowSuggestions(true) }}
@@ -420,57 +472,24 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
           />
           {/* Keyboard shortcut hint — like Google/GitHub "/" badge */}
           {!filters.search && kbdHintVisible && (
-            <kbd
+            <KbdHint
               aria-hidden="true"
-              style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                minWidth: 22, height: 22, padding: '0 6px',
-                background: t.surfaceLight, border: `1px solid ${t.border}`,
-                borderRadius: t.r.sm, fontSize: 11, fontWeight: 700,
-                color: t.textDim, fontFamily: t.font, flexShrink: 0,
-                boxShadow: `inset 0 -1px 0 ${t.border}`,
-                transition: `all ${t.tr}`, cursor: 'pointer', userSelect: 'none',
-              }}
               onClick={() => {
                 const el = document.getElementById('landmap-search-input') as HTMLInputElement | null
                 if (el) el.focus()
               }}
               title="לחצו / לחיפוש מהיר"
-            >/</kbd>
+            >/</KbdHint>
           )}
           {resultCount != null && (
-            <span
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 3,
-                fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
-                padding: '3px 10px', borderRadius: t.r.full, flexShrink: 0,
-                background: resultCount > 0 ? t.goldDim : 'rgba(239,68,68,0.08)',
-                color: resultCount > 0 ? t.gold : t.err,
-                border: `1px solid ${resultCount > 0 ? t.goldBorder : 'rgba(239,68,68,0.2)'}`,
-                transition: `all ${t.tr}`,
-              }}
-            >
+            <ResultCountBadge $empty={resultCount === 0} role="status" aria-live="polite" aria-atomic="true">
               {resultCount > 0 ? `${resultCount} חלקות` : 'אין תוצאות'}
-            </span>
+            </ResultCountBadge>
           )}
           {filters.search && (
-            <button
-              onClick={() => { onChange({ ...filters, search: '' }); setShowSuggestions(false) }}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 28, height: 28, borderRadius: t.r.sm, border: `1px solid ${t.border}`,
-                background: 'transparent', color: t.textDim, cursor: 'pointer', flexShrink: 0,
-                transition: `all ${t.tr}`,
-              }}
-              aria-label="נקה חיפוש"
-              onMouseOver={e => { (e.target as HTMLElement).style.color = t.gold; (e.target as HTMLElement).style.borderColor = t.goldBorder }}
-              onMouseOut={e => { (e.target as HTMLElement).style.color = t.textDim; (e.target as HTMLElement).style.borderColor = t.border }}
-            >
+            <SearchClearBtn onClick={() => { onChange({ ...filters, search: '' }); setShowSuggestions(false) }} aria-label="נקה חיפוש">
               <X size={14} />
-            </button>
+            </SearchClearBtn>
           )}
           <FilterBtn $active={activeCount > 0} onClick={() => { setDraft(filters); setOpen(o => !o) }} aria-label="סננים">
             <SlidersHorizontal size={18} />
@@ -642,21 +661,16 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
             <Grid>
               <Field>
                 <FieldLabel>תשואה מינימלית (%ROI)</FieldLabel>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input
-                    type="range" min={0} max={100} step={5}
+                <RoiSliderWrap>
+                  <RoiSlider min={0} max={100} step={5}
                     value={Number(draft.minRoi) || 0}
+                    $pct={Number(draft.minRoi) || 0}
                     onChange={e => set('minRoi', Number(e.target.value) > 0 ? e.target.value : '')}
-                    style={{
-                      flex: 1, height: 6, WebkitAppearance: 'none', appearance: 'none',
-                      borderRadius: 3, outline: 'none', cursor: 'pointer',
-                      background: `linear-gradient(90deg, ${t.gold} 0%, ${t.gold} ${Number(draft.minRoi) || 0}%, ${t.surfaceLight} ${Number(draft.minRoi) || 0}%, ${t.surfaceLight} 100%)`,
-                    }}
                   />
-                  <span style={{ fontSize: 14, fontWeight: 800, color: Number(draft.minRoi) > 0 ? t.gold : t.textDim, minWidth: 44, textAlign: 'center' }}>
+                  <RoiValue $active={Number(draft.minRoi) > 0}>
                     {Number(draft.minRoi) > 0 ? `${draft.minRoi}%` : 'הכל'}
-                  </span>
-                </div>
+                  </RoiValue>
+                </RoiSliderWrap>
                 <PresetRow>
                   {[
                     { label: 'הכל', value: '' },
@@ -674,21 +688,14 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
               </Field>
               <Field>
                 <FieldLabel>ציון השקעה</FieldLabel>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <RipenessColumn>
                   {[
                     { value: '', label: 'כל הציונים', icon: '📊', color: t.textSec },
                     { value: 'high', label: 'גבוה (7-10)', icon: '⭐', color: '#10B981' },
                     { value: 'medium', label: 'בינוני (4-6)', icon: '📈', color: '#F59E0B' },
                     { value: 'low', label: 'נמוך (1-3)', icon: '📉', color: '#EF4444' },
                   ].map(opt => (
-                    <label key={opt.value} style={{
-                      display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
-                      background: draft.ripeness === opt.value ? `${opt.color}12` : t.surfaceLight,
-                      border: `1px solid ${draft.ripeness === opt.value ? `${opt.color}40` : t.border}`,
-                      borderRadius: t.r.md, cursor: 'pointer', transition: `all ${t.tr}`,
-                      fontSize: 13, fontWeight: draft.ripeness === opt.value ? 700 : 500,
-                      color: draft.ripeness === opt.value ? opt.color : t.textSec,
-                    }}>
+                    <RipenessOption key={opt.value} $active={draft.ripeness === opt.value} $c={opt.color}>
                       <input
                         type="radio" name="ripeness" value={opt.value}
                         checked={draft.ripeness === opt.value}
@@ -697,9 +704,9 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
                       />
                       <span>{opt.icon}</span>
                       <span>{opt.label}</span>
-                    </label>
+                    </RipenessOption>
                   ))}
-                </div>
+                </RipenessColumn>
               </Field>
             </Grid>
           </Section>
