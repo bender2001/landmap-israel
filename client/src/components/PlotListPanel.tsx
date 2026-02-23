@@ -87,6 +87,7 @@ const ItemWrap = styled.div<{ $active: boolean; $i: number; $gradeColor?: string
   animation:${fadeIn} 0.3s ease-out both;
   animation-delay:${pr => Math.min(pr.$i * 0.03, 0.5)}s;
   border-right:3px solid ${pr => pr.$active ? t.gold : pr.$gradeColor || t.border};
+  content-visibility:auto;contain-intrinsic-size:auto 120px;
   &:hover{background:${t.hover};border-color:${t.goldBorder};border-right-color:${pr => pr.$gradeColor || t.goldBorder};transform:translateX(-2px);}
   ${pr => pr.$active && `box-shadow:inset 3px 0 0 ${t.gold};`}
 `

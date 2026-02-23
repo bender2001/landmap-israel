@@ -167,6 +167,7 @@ const TickerTrack = styled.div<{$dur:number}>`
   display:flex;align-items:center;gap:32px;white-space:nowrap;
   animation:${tickerScroll} ${p=>p.$dur}s linear infinite;
   &:hover{animation-play-state:paused;}
+  @media(prefers-reduced-motion:reduce){animation:none;justify-content:center;flex-wrap:wrap;gap:16px;}
 `
 const TickerItem = styled.span`
   display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;
@@ -227,6 +228,7 @@ const CitiesSectionHead = styled.h2`
 const FeaturedSection = styled.section`
   padding:64px 24px;direction:rtl;position:relative;overflow:hidden;
   background:linear-gradient(180deg,${t.bg},rgba(212,168,75,0.03),${t.bg});
+  content-visibility:auto;contain-intrinsic-size:auto 600px;
 `
 const FeaturedGrid = styled.div`
   max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:20px;
@@ -377,7 +379,7 @@ const COMPARE_FEATURES = [
 ]
 
 /* ══════ HOW IT WORKS ══════ */
-const HowSection = styled.section`padding:80px 24px;direction:rtl;position:relative;`
+const HowSection = styled.section`padding:80px 24px;direction:rtl;position:relative;content-visibility:auto;contain-intrinsic-size:auto 500px;`
 const SectionHead = styled.h2`
   text-align:center;font-size:clamp(26px,4vw,40px);font-weight:800;color:${t.text};
   margin-bottom:56px;font-family:${t.font};animation:${fadeInUp} 0.5s ease-out both;
@@ -413,6 +415,7 @@ const Connector = styled.div`
 const Features = styled.section`
   padding:80px 24px;direction:rtl;
   background:linear-gradient(180deg,transparent,rgba(212,168,75,0.02),transparent);
+  content-visibility:auto;contain-intrinsic-size:auto 500px;
 `
 const FeatGrid = styled.div`
   max-width:1060px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:24px;
@@ -435,7 +438,7 @@ const CardTitle = styled.h3`font-size:17px;font-weight:700;color:${t.text};font-
 const CardDesc = styled.p`font-size:13px;color:${t.textSec};line-height:1.7;`
 
 /* ══════ TESTIMONIALS ══════ */
-const TestSection = styled.section`padding:80px 24px;direction:rtl;`
+const TestSection = styled.section`padding:80px 24px;direction:rtl;content-visibility:auto;contain-intrinsic-size:auto 400px;`
 const TestGrid = styled.div`
   max-width:1060px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:24px;
   ${sm}{grid-template-columns:repeat(2,1fr);}
@@ -503,6 +506,7 @@ const CtaGhost = styled(GhostButton).attrs({as:Link})`
 const FaqSection = styled.section`
   padding:80px 24px;direction:rtl;position:relative;
   background:${t.bg};
+  content-visibility:auto;contain-intrinsic-size:auto 600px;
 `
 const FaqGrid = styled.div`
   max-width:780px;margin:0 auto;display:flex;flex-direction:column;gap:12px;

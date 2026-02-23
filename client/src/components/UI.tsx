@@ -65,19 +65,40 @@ const ToastItem = styled.div<{ $v: Variant }>`
 `
 
 /* ── ErrorBoundary ── */
-type EBState = { err: Error | null }
-export class ErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, EBState> {
-  state: EBState = { err: null }
+type EBState = { err: Error | null; retryCount: number }
+export class ErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode; onReset?: () => void }, EBState> {
+  state: EBState = { err: null, retryCount: 0 }
   static getDerivedStateFromError(err: Error) { return { err } }
+  componentDidCatch(err: Error, info: React.ErrorInfo) {
+    // Log error details for debugging (production would send to error tracking)
+    if (import.meta.env.DEV) console.error('[ErrorBoundary]', err, info.componentStack)
+  }
+  handleRetry = () => {
+    this.props.onReset?.()
+    this.setState(prev => ({ err: null, retryCount: prev.retryCount + 1 }))
+  }
   render() {
-    if (this.state.err) return this.props.fallback ?? (
-      <ErrWrap>
-        <ErrIconWrap><AlertTriangle size={32} color={t.err} /></ErrIconWrap>
-        <ErrTitle>משהו השתבש</ErrTitle>
-        <ErrDesc>{this.state.err.message || 'אירעה שגיאה בלתי צפויה. נסו לרענן את הדף.'}</ErrDesc>
-        <ErrRetryBtn onClick={() => window.location.reload()}>🔄 רענן דף</ErrRetryBtn>
-      </ErrWrap>
-    )
+    if (this.state.err) {
+      const tooManyRetries = this.state.retryCount >= 3
+      return this.props.fallback ?? (
+        <ErrWrap>
+          <ErrIconWrap><AlertTriangle size={32} color={t.err} /></ErrIconWrap>
+          <ErrTitle>משהו השתבש</ErrTitle>
+          <ErrDesc>{this.state.err.message || 'אירעה שגיאה בלתי צפויה. נסו לרענן את הדף.'}</ErrDesc>
+          <ErrActions>
+            {!tooManyRetries && (
+              <ErrRetryBtn onClick={this.handleRetry}>🔄 נסה שוב</ErrRetryBtn>
+            )}
+            <ErrReloadBtn onClick={() => window.location.reload()}>
+              {tooManyRetries ? '🔄 רענן דף' : 'רענן דף'}
+            </ErrReloadBtn>
+          </ErrActions>
+          {this.state.retryCount > 0 && (
+            <ErrRetryNote>ניסיון {this.state.retryCount}/3 — {tooManyRetries ? 'מומלץ לרענן את הדף' : 'ניתן לנסות שוב'}</ErrRetryNote>
+          )}
+        </ErrWrap>
+      )
+    }
     return this.props.children
   }
 }
@@ -97,13 +118,26 @@ const ErrTitle = styled.h3`
 const ErrDesc = styled.p`
   font-size:13px;color:${t.textSec};margin:0;max-width:360px;line-height:1.6;
 `
+const ErrActions = styled.div`
+  display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap;justify-content:center;
+`
 const ErrRetryBtn = styled.button`
-  display:inline-flex;align-items:center;gap:6px;padding:10px 24px;margin-top:8px;
+  display:inline-flex;align-items:center;gap:6px;padding:10px 24px;
   background:linear-gradient(135deg,${t.gold},${t.goldBright});color:${t.bg};
   border:none;border-radius:${t.r.full};font-weight:700;font-size:14px;font-family:${t.font};
   cursor:pointer;transition:all ${t.tr};
   &:hover{box-shadow:0 0 24px rgba(212,168,75,0.2);transform:translateY(-2px);}
   &:active{transform:translateY(0);}
+`
+const ErrReloadBtn = styled.button`
+  display:inline-flex;align-items:center;gap:6px;padding:10px 24px;
+  background:transparent;color:${t.textSec};
+  border:1px solid ${t.border};border-radius:${t.r.full};font-weight:600;font-size:13px;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};
+  &:hover{border-color:${t.goldBorder};color:${t.gold};}
+`
+const ErrRetryNote = styled.div`
+  font-size:11px;color:${t.textDim};margin-top:4px;
 `
 
 /* ── Glass Panel ── */

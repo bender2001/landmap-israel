@@ -11,7 +11,16 @@
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://landmap.co.il/" />
     <meta property="og:locale" content="he_IL" />
-    <meta name="theme-color" content="#0B1120" />
+    <meta property="og:site_name" content="LandMap Israel" />
+    <meta property="og:image" content="https://landmap.co.il/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="LandMap Israel — מפת קרקעות להשקעה" />
+    <meta name="twitter:description" content="פלטפורמת השקעות קרקעות בישראל — מפה אינטראקטיבית, ניתוח AI, נתוני תכנון" />
+    <meta name="twitter:image" content="https://landmap.co.il/og-image.png" />
+    <meta name="theme-color" content="#0B1120" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#D4A84B" media="(prefers-color-scheme: light)" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="canonical" href="https://landmap.co.il/" />
 
@@ -36,8 +45,37 @@
 
     <link rel="preload" href="/api/plots" as="fetch" crossorigin="anonymous" fetchpriority="high" />
 
-    <!-- Structured data -->
-    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"LandMap Israel","url":"https://landmap.co.il"}</script>
+    <!-- Structured data — WebSite + SoftwareApplication -->
+    <script type="application/ld+json">{
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "LandMap Israel",
+      "url": "https://landmap.co.il",
+      "alternateName": "לנדמאפ ישראל",
+      "description": "פלטפורמת השקעות קרקעות בישראל — מפה אינטראקטיבית, ניתוח AI, נתוני תכנון וועדות",
+      "inLanguage": "he",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://landmap.co.il/explore?search={search_term}"
+        },
+        "query-input": "required name=search_term"
+      }
+    }</script>
+    <script type="application/ld+json">{
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "LandMap Israel",
+      "url": "https://landmap.co.il",
+      "logo": "https://landmap.co.il/logo.png",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "customer service",
+        "availableLanguage": ["Hebrew", "English"]
+      },
+      "sameAs": []
+    }</script>
   </head>
   <body>
     <div id="root"></div>
