@@ -1,6 +1,19 @@
 import { supabaseAdmin } from '../config/supabase.js'
 import { supabaseRetry } from '../utils/retry.js'
 
+// ─── Shared helper: detect "table not found" errors from Supabase ─────────
+// Supabase can return different error shapes depending on version and config:
+//   - PostgreSQL error code 42P01 (undefined_table)
+//   - SchemaCache miss: "Could not find the table 'public.X' in the schema cache"
+//   - Generic: "relation ... does not exist"
+// A single predicate avoids scattered string matching across the codebase.
+function isTableNotFoundError(error) {
+  if (!error) return false
+  if (error.code === '42P01') return true
+  const msg = error.message || ''
+  return msg.includes('does not exist') || msg.includes('schema cache')
+}
+
 // ─── Area Market Trend Cache ──────────────────────────────────────────────
 // Caches per-city price trend direction based on price_snapshots.
 // Refreshed every 10 minutes. Shows investors whether the area is appreciating,
@@ -8,9 +21,16 @@ import { supabaseRetry } from '../utils/retry.js'
 let areaMarketTrends = new Map() // city → { direction: 'up'|'down'|'stable', changePct: number }
 let areaMarketTrendsUpdatedAt = 0
 const AREA_TREND_TTL = 10 * 60 * 1000 // 10 min
+// Circuit breaker: once we know the table doesn't exist, stop querying until restart.
+// Prevents noisy error spam every 10 min when price_snapshots hasn't been created yet.
+let snapshotsTableMissing = false
 
 async function refreshAreaMarketTrends() {
   const now = Date.now()
+  if (snapshotsTableMissing) {
+    areaMarketTrendsUpdatedAt = now
+    return areaMarketTrends
+  }
   if (now - areaMarketTrendsUpdatedAt < AREA_TREND_TTL && areaMarketTrends.size > 0) {
     return areaMarketTrends
   }
@@ -24,8 +44,9 @@ async function refreshAreaMarketTrends() {
       .order('snapshot_date', { ascending: true })
 
     if (error) {
-      // Table may not exist — degrade gracefully
-      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+      // Table may not exist — degrade gracefully and flip circuit breaker
+      if (isTableNotFoundError(error)) {
+        snapshotsTableMissing = true
         areaMarketTrendsUpdatedAt = now
         return areaMarketTrends
       }

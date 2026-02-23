@@ -441,6 +441,32 @@ const MomentumBadge = styled.span<{$c:string}>`
 const ClickableLiveBadge = styled(LiveBadge)`cursor:pointer;`
 const ClickableDemo = styled(Demo)`cursor:pointer;`
 
+/* ── Active Filter Summary Strip (compact, always visible when filters applied) ── */
+const filterStripIn = keyframes`from{opacity:0;transform:translateX(-50%) translateY(-4px) scale(0.96)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}`
+const FilterSummaryStrip = styled.div`
+  position:absolute;top:106px;left:50%;transform:translateX(-50%);z-index:${t.z.filter - 2};
+  display:flex;align-items:center;gap:6px;padding:5px 14px;direction:rtl;
+  background:${t.glass};backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid ${t.goldBorder};border-radius:${t.r.full};
+  box-shadow:${t.sh.sm};font-size:11px;font-family:${t.font};
+  animation:${filterStripIn} 0.2s ease-out;max-width:calc(100vw - 32px);
+  overflow:hidden;white-space:nowrap;
+  ${mobile}{top:60px;font-size:10px;padding:4px 10px;gap:4px;}
+`
+const FilterStripLabel = styled.span`
+  color:${t.textDim};font-weight:600;flex-shrink:0;
+`
+const FilterStripValue = styled.span`
+  color:${t.gold};font-weight:700;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+`
+const FilterStripClear = styled.button`
+  display:flex;align-items:center;justify-content:center;width:18px;height:18px;
+  border-radius:50%;background:transparent;border:1px solid ${t.border};
+  color:${t.textDim};cursor:pointer;transition:all ${t.tr};flex-shrink:0;
+  &:hover{border-color:${t.err};color:${t.err};background:rgba(239,68,68,0.08);}
+`
+
 /* ── Skip to content (WCAG 2.1 accessibility) ── */
 const SkipLink = styled.a`
   position:absolute;top:-100%;left:50%;transform:translateX(-50%);
@@ -860,11 +886,35 @@ interface MobilePreviewProps {
   onToggleFav: () => void
   isCompared: boolean
   onToggleCompare: () => void
+  onNavigate?: (plot: Plot) => void
 }
 
+/* ── Mobile Preview Nav Arrows ── */
+const PreviewNavRow = styled.div`
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding-bottom:4px;
+`
+const PreviewNavBtn = styled.button<{$disabled?:boolean}>`
+  display:flex;align-items:center;gap:4px;padding:6px 12px;
+  background:${pr=>pr.$disabled?'transparent':t.surfaceLight};
+  border:1px solid ${pr=>pr.$disabled?'transparent':t.border};
+  border-radius:${t.r.full};color:${pr=>pr.$disabled?t.textDim:t.textSec};
+  font-size:11px;font-weight:600;font-family:${t.font};cursor:${pr=>pr.$disabled?'default':'pointer'};
+  transition:all ${t.tr};opacity:${pr=>pr.$disabled?0.3:1};
+  &:hover{${pr=>!pr.$disabled&&`border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};`}}
+`
+const PreviewNavCounter = styled.span`
+  font-size:10px;font-weight:700;color:${t.textDim};
+`
+
 const MobilePreviewCard = memo(forwardRef<HTMLDivElement, MobilePreviewProps>(
-  function MobilePreviewCard({ plot, allSorted, onExpand, onShare, onClose, isFav, onToggleFav, isCompared, onToggleCompare }, ref) {
+  function MobilePreviewCard({ plot, allSorted, onExpand, onShare, onClose, isFav, onToggleFav, isCompared, onToggleCompare, onNavigate }, ref) {
     const d = p(plot), score = calcScore(plot), grade = getGrade(score)
+    const plotIdx = allSorted.findIndex(pl => pl.id === plot.id)
+    const hasPrev = plotIdx > 0
+    const hasNext = plotIdx >= 0 && plotIdx < allSorted.length - 1
+    const goPrev = useCallback(() => { if (hasPrev && onNavigate) onNavigate(allSorted[plotIdx - 1]) }, [hasPrev, onNavigate, allSorted, plotIdx])
+    const goNext = useCallback(() => { if (hasNext && onNavigate) onNavigate(allSorted[plotIdx + 1]) }, [hasNext, onNavigate, allSorted, plotIdx])
     const insight = calcQuickInsight(plot, allSorted)
     const pp = pricePosition(plot, allSorted)
     const dom = daysOnMarket(d.created)
@@ -887,6 +937,18 @@ const MobilePreviewCard = memo(forwardRef<HTMLDivElement, MobilePreviewProps>(
       <MobilePreview $show ref={ref}>
         <PreviewHandle />
         <PreviewBody>
+          {/* Prev / Next navigation */}
+          {allSorted.length > 1 && (
+            <PreviewNavRow>
+              <PreviewNavBtn $disabled={!hasPrev} onClick={goPrev} aria-label="חלקה קודמת">
+                <ChevronLeft size={14} style={{ transform: 'rotate(180deg)' }} /> הקודמת
+              </PreviewNavBtn>
+              <PreviewNavCounter>{plotIdx + 1} / {allSorted.length}</PreviewNavCounter>
+              <PreviewNavBtn $disabled={!hasNext} onClick={goNext} aria-label="חלקה הבאה">
+                הבאה <ChevronLeft size={14} />
+              </PreviewNavBtn>
+            </PreviewNavRow>
+          )}
           <PreviewTopRow>
             <PreviewInfo>
               <PreviewTitle>גוש {d.block} · חלקה {plot.number}</PreviewTitle>
@@ -1280,6 +1342,26 @@ export default function Explore() {
 
   // InsightsTicker state is now managed inside InsightsTickerWidget (memoized)
 
+  // Compact filter summary text (shown as a strip below breadcrumbs when filters are active)
+  const filterSummaryText = useMemo(() => {
+    const parts: string[] = []
+    if (filters.priceMin && Number(filters.priceMin) > 0) parts.push(`מ-${fmt.short(Number(filters.priceMin))}`)
+    if (filters.priceMax && Number(filters.priceMax) > 0) parts.push(`עד ${fmt.short(Number(filters.priceMax))}`)
+    if (filters.sizeMin && Number(filters.sizeMin) > 0) parts.push(`${Number(filters.sizeMin).toLocaleString()}+ מ״ר`)
+    if (filters.sizeMax && Number(filters.sizeMax) > 0) parts.push(`עד ${Number(filters.sizeMax).toLocaleString()} מ״ר`)
+    if (filters.zoning) {
+      const z = filters.zoning
+      const label: Record<string, string> = { AGRICULTURAL: 'חקלאית', MASTER_PLAN_DEPOSIT: 'הפקדת מתאר', MASTER_PLAN_APPROVED: 'מתאר מאושרת', DETAILED_PLAN_PREP: 'הכנת מפורטת', DETAILED_PLAN_APPROVED: 'מפורטת מאושרת', BUILDING_PERMIT: 'היתר בנייה' }
+      parts.push(label[z] || z)
+    }
+    if (filters.minRoi && Number(filters.minRoi) > 0) parts.push(`ROI ${filters.minRoi}%+`)
+    if (filters.ripeness === 'high') parts.push('ציון גבוה')
+    else if (filters.ripeness === 'medium') parts.push('ציון בינוני')
+    else if (filters.ripeness === 'low') parts.push('ציון נמוך')
+    if (filters.belowAvg === 'true') parts.push('מתחת לממוצע')
+    return parts.length > 0 ? parts.join(' · ') : null
+  }, [filters])
+
   // Dynamic document title + meta description based on active city filter
   const exploreTitle = useMemo(() => {
     const city = filters.city && filters.city !== 'all' ? filters.city : null
@@ -1607,6 +1689,17 @@ export default function Explore() {
           </BreadcrumbBar>
         )}
 
+        {/* Active Filter Summary Strip (compact at-a-glance view of non-city filters) */}
+        {!mapFullscreen && !isLoading && filterSummaryText && (
+          <FilterSummaryStrip>
+            <FilterStripLabel>🔍 סינון:</FilterStripLabel>
+            <FilterStripValue>{filterSummaryText}</FilterStripValue>
+            <FilterStripClear onClick={resetFilters} aria-label="נקה סינון" title="נקה הכל">
+              <X size={10} />
+            </FilterStripClear>
+          </FilterSummaryStrip>
+        )}
+
         {/* Area bounds filter chip */}
         {!mapFullscreen && areaBounds && !isLoading && (
           <AreaBoundsChip>
@@ -1894,6 +1987,7 @@ export default function Explore() {
             onToggleFav={() => toggle(selected.id)}
             isCompared={isCompared(selected.id)}
             onToggleCompare={() => toggleCompare(selected.id)}
+            onNavigate={selectPlot}
           />
         )}
 

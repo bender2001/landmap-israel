@@ -21,19 +21,37 @@ import { supabaseAdmin } from '../config/supabase.js'
  * CREATE INDEX idx_price_snapshots_plot_date ON price_snapshots(plot_id, snapshot_date);
  */
 
+// ─── Circuit breaker: stop querying after first "table not found" error ───
+// Prevents log spam when the table hasn't been created yet.
+let _tableMissing = false
+
+function isTableNotFoundError(error) {
+  if (!error) return false
+  if (error.code === '42P01') return true
+  const msg = error.message || ''
+  return msg.includes('does not exist') || msg.includes('schema cache')
+}
+
 /**
  * Take a daily price snapshot for all published plots.
  * Uses UPSERT to avoid duplicates for the same day.
  * Should be called once daily (e.g., via cron or on first API hit of the day).
  */
 export async function takeDailySnapshot() {
+  if (_tableMissing) return { skipped: true, reason: 'table_not_created' }
   try {
     // Check if we already snapped today
     const today = new Date().toISOString().slice(0, 10)
-    const { count } = await supabaseAdmin
+    const { count, error: checkErr } = await supabaseAdmin
       .from('price_snapshots')
       .select('id', { count: 'exact', head: true })
       .eq('snapshot_date', today)
+
+    if (checkErr && isTableNotFoundError(checkErr)) {
+      _tableMissing = true
+      return { skipped: true, reason: 'table_not_created' }
+    }
+    if (checkErr) throw checkErr
 
     if (count > 0) {
       return { skipped: true, date: today, existing: count }
@@ -61,7 +79,13 @@ export async function takeDailySnapshot() {
       .from('price_snapshots')
       .upsert(rows, { onConflict: 'plot_id,snapshot_date' })
 
-    if (insertError) throw insertError
+    if (insertError) {
+      if (isTableNotFoundError(insertError)) {
+        _tableMissing = true
+        return { skipped: true, reason: 'table_not_created' }
+      }
+      throw insertError
+    }
 
     return { success: true, date: today, count: rows.length }
   } catch (err) {
@@ -75,6 +99,7 @@ export async function takeDailySnapshot() {
  * Returns up to 365 days of price data.
  */
 export async function getPlotPriceHistory(plotId, days = 365) {
+  if (_tableMissing) return []
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
   const { data, error } = await supabaseAdmin
@@ -86,7 +111,8 @@ export async function getPlotPriceHistory(plotId, days = 365) {
 
   if (error) {
     // Table might not exist yet — return empty gracefully
-    if (error.code === '42P01' || error.message?.includes('does not exist')) {
+    if (isTableNotFoundError(error)) {
+      _tableMissing = true
       return []
     }
     throw error
@@ -99,6 +125,7 @@ export async function getPlotPriceHistory(plotId, days = 365) {
  * Get aggregated price history for a city (average price/sqm per day).
  */
 export async function getCityPriceHistory(city, days = 365) {
+  if (_tableMissing) return []
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
   // Join snapshots with plots to filter by city
@@ -110,7 +137,8 @@ export async function getCityPriceHistory(city, days = 365) {
     .order('snapshot_date', { ascending: true })
 
   if (error) {
-    if (error.code === '42P01' || error.message?.includes('does not exist')) {
+    if (isTableNotFoundError(error)) {
+      _tableMissing = true
       return []
     }
     throw error

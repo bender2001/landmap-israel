@@ -555,6 +555,13 @@ function MiniSparkline({ plot }: { plot: Plot }) {
   )
 }
 
+/* ── PlotItem inner layout (extracted from inline styles to avoid re-allocation) ── */
+const ItemRow = styled.div`display:flex;gap:12px;`
+const ItemInner = styled.div`flex:1;min-width:0;`
+const ItemBadgesLeft = styled.div`display:flex;align-items:center;gap:6px;flex-wrap:wrap;`
+const ItemBadgesRight = styled.div`display:flex;align-items:center;gap:4px;flex-shrink:0;`
+const ItemInsightRow = styled.div`display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap;`
+
 /* ── Zoning Pipeline Mini Bar ── */
 const ZoningBar = styled.div`
   display:flex;align-items:center;gap:2px;margin-top:6px;width:100%;
@@ -769,11 +776,11 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
 
   return (
     <ItemWrap $active={active} $i={index} $gradeColor={grade.color} onClick={onClick} aria-label={`חלקה ${plot.number} גוש ${d.block}`}>
-      <div style={{ display: 'flex', gap: 12 }}>
+      <ItemRow>
         {thumbUrl && <SatThumb $url={thumbUrl} title={`תצלום לוויין — ${plot.city}`} />}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <ItemInner>
       <ItemTop>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <ItemBadgesLeft>
           <ItemCity>{plot.city}</ItemCity>
           <ItemBadge $c={sColor}>{statusLabels[status] || status}</ItemBadge>
           {isNew && <NewBadge>✨ חדש</NewBadge>}
@@ -781,8 +788,8 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
           {percentile && <PercentileBadge $c={percentile.color}>{percentile.icon} {percentile.label}</PercentileBadge>}
           {estYear && <EstYearBadge title={`${estYear.monthsLeft} חודשים צפויים`}>🏗️ {estYear.label}</EstYearBadge>}
           {isBestValue && <BestValueBadge title="ערך הכי טוב בעיר — ציון גבוה + מחיר מתחת לממוצע">💎 BEST VALUE</BestValueBadge>}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        </ItemBadgesLeft>
+        <ItemBadgesRight>
           {distance != null && <DistanceBadge>📍 {fmtDistance(distance)}</DistanceBadge>}
           {pos && (
             <PricePosTag $c={pos.color}>
@@ -791,7 +798,7 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
             </PricePosTag>
           )}
           <ItemGrade $c={grade.color}>{grade.grade}</ItemGrade>
-        </div>
+        </ItemBadgesRight>
       </ItemTop>
       <ItemBlock>גוש {d.block} · חלקה {plot.number}</ItemBlock>
       <Metrics>
@@ -894,7 +901,7 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
         </>
       )}
       {/* Quick investment insight + recommendation chip */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+      <ItemInsightRow>
         {(() => {
           const insight = calcQuickInsight(plot, allPlots)
           return insight.priority >= 5 ? (
@@ -910,9 +917,9 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
           const tags = getLocationTags(plot)
           return tags.length > 0 ? tags.map((tag, i) => <LocTag key={i} $c={tag.color}>{tag.icon} {tag.label}</LocTag>) : null
         })()}
-      </div>
-        </div>{/* close flex inner */}
-      </div>{/* close flex row */}
+      </ItemInsightRow>
+        </ItemInner>
+      </ItemRow>
     </ItemWrap>
   )
 })
