@@ -10,7 +10,7 @@ import FilterBar from '../components/Filters'
 import { ErrorBoundary, useToast, NetworkBanner, AnimatedValue, DemoModeBanner, ExploreLoadingSkeleton } from '../components/UI'
 import { CityStatsOverlay, MarketPulseOverlay, InsightsTickerOverlay, RecentlyViewedStrip, TopPickOverlay } from '../components/ExploreOverlays'
 import type { MarketPulseData, InsightItem } from '../components/ExploreOverlays'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance, zoningLabels, calcAggregateStats, estimatedYear, plotCenter, SITE_CONFIG, calcMarketTemperature } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcMonthly, statusColors, statusLabels, pricePosition, plotDistanceFromUser, fmtDistance, zoningLabels, calcAggregateStats, estimatedYear, plotCenter, SITE_CONFIG, calcMarketTemperature, calcQuickInsight } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -296,6 +296,13 @@ const PreviewMetric = styled.div`
 `
 const PreviewMetricVal = styled.span<{$c?:string}>`font-size:13px;font-weight:800;color:${pr=>pr.$c||t.text};`
 const PreviewMetricLabel = styled.span`font-size:9px;font-weight:600;color:${t.textDim};white-space:nowrap;`
+const PreviewInsight = styled.div<{$c:string}>`
+  display:flex;align-items:center;gap:6px;padding:7px 12px;
+  background:${pr=>pr.$c}0A;border:1px solid ${pr=>pr.$c}20;
+  border-radius:${t.r.md};font-size:12px;font-weight:600;color:${pr=>pr.$c};
+  direction:rtl;line-height:1.4;
+`
+const PreviewInsightEmoji = styled.span`font-size:14px;flex-shrink:0;`
 const PreviewActions = styled.div`
   display:flex;align-items:center;gap:8px;
 `
@@ -1308,6 +1315,16 @@ export default function Explore() {
                     </PreviewMetric>
                   )}
                 </PreviewMetrics>
+                {/* Quick investment insight */}
+                {(() => {
+                  const insight = calcQuickInsight(selected, sorted)
+                  return (
+                    <PreviewInsight $c={insight.color}>
+                      <PreviewInsightEmoji>{insight.emoji}</PreviewInsightEmoji>
+                      {insight.text}
+                    </PreviewInsight>
+                  )
+                })()}
                 {/* Navigation quick links */}
                 {navLinks && (
                   <PreviewNavRow>

@@ -972,6 +972,161 @@ export function calcBettermentTax(plot: Plot): {
   }
 }
 
+// ── Quick Investment Insight (one-liner for cards & previews) ──
+export type QuickInsight = { text: string; emoji: string; color: string; priority: number }
+
+/**
+ * Generate a contextual one-line investment insight for a plot.
+ * Prioritizes the most impressive/relevant metric.
+ * Used in mobile preview, plot list items, and map popups.
+ */
+export function calcQuickInsight(plot: Plot, allPlots?: Plot[]): QuickInsight {
+  const d = p(plot), r = roi(plot), score = calcScore(plot)
+  const cagr = calcCAGR(r, d.readiness)
+  const pps = pricePerSqm(plot)
+
+  // Check if this plot beats S&P 500 (10% annual)
+  if (cagr && cagr.cagr > 20) {
+    return { text: `תשואה שנתית ${cagr.cagr}% — פי ${(cagr.cagr / 10).toFixed(1)} ממדד S&P`, emoji: '🚀', color: '#10B981', priority: 10 }
+  }
+
+  // Check price position vs area average
+  if (allPlots && allPlots.length >= 3) {
+    const sameCityPlots = allPlots.filter(pl => pl.city === plot.city && pl.id !== plot.id)
+    if (sameCityPlots.length >= 2) {
+      const cityPps = sameCityPlots.map(pricePerSqm).filter(v => v > 0)
+      const avgPps = cityPps.length ? cityPps.reduce((s, v) => s + v, 0) / cityPps.length : 0
+      if (pps > 0 && avgPps > 0) {
+        const diff = ((avgPps - pps) / avgPps) * 100
+        if (diff > 15) {
+          return { text: `${Math.round(diff)}% מתחת לממוצע ב${plot.city}`, emoji: '💎', color: '#10B981', priority: 9 }
+        }
+      }
+    }
+  }
+
+  // High score
+  if (score >= 9) {
+    return { text: 'ציון השקעה מעולה — הזדמנות נדירה', emoji: '🔥', color: '#10B981', priority: 8 }
+  }
+
+  // High ROI
+  if (r >= 150) {
+    return { text: `תשואה צפויה +${Math.round(r)}% — פוטנציאל גבוה`, emoji: '📈', color: '#10B981', priority: 7 }
+  }
+
+  // Near building permit
+  const timeline = calcTimeline(plot)
+  if (timeline && timeline.remaining <= 12 && timeline.currentIdx >= 5) {
+    return { text: 'קרוב להיתר בנייה — ערך צפוי לזנק', emoji: '🏗️', color: '#F59E0B', priority: 7 }
+  }
+
+  // Reasonable CAGR
+  if (cagr && cagr.cagr > 10) {
+    return { text: `תשואה שנתית ${cagr.cagr}% על פני ${cagr.years} שנים`, emoji: '📊', color: '#4ADE80', priority: 5 }
+  }
+
+  // Good score
+  if (score >= 7) {
+    return { text: 'ציון השקעה גבוה — מומלץ לבדיקה', emoji: '👍', color: '#4ADE80', priority: 4 }
+  }
+
+  // Large plot
+  if (d.size >= 5000) {
+    return { text: `חלקה גדולה — ${fmt.dunam(d.size)} דונם`, emoji: '📐', color: '#3B82F6', priority: 3 }
+  }
+
+  // Default
+  return { text: investmentRecommendation(plot).text, emoji: investmentRecommendation(plot).emoji, color: investmentRecommendation(plot).color, priority: 1 }
+}
+
+// ── Estimated Rental Yield (post-development) ──
+export interface RentalYieldEstimate {
+  monthlyRent: number
+  annualRent: number
+  grossYield: number
+  netYield: number
+  totalUnits: number
+  avgUnitSize: number
+  rentPerSqm: number
+}
+
+/**
+ * Estimate potential rental yield once the plot is developed.
+ * Based on Israeli market averages by city and density.
+ * This helps investors compare land investment vs buying rental properties directly.
+ */
+export function calcRentalYield(plot: Plot): RentalYieldEstimate | null {
+  const d = p(plot)
+  if (d.projected <= 0 || d.size <= 0) return null
+
+  // Average rent per sqm per month by city tier (Israeli market 2024-2025)
+  const RENT_PER_SQM: Record<string, number> = {
+    'תל אביב': 75, 'הרצליה': 65, 'רעננה': 55, 'כפר סבא': 48,
+    'הוד השרון': 48, 'נתניה': 42, 'חדרה': 35, 'קיסריה': 50,
+    'חיפה': 38, 'באר שבע': 30, 'ראשון לציון': 50, 'אשדוד': 38,
+    'ירושלים': 52, 'פתח תקווה': 48, 'רחובות': 45, 'אשקלון': 35,
+  }
+
+  const rentPerSqm = RENT_PER_SQM[plot.city || ''] || 40 // default
+  const density = d.density > 0 ? d.density : 4 // units per dunam default
+  const dunams = d.size / 1000
+  const totalUnits = Math.max(1, Math.round(dunams * density))
+  const avgUnitSize = 85 // sqm average apartment
+
+  const monthlyRent = totalUnits * avgUnitSize * rentPerSqm
+  const annualRent = monthlyRent * 12
+  // Gross yield = annual rent / projected development cost
+  // Development cost ≈ projected value (includes construction)
+  const grossYield = (annualRent / d.projected) * 100
+  // Net yield accounts for ~30% expenses (management, maintenance, vacancy, taxes)
+  const netYield = grossYield * 0.7
+
+  return {
+    monthlyRent,
+    annualRent,
+    grossYield: Math.round(grossYield * 10) / 10,
+    netYield: Math.round(netYield * 10) / 10,
+    totalUnits,
+    avgUnitSize,
+    rentPerSqm,
+  }
+}
+
+// ── Value Growth Trajectory (for sparkline visualization) ──
+export interface GrowthPoint { year: number; value: number; label: string; isCurrent: boolean }
+
+/**
+ * Generate a growth trajectory from current value to projected value,
+ * interpolated through zoning stages. Returns points for sparkline rendering.
+ */
+export function calcGrowthTrajectory(plot: Plot): GrowthPoint[] | null {
+  const d = p(plot)
+  if (d.price <= 0 || d.projected <= d.price) return null
+
+  const scenarios = calcExitScenarios(plot)
+  if (!scenarios || scenarios.length === 0) return null
+
+  const now = new Date()
+  const currentYear = now.getFullYear()
+
+  const points: GrowthPoint[] = [
+    { year: currentYear, value: d.price, label: 'היום', isCurrent: true },
+  ]
+
+  for (const sc of scenarios) {
+    const futureYear = currentYear + Math.max(1, Math.round(sc.monthsFromNow / 12))
+    points.push({
+      year: futureYear,
+      value: sc.estimatedValue,
+      label: sc.stageLabel,
+      isCurrent: false,
+    })
+  }
+
+  return points
+}
+
 // ── Normalize ──
 export function normalizePlot(plot: Plot): Plot {
   return { ...plot, total_price: plot.totalPrice ?? plot.total_price, projected_value: plot.projectedValue ?? plot.projected_value,

@@ -3,7 +3,7 @@ import styled, { keyframes, css } from 'styled-components'
 import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe, Sparkles, Printer, Navigation, Map as MapIcon2, Eye, Calculator, ClipboardCopy, Banknote, AlertTriangle } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
-import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcTimeline, calcMonthly, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter, getLocationTags, generatePlotReport, calcAlternativeInvestments, nearestTrainStation, nearestHighway, calcBettermentTax } from '../utils'
+import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcTimeline, calcMonthly, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter, getLocationTags, generatePlotReport, calcAlternativeInvestments, nearestTrainStation, nearestHighway, calcBettermentTax, calcRentalYield, calcGrowthTrajectory, calcQuickInsight } from '../utils'
 import type { Plot } from '../types'
 import { GoldButton, GhostButton, Badge, RadialScore, InfoTooltip, PriceAlertButton } from './UI'
 
@@ -322,6 +322,175 @@ function AlternativeInvestments({ plot }: { plot: Plot }) {
         </div>
       ))}
     </AltInvestWrap>
+  )
+}
+
+/* ── Growth Trajectory Sparkline ── */
+const GrowthWrap = styled.div`
+  margin-bottom:16px;padding:14px;background:${t.surfaceLight};
+  border:1px solid ${t.border};border-radius:${t.r.md};
+  animation:${fadeSection} 0.5s 0.25s both;
+`
+const GrowthTitle = styled.div`
+  font-size:11px;font-weight:700;color:${t.textDim};margin-bottom:12px;
+  display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:0.3px;
+`
+const GrowthSvg = styled.svg`width:100%;height:80px;overflow:visible;`
+const GrowthLegend = styled.div`
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:8px;font-size:10px;color:${t.textDim};
+`
+const GrowthVal = styled.span<{$c?:string}>`font-weight:800;color:${pr=>pr.$c||t.gold};`
+
+function GrowthTrajectory({ plot }: { plot: Plot }) {
+  const trajectory = useMemo(() => calcGrowthTrajectory(plot), [plot])
+  if (!trajectory || trajectory.length < 2) return null
+
+  const values = trajectory.map(p => p.value)
+  const minV = Math.min(...values) * 0.9
+  const maxV = Math.max(...values) * 1.05
+  const range = maxV - minV || 1
+  const w = 300, h = 60, pad = 12
+
+  const points = trajectory.map((pt, i) => ({
+    x: pad + (i / (trajectory.length - 1)) * (w - pad * 2),
+    y: h - pad - ((pt.value - minV) / range) * (h - pad * 2),
+    ...pt,
+  }))
+
+  // Create smooth curve path
+  const linePath = points.map((pt, i) => {
+    if (i === 0) return `M ${pt.x} ${pt.y}`
+    const prev = points[i - 1]
+    const cpx = (prev.x + pt.x) / 2
+    return `C ${cpx} ${prev.y} ${cpx} ${pt.y} ${pt.x} ${pt.y}`
+  }).join(' ')
+
+  // Area fill path
+  const areaPath = `${linePath} L ${points[points.length - 1].x} ${h - pad} L ${points[0].x} ${h - pad} Z`
+
+  const totalGrowth = trajectory.length >= 2
+    ? Math.round(((trajectory[trajectory.length - 1].value - trajectory[0].value) / trajectory[0].value) * 100)
+    : 0
+
+  return (
+    <GrowthWrap>
+      <GrowthTitle>
+        <TrendingUp size={12} color={t.ok} />
+        מסלול צמיחה צפוי
+      </GrowthTitle>
+      <GrowthSvg viewBox={`0 0 ${w} ${h + 8}`} preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="growthGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={t.ok} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={t.ok} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        {/* Area fill */}
+        <path d={areaPath} fill="url(#growthGrad)" />
+        {/* Line */}
+        <path d={linePath} fill="none" stroke={t.ok} strokeWidth="2" strokeLinecap="round" />
+        {/* Data points */}
+        {points.map((pt, i) => (
+          <g key={i}>
+            <circle cx={pt.x} cy={pt.y} r={pt.isCurrent ? 4 : 3} fill={pt.isCurrent ? t.gold : t.ok} stroke={t.surface} strokeWidth="1.5" />
+            <text x={pt.x} y={pt.y - 8} textAnchor="middle" fill={pt.isCurrent ? t.gold : t.textDim} fontSize="7" fontWeight={pt.isCurrent ? '800' : '600'} fontFamily={t.font}>
+              {fmt.compact(pt.value)}
+            </text>
+            <text x={pt.x} y={h + 4} textAnchor="middle" fill={t.textDim} fontSize="7" fontWeight="600" fontFamily={t.font}>
+              {pt.label.length > 8 ? pt.label.slice(0, 8) + '…' : pt.label}
+            </text>
+          </g>
+        ))}
+      </GrowthSvg>
+      <GrowthLegend>
+        <span>היום → בנייה</span>
+        <GrowthVal $c={t.ok}>+{totalGrowth}% צמיחה</GrowthVal>
+      </GrowthLegend>
+    </GrowthWrap>
+  )
+}
+
+/* ── Rental Yield Estimate ── */
+const RentalWrap = styled.div`
+  margin-bottom:16px;padding:14px;background:${t.surfaceLight};
+  border:1px solid ${t.border};border-radius:${t.r.md};
+  animation:${fadeSection} 0.5s 0.3s both;
+`
+const RentalTitle = styled.div`
+  font-size:11px;font-weight:700;color:${t.textDim};margin-bottom:10px;
+  display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:0.3px;
+`
+const RentalGrid = styled.div`display:grid;grid-template-columns:repeat(3,1fr);gap:8px;`
+const RentalStat = styled.div`text-align:center;padding:8px 4px;background:${t.bg};border-radius:${t.r.sm};`
+const RentalStatVal = styled.div<{$c?:string}>`font-size:14px;font-weight:800;color:${pr=>pr.$c||t.text};`
+const RentalStatLabel = styled.div`font-size:9px;color:${t.textDim};margin-top:2px;font-weight:600;`
+const RentalNote = styled.div`
+  font-size:10px;color:${t.textDim};margin-top:8px;line-height:1.5;
+  padding:6px 8px;background:rgba(59,130,246,0.05);border:1px solid rgba(59,130,246,0.1);
+  border-radius:${t.r.sm};display:flex;align-items:flex-start;gap:4px;
+`
+
+function RentalYieldCard({ plot }: { plot: Plot }) {
+  const rental = useMemo(() => calcRentalYield(plot), [plot])
+  if (!rental) return null
+  return (
+    <RentalWrap>
+      <RentalTitle>
+        <Building2 size={12} color={t.gold} />
+        תשואת שכירות משוערת (לאחר בנייה)
+      </RentalTitle>
+      <RentalGrid>
+        <RentalStat>
+          <RentalStatVal $c={t.gold}>{fmt.compact(rental.monthlyRent)}</RentalStatVal>
+          <RentalStatLabel>שכ״ד חודשי</RentalStatLabel>
+        </RentalStat>
+        <RentalStat>
+          <RentalStatVal $c={rental.grossYield >= 5 ? t.ok : t.warn}>{rental.grossYield}%</RentalStatVal>
+          <RentalStatLabel>תשואה ברוטו</RentalStatLabel>
+        </RentalStat>
+        <RentalStat>
+          <RentalStatVal $c={rental.netYield >= 3.5 ? t.ok : t.warn}>{rental.netYield}%</RentalStatVal>
+          <RentalStatLabel>תשואה נטו</RentalStatLabel>
+        </RentalStat>
+      </RentalGrid>
+      <RentalGrid style={{ marginTop: 6 }}>
+        <RentalStat>
+          <RentalStatVal>{rental.totalUnits}</RentalStatVal>
+          <RentalStatLabel>יח״ד משוערות</RentalStatLabel>
+        </RentalStat>
+        <RentalStat>
+          <RentalStatVal>{rental.avgUnitSize} מ״ר</RentalStatVal>
+          <RentalStatLabel>דירה ממוצעת</RentalStatLabel>
+        </RentalStat>
+        <RentalStat>
+          <RentalStatVal>₪{rental.rentPerSqm}</RentalStatVal>
+          <RentalStatLabel>שכ״ד/מ״ר</RentalStatLabel>
+        </RentalStat>
+      </RentalGrid>
+      <RentalNote>
+        <Info size={10} style={{ flexShrink: 0, marginTop: 2 }} />
+        הערכה בלבד על בסיס צפיפות וממוצעי שכירות באזור. התשואה בפועל תלויה בתוכנית הבנייה ותנאי השוק.
+      </RentalNote>
+    </RentalWrap>
+  )
+}
+
+/* ── Quick Investment Insight Banner ── */
+const QuickInsightBanner = styled.div<{$c:string}>`
+  display:flex;align-items:center;gap:6px;padding:8px 12px;margin-bottom:12px;
+  background:${pr=>pr.$c}0A;border:1px solid ${pr=>pr.$c}20;
+  border-radius:${t.r.md};font-size:12px;font-weight:700;color:${pr=>pr.$c};
+  direction:rtl;animation:${fadeSection} 0.4s ease-out both;
+`
+
+function QuickInsightBadge({ plot, allPlots }: { plot: Plot; allPlots?: Plot[] }) {
+  const insight = useMemo(() => calcQuickInsight(plot, allPlots), [plot, allPlots])
+  return (
+    <QuickInsightBanner $c={insight.color}>
+      <span style={{ fontSize: 16 }}>{insight.emoji}</span>
+      {insight.text}
+    </QuickInsightBanner>
   )
 }
 
@@ -1433,6 +1602,9 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
             })()}
           </MetricsGrid>
 
+          {/* Quick Investment Insight — one-line contextual summary */}
+          <QuickInsightBadge plot={plot} allPlots={plots} />
+
           {/* Price Thermometer Gauge — visual market position indicator (like Madlan) */}
           {plots && plots.length >= 3 && <PriceThermometer plot={plot} allPlots={plots} />}
 
@@ -1517,6 +1689,12 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
 
           {/* Alternative Investment Comparison — show ROI vs bank, bonds, S&P 500 */}
           <AlternativeInvestments plot={plot} />
+
+          {/* Growth Trajectory Sparkline — visual path from current to future value */}
+          <GrowthTrajectory plot={plot} />
+
+          {/* Rental Yield Estimate — post-development income potential */}
+          <RentalYieldCard plot={plot} />
 
           {/* Market Trend Card — like Madlan's area trend indicator */}
           {marketTrend && (
