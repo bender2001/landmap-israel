@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker,
 import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette, Ruler, Undo2, Trash2, LocateFixed, Copy, Check } from 'lucide-react'
-import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket, investmentRecommendation, estimatedYear } from '../utils'
+import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket, investmentRecommendation, estimatedYear, pricePosition } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
 import { israelAreas } from '../data'
@@ -953,7 +953,13 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         </div>
         {/* Data rows */}
         <div style={{ padding: '10px 16px 12px' }}>
-          <div className="plot-popup-row"><span className="plot-popup-label">מחיר</span><span className="plot-popup-value" style={{ fontSize: 15, fontWeight: 900 }}>{fmt.compact(d.price)}</span></div>
+          <div className="plot-popup-row"><span className="plot-popup-label">מחיר</span><span className="plot-popup-value" style={{ fontSize: 15, fontWeight: 900 }}>{fmt.compact(d.price)}{(() => {
+            const pp = pricePosition(plot, plots)
+            if (!pp) return null
+            return <span style={{ marginRight: 6, fontSize: 10, fontWeight: 700, color: pp.color, padding: '1px 6px', background: `${pp.color}12`, borderRadius: t.r.full, border: `1px solid ${pp.color}25` }}>
+              {pp.direction === 'below' ? '↓' : pp.direction === 'above' ? '↑' : '–'} {pp.label}
+            </span>
+          })()}</span></div>
           <div className="plot-popup-row"><span className="plot-popup-label">שטח</span><span className="plot-popup-value">{fmt.dunam(d.size)} דונם ({fmt.num(d.size)} מ״ר)</span></div>
           {ppd > 0 && <div className="plot-popup-row"><span className="plot-popup-label">₪/דונם</span><span className="plot-popup-value">{fmt.num(ppd)}</span></div>}
           <div className="plot-popup-row"><span className="plot-popup-label">תשואה צפויה</span><span className="plot-popup-value gold">+{fmt.pct(r)}</span></div>
@@ -1053,7 +1059,7 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
         </div>
       </div>
     )
-  }, [favorites, compare, onLead, copiedCoords, copyCoordinates, navigate])
+  }, [favorites, compare, onLead, copiedCoords, copyCoordinates, navigate, plots])
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }} className={darkMode ? 'dark' : ''}>

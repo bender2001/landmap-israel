@@ -1,14 +1,14 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye } from 'lucide-react'
+import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription, useRecentlyViewed } from '../hooks'
 // Note: dataFreshness and dataSource are computed locally in this component (not via hooks)
 import MapArea from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, useToast, NetworkBanner, AnimatedValue, DemoModeBanner, ExploreLoadingSkeleton } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade, calcQuickInsight } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, calcScore, getGrade, calcQuickInsight, pricePosition } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -246,6 +246,27 @@ const PreviewCloseBtn = styled.button`
   color:${t.textSec};cursor:pointer;
   display:flex;align-items:center;justify-content:center;transition:all ${t.tr};flex-shrink:0;
   &:hover{border-color:${t.goldBorder};color:${t.gold};}
+`
+
+/* ── Preview Quick Actions ── */
+const PreviewQuickActions = styled.div`
+  display:flex;align-items:center;gap:6px;
+`
+const PreviewQuickBtn = styled.button<{$active?:boolean;$color?:string}>`
+  display:flex;align-items:center;justify-content:center;width:40px;height:40px;
+  border-radius:${t.r.md};border:1px solid ${pr=>pr.$active?pr.$color||t.gold:t.border};
+  background:${pr=>pr.$active?`${pr.$color||t.gold}15`:'transparent'};
+  color:${pr=>pr.$active?pr.$color||t.gold:t.textSec};cursor:pointer;
+  transition:all ${t.tr};flex-shrink:0;
+  &:hover{border-color:${pr=>pr.$color||t.goldBorder};color:${pr=>pr.$color||t.gold};background:${pr=>`${pr.$color||t.gold}10`};}
+`
+
+/* ── Price Position Badge ── */
+const PricePositionBadge = styled.div<{$color:string}>`
+  display:inline-flex;align-items:center;gap:4px;padding:4px 10px;
+  background:${pr=>`${pr.$color}10`};border:1px solid ${pr=>`${pr.$color}25`};
+  border-radius:${t.r.full};font-size:11px;font-weight:700;color:${pr=>pr.$color};
+  direction:rtl;white-space:nowrap;
 `
 
 /* ── Keyboard Shortcuts Dialog ── */
@@ -505,6 +526,31 @@ export default function Explore() {
     if (pl) recentlyViewed.add(pl.id)
   }, [recentlyViewed])
 
+  // Share plot via Web Share API with clipboard fallback
+  const sharePlot = useCallback(async (plot: Plot) => {
+    const d = p(plot)
+    const url = `${window.location.origin}/plot/${plot.id}`
+    const title = `חלקה ${plot.number} גוש ${d.block} — ${plot.city}`
+    const text = `${title}\n${fmt.compact(d.price)} · ${fmt.dunam(d.size)} דונם · ציון ${calcScore(plot)}/10`
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text, url })
+        toast('🔗 שותף בהצלחה', 'success')
+        return
+      } catch (e: unknown) {
+        if (e instanceof Error && e.name === 'AbortError') return // user cancelled
+      }
+    }
+    // Clipboard fallback
+    try {
+      await navigator.clipboard.writeText(`${text}\n${url}`)
+      toast('📋 הקישור הועתק ללוח', 'success')
+    } catch {
+      toast('לא ניתן להעתיק', 'info')
+    }
+  }, [toast])
+
   // Mobile preview swipe-to-dismiss
   const previewRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -685,6 +731,11 @@ export default function Explore() {
       if (e.key === 'l' || e.key === 'L') {
         setListOpen(o => !o)
       }
+      // 'S' key to share selected plot
+      if ((e.key === 's' || e.key === 'S') && selected) {
+        e.preventDefault()
+        sharePlot(selected)
+      }
       // Arrow keys to navigate between plots when sidebar is open
       if (selected && sorted.length > 1) {
         const idx = sorted.findIndex(pl => pl.id === selected.id)
@@ -703,7 +754,7 @@ export default function Explore() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selected, sortOpen, listOpen, sorted, selectPlot, shortcutsOpen, mapFullscreen])
+  }, [selected, sortOpen, listOpen, sorted, selectPlot, shortcutsOpen, mapFullscreen, sharePlot])
 
   return (
     <Wrap className="dark" aria-label="מפת חלקות להשקעה">
@@ -780,6 +831,7 @@ export default function Explore() {
         {selected && !mobileExpanded && (() => {
           const d = p(selected), score = calcScore(selected), grade = getGrade(score)
           const insight = calcQuickInsight(selected, sorted)
+          const pp = pricePosition(selected, sorted)
           return (
             <MobilePreview $show={true} ref={previewRef}>
               <PreviewHandle />
@@ -789,6 +841,12 @@ export default function Explore() {
                     <PreviewTitle>גוש {d.block} · חלקה {selected.number}</PreviewTitle>
                     <PreviewCity>
                       <MapIcon size={12} /> {selected.city}
+                      {pp && (
+                        <PricePositionBadge $color={pp.color}>
+                          {pp.direction === 'below' ? <TrendingDown size={10} /> : pp.direction === 'above' ? <TrendingUp size={10} /> : <Minus size={10} />}
+                          {pp.label}
+                        </PricePositionBadge>
+                      )}
                     </PreviewCity>
                   </PreviewInfo>
                   <PreviewPrice>{fmt.compact(d.price)}</PreviewPrice>
@@ -811,6 +869,33 @@ export default function Explore() {
                   <PreviewDetailBtn onClick={() => setMobileExpanded(true)}>
                     <ChevronLeft size={16} /> פרטים מלאים
                   </PreviewDetailBtn>
+                  <PreviewQuickActions>
+                    <PreviewQuickBtn
+                      onClick={() => sharePlot(selected)}
+                      aria-label="שתף חלקה"
+                      title="שתף"
+                    >
+                      <Share2 size={16} />
+                    </PreviewQuickBtn>
+                    <PreviewQuickBtn
+                      $active={isFav(selected.id)}
+                      $color="#EF4444"
+                      onClick={() => toggle(selected.id)}
+                      aria-label={isFav(selected.id) ? 'הסר מהמועדפים' : 'הוסף למועדפים'}
+                      title="מועדפים"
+                    >
+                      <Heart size={16} fill={isFav(selected.id) ? '#EF4444' : 'none'} />
+                    </PreviewQuickBtn>
+                    <PreviewQuickBtn
+                      $active={isCompared(selected.id)}
+                      $color={t.info}
+                      onClick={() => toggleCompare(selected.id)}
+                      aria-label={isCompared(selected.id) ? 'הסר מהשוואה' : 'הוסף להשוואה'}
+                      title="השוואה"
+                    >
+                      <GitCompareArrows size={16} />
+                    </PreviewQuickBtn>
+                  </PreviewQuickActions>
                   <PreviewCloseBtn onClick={() => setSelected(null)} aria-label="סגור">
                     <X size={18} />
                   </PreviewCloseBtn>
@@ -865,6 +950,7 @@ export default function Explore() {
               <KbGroupLabel>חלקה נבחרת</KbGroupLabel>
               <KbRow><KbLabel>חלקה הבאה</KbLabel><KbKey>←</KbKey></KbRow>
               <KbRow><KbLabel>חלקה קודמת</KbLabel><KbKey>→</KbKey></KbRow>
+              <KbRow><KbLabel>שתף חלקה</KbLabel><KbKey>S</KbKey></KbRow>
             </KbGroup>
             <KbGroup>
               <KbGroupLabel>עזרה</KbGroupLabel>
@@ -875,25 +961,37 @@ export default function Explore() {
         </KbBackdrop>
 
         {/* Stats bar with viewport visible count */}
-        {!mapFullscreen && <Stats>
-          <Stat><Val><AnimatedValue value={filtered.length} /></Val> חלקות</Stat>
-          {visibleInViewport != null && visibleInViewport < filtered.length && (
-            <ViewportStat title="חלקות הנראות בתצוגת המפה הנוכחית">
-              <Eye size={10} /> {visibleInViewport} נראות
-            </ViewportStat>
-          )}
-          <Stat>ממוצע <Val><AnimatedValue value={Math.round(avg)} format={fmt.compact} /></Val></Stat>
-          {sse.status === 'connected' ? (
-            <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים`}>
-              <LiveDot $c={t.ok} /> LIVE
-            </LiveBadge>
-          ) : (
-            <Demo>{dataSource === 'api' ? 'API' : 'DEMO'}</Demo>
-          )}
-          <KbHintBtn onClick={() => setShortcutsOpen(true)} title="קיצורי מקלדת (?)">
-            <Keyboard size={10} /> ?
-          </KbHintBtn>
-        </Stats>}
+        {!mapFullscreen && (() => {
+          const prices = filtered.map(pl => p(pl).price).filter(v => v > 0)
+          const minPrice = prices.length ? Math.min(...prices) : 0
+          const maxPrice = prices.length ? Math.max(...prices) : 0
+          return (
+            <Stats>
+              <Stat><Val><AnimatedValue value={filtered.length} /></Val> חלקות</Stat>
+              {visibleInViewport != null && visibleInViewport < filtered.length && (
+                <ViewportStat title="חלקות הנראות בתצוגת המפה הנוכחית">
+                  <Eye size={10} /> {visibleInViewport} נראות
+                </ViewportStat>
+              )}
+              <Stat>ממוצע <Val><AnimatedValue value={Math.round(avg)} format={fmt.compact} /></Val></Stat>
+              {prices.length >= 2 && (
+                <Stat title={`טווח: ${fmt.compact(minPrice)} – ${fmt.compact(maxPrice)}`}>
+                  {fmt.short(minPrice)} – <Val>{fmt.short(maxPrice)}</Val>
+                </Stat>
+              )}
+              {sse.status === 'connected' ? (
+                <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים`}>
+                  <LiveDot $c={t.ok} /> LIVE
+                </LiveBadge>
+              ) : (
+                <Demo>{dataSource === 'api' ? 'API' : 'DEMO'}</Demo>
+              )}
+              <KbHintBtn onClick={() => setShortcutsOpen(true)} title="קיצורי מקלדת (?)">
+                <Keyboard size={10} /> ?
+              </KbHintBtn>
+            </Stats>
+          )
+        })()}
 
         {/* Mobile Favorites Overlay */}
         <MobileOverlay $open={tab === 'fav'}>
