@@ -20,6 +20,8 @@ const Chat = lazy(() => import('../components/Chat'))
 const PlotListPanel = lazy(() => import('../components/PlotListPanel'))
 const CompareDrawer = lazy(() => import('../components/CompareDrawer'))
 const MortgageCalculator = lazy(() => import('../components/MortgageCalculator'))
+const MobileNavigation = lazy(() => import('../components/MobileNavigation'))
+const StatsBarWidget = lazy(() => import('../components/StatsBarWidget'))
 
 const DEFAULTS: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '', belowAvg: '' }
 
@@ -762,6 +764,36 @@ const AreaBoundsClose = styled.button`
   &:hover{border-color:${t.err};color:${t.err};background:rgba(239,68,68,0.08);}
 `
 
+/* ── Top Opportunity Alert Banner ── */
+const topOppSlide = keyframes`from{opacity:0;transform:translateX(-50%) translateY(8px) scale(0.95)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}`
+const topOppPulse = keyframes`0%,100%{border-color:rgba(16,185,129,0.3)}50%{border-color:rgba(16,185,129,0.6)}`
+const TopOppBanner = styled.div<{$show:boolean}>`
+  position:absolute;top:140px;left:50%;transform:translateX(-50%);z-index:${t.z.filter - 2};
+  display:${pr=>pr.$show?'flex':'none'};align-items:center;gap:10px;
+  padding:8px 16px 8px 12px;direction:rtl;
+  background:${t.glass};backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1.5px solid rgba(16,185,129,0.3);border-radius:${t.r.full};
+  box-shadow:${t.sh.md};font-family:${t.font};
+  animation:${topOppSlide} 0.4s cubic-bezier(0.32,0.72,0,1),${topOppPulse} 3s ease-in-out infinite;
+  max-width:calc(100vw - 32px);cursor:pointer;
+  transition:all ${t.tr};
+  &:hover{background:rgba(16,185,129,0.08);border-color:rgba(16,185,129,0.5);transform:translateX(-50%) translateY(-1px);}
+  ${mobile}{top:104px;font-size:11px;padding:6px 12px 6px 10px;gap:8px;}
+`
+const TopOppIcon = styled.span`
+  display:flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border-radius:50%;flex-shrink:0;
+  background:rgba(16,185,129,0.12);font-size:14px;
+`
+const TopOppText = styled.span`font-size:12px;font-weight:700;color:${t.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`
+const TopOppValue = styled.span`font-size:12px;font-weight:800;color:${t.ok};white-space:nowrap;flex-shrink:0;`
+const TopOppDismiss = styled.button`
+  display:flex;align-items:center;justify-content:center;width:20px;height:20px;
+  border-radius:50%;background:transparent;border:1px solid ${t.border};
+  color:${t.textDim};cursor:pointer;transition:all ${t.tr};flex-shrink:0;
+  &:hover{border-color:${t.err};color:${t.err};}
+`
+
 /* ── Smart Suggestion Button (for empty state) ── */
 const SuggestionBtn = styled.button`
   display:flex;align-items:center;gap:8px;padding:10px 14px;
@@ -915,99 +947,7 @@ function filtersToParams(f: Filters): URLSearchParams {
   return sp
 }
 
-/* ── Extracted: StatsBarWidget (memoized to prevent re-renders from parent state changes) ── */
-interface StatsBarProps {
-  filtered: Plot[]
-  avg: number
-  visibleInViewport: number | null
-  totalPortfolioValue: number
-  statsBarData: { prices: number[]; minPrice: number; maxPrice: number; avgRoi: number; avgPpd: number }
-  marketMomentum: { label: string; color: string; tip: string } | null
-  portfolioQuality: { avg: number; grade: { grade: string; color: string }; pct: number } | null
-  apiLatency: { latencyMs: number | null; label: string | null; color: string | null }
-  dataSource: string
-  sse: { status: string; updateCount: number }
-  dataFreshness: { relativeTime: string | null; lastFetched: number | null }
-  isRefreshing: boolean
-  refreshData: () => void
-  onShortcutsOpen: () => void
-}
-
-const StatsBarWidget = memo(function StatsBarWidget({
-  filtered, avg, visibleInViewport, totalPortfolioValue, statsBarData,
-  marketMomentum, portfolioQuality, apiLatency, dataSource,
-  sse, dataFreshness, isRefreshing, refreshData, onShortcutsOpen,
-}: StatsBarProps) {
-  return (
-    <Stats>
-      <Stat><Val><AnimatedValue value={filtered.length} /></Val> חלקות</Stat>
-      {visibleInViewport != null && visibleInViewport < filtered.length && (
-        <ViewportStat title="חלקות הנראות בתצוגת המפה הנוכחית">
-          <Eye size={10} /> {visibleInViewport} נראות
-        </ViewportStat>
-      )}
-      <Stat>ממוצע <Val><AnimatedValue value={Math.round(avg)} format={fmt.compact} /></Val></Stat>
-      {totalPortfolioValue > 0 && (
-        <TotalValueStat title={`סך שווי כל החלקות המוצגות: ${fmt.price(totalPortfolioValue)}`}>
-          💰 סה״כ <TotalValueAmount>{fmt.compact(totalPortfolioValue)}</TotalValueAmount>
-        </TotalValueStat>
-      )}
-      {statsBarData.avgPpd > 0 && (
-        <DunamStat title={`מחיר ממוצע לדונם: ${fmt.price(statsBarData.avgPpd)}`}>
-          📐 <DunamStatVal>{fmt.compact(statsBarData.avgPpd)}</DunamStatVal>/דונם
-        </DunamStat>
-      )}
-      {statsBarData.prices.length >= 2 && (
-        <Stat title={`טווח: ${fmt.compact(statsBarData.minPrice)} – ${fmt.compact(statsBarData.maxPrice)}`}>
-          {fmt.short(statsBarData.minPrice)} – <Val>{fmt.short(statsBarData.maxPrice)}</Val>
-        </Stat>
-      )}
-      {statsBarData.avgRoi > 0 && (
-        <Stat title={`תשואה ממוצעת צפויה: +${statsBarData.avgRoi}%`}>
-          ROI <ValOk>+{statsBarData.avgRoi}%</ValOk>
-        </Stat>
-      )}
-      {marketMomentum && (
-        <MomentumBadge $c={marketMomentum.color} title={marketMomentum.tip}>
-          {marketMomentum.label}
-        </MomentumBadge>
-      )}
-      {portfolioQuality && (
-        <PortfolioGauge title={`ציון תיק השקעות ממוצע: ${portfolioQuality.avg}/10 — ${portfolioQuality.grade.grade}`}>
-          <QualityLabel>איכות</QualityLabel>
-          <GaugeTrack>
-            <GaugeFill $w={portfolioQuality.pct} $c={portfolioQuality.grade.color} />
-          </GaugeTrack>
-          <GaugeLabel $c={portfolioQuality.grade.color}>{portfolioQuality.avg}</GaugeLabel>
-        </PortfolioGauge>
-      )}
-      {apiLatency.latencyMs != null && apiLatency.color && dataSource === 'api' && (
-        <LatencyBadge
-          $c={apiLatency.color}
-          title={`זמן תגובת שרת: ${apiLatency.latencyMs}ms — ${apiLatency.label}`}
-        >
-          {apiLatency.label} {apiLatency.latencyMs}ms
-        </LatencyBadge>
-      )}
-      {sse.status === 'connected' ? (
-        <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים מתעדכנים אוטומטית${dataFreshness.relativeTime ? ` · עודכן ${dataFreshness.relativeTime}` : ''}`}>
-          <LiveDot $c={t.ok} /> עדכני {sse.updateCount > 0 && <SseUpdateCount>({sse.updateCount})</SseUpdateCount>}
-        </LiveBadge>
-      ) : dataSource === 'api' ? (
-        <ClickableLiveBadge $connected={false} title={`נתונים מהשרת${dataFreshness.relativeTime ? ` · עודכן ${dataFreshness.relativeTime}` : ''} — לחץ לרענון`}
-          onClick={refreshData}>
-          <LiveDot $c={t.warn} /> {isRefreshing ? 'מרענן...' : (dataFreshness.relativeTime && dataFreshness.relativeTime !== 'עכשיו' ? dataFreshness.relativeTime : 'נתוני שרת')} ↻
-        </ClickableLiveBadge>
-      ) : (
-        <ClickableDemo title="נתונים לדוגמה — לחץ לנסות שוב"
-          onClick={refreshData}>{isRefreshing ? 'מרענן...' : 'נתוני דמו'} ↻</ClickableDemo>
-      )}
-      <KbHintBtn onClick={onShortcutsOpen} title="קיצורי מקלדת (?)">
-        <Keyboard size={10} /> ?
-      </KbHintBtn>
-    </Stats>
-  )
-})
+/* ── StatsBarWidget extracted to separate component for better performance ── */
 
 /* ── Extracted: InsightsTickerWidget (memoized to prevent re-render cascades from parent state) ── */
 interface InsightsTickerProps {
@@ -1323,6 +1263,7 @@ export default function Explore() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const kbDialogTrapRef = useFocusTrap(shortcutsOpen)
   const [areaBounds, setAreaBounds] = useState<MapBounds | null>(null)
+  const [topOppDismissed, setTopOppDismissed] = useState(false)
 
   // API filters + data fetch — MUST come before any useMemo that depends on `plots`
   const apiFilters = useMemo(() => {
@@ -1994,6 +1935,30 @@ export default function Explore() {
           </AreaBoundsChip>
         )}
 
+        {/* Top Opportunity Alert — highlights the best deal in current view */}
+        {!mapFullscreen && !isLoading && !topOppDismissed && sorted.length >= 3 && (() => {
+          // Find the best-scoring plot with positive ROI in current filtered set
+          const topPlot = sorted.reduce<Plot | null>((best, pl) => {
+            const sc = calcScore(pl), rr = roi(pl), dd = p(pl)
+            if (sc < 7 || rr <= 0 || dd.price <= 0) return best
+            if (!best) return pl
+            const bestSc = calcScore(best)
+            return sc > bestSc ? pl : best
+          }, null)
+          if (!topPlot || selected?.id === topPlot.id) return null
+          const td = p(topPlot), tScore = calcScore(topPlot), tGrade = getGrade(tScore), tRoi = roi(topPlot)
+          return (
+            <TopOppBanner $show onClick={() => { selectPlot(topPlot); setTopOppDismissed(true) }}>
+              <TopOppIcon>💎</TopOppIcon>
+              <TopOppText>הזדמנות: גוש {td.block} · {topPlot.city}</TopOppText>
+              <TopOppValue>{tGrade.grade} · {fmt.compact(td.price)} · +{Math.round(tRoi)}%</TopOppValue>
+              <TopOppDismiss onClick={e => { e.stopPropagation(); setTopOppDismissed(true) }} aria-label="סגור">
+                <X size={10} />
+              </TopOppDismiss>
+            </TopOppBanner>
+          )
+        })()}
+
         {/* City Market Summary Card (shown when filtering by city) */}
         {!mapFullscreen && cityMarketStats && !isLoading && (
           <CityMarketCard>
@@ -2371,24 +2336,26 @@ export default function Explore() {
           <InsightsTickerWidget insights={marketInsights} hasCompare={compareIds.length > 0} />
         )}
 
-        {/* Stats bar — extracted memoized component to prevent re-renders on selection/sort/tab changes */}
+        {/* Stats bar — extracted component for better performance */}
         {!mapFullscreen && (
-          <StatsBarWidget
-            filtered={filtered}
-            avg={avg}
-            visibleInViewport={visibleInViewport}
-            totalPortfolioValue={totalPortfolioValue}
-            statsBarData={statsBarData}
-            marketMomentum={marketMomentum}
-            portfolioQuality={portfolioQuality}
-            apiLatency={apiLatency}
-            dataSource={dataSource}
-            sse={sse}
-            dataFreshness={dataFreshness}
-            isRefreshing={isRefreshing}
-            refreshData={refreshData}
-            onShortcutsOpen={() => setShortcutsOpen(true)}
-          />
+          <Suspense fallback={null}>
+            <StatsBarWidget
+              filtered={filtered}
+              avg={avg}
+              visibleInViewport={visibleInViewport}
+              totalPortfolioValue={totalPortfolioValue}
+              statsBarData={statsBarData}
+              marketMomentum={marketMomentum}
+              portfolioQuality={portfolioQuality}
+              apiLatency={apiLatency}
+              dataSource={dataSource}
+              sse={sse}
+              dataFreshness={dataFreshness}
+              isRefreshing={isRefreshing}
+              refreshData={refreshData}
+              onShortcutsOpen={() => setShortcutsOpen(true)}
+            />
+          </Suspense>
         )}
 
         {/* Mobile Favorites Overlay */}
@@ -2426,35 +2393,18 @@ export default function Explore() {
           )}
         </MobileOverlay>
 
-        {/* Mobile Nav — 3 tabs (no IIFE, computed inline for clarity) */}
-        {!mapFullscreen && (
-          <MobileNav role="navigation" aria-label="ניווט ראשי">
-            <NavIndicator
-              $idx={((tab === 'map' && listOpen) ? 'areas' : tab) === 'fav' ? 1 : ((tab === 'map' && listOpen) ? 'areas' : tab) === 'areas' ? 2 : 0}
-              $total={3}
-            />
-            <NavBtn $active={tab==='map' && !listOpen} onClick={()=>{ setTab('map'); setListOpen(false) }} aria-label="מפה" aria-current={tab==='map' && !listOpen ?'page':undefined}>
-              <NavBtnWrap>
-                <MapIcon size={20}/>
-              </NavBtnWrap>
-              מפה
-            </NavBtn>
-            <NavBtn $active={tab==='fav'} onClick={()=>{ setTab('fav'); setListOpen(false) }} aria-label={`מועדפים${favIds.length>0?` (${favIds.length})`:''}`} aria-current={tab==='fav'?'page':undefined}>
-              <NavBtnWrap>
-                <Heart size={20}/>
-                {favIds.length > 0 && <NavBadge>{favIds.length}</NavBadge>}
-              </NavBtnWrap>
-              מועדפים
-            </NavBtn>
-            <NavBtn $active={tab==='map' && listOpen} onClick={()=>{ setTab('map'); setListOpen(o => !o) }} aria-label="רשימת חלקות" aria-current={tab==='map' && listOpen?'page':undefined}>
-              <NavBtnWrap>
-                <Layers size={20}/>
-                {sorted.length > 0 && <NavBadge>{sorted.length > 99 ? '99+' : sorted.length}</NavBadge>}
-              </NavBtnWrap>
-              רשימה
-            </NavBtn>
-          </MobileNav>
-        )}
+        {/* Mobile Navigation */}
+        <Suspense fallback={null}>
+          <MobileNavigation
+            tab={tab}
+            listOpen={listOpen}
+            favIds={favIds}
+            sortedLength={sorted.length}
+            mapFullscreen={mapFullscreen}
+            onTabChange={setTab}
+            onListToggle={() => setListOpen(o => !o)}
+          />
+        </Suspense>
       </ErrorBoundary>
     </Wrap>
   )

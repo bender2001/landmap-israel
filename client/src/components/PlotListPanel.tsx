@@ -645,6 +645,47 @@ const ScrollTopBtn = styled.button<{ $visible: boolean }>`
   &:hover{transform:translateY(-2px);box-shadow:${t.sh.lg};}
 `
 
+/* ── Market Heat Index Styles ── */
+const MarketHeatStrip = styled.div`
+  padding:10px 14px 8px;border-bottom:1px solid ${t.border};flex-shrink:0;direction:rtl;
+`
+const MarketHeatHeader = styled.div`
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;
+`
+const MarketHeatTitle = styled.span`
+  font-size:10px;font-weight:700;color:${t.textDim};letter-spacing:0.3px;
+`
+const MarketHeatValue = styled.span<{$c:string}>`
+  font-size:11px;font-weight:800;color:${pr=>pr.$c};
+`
+const MarketHeatBarTrack = styled.div`
+  position:relative;width:100%;height:6px;border-radius:3px;overflow:visible;
+  background:linear-gradient(90deg,#3B82F6 0%,#F59E0B 50%,#EF4444 100%);
+  opacity:0.25;
+`
+const heatGlow = keyframes`0%,100%{box-shadow:0 0 4px currentColor}50%{box-shadow:0 0 10px currentColor}`
+const MarketHeatBarFill = styled.div<{$pct:number;$c:string}>`
+  position:absolute;top:0;right:0;height:100%;border-radius:3px;
+  width:${pr=>pr.$pct}%;
+  background:linear-gradient(90deg,#3B82F6,#F59E0B ${pr=>Math.min(70,pr.$pct)}%,#EF4444);
+  opacity:1;transition:width 0.8s cubic-bezier(0.32,0.72,0,1);
+`
+const MarketHeatBarPointer = styled.div<{$pct:number;$c:string}>`
+  position:absolute;top:-3px;right:${pr=>pr.$pct}%;transform:translateX(50%);
+  width:12px;height:12px;border-radius:50%;
+  background:${pr=>pr.$c};border:2px solid ${t.surface};
+  box-shadow:0 1px 4px rgba(0,0,0,0.3);
+  transition:right 0.8s cubic-bezier(0.32,0.72,0,1);
+  color:${pr=>pr.$c};
+  animation:${heatGlow} 2.5s ease-in-out infinite;
+`
+const MarketHeatMeta = styled.div`
+  display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap;
+`
+const MarketHeatMetaItem = styled.span`
+  font-size:9px;font-weight:600;color:${t.textDim};white-space:nowrap;
+`
+
 const GRADE_TIERS = [
   { min: 9, label: 'A/A+', color: '#10B981' },
   { min: 7, label: 'A-/B+', color: '#84CC16' },
@@ -1090,6 +1131,40 @@ function PlotListPanel({ plots, selected, onSelect, open, onToggle, isLoading, u
             </SummaryStat>
           </SummaryBar>
         )}
+        {/* Market Heat Index — compact market temperature indicator */}
+        {plots.length >= 3 && (() => {
+          const scores = plots.map(pl => calcScore(pl))
+          const avgScore = scores.reduce((s, v) => s + v, 0) / scores.length
+          const highScoreCount = scores.filter(s => s >= 7).length
+          const highScorePct = Math.round((highScoreCount / scores.length) * 100)
+          const hotDeals = plots.filter(pl => {
+            const d = p(pl)
+            return d.price > 0 && roi(pl) > 20
+          }).length
+          // Heat 0-100: combo of avg score, high-score %, and hot deals
+          const heat = Math.min(100, Math.round(
+            (avgScore / 10) * 35 + (highScorePct / 100) * 35 + Math.min(1, hotDeals / 3) * 30
+          ))
+          const heatColor = heat >= 70 ? '#EF4444' : heat >= 45 ? '#F59E0B' : '#3B82F6'
+          const heatLabel = heat >= 70 ? 'שוק חם 🔥' : heat >= 45 ? 'שוק פעיל 📈' : 'שוק יציב 🧊'
+          return (
+            <MarketHeatStrip>
+              <MarketHeatHeader>
+                <MarketHeatTitle>🌡️ מדד חום שוק</MarketHeatTitle>
+                <MarketHeatValue $c={heatColor}>{heat}/100 — {heatLabel}</MarketHeatValue>
+              </MarketHeatHeader>
+              <MarketHeatBarTrack>
+                <MarketHeatBarFill $pct={heat} $c={heatColor} />
+                <MarketHeatBarPointer $pct={heat} $c={heatColor} />
+              </MarketHeatBarTrack>
+              <MarketHeatMeta>
+                <MarketHeatMetaItem>⭐ {highScoreCount} ציון גבוה ({highScorePct}%)</MarketHeatMetaItem>
+                <MarketHeatMetaItem>🔥 {hotDeals} עסקאות חמות</MarketHeatMetaItem>
+                <MarketHeatMetaItem>📊 ממוצע {avgScore.toFixed(1)}/10</MarketHeatMetaItem>
+              </MarketHeatMeta>
+            </MarketHeatStrip>
+          )
+        })()}
         {/* City quick-filter chips */}
         {cityCounts.length > 1 && (
           <CityChipRow>

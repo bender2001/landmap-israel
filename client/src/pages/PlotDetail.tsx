@@ -816,6 +816,171 @@ const CompDelta = styled.div<{$positive:boolean}>`
   color:${pr=>pr.$positive?t.ok:t.err};
 `
 
+/* ── Radar/Spider Chart — visual multi-axis comparison ── */
+const RadarWrap = styled.div`
+  display:flex;flex-direction:column;align-items:center;gap:16px;margin-bottom:16px;
+`
+const RadarLegend = styled.div`
+  display:flex;align-items:center;gap:16px;justify-content:center;flex-wrap:wrap;
+`
+const RadarLegendItem = styled.div`
+  display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
+`
+const RadarLegendDot = styled.span<{$color:string;$dashed?:boolean}>`
+  width:12px;height:3px;border-radius:2px;
+  background:${pr=>pr.$dashed?'transparent':pr.$color};
+  border:${pr=>pr.$dashed?`1.5px dashed ${pr.$color}`:'none'};
+  flex-shrink:0;
+`
+
+function RadarChart({ plot, similarPlots }: { plot: Plot; similarPlots: Plot[] }) {
+  const allPlots = [plot, ...similarPlots]
+  if (allPlots.length < 2) return null
+
+  const d = p(plot), thisRoi = roi(plot), thisScore = calcScore(plot)
+  const thisPps = pricePerSqm(plot), thisPpd = pricePerDunam(plot)
+  const thisLocScore = calcLocationScore(plot).score
+
+  // Calculate area averages
+  const prices = allPlots.map(pl => p(pl).price).filter(v => v > 0)
+  const rois = allPlots.map(pl => roi(pl)).filter(v => v > 0)
+  const ppdList = allPlots.map(pl => pricePerDunam(pl)).filter(v => v > 0)
+  const scores = allPlots.map(pl => calcScore(pl))
+  const locScores = allPlots.map(pl => calcLocationScore(pl).score)
+
+  const avgPrice = prices.length ? prices.reduce((s, v) => s + v, 0) / prices.length : 0
+  const avgRoi = rois.length ? rois.reduce((s, v) => s + v, 0) / rois.length : 0
+  const avgPpd = ppdList.length ? Math.round(ppdList.reduce((s, v) => s + v, 0) / ppdList.length) : 0
+  const avgScore = scores.length ? scores.reduce((s, v) => s + v, 0) / scores.length : 0
+  const avgLocScore = locScores.length ? locScores.reduce((s, v) => s + v, 0) / locScores.length : 0
+
+  // Build radar axes: each metric normalized to 0-1 range
+  // For "lower is better" metrics (like price), invert so higher = better visually
+  const axes = [
+    { label: 'ציון השקעה', thisRaw: thisScore, avgRaw: avgScore, max: 10, lowerBetter: false },
+    { label: 'תשואה', thisRaw: thisRoi, avgRaw: avgRoi, max: Math.max(thisRoi, avgRoi, 50) || 50, lowerBetter: false },
+    { label: 'מחיר/דונם', thisRaw: thisPpd, avgRaw: avgPpd, max: Math.max(thisPpd, avgPpd) * 1.2 || 1, lowerBetter: true },
+    { label: 'מיקום', thisRaw: thisLocScore, avgRaw: avgLocScore, max: 10, lowerBetter: false },
+    { label: 'ערך שוק', thisRaw: d.price, avgRaw: avgPrice, max: Math.max(d.price, avgPrice) * 1.2 || 1, lowerBetter: true },
+  ].filter(a => a.thisRaw > 0 && a.avgRaw > 0)
+
+  if (axes.length < 3) return null
+
+  // Normalize to 0-1 (invert "lowerBetter" axes)
+  const thisNorm = axes.map(a => {
+    const norm = a.max > 0 ? a.thisRaw / a.max : 0
+    return a.lowerBetter ? Math.max(0, 1 - norm) : Math.min(1, norm)
+  })
+  const avgNorm = axes.map(a => {
+    const norm = a.max > 0 ? a.avgRaw / a.max : 0
+    return a.lowerBetter ? Math.max(0, 1 - norm) : Math.min(1, norm)
+  })
+
+  // SVG geometry
+  const cx = 140, cy = 130, radius = 95, n = axes.length
+  const angleStep = (2 * Math.PI) / n
+  const startAngle = -Math.PI / 2 // Start from top
+
+  function polarToXY(value: number, index: number): { x: number; y: number } {
+    const angle = startAngle + index * angleStep
+    const r = value * radius
+    return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) }
+  }
+
+  const gridLevels = [0.2, 0.4, 0.6, 0.8, 1.0]
+
+  const thisPath = thisNorm.map((v, i) => {
+    const { x, y } = polarToXY(v, i)
+    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ') + ' Z'
+
+  const avgPath = avgNorm.map((v, i) => {
+    const { x, y } = polarToXY(v, i)
+    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ') + ' Z'
+
+  return (
+    <RadarWrap>
+      <svg width="280" height="280" viewBox="0 0 280 260" style={{ overflow: 'visible' }}
+        role="img" aria-label="תרשים רדאר — השוואת חלקה לממוצע האזור"
+      >
+        <defs>
+          <linearGradient id="radarGoldGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={t.gold} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={t.goldBright} stopOpacity="0.08" />
+          </linearGradient>
+        </defs>
+        {/* Grid circles */}
+        {gridLevels.map(level => {
+          const pts = Array.from({ length: n }, (_, i) => {
+            const { x, y } = polarToXY(level, i)
+            return `${x.toFixed(1)},${y.toFixed(1)}`
+          })
+          return (
+            <polygon key={level} points={pts.join(' ')}
+              fill="none" stroke={t.lBorder} strokeWidth="0.8"
+              strokeDasharray={level < 1 ? '3 3' : 'none'}
+              opacity={level === 1 ? 0.6 : 0.3}
+            />
+          )
+        })}
+        {/* Axis lines */}
+        {axes.map((_, i) => {
+          const { x, y } = polarToXY(1, i)
+          return (
+            <line key={i} x1={cx} y1={cy} x2={x} y2={y}
+              stroke={t.lBorder} strokeWidth="0.6" opacity="0.4"
+            />
+          )
+        })}
+        {/* Average area (dashed, grey) */}
+        <path d={avgPath} fill="rgba(148,163,184,0.08)" stroke="#94A3B8" strokeWidth="1.5"
+          strokeDasharray="5 3" opacity="0.7"
+        />
+        {/* This plot area (solid, gold) */}
+        <path d={thisPath} fill="url(#radarGoldGrad)" stroke={t.gold} strokeWidth="2.5"
+          strokeLinejoin="round"
+        />
+        {/* This plot dots */}
+        {thisNorm.map((v, i) => {
+          const { x, y } = polarToXY(v, i)
+          return (
+            <circle key={i} cx={x} cy={y} r="4"
+              fill={t.gold} stroke="#fff" strokeWidth="2"
+              style={{ filter: 'drop-shadow(0 1px 3px rgba(212,168,75,0.4))' }}
+            />
+          )
+        })}
+        {/* Axis labels */}
+        {axes.map((a, i) => {
+          const { x, y } = polarToXY(1.2, i)
+          const textAnchor = x < cx - 10 ? 'end' : x > cx + 10 ? 'start' : 'middle'
+          const dy = y < cy - 20 ? '-4' : y > cy + 20 ? '12' : '4'
+          return (
+            <text key={i} x={x} y={y} dy={dy}
+              textAnchor={textAnchor}
+              fontSize="11" fontWeight="700" fill={t.lTextSec}
+              fontFamily={t.font} style={{ userSelect: 'none' }}
+            >
+              {a.label}
+            </text>
+          )
+        })}
+      </svg>
+      <RadarLegend>
+        <RadarLegendItem>
+          <RadarLegendDot $color={t.gold} />
+          <span style={{ color: t.gold, fontWeight: 700 }}>חלקה זו</span>
+        </RadarLegendItem>
+        <RadarLegendItem>
+          <RadarLegendDot $color="#94A3B8" $dashed />
+          <span style={{ color: t.lTextSec }}>ממוצע אזורי</span>
+        </RadarLegendItem>
+      </RadarLegend>
+    </RadarWrap>
+  )
+}
+
 function PlotVsAreaComparison({ plot, similarPlots }: { plot: Plot; similarPlots: Plot[] }) {
   const allPlots = [plot, ...similarPlots]
   if (allPlots.length < 2) return null
@@ -855,6 +1020,8 @@ function PlotVsAreaComparison({ plot, similarPlots }: { plot: Plot; similarPlots
       <CompVsAreaSubtitle>
         בהשוואה ל-{allPlots.length - 1} חלקות דומות ב{plot.city}
       </CompVsAreaSubtitle>
+      {/* Radar Chart — visual multi-axis comparison */}
+      <RadarChart plot={plot} similarPlots={similarPlots} />
       <CompGrid>
         {metrics.map(m => {
           const maxNum = Math.max(m.thisNum, m.avgNum) || 1

@@ -1203,14 +1203,17 @@ export const InlineFallback = () => (
 /* ── Cookie Consent Banner ── */
 const cookieSlideUp = keyframes`from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}`
 const CookieBanner = styled.div<{$show:boolean}>`
-  position:fixed;bottom:0;left:0;right:0;z-index:9999;
+  position:fixed;bottom:0;left:0;right:0;z-index:${t.z.toast + 5};
   display:${pr=>pr.$show?'flex':'none'};align-items:center;justify-content:center;
   gap:16px;padding:14px 24px;direction:rtl;
   background:rgba(17,24,39,0.97);backdrop-filter:blur(16px);
   border-top:1px solid rgba(212,168,75,0.2);
   box-shadow:0 -8px 32px rgba(0,0,0,0.3);
   animation:${cookieSlideUp} 0.4s cubic-bezier(0.32,0.72,0,1);
-  @media(max-width:640px){flex-direction:column;gap:10px;padding:14px 16px;text-align:center;}
+  @media(max-width:640px){
+    flex-direction:column;gap:10px;padding:14px 16px;text-align:center;
+    bottom:56px; /* Account for mobile navigation height */
+  }
 `
 const CookieText = styled.p`
   font-size:13px;color:rgba(255,255,255,0.8);margin:0;line-height:1.6;flex:1;
