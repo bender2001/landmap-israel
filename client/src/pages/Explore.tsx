@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense, memo, forwardRef } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus, Home, BarChart3, Building2, MapPin, Clock, TrainFront, Route, MessageCircle } from 'lucide-react'
+import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus, Home, BarChart3, Building2, MapPin, Clock, TrainFront, Route, MessageCircle, Link2, Check } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription, useRecentlyViewed, useDataFreshness, useApiLatency, useRefreshData } from '../hooks'
+import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription, useRecentlyViewed, useDataFreshness, useApiLatency, useRefreshData, useFocusTrap } from '../hooks'
 // Note: dataFreshness and dataSource are computed locally in this component (not via hooks)
 import MapArea from '../components/Map'
 import type { MapBounds } from '../components/Map'
@@ -590,6 +590,13 @@ const CompareClear = styled.button`
   background:transparent;border:1px solid ${t.border};border-radius:${t.r.sm};
   color:${t.textSec};cursor:pointer;transition:all ${t.tr};flex-shrink:0;
   &:hover{border-color:${t.err};color:${t.err};background:rgba(239,68,68,0.08);}
+`
+const CompareShareBtn = styled.button<{$copied?:boolean}>`
+  display:flex;align-items:center;justify-content:center;width:32px;height:32px;
+  background:${pr=>pr.$copied?'rgba(16,185,129,0.1)':'transparent'};
+  border:1px solid ${pr=>pr.$copied?'rgba(16,185,129,0.3)':t.border};border-radius:${t.r.sm};
+  color:${pr=>pr.$copied?t.ok:t.textSec};cursor:pointer;transition:all ${t.tr};flex-shrink:0;
+  &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
 `
 
 /* ── Empty State ── */
@@ -1309,9 +1316,12 @@ export default function Explore() {
   const [mobileExpanded, setMobileExpanded] = useState(false)
   const [mapFullscreen, setMapFullscreen] = useState(false)
   const [cityCompOpen, setCityCompOpen] = useState(false)
+  const cityCompTrapRef = useFocusTrap(cityCompOpen)
+  const [compareLinkCopied, setCompareLinkCopied] = useState(false)
   const toggleFullscreen = useCallback(() => setMapFullscreen(f => !f), [])
   const [visibleInViewport, setVisibleInViewport] = useState<number | null>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const kbDialogTrapRef = useFocusTrap(shortcutsOpen)
   const [areaBounds, setAreaBounds] = useState<MapBounds | null>(null)
 
   // API filters + data fetch — MUST come before any useMemo that depends on `plots`
@@ -1388,6 +1398,38 @@ export default function Explore() {
       }
     }
   }, [plots, searchParams])
+
+  // Restore compare IDs from URL on mount (enables shareable comparison links)
+  const compareUrlRestored = useRef(false)
+  useEffect(() => {
+    if (compareUrlRestored.current) return
+    const urlCompare = searchParams.get('compare')
+    if (urlCompare) {
+      compareUrlRestored.current = true
+      const ids = urlCompare.split(',').filter(Boolean)
+      for (const id of ids) {
+        if (!isCompared(id)) rawToggleCompare(id)
+      }
+      if (ids.length >= 2) setCompareOpen(true)
+    } else {
+      compareUrlRestored.current = true
+    }
+  }, [searchParams])
+
+  // Sync compare IDs → URL (so comparison state is shareable & bookmarkable)
+  useEffect(() => {
+    if (!compareUrlRestored.current) return
+    const sp = new URLSearchParams(searchParams)
+    if (compareIds.length > 0) {
+      sp.set('compare', compareIds.join(','))
+    } else {
+      sp.delete('compare')
+    }
+    // Only update if changed to avoid loops
+    const newQ = sp.toString()
+    const curQ = searchParams.toString()
+    if (newQ !== curQ) setSearchParams(sp, { replace: true })
+  }, [compareIds])
 
   const filtered = useMemo(() => {
     let list = plots
@@ -1657,6 +1699,20 @@ export default function Explore() {
       toast('לא ניתן להעתיק', 'info')
     }
   }, [toast])
+
+  // Copy shareable comparison link to clipboard
+  const copyCompareLink = useCallback(async () => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('compare', compareIds.join(','))
+    try {
+      await navigator.clipboard.writeText(url.toString())
+      setCompareLinkCopied(true)
+      toast('🔗 קישור השוואה הועתק ללוח', 'success')
+      setTimeout(() => setCompareLinkCopied(false), 2500)
+    } catch {
+      toast('לא ניתן להעתיק', 'info')
+    }
+  }, [compareIds, toast])
 
   // Mobile preview swipe-to-dismiss
   const previewRef = useRef<HTMLDivElement>(null)
@@ -2149,7 +2205,7 @@ export default function Explore() {
 
         {/* City Comparison Overlay Panel */}
         {!mapFullscreen && cityCompOpen && cityComparisonData.length > 1 && (
-          <CityCompPanel>
+          <CityCompPanel ref={cityCompTrapRef} role="dialog" aria-modal="false" aria-label="השוואת ערים">
             <CityCompHeader>
               <CityCompTitle><Building2 size={16} color={t.gold} /> השוואת ערים ({cityComparisonData.length})</CityCompTitle>
               <CityCompClose onClick={() => setCityCompOpen(false)} aria-label="סגור השוואת ערים"><X size={14} /></CityCompClose>
@@ -2264,6 +2320,12 @@ export default function Explore() {
                 <GitCompareArrows size={14} /> השווה
               </CompareAction>
             )}
+            {compareIds.length >= 2 && (
+              <CompareShareBtn $copied={compareLinkCopied} onClick={copyCompareLink}
+                aria-label="העתק קישור השוואה" title={compareLinkCopied ? 'הקישור הועתק!' : 'העתק קישור להשוואה'}>
+                {compareLinkCopied ? <Check size={14} /> : <Link2 size={14} />}
+              </CompareShareBtn>
+            )}
             <CompareClear onClick={clearCompare} aria-label="נקה השוואה"><Trash2 size={14} /></CompareClear>
           </CompareBar>
         )}
@@ -2280,7 +2342,7 @@ export default function Explore() {
 
         {/* Keyboard Shortcuts Dialog */}
         <KbBackdrop $open={shortcutsOpen} onClick={() => setShortcutsOpen(false)}>
-          <KbDialog onClick={e => e.stopPropagation()} role="dialog" aria-label="קיצורי מקלדת">
+          <KbDialog ref={kbDialogTrapRef} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="קיצורי מקלדת">
             <KbClose onClick={() => setShortcutsOpen(false)} aria-label="סגור"><X size={14} /></KbClose>
             <KbTitle><Keyboard size={20} color={t.gold} /> קיצורי מקלדת</KbTitle>
             <KbGroup>
