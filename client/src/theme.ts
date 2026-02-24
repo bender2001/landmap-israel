@@ -211,6 +211,8 @@ export const GlobalStyles = createGlobalStyle`
 
   /* Search in area button animation */
   @keyframes searchAreaFadeIn{from{opacity:0;transform:translateX(-50%) translateY(-8px) scale(0.92)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+  /* Map legend collapse/expand animation */
+  @keyframes legendFadeIn{from{opacity:0;transform:translateY(6px) scale(0.94)}to{opacity:1;transform:translateY(0) scale(1)}}
 
   /* Performance: GPU-composited layers for animated elements */
   .gpu-layer{will-change:transform;transform:translateZ(0)}

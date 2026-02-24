@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker,
 import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette, Ruler, Undo2, Trash2, LocateFixed, Copy, Check, Search } from 'lucide-react'
-import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, calcScoreBreakdown, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket, investmentRecommendation, estimatedYear, pricePosition, calcPercentileRank, findBestValueIds, estimateDemand, satelliteTileUrl, SITE_CONFIG } from '../utils'
+import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, calcScoreBreakdown, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket, investmentRecommendation, estimatedYear, pricePosition, calcPercentileRank, findBestValueIds, estimateDemand, satelliteTileUrl, SITE_CONFIG, dataFreshnessLabel } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
 import { israelAreas } from '../data'
@@ -375,23 +375,64 @@ function RulerTool({ active, darkMode, onPointsChange }: { active: boolean; dark
   )
 }
 
-// ── Map Legend ──
-// Legend wrapper with responsive bottom positioning
-function LegendBox({ darkMode, children }: { darkMode: boolean; children: React.ReactNode }) {
+// ── Map Legend (Collapsible) ──
+const LEGEND_COLLAPSED_KEY = 'landmap_legend_collapsed'
+
+function LegendBox({ darkMode, children, collapsed, onToggle }: {
+  darkMode: boolean; children: React.ReactNode; collapsed: boolean; onToggle: () => void
+}) {
+  const btnBg = darkMode ? 'rgba(11,17,32,0.92)' : 'rgba(255,255,255,0.95)'
+  const btnBorder = darkMode ? t.border : t.lBorder
   return (
     <div className="map-legend-box" style={{
       position: 'absolute', bottom: 48, right: 16, zIndex: t.z.controls,
-      background: darkMode ? 'rgba(11,17,32,0.92)' : 'rgba(255,255,255,0.95)',
-      backdropFilter: 'blur(12px)', borderRadius: t.r.md,
-      border: `1px solid ${darkMode ? t.border : t.lBorder}`,
-      padding: '8px 12px', direction: 'rtl' as const, boxShadow: t.sh.md,
+      display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4,
     }}>
-      {children}
+      {/* Collapse / expand toggle */}
+      <button
+        onClick={onToggle}
+        aria-label={collapsed ? 'הצג מקרא' : 'הסתר מקרא'}
+        title={collapsed ? 'הצג מקרא צבעים' : 'הסתר מקרא'}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          padding: collapsed ? '6px 10px' : '4px 8px',
+          background: btnBg, backdropFilter: 'blur(12px)',
+          border: `1px solid ${btnBorder}`, borderRadius: t.r.full,
+          color: darkMode ? t.gold : t.lText, cursor: 'pointer',
+          fontSize: 10, fontWeight: 700, fontFamily: t.font,
+          boxShadow: t.sh.sm, transition: `all ${t.tr}`,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {collapsed ? '🗂️ מקרא' : '✕'}
+      </button>
+      {/* Legend content */}
+      {!collapsed && (
+        <div style={{
+          background: btnBg, backdropFilter: 'blur(12px)',
+          borderRadius: t.r.md, border: `1px solid ${btnBorder}`,
+          padding: '8px 12px', direction: 'rtl' as const, boxShadow: t.sh.md,
+          animation: 'legendFadeIn 0.2s ease-out',
+        }}>
+          {children}
+        </div>
+      )}
     </div>
   )
 }
 
 function MapLegend({ colorMode, darkMode }: { colorMode: ColorMode; darkMode: boolean }) {
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(LEGEND_COLLAPSED_KEY) === 'true' } catch { return false }
+  })
+  const toggle = useCallback(() => {
+    setCollapsed(prev => {
+      const next = !prev
+      try { localStorage.setItem(LEGEND_COLLAPSED_KEY, String(next)) } catch {}
+      return next
+    })
+  }, [])
+
   const labelColor = darkMode ? t.textDim : t.lTextSec
   const textColor = darkMode ? t.textSec : t.lTextSec
 
@@ -403,7 +444,7 @@ function MapLegend({ colorMode, darkMode }: { colorMode: ColorMode; darkMode: bo
       { color: statusColors.SOLD, label: 'נמכר' },
     ]
     return (
-      <LegendBox darkMode={darkMode}>
+      <LegendBox darkMode={darkMode} collapsed={collapsed} onToggle={toggle}>
         <div style={{ fontSize: 10, fontWeight: 700, color: labelColor, marginBottom: 6 }}>
           {COLOR_MODE_LABELS[colorMode]}
         </div>
@@ -419,7 +460,7 @@ function MapLegend({ colorMode, darkMode }: { colorMode: ColorMode; darkMode: bo
 
   if (colorMode === 'grade') {
     return (
-      <LegendBox darkMode={darkMode}>
+      <LegendBox darkMode={darkMode} collapsed={collapsed} onToggle={toggle}>
         <div style={{ fontSize: 10, fontWeight: 700, color: labelColor, marginBottom: 6 }}>
           ציון השקעה
         </div>
@@ -436,7 +477,7 @@ function MapLegend({ colorMode, darkMode }: { colorMode: ColorMode; darkMode: bo
 
   if (colorMode === 'pps') {
     return (
-      <LegendBox darkMode={darkMode}>
+      <LegendBox darkMode={darkMode} collapsed={collapsed} onToggle={toggle}>
         <div style={{ fontSize: 10, fontWeight: 700, color: labelColor, marginBottom: 6 }}>
           ₪/מ״ר
         </div>
@@ -452,7 +493,7 @@ function MapLegend({ colorMode, darkMode }: { colorMode: ColorMode; darkMode: bo
 
   // heatmap mode
   return (
-    <LegendBox darkMode={darkMode}>
+    <LegendBox darkMode={darkMode} collapsed={collapsed} onToggle={toggle}>
       <div style={{ fontSize: 10, fontWeight: 700, color: labelColor, marginBottom: 6 }}>
         🔥 מפת חום — מחיר/מ״ר
       </div>
@@ -1120,6 +1161,19 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
                 {reco.emoji} {reco.text}
               </div>
             )
+          })()}
+
+          {/* Data freshness trust signal */}
+          {(() => {
+            const fresh = dataFreshnessLabel(d.updated || d.created)
+            return fresh ? (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 4, marginTop: 4,
+                fontSize: 9, fontWeight: 600, opacity: 0.6, direction: 'rtl',
+              }} title={fresh.tooltip}>
+                🔄 עודכן {fresh.label}
+              </div>
+            ) : null
           })()}
 
           {/* Navigation quick links row */}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import styled, { keyframes, createGlobalStyle } from 'styled-components'
-import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, TrendingDown, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon, MessageCircle, Compass, ClipboardCopy, Construction, Milestone, Phone, GitCompareArrows } from 'lucide-react'
+import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, TrendingDown, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon, MessageCircle, Compass, ClipboardCopy, Construction, Milestone, Phone, GitCompareArrows, RotateCcw } from 'lucide-react'
 import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites, useCompare, useSimilarPlots, useRecentlyViewed, useAllPlots, usePlotCityRanking } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard, ScrollToTop } from '../components/UI'
@@ -246,6 +246,20 @@ const HighlightVal = styled.div<{$c?:string}>`font-size:15px;font-weight:800;col
 
 const Center = styled.div`display:flex;align-items:center;justify-content:center;min-height:60vh;`
 
+/* ── Reading Progress Bar (must be before PrintStyles which references it) ── */
+const ReadingProgress = styled.div<{$pct:number}>`
+  position:fixed;top:0;left:0;right:0;height:3px;z-index:999;pointer-events:none;
+  background:transparent;
+  &::after{
+    content:'';position:absolute;top:0;left:0;height:100%;
+    width:${pr => pr.$pct}%;
+    background:linear-gradient(90deg,${t.gold},${t.goldBright});
+    transition:width 0.1s linear;
+    box-shadow:${pr => pr.$pct > 5 ? '0 0 8px rgba(212,168,75,0.4)' : 'none'};
+  }
+  @media print{display:none;}
+`
+
 /* ── Print Styles — professional investor report layout ── */
 const PrintStyles = createGlobalStyle`
   @media print {
@@ -329,20 +343,6 @@ const PrintStyles = createGlobalStyle`
     /* Hide reading progress bar */
     ${ReadingProgress} { display: none !important; }
   }
-`
-
-/* ── Reading Progress Bar ── */
-const ReadingProgress = styled.div<{$pct:number}>`
-  position:fixed;top:0;left:0;right:0;height:3px;z-index:999;pointer-events:none;
-  background:transparent;
-  &::after{
-    content:'';position:absolute;top:0;left:0;height:100%;
-    width:${pr => pr.$pct}%;
-    background:linear-gradient(90deg,${t.gold},${t.goldBright});
-    transition:width 0.1s linear;
-    box-shadow:${pr => pr.$pct > 5 ? '0 0 8px rgba(212,168,75,0.4)' : 'none'};
-  }
-  @media print{display:none;}
 `
 
 function useReadingProgress() {
@@ -1416,22 +1416,34 @@ export default function PlotDetail() {
   }, [plot, _d])
 
   if (isLoading) return <PublicLayout><PlotDetailSkeleton /></PublicLayout>
-  if (error || !plot) return (
-    <PublicLayout>
-      <Center>
-        <ErrorCenter>
-          <ErrorIcon>🔍</ErrorIcon>
-          <ErrorTitle>החלקה לא נמצאה</ErrorTitle>
-          <ErrorDesc>
-            ייתכן שהחלקה הוסרה או שהקישור שגוי.<br/>נסו לחפש חלקה אחרת במפה.
-          </ErrorDesc>
-          <ErrorBackLink to="/explore">
-            <MapPin size={16} /> חזרה למפה
-          </ErrorBackLink>
-        </ErrorCenter>
-      </Center>
-    </PublicLayout>
-  )
+  if (error || !plot) {
+    const isNetworkError = error && ('status' in (error as any) ? (error as any).status >= 500 : !navigator.onLine || String(error).includes('fetch') || String(error).includes('network') || String(error).includes('ECONNREFUSED'))
+    return (
+      <PublicLayout>
+        <Center>
+          <ErrorCenter>
+            <ErrorIcon>{isNetworkError ? '🔌' : '🔍'}</ErrorIcon>
+            <ErrorTitle>{isNetworkError ? 'שגיאת חיבור' : 'החלקה לא נמצאה'}</ErrorTitle>
+            <ErrorDesc>
+              {isNetworkError ? (
+                <>השרת אינו זמין כרגע.<br/>נסו לרענן את הדף או חזרו מאוחר יותר.</>
+              ) : (
+                <>ייתכן שהחלקה הוסרה או שהקישור שגוי.<br/>נסו לחפש חלקה אחרת במפה.</>
+              )}
+            </ErrorDesc>
+            {isNetworkError && (
+              <GhostButton onClick={() => window.location.reload()} style={{marginBottom: 8}}>
+                <RotateCcw size={14} /> רענון הדף
+              </GhostButton>
+            )}
+            <ErrorBackLink to="/explore">
+              <MapPin size={16} /> חזרה למפה
+            </ErrorBackLink>
+          </ErrorCenter>
+        </Center>
+      </PublicLayout>
+    )
+  }
 
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
   const cagr = calcCAGR(r, d.readiness), timeline = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot), ppd = pricePerDunam(plot)

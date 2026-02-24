@@ -35,6 +35,7 @@ export const p = (plot: Plot) => ({
   created: plot.created_at ?? plot.createdAt ?? '', seaDist: plot.distance_to_sea ?? plot.distanceToSea ?? null,
   parkDist: plot.distance_to_park ?? plot.distanceToPark ?? null,
   density: plot.density_units_per_dunam ?? plot.densityUnitsPerDunam ?? 0,
+  updated: plot.updated_at ?? plot.updatedAt ?? '',
 })
 export const roi = (plot: Plot) => { const { price, projected } = p(plot); return price > 0 ? ((projected - price) / price) * 100 : 0 }
 
@@ -146,6 +147,21 @@ export function daysOnMarket(created: string | null | undefined) {
   if (!created) return null; const d = Math.floor((Date.now() - new Date(created).getTime()) / 864e5)
   if (d <= 7) return { days: d, label: 'חדש', color: '#10B981' }; if (d <= 30) return { days: d, label: `${d} ימים`, color: '#84CC16' }
   if (d <= 90) return { days: d, label: `${Math.floor(d / 7)} שבועות`, color: '#F59E0B' }; return { days: d, label: `${Math.floor(d / 30)} חודשים`, color: '#EF4444' }
+}
+
+/** Relative freshness label for "last updated" — shows how recently data was refreshed */
+export function dataFreshnessLabel(updated: string | null | undefined): { label: string; color: string; tooltip: string } | null {
+  if (!updated) return null
+  const diffMs = Date.now() - new Date(updated).getTime()
+  if (diffMs < 0 || isNaN(diffMs)) return null
+  const hours = diffMs / 3.6e6
+  const days = Math.floor(hours / 24)
+  if (hours < 1) return { label: 'עכשיו', color: '#10B981', tooltip: `עודכן ${new Date(updated).toLocaleString('he-IL')}` }
+  if (hours < 24) return { label: `לפני ${Math.floor(hours)} שע׳`, color: '#10B981', tooltip: `עודכן ${new Date(updated).toLocaleString('he-IL')}` }
+  if (days <= 3) return { label: `לפני ${days} ימים`, color: '#84CC16', tooltip: `עודכן ${new Date(updated).toLocaleString('he-IL')}` }
+  if (days <= 7) return { label: `לפני שבוע`, color: '#F59E0B', tooltip: `עודכן ${new Date(updated).toLocaleString('he-IL')}` }
+  if (days <= 30) return { label: `לפני ${Math.floor(days / 7)} שבועות`, color: '#F97316', tooltip: `עודכן ${new Date(updated).toLocaleString('he-IL')}` }
+  return { label: `לפני ${Math.floor(days / 30)} חודשים`, color: '#EF4444', tooltip: `עודכן ${new Date(updated).toLocaleString('he-IL')}` }
 }
 
 // ── Geolocation Distance ──

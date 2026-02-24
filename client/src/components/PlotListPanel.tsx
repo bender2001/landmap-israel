@@ -3,7 +3,7 @@ import styled, { keyframes, css } from 'styled-components'
 import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download, Share2, MessageCircle, LayoutGrid, Table2, Eye } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, estimatedYear, findBestValueIds, SITE_CONFIG, plotCenter, satelliteTileUrl, investmentRecommendation, calcQuickInsight, estimateDemand, calcLocationScore } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, estimatedYear, findBestValueIds, SITE_CONFIG, plotCenter, satelliteTileUrl, investmentRecommendation, calcQuickInsight, estimateDemand, calcLocationScore, dataFreshnessLabel } from '../utils'
 import { Skeleton, PriceAlertButton } from './UI'
 import type { Plot } from '../types'
 
@@ -521,6 +521,14 @@ const InsightChip = styled.span<{$c:string}>`
   animation:${insightGlow} 3s ease-in-out infinite;
 `
 
+/* ── Data Freshness Badge (trust signal — "last updated") ── */
+const FreshnessBadge = styled.span<{$c:string}>`
+  display:inline-flex;align-items:center;gap:3px;font-size:8px;font-weight:700;
+  padding:1px 6px;border-radius:${t.r.full};color:${pr=>pr.$c};
+  background:${pr=>pr.$c}08;border:1px solid ${pr=>pr.$c}18;
+  white-space:nowrap;opacity:0.8;
+`
+
 /* ── WhatsApp Quick CTA ── */
 const WaCta = styled.a`
   display:flex;align-items:center;justify-content:center;width:28px;height:28px;
@@ -778,6 +786,7 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
   const center = plotCenter(plot.coordinates)
   const thumbUrl = center ? satelliteTileUrl(center.lat, center.lng) : null
   const locationScore = calcLocationScore(plot)
+  const freshness = dataFreshnessLabel(d.updated)
 
   // Zoning pipeline stage
   const zoningIdx = zoningPipeline.findIndex(z => z.key === d.zoning)
@@ -836,6 +845,7 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
           </Metric>
         )}
         {dom && <ItemDom $c={dom.color}>{dom.label}</ItemDom>}
+        {freshness && <FreshnessBadge $c={freshness.color} title={freshness.tooltip}>🔄 {freshness.label}</FreshnessBadge>}
         {(() => {
           // Show real views if available, otherwise show estimated demand
           const realViews = plot.views ?? 0
