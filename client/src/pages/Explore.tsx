@@ -9,7 +9,7 @@ import MapArea from '../components/Map'
 import type { MapBounds } from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, useToast, NetworkBanner, AnimatedValue, DemoModeBanner, StaleDataBanner, ExploreLoadingSkeleton, SidebarFallback, CompareDrawerFallback, InlineFallback } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcQuickInsight, pricePosition, findBestValueIds, calcAggregateStats, generateMarketInsights, plotCenter, daysOnMarket, estimateDemand, nearestTrainStation, nearestHighway, fmtDistance, SITE_CONFIG } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcQuickInsight, pricePosition, findBestValueIds, calcAggregateStats, generateMarketInsights, plotCenter, daysOnMarket, estimateDemand, nearestTrainStation, nearestHighway, fmtDistance, SITE_CONFIG, calcCityQualityScore } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -320,6 +320,34 @@ const HistogramLabels = styled.div`
 `
 const HistogramLabel = styled.span`
   font-size:7px;color:${t.textDim};
+`
+
+/* ── City Quality Score Gauge (neighborhood quality indicator) ── */
+const QualityGaugeWrap = styled.div`
+  margin-top:10px;padding-top:8px;border-top:1px solid ${t.border};
+`
+const QualityGaugeTitle = styled.div`
+  font-size:9px;font-weight:700;color:${t.textDim};margin-bottom:6px;letter-spacing:0.3px;
+  display:flex;align-items:center;gap:4px;
+`
+const QualityGaugeRow = styled.div`
+  display:flex;align-items:center;gap:8px;margin-bottom:3px;
+`
+const QualityGaugeIcon = styled.span`font-size:11px;flex-shrink:0;`
+const QualityGaugeLabel = styled.span`font-size:9px;font-weight:600;color:${t.textDim};min-width:36px;`
+const QualityGaugeTrack = styled.div`flex:1;height:5px;background:${t.bg};border-radius:3px;overflow:hidden;`
+const QualityGaugeFill = styled.div<{$w:number;$c:string}>`
+  height:100%;width:${pr=>pr.$w}%;background:${pr=>pr.$c};border-radius:3px;
+  transition:width 0.6s cubic-bezier(0.32,0.72,0,1);
+`
+const QualityGaugeScore = styled.div<{$c:string}>`
+  display:flex;align-items:center;gap:6px;margin-top:6px;
+`
+const QualityGaugeVal = styled.span<{$c:string}>`
+  font-size:16px;font-weight:900;color:${pr=>pr.$c};
+`
+const QualityGaugeText = styled.span<{$c:string}>`
+  font-size:10px;font-weight:700;color:${pr=>pr.$c};
 `
 
 /* ── City Comp Best Value Badge (extracted from inline) ── */
@@ -1452,6 +1480,12 @@ export default function Explore() {
     }
   }, [filters.city, filtered, avg])
 
+  // City/neighborhood quality score (aggregated location + infrastructure)
+  const cityQualityScore = useMemo(() => {
+    if (!filters.city || filters.city === 'all' || filtered.length === 0) return null
+    return calcCityQualityScore(filtered)
+  }, [filters.city, filtered])
+
   // City comparison data — deferred: only compute when panel is open (expensive O(n) with findBestValueIds)
   const cityComparisonData = useMemo(() => {
     if (!cityCompOpen || plots.length < 2) return []
@@ -1948,6 +1982,28 @@ export default function Explore() {
                   <HistogramLabel>{fmt.compact(cityMarketStats.maxPrice)}</HistogramLabel>
                 </HistogramLabels>
               </HistogramWrap>
+            )}
+            {/* Neighborhood Quality Score Gauge */}
+            {cityQualityScore && (
+              <QualityGaugeWrap>
+                <QualityGaugeTitle>🏘️ איכות שכונה</QualityGaugeTitle>
+                <QualityGaugeScore $c={cityQualityScore.color}>
+                  <QualityGaugeVal $c={cityQualityScore.color}>{cityQualityScore.score}</QualityGaugeVal>
+                  <QualityGaugeText $c={cityQualityScore.color}>{cityQualityScore.label}</QualityGaugeText>
+                </QualityGaugeScore>
+                {cityQualityScore.factors.slice(0, 3).map(f => (
+                  <QualityGaugeRow key={f.label}>
+                    <QualityGaugeIcon>{f.icon}</QualityGaugeIcon>
+                    <QualityGaugeLabel>{f.label}</QualityGaugeLabel>
+                    <QualityGaugeTrack>
+                      <QualityGaugeFill
+                        $w={(f.score / f.maxScore) * 100}
+                        $c={f.score / f.maxScore >= 0.7 ? t.ok : f.score / f.maxScore >= 0.4 ? t.warn : t.err}
+                      />
+                    </QualityGaugeTrack>
+                  </QualityGaugeRow>
+                ))}
+              </QualityGaugeWrap>
             )}
           </CityMarketCard>
         )}

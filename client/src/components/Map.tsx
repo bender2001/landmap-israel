@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker,
 import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette, Ruler, Undo2, Trash2, LocateFixed, Copy, Check, Search } from 'lucide-react'
-import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, calcScoreBreakdown, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket, investmentRecommendation, estimatedYear, pricePosition, calcPercentileRank, findBestValueIds, estimateDemand, satelliteTileUrl } from '../utils'
+import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, calcScoreBreakdown, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket, investmentRecommendation, estimatedYear, pricePosition, calcPercentileRank, findBestValueIds, estimateDemand, satelliteTileUrl, SITE_CONFIG } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
 import { israelAreas } from '../data'
@@ -1072,26 +1072,23 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
           {ppd > 0 && <div className="plot-popup-row"><span className="plot-popup-label">₪/דונם</span><span className="plot-popup-value">{fmt.num(ppd)}</span></div>}
           <div className="plot-popup-row"><span className="plot-popup-label">תשואה צפויה</span><span className="plot-popup-value gold">+{fmt.pct(r)}</span></div>
 
-          {/* Score breakdown mini-bars */}
+          {/* Score breakdown mini-bars (using CSS classes for dark mode) */}
           {(() => {
             const bd = calcScoreBreakdown(plot)
             if (!bd) return null
             return (
-              <div style={{
-                display: 'flex', flexDirection: 'column', gap: 3, marginTop: 6, padding: '6px 10px',
-                background: 'rgba(0,0,0,0.03)', borderRadius: t.r.sm, direction: 'rtl',
-              }}>
+              <div className="popup-score-breakdown">
                 {bd.factors.map(f => {
                   const pct = f.maxScore > 0 ? (f.score / f.maxScore) * 100 : 0
                   const barColor = pct >= 70 ? '#10B981' : pct >= 40 ? '#F59E0B' : '#EF4444'
                   return (
-                    <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }} title={f.detail}>
-                      <span style={{ fontSize: 10, flexShrink: 0 }}>{f.icon}</span>
-                      <span style={{ fontSize: 9, fontWeight: 600, color: t.textDim, minWidth: 48, flexShrink: 0 }}>{f.label}</span>
-                      <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: 2, transition: 'width 0.4s' }} />
+                    <div key={f.label} className="popup-score-row" title={f.detail}>
+                      <span className="popup-score-icon">{f.icon}</span>
+                      <span className="popup-score-label">{f.label}</span>
+                      <div className="popup-score-track">
+                        <div className="popup-score-fill" style={{ width: `${pct}%`, background: barColor }} />
                       </div>
-                      <span style={{ fontSize: 9, fontWeight: 800, color: barColor, minWidth: 20, textAlign: 'left' }}>{f.score}/{f.maxScore}</span>
+                      <span className="popup-score-val" style={{ color: barColor }}>{f.score}/{f.maxScore}</span>
                     </div>
                   )
                 })}
@@ -1103,12 +1100,9 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
           {(() => {
             const demand = estimateDemand(plot, plots)
             return demand.viewers >= 15 ? (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, padding: '4px 10px',
+              <div className="popup-demand" style={{
                 background: demand.intensity === 'hot' ? 'rgba(239,68,68,0.06)' : 'rgba(148,163,184,0.06)',
-                border: `1px solid ${demand.color}20`,
-                borderRadius: t.r.full, fontSize: 10, fontWeight: 700, color: demand.color,
-                direction: 'rtl',
+                border: `1px solid ${demand.color}20`, color: demand.color,
               }}>
                 👁 ~{demand.label} השבוע
                 {demand.intensity === 'hot' && <span style={{ fontSize: 9, fontWeight: 800, color: '#EF4444' }}>🔥 ביקוש גבוה</span>}
@@ -1120,11 +1114,8 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
           {(() => {
             const reco = investmentRecommendation(plot)
             return (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, padding: '5px 10px',
-                background: `${reco.color}10`, border: `1px solid ${reco.color}25`,
-                borderRadius: t.r.full, fontSize: 10, fontWeight: 800, color: reco.color,
-                direction: 'rtl',
+              <div className="popup-reco" style={{
+                background: `${reco.color}10`, border: `1px solid ${reco.color}25`, color: reco.color,
               }}>
                 {reco.emoji} {reco.text}
               </div>
@@ -1154,10 +1145,19 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
             <button className="plot-popup-cta" style={{ flex: 1 }} onClick={() => onLead(plot)}>
               <Phone size={13} /> קבל פרטים
             </button>
+            <a
+              href={`${SITE_CONFIG.waLink}?text=${encodeURIComponent(`שלום, אני מתעניין/ת בחלקה ${plot.number} גוש ${d.block} ב${plot.city} (${fmt.compact(d.price)})`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="plot-popup-wa"
+              title="צור קשר בוואטסאפ"
+            >
+              💬
+            </a>
             <a
               href={`/plot/${plot.id}`}
               onClick={(e) => { e.preventDefault(); navigate(`/plot/${plot.id}`) }}

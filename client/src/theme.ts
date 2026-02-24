@@ -141,6 +141,32 @@ export const GlobalStyles = createGlobalStyle`
   .plot-popup-cta{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:12px;width:100%;padding:8px;background:linear-gradient(135deg,${t.gold},${t.goldBright});border:none;border-radius:${t.r.sm};color:${t.bg};font-weight:700;font-size:12px;cursor:pointer;font-family:${t.font};transition:all ${t.tr}}
   .plot-popup-cta:hover{transform:translateY(-1px);box-shadow:${t.sh.glow}}
 
+  /* WhatsApp quick contact button in popup */
+  .plot-popup-wa{display:flex;align-items:center;justify-content:center;width:36px;height:36px;
+    border-radius:${t.r.sm};background:#25D366;border:none;cursor:pointer;
+    font-size:16px;line-height:1;transition:all ${t.tr};text-decoration:none!important;
+    box-shadow:0 2px 8px rgba(37,211,102,0.25);}
+  .plot-popup-wa:hover{background:#20bd5a;transform:translateY(-1px);box-shadow:0 4px 16px rgba(37,211,102,0.4);}
+
+  /* Dark-mode-aware popup score breakdown */
+  .popup-score-breakdown{display:flex;flex-direction:column;gap:3px;margin-top:6px;padding:6px 10px;
+    background:rgba(0,0,0,0.03);border-radius:${t.r.sm};direction:rtl;}
+  .dark .popup-score-breakdown{background:rgba(255,255,255,0.04);}
+  .popup-score-row{display:flex;align-items:center;gap:6px;}
+  .popup-score-icon{font-size:10px;flex-shrink:0;}
+  .popup-score-label{font-size:9px;font-weight:600;color:${t.lTextSec};min-width:48px;flex-shrink:0;}
+  .dark .popup-score-label{color:${t.textDim};}
+  .popup-score-track{flex:1;height:4px;border-radius:2px;background:rgba(0,0,0,0.06);overflow:hidden;}
+  .dark .popup-score-track{background:rgba(255,255,255,0.08);}
+  .popup-score-fill{height:100%;border-radius:2px;transition:width 0.4s;}
+  .popup-score-val{font-size:9px;font-weight:800;min-width:20px;text-align:left;}
+
+  /* Dark-mode popup demand badge */
+  .popup-demand{display:flex;align-items:center;gap:6px;margin-top:6px;padding:4px 10px;
+    border-radius:${t.r.full};font-size:10px;font-weight:700;direction:rtl;}
+  .popup-reco{display:flex;align-items:center;gap:6px;margin-top:6px;padding:5px 10px;
+    border-radius:${t.r.full};font-size:10px;font-weight:800;direction:rtl;}
+
   /* Best Value diamond marker */
   .plot-best-value-badge{background:none!important;border:none!important;pointer-events:none!important}
   .pbv-inner{display:inline-flex;align-items:center;gap:3px;padding:2px 10px;

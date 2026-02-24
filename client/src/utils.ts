@@ -1273,6 +1273,52 @@ export function generateMarketInsights(plots: Plot[], cityFilter?: string): Mark
   return insights
 }
 
+// ── City / Neighborhood Quality Score ──
+/** Compute an aggregate quality score for a set of plots in a city/area.
+ *  Averages individual location scores and adds bonuses for infrastructure density. */
+export function calcCityQualityScore(plots: Plot[]): {
+  score: number; label: string; color: string;
+  factors: { icon: string; label: string; score: number; maxScore: number }[];
+} | null {
+  if (plots.length === 0) return null
+
+  // Average location scores
+  const locScores = plots.map(pl => calcLocationScore(pl))
+  const avgLoc = locScores.reduce((s, ls) => s + ls.score, 0) / locScores.length
+
+  // Infrastructure availability: what % of plots have proximity tags?
+  const withSea = locScores.filter(ls => ls.tags.some(t => t.icon === '🌊')).length
+  const withTrain = locScores.filter(ls => ls.tags.some(t => t.icon === '🚂')).length
+  const withPark = locScores.filter(ls => ls.tags.some(t => t.icon === '🌳')).length
+
+  const seaPct = plots.length > 0 ? (withSea / plots.length) * 100 : 0
+  const trainPct = plots.length > 0 ? (withTrain / plots.length) * 100 : 0
+  const parkPct = plots.length > 0 ? (withPark / plots.length) * 100 : 0
+
+  // Average investment score (market quality proxy)
+  const avgInvestment = plots.reduce((s, pl) => s + calcScore(pl), 0) / plots.length
+
+  // Weighted composite: location quality 40%, investment 30%, infrastructure coverage 30%
+  const infraScore = ((seaPct + trainPct + parkPct) / 300) * 10 // normalize to 0-10
+  const composite = avgLoc * 0.4 + avgInvestment * 0.3 + infraScore * 0.3
+  const finalScore = Math.max(1, Math.min(10, Math.round(composite * 10) / 10))
+
+  const label = finalScore >= 8 ? 'שכונה מעולה' : finalScore >= 6 ? 'שכונה טובה'
+    : finalScore >= 4 ? 'שכונה סבירה' : 'שכונה מתפתחת'
+  const color = finalScore >= 8 ? '#10B981' : finalScore >= 6 ? '#84CC16'
+    : finalScore >= 4 ? '#F59E0B' : '#EF4444'
+
+  const factors = [
+    { icon: '📍', label: 'מיקום', score: Math.round(avgLoc * 10) / 10, maxScore: 10 },
+    { icon: '📊', label: 'השקעה', score: Math.round(avgInvestment * 10) / 10, maxScore: 10 },
+    { icon: '🌊', label: 'ים', score: Math.round(seaPct), maxScore: 100 },
+    { icon: '🚂', label: 'רכבת', score: Math.round(trainPct), maxScore: 100 },
+    { icon: '🌳', label: 'פארק', score: Math.round(parkPct), maxScore: 100 },
+  ]
+
+  return { score: finalScore, label, color, factors }
+}
+
 // ── Normalize ──
 export function normalizePlot(plot: Plot): Plot {
   return { ...plot, total_price: plot.totalPrice ?? plot.total_price, projected_value: plot.projectedValue ?? plot.projected_value,
