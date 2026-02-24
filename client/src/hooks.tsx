@@ -15,10 +15,16 @@ export function useAllPlots(filters: Partial<Filters> = {}) {
   return useQuery<Plot[]>({
     queryKey: ['plots', filters],
     queryFn: async () => {
+      const t0 = performance.now()
       try {
         const data = await api.getPlots(filters as Record<string, string>) as Plot[]
-        // Track data freshness
-        try { sessionStorage.setItem('data_last_fetched', String(Date.now())); sessionStorage.setItem('data_source', 'api') } catch {}
+        // Track data freshness + latency
+        const latencyMs = Math.round(performance.now() - t0)
+        try {
+          sessionStorage.setItem('data_last_fetched', String(Date.now()))
+          sessionStorage.setItem('data_source', 'api')
+          sessionStorage.setItem('api_latency_ms', String(latencyMs))
+        } catch {}
         return data.map(normalizePlot)
       } catch {
         try { sessionStorage.setItem('data_last_fetched', String(Date.now())); sessionStorage.setItem('data_source', 'demo') } catch {}
@@ -28,6 +34,37 @@ export function useAllPlots(filters: Partial<Filters> = {}) {
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   })
+}
+
+/** Track API response latency for UX confidence indicators */
+export function useApiLatency() {
+  const [latencyMs, setLatencyMs] = useState<number | null>(() => {
+    try { const v = sessionStorage.getItem('api_latency_ms'); return v ? Number(v) : null } catch { return null }
+  })
+  // Re-read on tab focus (fresh fetch might have updated it)
+  useEffect(() => {
+    const handler = () => {
+      try { const v = sessionStorage.getItem('api_latency_ms'); if (v) setLatencyMs(Number(v)) } catch {}
+    }
+    window.addEventListener('focus', handler)
+    return () => window.removeEventListener('focus', handler)
+  }, [])
+  // Also re-read after each query invalidation (new data fetch)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      try { const v = sessionStorage.getItem('api_latency_ms'); if (v) setLatencyMs(Number(v)) } catch {}
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [])
+  const label = latencyMs == null ? null :
+    latencyMs < 200 ? '⚡ מהיר' :
+    latencyMs < 800 ? '✓ תקין' :
+    latencyMs < 2000 ? '⏳ איטי' : '🐌 איטי מאוד'
+  const color = latencyMs == null ? null :
+    latencyMs < 200 ? '#10B981' :
+    latencyMs < 800 ? '#10B981' :
+    latencyMs < 2000 ? '#F59E0B' : '#EF4444'
+  return { latencyMs, label, color }
 }
 
 export function usePlot(id: string | undefined) {

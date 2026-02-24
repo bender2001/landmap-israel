@@ -3,7 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus, Home, BarChart3, Building2, MapPin, Clock, TrainFront, Route } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription, useRecentlyViewed, useDataFreshness } from '../hooks'
+import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription, useRecentlyViewed, useDataFreshness, useApiLatency } from '../hooks'
 // Note: dataFreshness and dataSource are computed locally in this component (not via hooks)
 import MapArea from '../components/Map'
 import type { MapBounds } from '../components/Map'
@@ -355,6 +355,23 @@ const CityCompCardCount = styled.span`
 const CityCompMetricValSm = styled(CityCompMetricVal)`font-size:11px;`
 const CityCompScoreGrade = styled.span<{$c:string}>`
   font-size:10px;font-weight:800;color:${pr=>pr.$c};
+`
+
+/* ── Extracted inline styles for CityMarket price range ── */
+const CityMarketStatValSm = styled(CityMarketStatVal)`font-size:11px;`
+const MobileCityValSm = styled(MobileCityVal)`font-size:10px;`
+
+/* ── Flipped chevron for RTL prev-arrow ── */
+const ChevronRight = styled(ChevronLeft)`transform:rotate(180deg);`
+
+/* ── API Latency Badge in stats bar ── */
+const LatencyBadge = styled.span<{$c:string}>`
+  display:inline-flex;align-items:center;gap:3px;
+  font-size:10px;font-weight:600;color:${pr=>pr.$c};
+  padding:2px 8px;border-radius:${t.r.full};
+  background:${pr=>`${pr.$c}08`};border:1px solid ${pr=>`${pr.$c}15`};
+  white-space:nowrap;transition:all 0.3s;
+  ${mobile}{display:none;}
 `
 
 /* ── Stats bar ₪/dunam average ── */
@@ -978,7 +995,7 @@ const MobilePreviewCard = memo(forwardRef<HTMLDivElement, MobilePreviewProps>(
           {allSorted.length > 1 && (
             <PreviewNavRow>
               <PreviewNavBtn $disabled={!hasPrev} onClick={goPrev} aria-label="חלקה קודמת">
-                <ChevronLeft size={14} style={{ transform: 'rotate(180deg)' }} /> הקודמת
+                <ChevronRight size={14} /> הקודמת
               </PreviewNavBtn>
               <PreviewNavCounter>{plotIdx + 1} / {allSorted.length}</PreviewNavCounter>
               <PreviewNavBtn $disabled={!hasNext} onClick={goNext} aria-label="חלקה הבאה">
@@ -1143,6 +1160,7 @@ export default function Explore() {
   const isMobile = useIsMobile()
   const recentlyViewed = useRecentlyViewed()
   const dataFreshness = useDataFreshness()
+  const apiLatency = useApiLatency()
   const [mobileExpanded, setMobileExpanded] = useState(false)
   const [mapFullscreen, setMapFullscreen] = useState(false)
   const [cityCompOpen, setCityCompOpen] = useState(false)
@@ -1790,7 +1808,7 @@ export default function Explore() {
                 <CityMarketStatLabel>ציון ממוצע</CityMarketStatLabel>
               </CityMarketStat>
               <CityMarketStat>
-                <CityMarketStatVal style={{fontSize:11}}>{fmt.compact(cityMarketStats.minPrice)}–{fmt.compact(cityMarketStats.maxPrice)}</CityMarketStatVal>
+                <CityMarketStatValSm>{fmt.compact(cityMarketStats.minPrice)}–{fmt.compact(cityMarketStats.maxPrice)}</CityMarketStatValSm>
                 <CityMarketStatLabel>טווח מחירים</CityMarketStatLabel>
               </CityMarketStat>
             </CityMarketGrid>
@@ -1841,7 +1859,7 @@ export default function Explore() {
             </MobileCityStat>
             <MobileCitySep />
             <MobileCityStat>
-              <MobileCityVal style={{fontSize:10}}>{fmt.compact(cityMarketStats.minPrice)}–{fmt.compact(cityMarketStats.maxPrice)}</MobileCityVal>
+              <MobileCityValSm>{fmt.compact(cityMarketStats.minPrice)}–{fmt.compact(cityMarketStats.maxPrice)}</MobileCityValSm>
             </MobileCityStat>
           </MobileCityStrip>
         )}
@@ -2162,6 +2180,15 @@ export default function Explore() {
                 </GaugeTrack>
                 <GaugeLabel $c={portfolioQuality.grade.color}>{portfolioQuality.avg}</GaugeLabel>
               </PortfolioGauge>
+            )}
+            {/* API response latency — data confidence indicator */}
+            {apiLatency.latencyMs != null && apiLatency.color && dataSource === 'api' && (
+              <LatencyBadge
+                $c={apiLatency.color}
+                title={`זמן תגובת שרת: ${apiLatency.latencyMs}ms — ${apiLatency.label}`}
+              >
+                {apiLatency.label} {apiLatency.latencyMs}ms
+              </LatencyBadge>
             )}
             {sse.status === 'connected' ? (
               <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים מתעדכנים אוטומטית${dataFreshness.relativeTime ? ` · עודכן ${dataFreshness.relativeTime}` : ''}`}>

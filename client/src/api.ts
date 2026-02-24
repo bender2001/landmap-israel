@@ -1,5 +1,19 @@
 const BASE = '/api'
 
+/** User-friendly Hebrew error messages for common HTTP status codes */
+const HTTP_ERROR_MESSAGES: Record<number, string> = {
+  400: 'בקשה לא תקינה — נסו שוב',
+  401: 'נדרשת התחברות מחדש',
+  403: 'אין הרשאה לפעולה זו',
+  404: 'המשאב המבוקש לא נמצא',
+  408: 'הבקשה ארכה יותר מדי זמן — נסו שוב',
+  429: 'יותר מדי בקשות — נסו שוב בעוד כמה שניות',
+  500: 'שגיאת שרת — הצוות שלנו מטפל',
+  502: 'שגיאת תקשורת עם השרת',
+  503: 'השרת אינו זמין כרגע — נסו שוב מאוחר יותר',
+  504: 'תם הזמן לתגובת השרת — נסו שוב',
+}
+
 /**
  * Smart retry with exponential backoff.
  * Retries on network errors and 5xx status codes (server transient failures).
@@ -44,7 +58,7 @@ async function fetchWithRetry(
       throw err
     }
   }
-  throw lastError || new Error('Request failed after retries')
+  throw lastError || new Error('הבקשה נכשלה לאחר מספר ניסיונות — בדקו את חיבור האינטרנט')
 }
 
 async function req(path: string, opts: RequestInit & { timeoutMs?: number; retries?: number } = {}): Promise<unknown> {
@@ -60,7 +74,10 @@ async function req(path: string, opts: RequestInit & { timeoutMs?: number; retri
   )
   if (!r.ok) {
     const b = await r.json().catch(() => ({})) as Record<string, unknown>
-    throw Object.assign(new Error((b.error as string) || `Error ${r.status}`), { status: r.status })
+    const serverMsg = b.error as string | undefined
+    const hebrewMsg = HTTP_ERROR_MESSAGES[r.status]
+    const message = serverMsg || hebrewMsg || `שגיאה ${r.status}`
+    throw Object.assign(new Error(message), { status: r.status, serverError: serverMsg, hebrewMessage: hebrewMsg })
   }
   return r.json()
 }
