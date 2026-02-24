@@ -3,7 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus, Home, BarChart3, Building2, MapPin, Clock, TrainFront, Route } from 'lucide-react'
 import { t, mobile } from '../theme'
-import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription, useRecentlyViewed, useDataFreshness, useApiLatency } from '../hooks'
+import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription, useRecentlyViewed, useDataFreshness, useApiLatency, useRefreshData } from '../hooks'
 // Note: dataFreshness and dataSource are computed locally in this component (not via hooks)
 import MapArea from '../components/Map'
 import type { MapBounds } from '../components/Map'
@@ -1161,6 +1161,7 @@ export default function Explore() {
   const recentlyViewed = useRecentlyViewed()
   const dataFreshness = useDataFreshness()
   const apiLatency = useApiLatency()
+  const { refresh: refreshData, refreshing: isRefreshing } = useRefreshData()
   const [mobileExpanded, setMobileExpanded] = useState(false)
   const [mapFullscreen, setMapFullscreen] = useState(false)
   const [cityCompOpen, setCityCompOpen] = useState(false)
@@ -1715,19 +1716,19 @@ export default function Explore() {
     <Wrap className="dark" aria-label="מפת חלקות להשקעה">
       <SkipLink href="#landmap-map-region">דלג לתוכן המפה</SkipLink>
       <ErrorBoundary>
-        <NetworkBanner online={online} wasOffline={wasOffline} onRetry={() => window.location.reload()} />
+        <NetworkBanner online={online} wasOffline={wasOffline} onRetry={refreshData} />
         {dataSource === 'demo' && !isLoading && online && (
-          <DemoModeBanner onRetry={() => window.location.reload()} />
+          <DemoModeBanner onRetry={refreshData} />
         )}
         {/* Stale data banner — show when data is > 5 min old and not in demo mode */}
         {!isLoading && dataSource === 'api' && dataFreshness.lastFetched &&
          (Date.now() - dataFreshness.lastFetched > 5 * 60 * 1000) && (
           <StaleDataBanner
             age={dataFreshness.relativeTime}
-            onRefresh={() => window.location.reload()}
+            onRefresh={refreshData}
           />
         )}
-        <TopProgress $show={isLoading} />
+        <TopProgress $show={isLoading || isRefreshing} />
         {isLoading && <ExploreLoadingSkeleton />}
         <div id="landmap-map-region" />
         <MapArea
@@ -2196,12 +2197,12 @@ export default function Explore() {
               </LiveBadge>
             ) : dataSource === 'api' ? (
               <ClickableLiveBadge $connected={false} title={`נתונים מהשרת${dataFreshness.relativeTime ? ` · עודכן ${dataFreshness.relativeTime}` : ''} — לחץ לרענון`}
-                onClick={() => { window.location.reload() }}>
-                <LiveDot $c={t.warn} /> {dataFreshness.relativeTime && dataFreshness.relativeTime !== 'עכשיו' ? dataFreshness.relativeTime : 'נתוני שרת'} ↻
+                onClick={refreshData}>
+                <LiveDot $c={t.warn} /> {isRefreshing ? 'מרענן...' : (dataFreshness.relativeTime && dataFreshness.relativeTime !== 'עכשיו' ? dataFreshness.relativeTime : 'נתוני שרת')} ↻
               </ClickableLiveBadge>
             ) : (
               <ClickableDemo title="נתונים לדוגמה — לחץ לנסות שוב"
-                onClick={() => { window.location.reload() }}>נתוני דמו ↻</ClickableDemo>
+                onClick={refreshData}>{isRefreshing ? 'מרענן...' : 'נתוני דמו'} ↻</ClickableDemo>
             )}
             <KbHintBtn onClick={() => setShortcutsOpen(true)} title="קיצורי מקלדת (?)">
               <Keyboard size={10} /> ?

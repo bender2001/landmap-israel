@@ -3,7 +3,7 @@ import styled, { keyframes, css } from 'styled-components'
 import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, ChevronLeft, BarChart3, ArrowDown, ArrowUp, Minus, ExternalLink, Activity, ChevronDown as LoadMoreIcon, Download, Share2, MessageCircle, LayoutGrid, Table2, Eye } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
-import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, estimatedYear, findBestValueIds, SITE_CONFIG, plotCenter, satelliteTileUrl, investmentRecommendation, calcQuickInsight, estimateDemand } from '../utils'
+import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, estimatedYear, findBestValueIds, SITE_CONFIG, plotCenter, satelliteTileUrl, investmentRecommendation, calcQuickInsight, estimateDemand, calcLocationScore } from '../utils'
 import { Skeleton, PriceAlertButton } from './UI'
 import type { Plot } from '../types'
 
@@ -326,6 +326,14 @@ const DemandBadge = styled.span<{$c:string;$hot?:boolean}>`
   background:${pr=>pr.$c}10;border:1px solid ${pr=>pr.$c}22;
   white-space:nowrap;
   ${pr=>pr.$hot?css`animation:${demandPulse} 2s ease-in-out infinite;`:''};
+`
+
+/* ── Location Quality Score Badge ── */
+const LocationScoreBadge = styled.span<{$c:string}>`
+  display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;
+  padding:2px 8px;border-radius:${t.r.full};color:${pr=>pr.$c};
+  background:${pr=>pr.$c}10;border:1px solid ${pr=>pr.$c}22;
+  white-space:nowrap;letter-spacing:0.2px;
 `
 
 /* ── View Toggle ── */
@@ -769,6 +777,7 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
   const reco = investmentRecommendation(plot)
   const center = plotCenter(plot.coordinates)
   const thumbUrl = center ? satelliteTileUrl(center.lat, center.lng) : null
+  const locationScore = calcLocationScore(plot)
 
   // Zoning pipeline stage
   const zoningIdx = zoningPipeline.findIndex(z => z.key === d.zoning)
@@ -786,6 +795,11 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
           {isNew && <NewBadge>✨ חדש</NewBadge>}
           {isHot && <HotBadge>🔥 HOT</HotBadge>}
           {percentile && <PercentileBadge $c={percentile.color}>{percentile.icon} {percentile.label}</PercentileBadge>}
+          {locationScore.score >= 6 && (
+            <LocationScoreBadge $c={locationScore.color} title={`ציון מיקום: ${locationScore.score}/10 — ${locationScore.label}`}>
+              📍 {locationScore.label}
+            </LocationScoreBadge>
+          )}
           {estYear && <EstYearBadge title={`${estYear.monthsLeft} חודשים צפויים`}>🏗️ {estYear.label}</EstYearBadge>}
           {isBestValue && <BestValueBadge title="ערך הכי טוב בעיר — ציון גבוה + מחיר מתחת לממוצע">💎 BEST VALUE</BestValueBadge>}
         </ItemBadgesLeft>

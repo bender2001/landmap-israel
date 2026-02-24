@@ -341,6 +341,29 @@ export function useDataFreshness() {
   return { lastFetched, markFetched, relativeTime }
 }
 
+/** Smart data refresh via React Query cache invalidation — avoids full page reload */
+export function useRefreshData() {
+  const qc = useQueryClient()
+  const [refreshing, setRefreshing] = useState(false)
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      // Invalidate all plot-related queries — triggers background refetch
+      await qc.invalidateQueries({ queryKey: ['plots'] })
+      // Also invalidate individual plot pages and similar plots
+      await qc.invalidateQueries({ queryKey: ['plot'] })
+      await qc.invalidateQueries({ queryKey: ['similar-plots'] })
+      // Update freshness timestamp
+      try { sessionStorage.setItem('data_last_fetched', String(Date.now())) } catch {}
+    } finally {
+      setRefreshing(false)
+    }
+  }, [qc])
+
+  return { refresh, refreshing }
+}
+
 // ── Auth ──
 
 interface AuthCtx {

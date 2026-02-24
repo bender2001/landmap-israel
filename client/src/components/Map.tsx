@@ -488,8 +488,14 @@ function MapControls({ darkMode, tileIdx, setTileIdx, showCadastral, setShowCada
     backdropFilter: 'blur(12px)', color: darkMode ? t.gold : t.lText,
     fontSize: 18, fontWeight: 700, transition: `all ${t.tr}`, fontFamily: t.font,
   })
-  // Larger touch targets on mobile via CSS media query — inline styles applied conditionally
-  const isMobileTouch = typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches
+  // Dynamic mobile detection — responds to viewport changes (rotation, resize)
+  const [isMobileTouch, setIsMobileTouch] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches)
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 639px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobileTouch(e.matches)
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [])
   const mobileBtnStyle = (darkMode: boolean): React.CSSProperties => ({
     ...btnStyle(darkMode),
     ...(isMobileTouch ? { width: 48, height: 48 } : {}),
