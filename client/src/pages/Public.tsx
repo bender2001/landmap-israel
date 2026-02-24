@@ -712,11 +712,90 @@ function Privacy() {
   )
 }
 
+/* ══════ ACCESSIBILITY STATEMENT ══════ */
+function Accessibility() {
+  return (
+    <LegalWrap>
+      <LegalTitle>♿ הצהרת נגישות</LegalTitle>
+      <LegalDate>עדכון אחרון: פברואר 2026</LegalDate>
+      <LegalBody>
+        <LegalSection>
+          <LegalH2>מחויבות לנגישות</LegalH2>
+          <LegalP>
+            LandMap Israel מחויבת להנגשת האתר והשירותים שלנו לכלל האוכלוסייה, כולל אנשים עם מוגבלויות.
+            אנו שואפים לעמוד בתקן הנגישות הישראלי (תקנות שוויון זכויות לאנשים עם מוגבלות, 2013)
+            וב-WCAG 2.1 ברמת AA.
+          </LegalP>
+        </LegalSection>
+
+        <LegalSection>
+          <LegalH2>פעולות נגישות שביצענו</LegalH2>
+          <LegalList>
+            <li>קישור "דלג לתוכן הראשי" בכל עמוד</li>
+            <li>תמיכה מלאה בניווט מקלדת (קיצורי מקלדת בעמוד המפה — לחצו ? לצפייה)</li>
+            <li>תגיות ARIA מלאות לכל רכיבים אינטראקטיביים</li>
+            <li>תמיכה בהגדלת טקסט (עד 200%) ללא אובדן תוכן</li>
+            <li>יחסי ניגודיות צבע העומדים בתקן WCAG AA</li>
+            <li>כיבוד הגדרת "הפחתת תנועה" (prefers-reduced-motion) במערכת ההפעלה</li>
+            <li>כיבוד הגדרת "ניגודיות גבוהה" (prefers-contrast) במערכת ההפעלה</li>
+            <li>כיבוד כיוון קריאה RTL (ימין לשמאל) לעברית</li>
+            <li>טפסים עם שגיאות ברורות ותוויות מלאות</li>
+            <li>תמיכה בגישה מכל מכשיר — נייד, טאבלט ומחשב</li>
+            <li>מטא-תגיות SEO ונתונים מובנים (Schema.org) לנגישות מנועי חיפוש</li>
+            <li>חלון חיפוש מהיר (Ctrl+K) נגיש לניווט מקלדת</li>
+          </LegalList>
+        </LegalSection>
+
+        <LegalSection>
+          <LegalH2>קיצורי מקלדת</LegalH2>
+          <LegalP>בעמוד המפה האינטראקטיבית:</LegalP>
+          <LegalList>
+            <li><strong>/</strong> — מיקוד שדה חיפוש</li>
+            <li><strong>?</strong> — הצגת כל קיצורי המקלדת</li>
+            <li><strong>F</strong> — מפה במסך מלא</li>
+            <li><strong>L</strong> — פתיחת/סגירת רשימת חלקות</li>
+            <li><strong>Escape</strong> — סגירת חלוניות</li>
+            <li><strong>←/→</strong> — ניווט בין חלקות</li>
+            <li><strong>Ctrl+K</strong> — חיפוש מהיר (מכל עמוד)</li>
+          </LegalList>
+        </LegalSection>
+
+        <LegalSection>
+          <LegalH2>דפדפנים נתמכים</LegalH2>
+          <LegalP>
+            האתר נבדק ותומך בדפדפנים: Chrome, Firefox, Safari ו-Edge בגרסאותיהם האחרונות.
+            מומלץ להשתמש בגרסה עדכנית לחוויה מיטבית.
+          </LegalP>
+        </LegalSection>
+
+        <LegalSection>
+          <LegalH2>נתקלתם בבעיית נגישות?</LegalH2>
+          <LegalP>
+            אנו עובדים ללא הרף לשפר את נגישות האתר. אם נתקלתם בבעיה או שיש לכם הצעות שיפור,
+            נשמח לשמוע:
+          </LegalP>
+          <LegalList>
+            <li>אימייל: <a href="mailto:accessibility@landmap.co.il">accessibility@landmap.co.il</a></li>
+            <li>טלפון: <a href={`tel:${SITE_CONFIG.phone}`}>{SITE_CONFIG.phone}</a></li>
+            <li><a href="/contact">טופס יצירת קשר</a></li>
+          </LegalList>
+          <LegalP>
+            נשתדל לטפל בפניות נגישות תוך 5 ימי עסקים.
+          </LegalP>
+        </LegalSection>
+      </LegalBody>
+      <LegalFooter>
+        © {new Date().getFullYear()} LandMap Israel · <a href="/terms">תנאי שימוש</a> · <a href="/privacy">מדיניות פרטיות</a>
+      </LegalFooter>
+    </LegalWrap>
+  )
+}
+
 export default function Public() {
   const { pathname } = useLocation()
   const titleMap: Record<string, string> = {
     '/about': 'אודות', '/contact': 'צור קשר', '/pricing': 'תוכניות ומחירים',
-    '/terms': 'תנאי שימוש', '/privacy': 'מדיניות פרטיות',
+    '/terms': 'תנאי שימוש', '/privacy': 'מדיניות פרטיות', '/accessibility': 'הצהרת נגישות',
   }
   const descMap: Record<string, string> = {
     '/about': 'LandMap Israel — פלטפורמת השקעות קרקעות מובילה בישראל עם מפה אינטראקטיבית וניתוח AI.',
@@ -724,6 +803,7 @@ export default function Public() {
     '/pricing': 'תוכניות מנוי LandMap Israel — גישה חינמית למפה, כלים מתקדמים למשקיעים ועסקים.',
     '/terms': 'תנאי השימוש באתר LandMap Israel — פלטפורמת השקעות קרקעות בישראל.',
     '/privacy': 'מדיניות הפרטיות של LandMap Israel — כיצד אנו אוספים, משתמשים ומגנים על המידע שלך.',
+    '/accessibility': 'הצהרת נגישות — מחויבות LandMap Israel לנגישות אתר לאנשים עם מוגבלויות.',
   }
   useDocumentTitle(titleMap[pathname] || 'אודות')
   useMetaDescription(descMap[pathname])
@@ -734,6 +814,7 @@ export default function Public() {
     case '/pricing': page = <Pricing />; break
     case '/terms': page = <Terms />; break
     case '/privacy': page = <Privacy />; break
+    case '/accessibility': page = <Accessibility />; break
     default: page = <About />
   }
   return <PublicLayout>{page}</PublicLayout>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import styled, { css } from 'styled-components'
-import { Menu, X, Map, Calculator, Info, CreditCard, LayoutDashboard, Heart, GitCompare, Settings, Users, FileText, BarChart3, LogOut, ChevronRight } from 'lucide-react'
+import { Menu, X, Map, Calculator, Info, CreditCard, LayoutDashboard, Heart, GitCompare, Settings, Users, FileText, BarChart3, LogOut, ChevronRight, Search, Command } from 'lucide-react'
 import { t, sm, md, lg, mobile, fadeIn, fadeInUp } from '../theme'
 import { useAuth } from '../hooks'
 import type { Role } from '../types'
@@ -43,6 +43,33 @@ const BtnGold = styled(Link)`
   padding: 8px 18px; border-radius: ${t.r.full}; font-size: 13px; font-weight: 600;
   background: ${goldGrad}; color: ${t.black}; text-decoration: none !important;
   transition: all ${tr}; &:hover { box-shadow: ${t.sh.glow}; transform: translateY(-1px); }
+`
+const SearchTrigger = styled.button`
+  display:inline-flex;align-items:center;gap:8px;padding:6px 14px;
+  background:${t.lBorder};border:1px solid transparent;border-radius:${t.r.full};
+  color:${t.lTextSec};font-size:13px;font-family:${t.font};font-weight:500;
+  cursor:pointer;transition:all ${tr};white-space:nowrap;
+  &:hover{border-color:${t.gold};color:${t.gold};background:${t.goldDim};}
+  ${mobile}{padding:6px;gap:0;width:36px;height:36px;justify-content:center;border-radius:${t.r.md};}
+`
+const SearchTriggerText = styled.span`${mobile}{display:none;}`
+const SearchTriggerKbd = styled.kbd`
+  display:inline-flex;align-items:center;gap:2px;padding:1px 6px;
+  font-size:10px;font-weight:600;font-family:${t.font};line-height:1.4;
+  color:${t.lTextSec};background:rgba(0,0,0,0.05);
+  border:1px solid ${t.lBorder};border-radius:4px;
+  ${mobile}{display:none;}
+`
+const MobileActions = styled.div`
+  display:none;align-items:center;gap:4px;
+  ${mobile}{display:flex;}
+`
+const MobileSearchBtn = styled.button`
+  display:flex;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:${t.r.md};
+  background:none;border:none;color:${t.lText};cursor:pointer;
+  transition:all ${tr};
+  &:hover{background:${t.lBorder};color:${t.gold};}
 `
 const Burger = styled.button`
   display: none; background: none; border: none; color: ${t.lText}; cursor: pointer; padding: 8px;
@@ -100,10 +127,32 @@ export function PublicNav() {
             })}
           </NavLinks>
           <AuthBtns>
+            <SearchTrigger
+              onClick={() => {
+                // Dispatch Ctrl+K to open the command palette
+                window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
+              }}
+              aria-label="חיפוש מהיר (Ctrl+K)"
+              title="חיפוש מהיר (Ctrl+K)"
+            >
+              <Search size={15} />
+              <SearchTriggerText>חיפוש</SearchTriggerText>
+              <SearchTriggerKbd>⌘K</SearchTriggerKbd>
+            </SearchTrigger>
             <BtnGhost to="/login">התחבר</BtnGhost>
             <BtnGold to="/login">הרשם</BtnGold>
           </AuthBtns>
-          <Burger onClick={() => setMobileOpen(true)} aria-label="תפריט"><Menu size={24} /></Burger>
+          <MobileActions>
+            <MobileSearchBtn
+              onClick={() => {
+                window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
+              }}
+              aria-label="חיפוש מהיר"
+            >
+              <Search size={18} />
+            </MobileSearchBtn>
+            <Burger onClick={() => setMobileOpen(true)} aria-label="תפריט"><Menu size={24} /></Burger>
+          </MobileActions>
         </NavInner>
       </NavWrap>
       <MobileMenu $open={mobileOpen}>

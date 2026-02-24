@@ -14,6 +14,7 @@ const Public = lazy(() => import('./pages/Public'))
 const UserDash = lazy(() => import('./pages/UserDash'))
 const Business = lazy(() => import('./pages/Business'))
 const Admin = lazy(() => import('./pages/Admin'))
+const CommandPalette = lazy(() => import('./components/CommandPalette'))
 
 /* ── Premium 404 Page ── */
 const nfFloat = keyframes`0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}`
@@ -94,6 +95,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <a href="#main-content" className="skip-link">דלג לתוכן הראשי</a>
+      <Suspense fallback={null}><CommandPalette /></Suspense>
       <Suspense fallback={<PageLoader />}>
         <main id="main-content">
         <Routes>
@@ -107,6 +109,7 @@ export default function App() {
           <Route path="/pricing" element={<Public />} />
           <Route path="/terms" element={<Public />} />
           <Route path="/privacy" element={<Public />} />
+          <Route path="/accessibility" element={<Public />} />
 
           {/* User */}
           <Route path="/dashboard" element={<RoleGuard role={['user', 'business', 'admin']}><UserDash /></RoleGuard>} />
