@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import styled, { keyframes, createGlobalStyle } from 'styled-components'
-import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, TrendingDown, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon, MessageCircle, Compass, ClipboardCopy, Construction, Milestone, Phone } from 'lucide-react'
+import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, TrendingDown, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon, MessageCircle, Compass, ClipboardCopy, Construction, Milestone, Phone, GitCompareArrows } from 'lucide-react'
 import { t, sm, md, lg, fadeInUp } from '../theme'
-import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed, useAllPlots, usePlotCityRanking } from '../hooks'
+import { usePlot, useFavorites, useCompare, useSimilarPlots, useRecentlyViewed, useAllPlots, usePlotCityRanking } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard, ScrollToTop } from '../components/UI'
 import { PublicLayout } from '../components/Layout'
 import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, plotCenter, calcRisk, calcLocationScore, setOgMeta, removeOgMeta, SITE_CONFIG, calcExitScenarios, estimatedYear, satelliteTileUrl } from '../utils'
@@ -110,7 +110,7 @@ const MetricVal = styled.div`font-size:24px;font-weight:800;color:${t.lText};fon
 const MetricLabel = styled.div`font-size:12px;color:${t.lTextSec};margin-top:4px;`
 
 const Grid = styled.div`display:grid;grid-template-columns:1fr;gap:24px;${lg}{grid-template-columns:1fr 360px;}`
-const Card = styled(AnimatedCard)`background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};padding:24px;`
+const Card = styled(AnimatedCard)`background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};padding:24px;contain:layout style;`
 const CardTitle = styled.h3`font-size:16px;font-weight:700;color:${t.lText};display:flex;align-items:center;gap:8px;margin-bottom:16px;font-family:${t.font};`
 const Row = styled.div`display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid ${t.lBorder};&:last-child{border:none;}`
 const Label = styled.span`font-size:13px;color:${t.lTextSec};`
@@ -418,6 +418,8 @@ const ChartValueLabel = styled.div<{$gold?:boolean}>`
   font-size:11px;font-weight:800;color:${pr=>pr.$gold?t.gold:t.lText};font-family:${t.font};
   display:flex;align-items:center;gap:3px;
 `
+const ChartFooter = styled.div`display:flex;justify-content:space-between;align-items:center;margin-top:4px;`
+const ChartCagrVal = styled.span`color:${t.gold};font-weight:800;`
 function InvestmentProjectionChart({ price, projected, years }: { price: number; projected: number; years: number }) {
   if (price <= 0 || projected <= 0 || years <= 0) return null
   const w = 320, h = 140, padL = 8, padR = 8, padT = 20, padB = 30
@@ -476,10 +478,10 @@ function InvestmentProjectionChart({ price, projected, years }: { price: number;
           {fmt.compact(projected)}
         </text>
       </svg>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-        <ChartValueLabel>📈 צמיחה שנתית: <span style={{ color: t.gold, fontWeight: 800 }}>{(cagr * 100).toFixed(1)}%</span></ChartValueLabel>
+      <ChartFooter>
+        <ChartValueLabel>📈 צמיחה שנתית: <ChartCagrVal>{(cagr * 100).toFixed(1)}%</ChartCagrVal></ChartValueLabel>
         <ChartValueLabel $gold>+{fmt.compact(projected - price)} רווח צפוי</ChartValueLabel>
-      </div>
+      </ChartFooter>
     </ChartWrap>
   )
 }
@@ -647,6 +649,70 @@ const AgentMetaRow = styled.div`
 const AgentMetaItem = styled.span`display:flex;align-items:center;gap:4px;white-space:nowrap;`
 const AgentMetaVal = styled.span`color:${t.lText};font-weight:700;`
 
+/* ── Extracted inline styles → styled components (perf: avoids new objects each render) ── */
+const FlexCol = styled.div<{$gap?:number}>`display:flex;flex-direction:column;gap:${pr=>pr.$gap||24}px;`
+const ErrorCenter = styled.div`text-align:center;direction:rtl;padding:40px;`
+const ErrorIcon = styled.div`font-size:56px;margin-bottom:16px;`
+const ErrorTitle = styled.h2`font-size:24px;font-weight:800;color:${t.lText};margin-bottom:8px;font-family:${t.font};`
+const ErrorDesc = styled.p`font-size:14px;color:${t.lTextSec};margin-bottom:24px;line-height:1.6;`
+const ErrorBackLink = styled(Link)`
+  display:inline-flex;align-items:center;gap:8px;padding:12px 28px;
+  background:linear-gradient(135deg,${t.gold},${t.goldBright});color:${t.bg};
+  border-radius:${t.r.full};font-weight:700;font-size:15px;font-family:${t.font};
+  text-decoration:none;transition:all ${t.tr};
+  &:hover{box-shadow:${t.sh.glow};transform:translateY(-2px);}
+`
+const StickyNavLabel = styled.span`
+  font-size:13px;font-weight:800;color:${t.lText};white-space:nowrap;
+  margin-inline-end:8px;font-family:${t.font};
+`
+const StickyNavSep = styled.span`width:1px;height:20px;background:${t.lBorder};flex-shrink:0;`
+const MetricDelta = styled.div<{$positive:boolean}>`
+  font-size:10px;font-weight:700;margin-top:4px;display:flex;align-items:center;
+  justify-content:center;gap:2px;color:${pr=>pr.$positive?t.ok:t.err};
+`
+const CardSubtitle = styled.div`font-size:12px;color:${t.lTextSec};margin-bottom:16px;line-height:1.6;`
+const ExitIntro = styled.div`font-size:13px;color:${t.lTextSec};margin-top:-8px;margin-bottom:4px;line-height:1.6;`
+const CommitteeDate = styled.span`margin-right:8px;font-size:11px;color:${t.lTextSec};`
+const DescriptionText = styled.p`font-size:14px;color:${t.lTextSec};line-height:1.8;margin:0;`
+const AmenitiesWrap = styled.div`margin-top:12px;`
+const AmenitiesTitle = styled.div`font-size:12px;font-weight:700;color:${t.lTextSec};margin-bottom:10px;`
+const TaxCompNote = styled.div`font-size:11px;color:${t.lTextSec};margin-top:8px;line-height:1.5;`
+const CompVsAreaSubtitle = styled.div`font-size:12px;color:${t.lTextSec};margin-top:-8px;margin-bottom:8px;`
+const SummaryDot = styled.span`color:${t.lBorder};margin:0 6px;`
+const SummaryGradeBadge = styled.span<{$color:string}>`
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:3px 10px;border-radius:${t.r.full};
+  background:${pr=>`${pr.$color}18`};border:1px solid ${pr=>`${pr.$color}30`};
+  font-size:13px;font-weight:800;color:${pr=>pr.$color};font-family:${t.font};
+`
+const SummaryActions = styled.span`
+  margin-inline-start:auto;flex-shrink:0;display:flex;align-items:center;gap:4px;
+`
+const RiskScoreLabel = styled.span<{$color:string}>`
+  font-size:12px;font-weight:800;color:${pr=>pr.$color};min-width:28px;text-align:center;
+`
+const SimilarSection = styled.div`margin-top:32px;`
+const SatThumbWrap = styled.div`position:relative;width:100%;height:80px;overflow:hidden;`
+const SatThumbOverlay = styled.div`
+  position:absolute;inset:0;
+  background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,0.45));
+`
+const BarSpacer = styled.span`flex:1;`
+const BarGetInfoBtn = styled(GoldButton)`padding:12px 32px;border-radius:${t.r.full};`
+const CompareToggleBtn = styled(IconBtn)<{$active?:boolean}>`
+  position:relative;
+  ${pr=>pr.$active?`background:rgba(139,92,246,0.12);border-color:rgba(139,92,246,0.3);color:#8B5CF6;`:''}
+`
+const CompareBadge = styled.span`
+  position:absolute;top:-4px;right:-4px;
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:16px;height:16px;padding:0 3px;
+  background:#8B5CF6;color:#fff;border-radius:${t.r.full};
+  font-size:9px;font-weight:800;line-height:1;
+  box-shadow:0 1px 4px rgba(139,92,246,0.4);
+`
+
 /* ── Lazy Satellite Thumbnail ── */
 const SatThumbImg = styled.img`
   width:100%;height:80px;object-fit:cover;display:block;
@@ -720,9 +786,9 @@ function PlotVsAreaComparison({ plot, similarPlots }: { plot: Plot; similarPlots
   return (
     <CompVsArea $delay={0.22}>
       <CardTitle><BarChart3 size={18} color={t.gold} /> השוואה לממוצע האזור</CardTitle>
-      <div style={{ fontSize: 12, color: t.lTextSec, marginTop: -8, marginBottom: 8 }}>
+      <CompVsAreaSubtitle>
         בהשוואה ל-{allPlots.length - 1} חלקות דומות ב{plot.city}
-      </div>
+      </CompVsAreaSubtitle>
       <CompGrid>
         {metrics.map(m => {
           const maxNum = Math.max(m.thisNum, m.avgNum) || 1
@@ -1142,6 +1208,7 @@ export default function PlotDetail() {
   const { id } = useParams<{ id: string }>()
   const { data: plot, isLoading, error } = usePlot(id)
   const { isFav, toggle } = useFavorites()
+  const { ids: compareIds, toggle: toggleCompare, has: isInCompare } = useCompare()
   const { add: addRecentlyViewed } = useRecentlyViewed()
   const [leadOpen, setLeadOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -1284,21 +1351,16 @@ export default function PlotDetail() {
   if (error || !plot) return (
     <PublicLayout>
       <Center>
-        <div style={{ textAlign:'center', direction:'rtl', padding:40 }}>
-          <div style={{ fontSize:56, marginBottom:16 }}>🔍</div>
-          <h2 style={{ fontSize:24, fontWeight:800, color:t.lText, marginBottom:8, fontFamily:t.font }}>החלקה לא נמצאה</h2>
-          <p style={{ fontSize:14, color:t.lTextSec, marginBottom:24, lineHeight:1.6 }}>
+        <ErrorCenter>
+          <ErrorIcon>🔍</ErrorIcon>
+          <ErrorTitle>החלקה לא נמצאה</ErrorTitle>
+          <ErrorDesc>
             ייתכן שהחלקה הוסרה או שהקישור שגוי.<br/>נסו לחפש חלקה אחרת במפה.
-          </p>
-          <Link to="/explore" style={{
-            display:'inline-flex', alignItems:'center', gap:8, padding:'12px 28px',
-            background:`linear-gradient(135deg,${t.gold},${t.goldBright})`, color:t.bg,
-            borderRadius:t.r.full, fontWeight:700, fontSize:15, fontFamily:t.font,
-            textDecoration:'none', transition:`all ${t.tr}`,
-          }}>
+          </ErrorDesc>
+          <ErrorBackLink to="/explore">
             <MapPin size={16} /> חזרה למפה
-          </Link>
-        </div>
+          </ErrorBackLink>
+        </ErrorCenter>
       </Center>
     </PublicLayout>
   )
@@ -1366,10 +1428,8 @@ export default function PlotDetail() {
         <PlotJsonLd plot={plot} />
         {/* Sticky scroll-spy navigation */}
         <StickyNav $show={showSticky} aria-label="ניווט מהיר">
-          <span style={{ fontSize: 13, fontWeight: 800, color: t.lText, whiteSpace: 'nowrap', marginInlineEnd: 8, fontFamily: t.font }}>
-            גוש {d.block} · {plot.number}
-          </span>
-          <span style={{ width: 1, height: 20, background: t.lBorder, flexShrink: 0 }} />
+          <StickyNavLabel>גוש {d.block} · {plot.number}</StickyNavLabel>
+          <StickyNavSep />
           {sectionIds.map(sid => (
             <SectionNavBtn key={sid} href={`#${sid}`} $active={activeId === sid}>
               {sectionLabels[sid]?.icon} {sectionLabels[sid]?.label}
@@ -1406,6 +1466,15 @@ export default function PlotDetail() {
                 <MapIcon size={16} /> הצג במפה
               </ViewOnMapBtn>
               <IconBtn $active={isFav(plot.id)} onClick={() => toggle(plot.id)} aria-label="מועדפים"><Heart size={20} fill={isFav(plot.id) ? t.gold : 'none'} /></IconBtn>
+              <CompareToggleBtn
+                $active={isInCompare(plot.id)}
+                onClick={() => toggleCompare(plot.id)}
+                aria-label={isInCompare(plot.id) ? 'הסר מהשוואה' : 'הוסף להשוואה'}
+                title={isInCompare(plot.id) ? 'הסר מהשוואה' : 'הוסף להשוואה'}
+              >
+                <GitCompareArrows size={20} />
+                {compareIds.length > 0 && <CompareBadge>{compareIds.length}</CompareBadge>}
+              </CompareToggleBtn>
               <IconBtn onClick={handleShare} aria-label="שיתוף">{copied ? <Check size={20} color={t.ok} /> : <Share2 size={20} />}</IconBtn>
               <PrintBtn onClick={() => window.print()} aria-label="הדפס דו״ח"><Printer size={20} /></PrintBtn>
               <IconBtn aria-label="ניווט" onClick={() => window.open(`https://waze.com/ul?ll=${plot.coordinates?.[0]?.[0]},${plot.coordinates?.[0]?.[1]}&navigate=yes`, '_blank')}><Navigation size={20} /></IconBtn>
@@ -1421,10 +1490,10 @@ export default function PlotDetail() {
                 if (avgPrice <= 0) return null
                 const pct = Math.round(((d.price - avgPrice) / avgPrice) * 100)
                 return pct !== 0 ? (
-                  <div style={{ fontSize: 10, fontWeight: 700, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, color: pct < 0 ? t.ok : t.err }}>
+                  <MetricDelta $positive={pct < 0}>
                     {pct < 0 ? <TrendingDown size={10} /> : <TrendingUp size={10} />}
                     {pct > 0 ? '+' : ''}{pct}% מהממוצע
-                  </div>
+                  </MetricDelta>
                 ) : null
               })()}
             </Metric>
@@ -1437,10 +1506,10 @@ export default function PlotDetail() {
                 if (avgPpd <= 0) return null
                 const pct = Math.round(((ppd - avgPpd) / avgPpd) * 100)
                 return pct !== 0 ? (
-                  <div style={{ fontSize: 10, fontWeight: 700, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, color: pct < 0 ? t.ok : t.err }}>
+                  <MetricDelta $positive={pct < 0}>
                     {pct < 0 ? <TrendingDown size={10} /> : <TrendingUp size={10} />}
                     {pct > 0 ? '+' : ''}{pct}% מהממוצע
-                  </div>
+                  </MetricDelta>
                 ) : null
               })()}
             </Metric>}
@@ -1453,10 +1522,10 @@ export default function PlotDetail() {
                 if (avgRoi <= 0) return null
                 const pct = Math.round(((r - avgRoi) / avgRoi) * 100)
                 return pct !== 0 ? (
-                  <div style={{ fontSize: 10, fontWeight: 700, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, color: pct > 0 ? t.ok : t.err }}>
+                  <MetricDelta $positive={pct > 0}>
                     {pct > 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
                     {pct > 0 ? '+' : ''}{pct}% מהממוצע
-                  </div>
+                  </MetricDelta>
                 ) : null
               })()}
             </Metric>
@@ -1468,21 +1537,16 @@ export default function PlotDetail() {
             <SummaryBar>
               <SummaryIcon>{grade.grade === 'A+' || grade.grade === 'A' ? '🏆' : grade.grade.startsWith('A') ? '⭐' : '📊'}</SummaryIcon>
               <span>
-                {investmentSummary.split(' · ').map((part, i, arr) => (
+                {investmentSummary.split(' · ').map((part, i) => (
                   <span key={i}>
-                    {i > 0 && <span style={{ color: t.lBorder, margin: '0 6px' }}>·</span>}
+                    {i > 0 && <SummaryDot>·</SummaryDot>}
                     {i === 0 ? part : <SummaryHighlight>{part}</SummaryHighlight>}
                   </span>
                 ))}
               </span>
-              <span style={{ marginInlineStart: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ 
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  padding: '3px 10px', borderRadius: t.r.full,
-                  background: `${grade.color}18`, border: `1px solid ${grade.color}30`,
-                  fontSize: 13, fontWeight: 800, color: grade.color,
-                }}>{grade.grade}</span>
-              </span>
+              <SummaryActions>
+                <SummaryGradeBadge $color={grade.color}>{grade.grade}</SummaryGradeBadge>
+              </SummaryActions>
             </SummaryBar>
           )}
 
@@ -1497,7 +1561,7 @@ export default function PlotDetail() {
 
           <Grid>
             {/* Main column */}
-            <div style={{display:'flex',flexDirection:'column',gap:24}}>
+            <FlexCol>
               <Card $delay={0.1} id="investment">
                 <CardTitle><TrendingUp size={18} color={t.gold} /> ניתוח השקעה</CardTitle>
                 <Row><Label>מחיר שמאי</Label><Value>{fmt.price(plot.standard22?.value || 0)}</Value></Row>
@@ -1556,13 +1620,13 @@ export default function PlotDetail() {
                         <TaxCompVal $color="#3B82F6">{fmt.compact(taxComparison.taxVal)}</TaxCompVal>
                       </TaxCompBarRow>
                     </TaxCompBars>
-                    <div style={{ fontSize: 11, color: t.lTextSec, marginTop: 8, lineHeight: 1.5 }}>
+                    <TaxCompNote>
                       {taxComparison.delta > 10
                         ? '⚠️ מחיר השוק גבוה משמעותית משומת המיסים — בדקו שהמחיר מוצדק'
                         : taxComparison.delta < -10
                         ? '✅ מחיר מתחת לשומה — ייתכן שמדובר בהזדמנות'
                         : 'ℹ️ מחיר השוק קרוב לשומת המיסים — תמחור סביר'}
-                    </div>
+                    </TaxCompNote>
                   </TaxCompWrap>
                 )}
                 {/* Copy Investment Report */}
@@ -1578,7 +1642,7 @@ export default function PlotDetail() {
                   <RiskLabel $color={risk.color}>{risk.icon} {risk.label}</RiskLabel>
                   <RiskMeter>
                     <RiskBar $pct={risk.score * 10} $color={risk.color} />
-                    <span style={{ fontSize: 12, fontWeight: 800, color: risk.color, minWidth: 28, textAlign: 'center' }}>{risk.score}/10</span>
+                    <RiskScoreLabel $color={risk.color}>{risk.score}/10</RiskScoreLabel>
                   </RiskMeter>
                 </RiskHeader>
                 <RiskFactors>
@@ -1598,9 +1662,9 @@ export default function PlotDetail() {
               {exitScenarios && exitScenarios.length > 0 && (
                 <ExitCard $delay={0.16} id="exit-strategy">
                   <CardTitle><Milestone size={18} color={t.gold} /> אסטרטגיית יציאה — תרחישי מכירה</CardTitle>
-                  <div style={{ fontSize: 13, color: t.lTextSec, marginTop: -8, marginBottom: 4, lineHeight: 1.6 }}>
+                  <ExitIntro>
                     מה יקרה אם תמכרו בכל שלב תכנוני? הנה התרחישים:
-                  </div>
+                  </ExitIntro>
                   <ExitGrid>
                     {exitScenarios.map((sc, i) => {
                       const isBest = sc.annualized === Math.max(...exitScenarios.map(s => s.annualized))
@@ -1694,9 +1758,9 @@ export default function PlotDetail() {
               {cityRanking && (
                 <Card $delay={0.24} id="city-ranking">
                   <CardTitle><BarChart3 size={18} color={t.gold} /> דירוג ב{cityRanking.city}</CardTitle>
-                  <div style={{ fontSize: 12, color: t.lTextSec, marginBottom: 16, lineHeight: 1.6 }}>
+                  <CardSubtitle>
                     מיקום החלקה מתוך {cityRanking.plotCount} חלקות ב{cityRanking.city}
-                  </div>
+                  </CardSubtitle>
                   <RankGrid>
                     <RankCell $highlight={cityRanking.price.isBelowAvg}>
                       <RankLabel>מחיר</RankLabel>
@@ -1787,7 +1851,7 @@ export default function PlotDetail() {
                         <Badge $color={c.status === 'approved' ? t.ok : c.status === 'in_preparation' ? t.warn : t.info}>
                           {c.status === 'approved' ? 'מאושר' : c.status === 'in_preparation' ? 'בהכנה' : c.status === 'pending' ? 'ממתין' : c.status === 'in_discussion' ? 'בדיון' : 'טרם התחיל'}
                         </Badge>
-                        {c.date && <span style={{marginRight:8,fontSize:11,color:t.lTextSec}}>{c.date}</span>}
+                        {c.date && <CommitteeDate>{c.date}</CommitteeDate>}
                       </Value>
                     </Row>
                   ))}
@@ -1797,7 +1861,7 @@ export default function PlotDetail() {
               {plot.description && (
                 <Card $delay={0.35}>
                   <CardTitle><FileText size={18} color={t.gold} /> תיאור</CardTitle>
-                  <p style={{fontSize:14,color:t.lTextSec,lineHeight:1.8}}>{plot.description}</p>
+                  <DescriptionText>{plot.description}</DescriptionText>
                 </Card>
               )}
 
@@ -1805,7 +1869,7 @@ export default function PlotDetail() {
               {(plot.area_context || plot.nearby_development || plot.nearbyDevelopment) && (
                 <DevCard $delay={0.37} id="neighborhood">
                   <CardTitle><Construction size={18} color={t.gold} /> סביבה ופיתוח</CardTitle>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <FlexCol $gap={12}>
                     {plot.area_context && (plot.area_context as string).trim() && (
                       <DevSection>
                         <DevSectionTitle>
@@ -1822,13 +1886,13 @@ export default function PlotDetail() {
                         <DevSectionText>{(plot.nearby_development ?? plot.nearbyDevelopment) as string}</DevSectionText>
                       </DevSection>
                     )}
-                  </div>
+                  </FlexCol>
                 </DevCard>
               )}
-            </div>
+            </FlexCol>
 
             {/* Side column */}
-            <div style={{display:'flex',flexDirection:'column',gap:24}}>
+            <FlexCol>
               {/* Investment Highlights — quick snapshot for investors */}
               <HighlightsCard $delay={0.05}>
                 <CardTitle style={{marginBottom:12}}>⚡ נקודות מפתח</CardTitle>
@@ -1928,8 +1992,8 @@ export default function PlotDetail() {
                 <Row><Label>גוש / חלקה</Label><Value>{d.block} / {plot.number}</Value></Row>
                 {/* Nearby Amenities */}
                 {(d.seaDist != null || d.parkDist != null || (plot.distance_to_hospital ?? plot.distanceToHospital)) && (
-                  <div style={{marginTop:12}}>
-                    <div style={{fontSize:12,fontWeight:700,color:t.lTextSec,marginBottom:10}}>קרבה למוקדי עניין</div>
+                  <AmenitiesWrap>
+                    <AmenitiesTitle>קרבה למוקדי עניין</AmenitiesTitle>
                     <AmenitiesGrid>
                       {d.seaDist != null && d.seaDist > 0 && (
                         <AmenityItem>
@@ -1950,7 +2014,7 @@ export default function PlotDetail() {
                         </AmenityItem>
                       )}
                     </AmenitiesGrid>
-                  </div>
+                  </AmenitiesWrap>
                 )}
               </Card>
 
@@ -1967,11 +2031,11 @@ export default function PlotDetail() {
               {plot.documents?.length ? (
                 <Card $delay={0.3}>
                   <CardTitle><FileText size={18} color={t.gold} /> מסמכים</CardTitle>
-                  <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  <FlexCol $gap={8}>
                     {plot.documents.map((doc, i) => (
                       <DocItem key={i} href="#"><FileText size={14} color={t.lTextSec} />{doc}</DocItem>
                     ))}
-                  </div>
+                  </FlexCol>
                 </Card>
               ) : null}
 
@@ -2104,12 +2168,12 @@ export default function PlotDetail() {
                   </AffordWrap>
                 </Card>
               )}
-            </div>
+            </FlexCol>
           </Grid>
 
           {/* Similar Plots */}
           {similarPlots.length > 0 && (
-            <div style={{ marginTop: 32 }} id="similar">
+            <SimilarSection id="similar">
               <Card $delay={0.4}>
                 <CardTitle><BarChart3 size={18} color={t.gold} /> חלקות דומות באזור</CardTitle>
                 <SimilarGrid>
@@ -2123,14 +2187,14 @@ export default function PlotDetail() {
                     return (
                       <SimilarCard key={sp.id} to={`/plot/${sp.id}`}>
                         {spThumb && (
-                          <div style={{ position: 'relative', width: '100%', height: 80, overflow: 'hidden' }}>
+                          <SatThumbWrap>
                             <SatThumbImg src={spThumb} alt={`לוויין — גוש ${sd.block} חלקה ${sp.number}`} loading="lazy" decoding="async" />
-                            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,transparent 40%,rgba(0,0,0,0.45))' }} />
+                            <SatThumbOverlay />
                             <SimilarThumbOverlay>
                               <SimilarThumbPrice>{fmt.compact(sd.price)}</SimilarThumbPrice>
                               <SimilarThumbGrade $c={sg.color}>{sg.grade}</SimilarThumbGrade>
                             </SimilarThumbOverlay>
-                          </div>
+                          </SatThumbWrap>
                         )}
                         <SimilarBody>
                         <SimilarTop>
@@ -2158,7 +2222,7 @@ export default function PlotDetail() {
                   })}
                 </SimilarGrid>
               </Card>
-            </div>
+            </SimilarSection>
           )}
         </Page>
 
@@ -2167,11 +2231,11 @@ export default function PlotDetail() {
           <BarPrice>{fmt.price(d.price)}</BarPrice>
           {r > 0 && <BarRoiBadge $color={r > 30 ? t.ok : t.warn}><TrendingUp size={11} />+{Math.round(r)}%</BarRoiBadge>}
           {d.projected > d.price && d.price > 0 && <BarProfit>+{fmt.compact(d.projected - d.price)} רווח</BarProfit>}
-          <span style={{ flex: 1 }} />
+          <BarSpacer />
           <BarCallBtn href={waLink} target="_blank" rel="noopener noreferrer">
             <MessageCircle size={16} /> WhatsApp
           </BarCallBtn>
-          <GoldButton onClick={() => setLeadOpen(true)} style={{padding:'12px 32px',borderRadius:t.r.full}}>קבל פרטים</GoldButton>
+          <BarGetInfoBtn onClick={() => setLeadOpen(true)}>קבל פרטים</BarGetInfoBtn>
         </BottomBar>
 
         <Suspense fallback={null}>
