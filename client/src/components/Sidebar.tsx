@@ -3,7 +3,7 @@ import styled, { keyframes, css } from 'styled-components'
 import { X, Phone, ChevronDown, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, MapPin, FileText, Clock, Building2, Landmark, Info, ExternalLink, GitCompareArrows, Share2, Copy, Check, BarChart3, Construction, Globe, Sparkles, Printer, Navigation, Map as MapIcon2, Eye, Calculator, ClipboardCopy, Banknote, AlertTriangle } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { t, fadeInUp, mobile } from '../theme'
-import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcTimeline, calcMonthly, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter, getLocationTags, generatePlotReport, calcAlternativeInvestments, nearestTrainStation, nearestHighway, calcBettermentTax, calcRentalYield, calcGrowthTrajectory, calcQuickInsight } from '../utils'
+import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcTimeline, calcMonthly, zoningLabels, statusLabels, statusColors, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, pricePosition, calcRisk, findSimilarPlots, plotCenter, getLocationTags, generatePlotReport, calcAlternativeInvestments, nearestTrainStation, nearestHighway, calcBettermentTax, calcRentalYield, calcGrowthTrajectory, calcQuickInsight, investmentRecommendation } from '../utils'
 import type { Plot } from '../types'
 import { GoldButton, GhostButton, Badge, RadialScore, InfoTooltip, PriceAlertButton } from './UI'
 
@@ -46,6 +46,12 @@ const CloseBtn = styled.button`
   display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:${t.r.sm};
   background:transparent;border:1px solid ${t.border};color:${t.textSec};cursor:pointer;transition:all ${t.tr};flex-shrink:0;
   &:hover{background:${t.hover};color:${t.text};border-color:${t.goldBorder};}
+`
+const RecoBadge = styled.span<{$c:string}>`
+  display:inline-flex;align-items:center;gap:4px;padding:3px 10px;
+  background:${pr=>pr.$c}18;border:1px solid ${pr=>pr.$c}30;
+  border-radius:${t.r.full};font-size:11px;font-weight:800;color:${pr=>pr.$c};
+  font-family:${t.font};white-space:nowrap;
 `
 const Body = styled.div`flex:1;overflow-y:auto;padding:16px 20px;direction:rtl;`
 
@@ -1531,6 +1537,7 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
           <TopRow>
             <Badges>
               <Badge $color={statusColors[plot.status || 'AVAILABLE']}>{statusLabels[plot.status || 'AVAILABLE']}</Badge>
+              {(() => { const reco = investmentRecommendation(plot); return <RecoBadge $c={reco.color}>{reco.emoji} {reco.text}</RecoBadge> })()}
               {dom && <Badge $color={dom.color}>{dom.label}</Badge>}
             </Badges>
             <CloseBtn ref={closeBtnRef} onClick={onClose} aria-label="סגור"><X size={18} /></CloseBtn>

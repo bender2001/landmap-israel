@@ -6,7 +6,7 @@ import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites, useCompare, useSimilarPlots, useRecentlyViewed, useAllPlots, usePlotCityRanking } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard, ScrollToTop } from '../components/UI'
 import { PublicLayout } from '../components/Layout'
-import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, plotCenter, calcRisk, calcLocationScore, setOgMeta, removeOgMeta, SITE_CONFIG, calcExitScenarios, estimatedYear, satelliteTileUrl } from '../utils'
+import { p, roi, fmt, calcScore, calcScoreBreakdown, getGrade, calcCAGR, calcMonthly, calcTimeline, statusLabels, statusColors, zoningLabels, daysOnMarket, zoningPipeline, pricePerSqm, pricePerDunam, plotCenter, calcRisk, calcLocationScore, setOgMeta, removeOgMeta, SITE_CONFIG, calcExitScenarios, estimatedYear, satelliteTileUrl, investmentRecommendation } from '../utils'
 import type { RiskAssessment } from '../utils'
 import type { Plot } from '../types'
 
@@ -14,6 +14,61 @@ const LeadModal = lazy(() => import('../components/LeadModal'))
 
 /* ── styled ── */
 const Back = styled(Link)`display:inline-flex;align-items:center;gap:6px;color:${t.lTextSec};font-size:13px;font-weight:500;margin-bottom:16px;text-decoration:none!important;transition:color ${t.tr};&:hover{color:${t.gold};}`
+
+/* ── Hero Satellite Banner ── */
+const heroPanKf = keyframes`0%{transform:scale(1.08) translate(0,0)}50%{transform:scale(1.12) translate(-1%,-1%)}100%{transform:scale(1.08) translate(0,0)}`
+const HeroBanner = styled.div`
+  position:relative;width:100%;height:200px;margin-bottom:24px;border-radius:${t.r.xl};overflow:hidden;
+  background:${t.lBorder};
+  @media(min-width:768px){height:260px;}
+  @media print{height:160px;page-break-inside:avoid;}
+`
+const HeroBannerImg = styled.img`
+  width:100%;height:100%;object-fit:cover;display:block;
+  animation:${heroPanKf} 25s ease-in-out infinite;
+  @media(prefers-reduced-motion:reduce){animation:none;}
+`
+const HeroBannerOverlay = styled.div`
+  position:absolute;inset:0;
+  background:linear-gradient(180deg,transparent 30%,rgba(0,0,0,0.55) 100%);
+  pointer-events:none;
+`
+const HeroBannerContent = styled.div`
+  position:absolute;bottom:16px;left:20px;right:20px;z-index:2;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:12px;direction:rtl;
+  @media(max-width:639px){bottom:12px;left:12px;right:12px;}
+`
+const HeroBannerTitle = styled.div`
+  display:flex;flex-direction:column;gap:4px;
+`
+const HeroBannerHeadline = styled.h2`
+  font-size:clamp(18px,3vw,26px);font-weight:900;color:#fff;margin:0;
+  font-family:${t.font};text-shadow:0 2px 12px rgba(0,0,0,0.5);
+`
+const HeroBannerSub = styled.div`
+  font-size:13px;color:rgba(255,255,255,0.85);font-weight:500;
+  text-shadow:0 1px 4px rgba(0,0,0,0.4);
+  display:flex;align-items:center;gap:8px;
+`
+const HeroBannerBadge = styled.span<{$bg:string;$c:string}>`
+  display:inline-flex;align-items:center;gap:5px;padding:6px 14px;
+  background:${pr=>pr.$bg};backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,0.2);border-radius:${t.r.full};
+  font-size:13px;font-weight:800;color:${pr=>pr.$c};
+  white-space:nowrap;box-shadow:0 2px 12px rgba(0,0,0,0.3);
+  text-shadow:none;
+  @media(max-width:639px){font-size:12px;padding:5px 10px;}
+`
+
+/* ── Investment Recommendation Pill ── */
+const RecoBadge = styled.span<{$color:string}>`
+  display:inline-flex;align-items:center;gap:5px;padding:5px 14px;
+  background:${pr=>pr.$color}14;border:1.5px solid ${pr=>pr.$color}35;
+  border-radius:${t.r.full};font-size:13px;font-weight:800;color:${pr=>pr.$color};
+  font-family:${t.font};white-space:nowrap;
+  transition:all ${t.tr};
+  &:hover{background:${pr=>pr.$color}1F;border-color:${pr=>pr.$color}50;}
+`
 
 /* ── Breadcrumbs ── */
 const BreadcrumbNav = styled.nav`
@@ -204,6 +259,13 @@ const PrintStyles = createGlobalStyle`
 
     /* Show the bottom bar price info but hide CTA buttons */
     ${BottomBar} { display: none !important; }
+
+    /* Hero banner: keep but reduce height for print */
+    ${HeroBanner} {
+      height: 120px !important;
+      margin-bottom: 16px !important;
+    }
+    ${HeroBannerImg} { animation: none !important; }
 
     /* Ensure page content is visible and not clipped */
     ${Page} { max-width: 100% !important; padding: 0 !important; }
@@ -439,7 +501,11 @@ function InvestmentProjectionChart({ price, projected, years }: { price: number;
   const areaPath = `${linePath} L${points[points.length - 1].x},${h - padB} L${points[0].x},${h - padB} Z`
   return (
     <ChartWrap>
-      <svg width="100%" height="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" style={{ overflow: 'visible' }}>
+      <svg width="100%" height="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" style={{ overflow: 'visible' }}
+        role="img" aria-label={`תרשים צמיחת השקעה: מ-${fmt.compact(price)} ל-${fmt.compact(projected)} על פני ${years} שנים, צמיחה שנתית ${(cagr * 100).toFixed(1)}%`}
+      >
+        <title>תחזית צמיחת ערך החלקה</title>
+        <desc>גרף המראה את עליית ערך החלקה מ-{fmt.compact(price)} ל-{fmt.compact(projected)} על פני {years} שנים</desc>
         <defs>
           <linearGradient id="projGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={t.gold} stopOpacity="0.25" />
@@ -921,6 +987,8 @@ function PlotDetailSkeleton() {
   return (
     <Page>
       <SkeletonPulse $w="120px" $h="14px" style={{marginBottom:16}} />
+      {/* Hero banner skeleton */}
+      <SkeletonPulse $h="200px" style={{borderRadius:'24px',marginBottom:24,width:'100%'}} />
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:24}}>
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           <div style={{display:'flex',gap:8}}><SkeletonPulse $w="60px" $h="22px" /><SkeletonPulse $w="40px" $h="22px" /></div>
@@ -1367,6 +1435,9 @@ export default function PlotDetail() {
 
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
   const cagr = calcCAGR(r, d.readiness), timeline = calcTimeline(plot), dom = daysOnMarket(d.created), pps = pricePerSqm(plot), ppd = pricePerDunam(plot)
+  const recommendation = investmentRecommendation(plot)
+  const heroCenter = plotCenter(plot.coordinates)
+  const heroSatUrl = heroCenter ? satelliteTileUrl(heroCenter.lat, heroCenter.lng, 16) : null
   const mortgage = d.price > 0 ? calcMonthly(d.price, ltvPct / 100, interestRate / 100, loanYears) : null
   const hasDevContext = !!(plot.area_context || plot.nearby_development || plot.nearbyDevelopment)
 
@@ -1447,11 +1518,38 @@ export default function PlotDetail() {
           </PrintHeader>
           <Breadcrumbs plot={plot} />
 
+          {/* Satellite Hero Banner — visual anchor like Madlan property photos */}
+          {heroSatUrl && (
+            <HeroBanner>
+              <HeroBannerImg
+                src={heroSatUrl}
+                alt={`תצלום לוויין — גוש ${d.block} חלקה ${plot.number}, ${plot.city}`}
+                loading="eager"
+                decoding="async"
+              />
+              <HeroBannerOverlay />
+              <HeroBannerContent>
+                <HeroBannerTitle>
+                  <HeroBannerHeadline>גוש {d.block} חלקה {plot.number}</HeroBannerHeadline>
+                  <HeroBannerSub>
+                    <MapPin size={13} /> {plot.city}
+                    {d.size > 0 && <><span>·</span>{fmt.dunam(d.size)} דונם</>}
+                    {dom && <><span>·</span>{dom.label}</>}
+                  </HeroBannerSub>
+                </HeroBannerTitle>
+                <HeroBannerBadge $bg={`${recommendation.color}22`} $c={recommendation.color}>
+                  {recommendation.emoji} {recommendation.text}
+                </HeroBannerBadge>
+              </HeroBannerContent>
+            </HeroBanner>
+          )}
+
           <TitleRow>
             <TitleLeft>
               <Badges>
                 <Badge $color={statusColors[plot.status || 'AVAILABLE']}>{statusLabels[plot.status || 'AVAILABLE'] || plot.status}</Badge>
                 <Badge $color={grade.color}>{grade.grade}</Badge>
+                <RecoBadge $color={recommendation.color}>{recommendation.emoji} {recommendation.text}</RecoBadge>
                 {dom && <Badge $color={dom.color}>{dom.label}</Badge>}
                 {(plot.updated_at || plot.updatedAt) && (
                   <UpdatedAtTag title={`עודכן: ${new Date((plot.updated_at || plot.updatedAt) as string).toLocaleDateString('he-IL', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`}>
