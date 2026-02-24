@@ -146,6 +146,25 @@ const HeroDropName = styled.div`font-size:14px;font-weight:700;color:${t.text};`
 const HeroDropMeta = styled.div`font-size:11px;color:${t.textSec};display:flex;gap:8px;margin-top:1px;`
 const HeroDropMetaVal = styled.span`font-weight:700;color:${t.goldBright};`
 
+/* ── Live Opportunity Pulse Badge (hero section) ── */
+const oppPulse = keyframes`0%{box-shadow:0 0 0 0 rgba(16,185,129,0.4)}70%{box-shadow:0 0 0 8px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}`
+const LiveOppBadge = styled.div`
+  display:inline-flex;align-items:center;gap:8px;padding:8px 18px;
+  background:rgba(16,185,129,0.08);backdrop-filter:blur(12px);
+  border:1px solid rgba(16,185,129,0.25);border-radius:${t.r.full};
+  font-size:13px;font-weight:700;color:#10B981;font-family:${t.font};
+  animation:${fadeInUp} 0.6s ease-out 0.5s both;
+  cursor:pointer;transition:all ${t.tr};
+  &:hover{background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.4);transform:translateY(-2px);}
+`
+const LiveOppDot = styled.span`
+  width:8px;height:8px;border-radius:50%;background:#10B981;
+  animation:${oppPulse} 2s ease-in-out infinite;flex-shrink:0;
+`
+const LiveOppCount = styled.span`
+  font-size:15px;font-weight:900;color:#34D399;
+`
+
 /* ── Scroll Indicator ── */
 const scrollBounce = keyframes`0%,100%{transform:translateY(0);opacity:0.6}50%{transform:translateY(10px);opacity:1}`
 const ScrollIndicator = styled.div`
@@ -845,6 +864,12 @@ export default function Landing(){
       .slice(0, 3)
   }, [plots])
 
+  // Count high-opportunity plots (score >= 7 AND positive ROI) for the live badge
+  const hotOpportunityCount = useMemo(() => {
+    if (!plots || plots.length === 0) return 0
+    return plots.filter(pl => calcScore(pl) >= 7 && roi(pl) > 0 && p(pl).price > 0).length
+  }, [plots])
+
   const liveStats = useMemo(() => {
     if (!plots || plots.length === 0) return FALLBACK_STATS
     const uniqueCities = new Set(plots.map(pl => pl.city).filter(Boolean))
@@ -888,6 +913,12 @@ export default function Landing(){
               <TrustBadge><FileText size={14}/> נתוני תקן 22</TrustBadge>
               <TrustBadge><Building2 size={14}/> נתוני ועדות</TrustBadge>
             </TrustRow>
+            {hotOpportunityCount > 0 && (
+              <LiveOppBadge onClick={() => navigate('/explore?ripeness=high')}>
+                <LiveOppDot />
+                <LiveOppCount>{hotOpportunityCount}</LiveOppCount> הזדמנויות חמות זמינות עכשיו
+              </LiveOppBadge>
+            )}
             <HeroSearchWrap onSubmit={e => { e.preventDefault(); navigate(`/explore${heroSearch ? `?city=${encodeURIComponent(heroSearch)}` : ''}`) }}>
               <HeroSearchInput
                 value={heroSearch}

@@ -47,6 +47,18 @@ const CloseBtn = styled.button`
   background:transparent;border:1px solid ${t.border};color:${t.textSec};cursor:pointer;transition:all ${t.tr};flex-shrink:0;
   &:hover{background:${t.hover};color:${t.text};border-color:${t.goldBorder};}
 `
+/* ── Copy Reference Quick Button ── */
+const copyRefPop = keyframes`from{opacity:0;transform:translateY(4px) scale(0.9)}to{opacity:1;transform:translateY(0) scale(1)}`
+const CopyRefBtn = styled.button<{$copied?:boolean}>`
+  display:flex;align-items:center;justify-content:center;gap:5px;padding:4px 10px;
+  background:${pr=>pr.$copied?'rgba(16,185,129,0.12)':'rgba(255,255,255,0.04)'};
+  border:1px solid ${pr=>pr.$copied?'rgba(16,185,129,0.3)':t.border};
+  border-radius:${t.r.full};color:${pr=>pr.$copied?'#10B981':t.textDim};
+  font-size:10px;font-weight:700;font-family:${t.font};cursor:pointer;
+  transition:all ${t.tr};white-space:nowrap;
+  &:hover{border-color:${t.goldBorder};color:${t.gold};background:${t.goldDim};}
+  ${pr=>pr.$copied?`animation:${copyRefPop} 0.2s ease-out;`:''}
+`
 const RecoBadge = styled.span<{$c:string}>`
   display:inline-flex;align-items:center;gap:4px;padding:3px 10px;
   background:${pr=>pr.$c}18;border:1px solid ${pr=>pr.$c}30;
@@ -1175,6 +1187,16 @@ function PriceDistribution({ plot, allPlots }: { plot: Plot; allPlots: Plot[] })
   )
 }
 
+/* ── Proximity Badge (extracted from inline styles for perf) ── */
+const ProximityBadge = styled.div<{$bg:string;$border:string;$c:string}>`
+  display:inline-flex;align-items:center;gap:5px;padding:5px 10px;
+  background:${pr=>pr.$bg};border:1px solid ${pr=>pr.$border};
+  border-radius:${t.r.full};font-size:11px;font-weight:600;
+  color:${pr=>pr.$c};transition:all ${t.tr};
+`
+const ProximityHighlight = styled.span`font-size:9px;font-weight:800;`
+const ProximityWrap = styled.div`display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;`
+
 /* ── Print Button ── */
 const PrintBtn = styled.button`
   display:flex;align-items:center;justify-content:center;width:40px;height:40px;
@@ -1375,6 +1397,7 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
   const closeBtnRef = useRefHook<HTMLButtonElement>(null)
   const [copied, setCopied] = useState(false)
   const [reportCopied, setReportCopied] = useState(false)
+  const [refCopied, setRefCopied] = useState(false)
   const [showStickyHeader, setShowStickyHeader] = useState(false)
 
   // Lock body scroll when sidebar is open
@@ -1446,7 +1469,19 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
   }, [open])
 
   // Reset copied state when plot changes
-  useEffect(() => { setCopied(false); setReportCopied(false) }, [plot?.id])
+  useEffect(() => { setCopied(false); setReportCopied(false); setRefCopied(false) }, [plot?.id])
+
+  // Copy plot reference (gush/helka/city) — for sharing with lawyers, agents, government offices
+  const handleCopyRef = useCallback(async () => {
+    if (!plot) return
+    const d_ = p(plot)
+    const refText = `גוש ${d_.block} חלקה ${plot.number} — ${plot.city}`
+    try {
+      await navigator.clipboard.writeText(refText)
+      setRefCopied(true)
+      setTimeout(() => setRefCopied(false), 2000)
+    } catch { /* clipboard not available */ }
+  }, [plot])
 
   const handleShare = useCallback(async () => {
     if (!plot) return
@@ -1545,7 +1580,13 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 4 }}>
             <RadialScore score={score} grade={grade.grade} color={grade.color} size={52} strokeWidth={4} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <Title>חלקה {plot.number} · גוש {d.block}</Title>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Title>חלקה {plot.number} · גוש {d.block}</Title>
+                <CopyRefBtn $copied={refCopied} onClick={handleCopyRef} aria-label="העתק מזהה חלקה" title={refCopied ? 'הועתק!' : 'העתק גוש/חלקה ללוח'}>
+                  {refCopied ? <Check size={10} /> : <Copy size={10} />}
+                  {refCopied ? 'הועתק' : 'העתק'}
+                </CopyRefBtn>
+              </div>
               <City>{plot.city}</City>
               {locTags.length > 0 && (
                 <SidebarLocTags>
@@ -1792,38 +1833,30 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
             })()}
             {/* Visual Proximity Badges */}
             {(d.seaDist != null || d.parkDist != null || (plot.distance_to_hospital ?? plot.distanceToHospital) != null) && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+              <ProximityWrap>
                 {d.seaDist != null && (
-                  <div style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px',
-                    background: d.seaDist <= 500 ? 'rgba(59,130,246,0.1)' : d.seaDist <= 1500 ? 'rgba(59,130,246,0.06)' : 'transparent',
-                    border: `1px solid ${d.seaDist <= 500 ? 'rgba(59,130,246,0.3)' : d.seaDist <= 1500 ? 'rgba(59,130,246,0.15)' : t.border}`,
-                    borderRadius: t.r.full, fontSize: 11, fontWeight: 600,
-                    color: d.seaDist <= 500 ? '#3B82F6' : d.seaDist <= 1500 ? '#60A5FA' : t.textSec,
-                  }}>
+                  <ProximityBadge
+                    $bg={d.seaDist <= 500 ? 'rgba(59,130,246,0.1)' : d.seaDist <= 1500 ? 'rgba(59,130,246,0.06)' : 'transparent'}
+                    $border={d.seaDist <= 500 ? 'rgba(59,130,246,0.3)' : d.seaDist <= 1500 ? 'rgba(59,130,246,0.15)' : t.border}
+                    $c={d.seaDist <= 500 ? '#3B82F6' : d.seaDist <= 1500 ? '#60A5FA' : t.textSec}
+                  >
                     🌊 {fmt.num(d.seaDist)} מ׳
-                    {d.seaDist <= 500 && <span style={{ fontSize: 9, fontWeight: 800, color: '#3B82F6' }}>קרוב!</span>}
-                  </div>
+                    {d.seaDist <= 500 && <ProximityHighlight style={{ color: '#3B82F6' }}>קרוב!</ProximityHighlight>}
+                  </ProximityBadge>
                 )}
                 {d.parkDist != null && (
-                  <div style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px',
-                    background: d.parkDist <= 300 ? 'rgba(16,185,129,0.1)' : 'transparent',
-                    border: `1px solid ${d.parkDist <= 300 ? 'rgba(16,185,129,0.3)' : t.border}`,
-                    borderRadius: t.r.full, fontSize: 11, fontWeight: 600,
-                    color: d.parkDist <= 300 ? '#10B981' : t.textSec,
-                  }}>
+                  <ProximityBadge
+                    $bg={d.parkDist <= 300 ? 'rgba(16,185,129,0.1)' : 'transparent'}
+                    $border={d.parkDist <= 300 ? 'rgba(16,185,129,0.3)' : t.border}
+                    $c={d.parkDist <= 300 ? '#10B981' : t.textSec}
+                  >
                     🌳 {fmt.num(d.parkDist)} מ׳
-                  </div>
+                  </ProximityBadge>
                 )}
                 {(plot.distance_to_hospital ?? plot.distanceToHospital) != null && (
-                  <div style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px',
-                    background: 'transparent', border: `1px solid ${t.border}`,
-                    borderRadius: t.r.full, fontSize: 11, fontWeight: 600, color: t.textSec,
-                  }}>
+                  <ProximityBadge $bg="transparent" $border={t.border} $c={t.textSec}>
                     🏥 {fmt.num((plot.distance_to_hospital ?? plot.distanceToHospital) as number)} מ׳
-                  </div>
+                  </ProximityBadge>
                 )}
                 {/* Train station proximity badge */}
                 {(() => {
@@ -1832,16 +1865,15 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
                   const isClose = station.distance <= 2000
                   const isMedium = station.distance <= 5000
                   return (
-                    <div style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px',
-                      background: isClose ? 'rgba(139,92,246,0.1)' : 'transparent',
-                      border: `1px solid ${isClose ? 'rgba(139,92,246,0.3)' : isMedium ? 'rgba(139,92,246,0.15)' : t.border}`,
-                      borderRadius: t.r.full, fontSize: 11, fontWeight: 600,
-                      color: isClose ? '#8B5CF6' : isMedium ? '#A78BFA' : t.textSec,
-                    }} title={`תחנת ${station.name}`}>
+                    <ProximityBadge
+                      $bg={isClose ? 'rgba(139,92,246,0.1)' : 'transparent'}
+                      $border={isClose ? 'rgba(139,92,246,0.3)' : isMedium ? 'rgba(139,92,246,0.15)' : t.border}
+                      $c={isClose ? '#8B5CF6' : isMedium ? '#A78BFA' : t.textSec}
+                      title={`תחנת ${station.name}`}
+                    >
                       🚂 {station.distance < 1000 ? `${station.distance} מ׳` : `${(station.distance / 1000).toFixed(1)} ק״מ`}
-                      {isClose && <span style={{ fontSize: 9, fontWeight: 800 }}>רכבת!</span>}
-                    </div>
+                      {isClose && <ProximityHighlight>רכבת!</ProximityHighlight>}
+                    </ProximityBadge>
                   )
                 })()}
                 {/* Highway proximity badge */}
@@ -1850,18 +1882,17 @@ export default function Sidebar({ plot, open, onClose, onLead, plots, onNavigate
                   if (!hw || hw.distance > 15000) return null
                   const isClose = hw.distance <= 3000
                   return (
-                    <div style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px',
-                      background: isClose ? 'rgba(59,130,246,0.06)' : 'transparent',
-                      border: `1px solid ${isClose ? 'rgba(59,130,246,0.15)' : t.border}`,
-                      borderRadius: t.r.full, fontSize: 11, fontWeight: 600,
-                      color: isClose ? '#60A5FA' : t.textSec,
-                    }} title={hw.name}>
+                    <ProximityBadge
+                      $bg={isClose ? 'rgba(59,130,246,0.06)' : 'transparent'}
+                      $border={isClose ? 'rgba(59,130,246,0.15)' : t.border}
+                      $c={isClose ? '#60A5FA' : t.textSec}
+                      title={hw.name}
+                    >
                       🛣️ {hw.distance < 1000 ? `${hw.distance} מ׳` : `${(hw.distance / 1000).toFixed(1)} ק״מ`}
-                    </div>
+                    </ProximityBadge>
                   )
                 })()}
-              </div>
+              </ProximityWrap>
             )}
             {/* Train station proximity — detailed */}
             {(() => {
