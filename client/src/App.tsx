@@ -85,7 +85,11 @@ const NotFound = () => (
 
 export default function App() {
   const { pathname } = useLocation()
-  useEffect(() => { window.scrollTo(0, 0) }, [pathname])
+  useEffect(() => {
+    // Explore page manages its own scroll (full-height map); skip it
+    if (pathname === '/explore') return
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+  }, [pathname])
 
   return (
     <ErrorBoundary>

@@ -1108,9 +1108,34 @@ export default function PlotDetail() {
       'twitter:description': desc,
     })
 
+    // Set canonical URL (important for SEO — prevents duplicate content issues)
+    const canonicalUrl = `${window.location.origin}/plot/${plot.id}`
+    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null
+    if (!canonical) {
+      canonical = document.createElement('link')
+      canonical.rel = 'canonical'
+      document.head.appendChild(canonical)
+    }
+    canonical.href = canonicalUrl
+
+    // Set meta description for search engines
+    let metaDesc = document.querySelector('meta[name="description"]') as HTMLMetaElement | null
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta')
+      metaDesc.name = 'description'
+      document.head.appendChild(metaDesc)
+    }
+    metaDesc.content = desc
+
     return () => {
       document.title = 'LandMap Israel'
       removeOgMeta(['og:title', 'og:description', 'og:url', 'og:type', 'og:site_name', 'og:locale', 'twitter:card', 'twitter:title', 'twitter:description'])
+      // Reset canonical
+      const c = document.querySelector('link[rel="canonical"]')
+      if (c) c.setAttribute('href', window.location.origin)
+      // Reset meta description
+      const m = document.querySelector('meta[name="description"]') as HTMLMetaElement | null
+      if (m) m.content = 'LandMap Israel — פלטפורמת ההשקעות בקרקעות המובילה בישראל'
     }
   }, [plot])
 

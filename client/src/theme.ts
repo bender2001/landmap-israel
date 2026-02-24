@@ -55,6 +55,13 @@ export const GlobalStyles = createGlobalStyle`
   :focus-visible{outline:2px solid ${t.gold};outline-offset:2px}
   :focus:not(:focus-visible){outline:none}
   @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}}
+  @media(prefers-contrast:more){
+    :root{--high-contrast:1;}
+    body{font-weight:500!important;}
+    button,a,[role="button"]{outline:2px solid transparent!important;outline-offset:2px!important;}
+    button:focus-visible,a:focus-visible,[role="button"]:focus-visible{outline:3px solid ${t.gold}!important;outline-offset:3px!important;}
+    .leaflet-popup-content-wrapper{border-width:2px!important;}
+  }
 
   /* Dark mode scope */
   .dark{background:${t.bg};color:${t.text}}
