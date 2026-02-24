@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense, memo, forwardRef } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus, Home, BarChart3, Building2, MapPin, Clock, TrainFront, Route } from 'lucide-react'
+import { Map as MapIcon, Heart, Layers, ArrowUpDown, GitCompareArrows, X, Trash2, SearchX, RotateCcw, ChevronLeft, Keyboard, Eye, Share2, TrendingDown, TrendingUp, Minus, Home, BarChart3, Building2, MapPin, Clock, TrainFront, Route, MessageCircle } from 'lucide-react'
 import { t, mobile } from '../theme'
 import { useAllPlots, useFavorites, useCompare, useDebounce, useUserLocation, useOnlineStatus, useIsMobile, useSSE, useDocumentTitle, useMetaDescription, useRecentlyViewed, useDataFreshness, useApiLatency, useRefreshData } from '../hooks'
 // Note: dataFreshness and dataSource are computed locally in this component (not via hooks)
@@ -9,7 +9,7 @@ import MapArea from '../components/Map'
 import type { MapBounds } from '../components/Map'
 import FilterBar from '../components/Filters'
 import { ErrorBoundary, useToast, NetworkBanner, AnimatedValue, DemoModeBanner, StaleDataBanner, ExploreLoadingSkeleton, SidebarFallback, CompareDrawerFallback, InlineFallback } from '../components/UI'
-import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcQuickInsight, pricePosition, findBestValueIds, calcAggregateStats, generateMarketInsights, plotCenter, daysOnMarket, estimateDemand, nearestTrainStation, nearestHighway, fmtDistance } from '../utils'
+import { p, roi, fmt, sortPlots, SORT_OPTIONS, pricePerSqm, pricePerDunam, calcScore, getGrade, calcQuickInsight, pricePosition, findBestValueIds, calcAggregateStats, generateMarketInsights, plotCenter, daysOnMarket, estimateDemand, nearestTrainStation, nearestHighway, fmtDistance, SITE_CONFIG } from '../utils'
 import type { SortKey } from '../utils'
 import { pois } from '../data'
 import type { Plot, Filters } from '../types'
@@ -34,10 +34,13 @@ const Stats = styled.div`
   display:flex;align-items:center;justify-content:center;gap:24px;padding:8px 16px;
   background:${t.glass};backdrop-filter:blur(12px);border-top:1px solid ${t.border};
   font-size:12px;color:${t.textSec};direction:rtl;
-  ${mobile}{bottom:56px;gap:12px;font-size:11px;padding:6px 14px;
-    justify-content:center;}
+  ${mobile}{bottom:56px;gap:10px;font-size:11px;padding:6px 10px;
+    justify-content:flex-start;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    scrollbar-width:none;&::-webkit-scrollbar{display:none;}
+    mask-image:linear-gradient(to left, transparent 0, black 12px, black calc(100% - 12px), transparent 100%);
+    -webkit-mask-image:linear-gradient(to left, transparent 0, black 12px, black calc(100% - 12px), transparent 100%);}
 `
-const Stat = styled.span`display:flex;align-items:center;gap:4px;`
+const Stat = styled.span`display:flex;align-items:center;gap:4px;flex-shrink:0;white-space:nowrap;`
 const Val = styled.span`color:${t.goldBright};font-weight:700;`
 const ValOk = styled(Val)`color:${t.ok};`
 const Demo = styled.span`padding:2px 8px;border-radius:${t.r.full};background:${t.goldDim};color:${t.gold};font-size:10px;font-weight:600;`
@@ -269,6 +272,16 @@ const CityCompScoreTrack = styled.div`flex:1;height:4px;border-radius:2px;backgr
 const CityCompScoreFill = styled.div<{$w:number;$c:string}>`
   height:100%;width:${pr=>pr.$w}%;background:${pr=>pr.$c};border-radius:2px;
   transition:width 0.6s cubic-bezier(0.32,0.72,0,1);
+`
+
+/* ── WhatsApp Quick Contact CTA (mobile preview conversion button) ── */
+const WhatsAppCta = styled.a`
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  flex:1;padding:12px;
+  background:#25D366;color:#fff;
+  border:none;border-radius:${t.r.md};font-weight:700;font-size:14px;font-family:${t.font};
+  cursor:pointer;transition:all ${t.tr};text-decoration:none!important;
+  &:hover{background:#20bd5a;transform:translateY(-1px);box-shadow:0 4px 16px rgba(37,211,102,0.3);}
 `
 
 /* ── CityComp Close Button (extracted from inline) ── */
@@ -675,7 +688,7 @@ const DemandBadge = styled.span<{$c:string}>`
 
 /* ── Preview Quick Actions ── */
 const PreviewQuickActions = styled.div`
-  display:flex;align-items:center;gap:6px;
+  display:flex;align-items:center;justify-content:center;gap:6px;
 `
 const PreviewQuickBtn = styled.button<{$active?:boolean;$color?:string}>`
   display:flex;align-items:center;justify-content:center;width:40px;height:40px;
@@ -866,6 +879,100 @@ function filtersToParams(f: Filters): URLSearchParams {
   }
   return sp
 }
+
+/* ── Extracted: StatsBarWidget (memoized to prevent re-renders from parent state changes) ── */
+interface StatsBarProps {
+  filtered: Plot[]
+  avg: number
+  visibleInViewport: number | null
+  totalPortfolioValue: number
+  statsBarData: { prices: number[]; minPrice: number; maxPrice: number; avgRoi: number; avgPpd: number }
+  marketMomentum: { label: string; color: string; tip: string } | null
+  portfolioQuality: { avg: number; grade: { grade: string; color: string }; pct: number } | null
+  apiLatency: { latencyMs: number | null; label: string | null; color: string | null }
+  dataSource: string
+  sse: { status: string; updateCount: number }
+  dataFreshness: { relativeTime: string | null; lastFetched: number | null }
+  isRefreshing: boolean
+  refreshData: () => void
+  onShortcutsOpen: () => void
+}
+
+const StatsBarWidget = memo(function StatsBarWidget({
+  filtered, avg, visibleInViewport, totalPortfolioValue, statsBarData,
+  marketMomentum, portfolioQuality, apiLatency, dataSource,
+  sse, dataFreshness, isRefreshing, refreshData, onShortcutsOpen,
+}: StatsBarProps) {
+  return (
+    <Stats>
+      <Stat><Val><AnimatedValue value={filtered.length} /></Val> חלקות</Stat>
+      {visibleInViewport != null && visibleInViewport < filtered.length && (
+        <ViewportStat title="חלקות הנראות בתצוגת המפה הנוכחית">
+          <Eye size={10} /> {visibleInViewport} נראות
+        </ViewportStat>
+      )}
+      <Stat>ממוצע <Val><AnimatedValue value={Math.round(avg)} format={fmt.compact} /></Val></Stat>
+      {totalPortfolioValue > 0 && (
+        <TotalValueStat title={`סך שווי כל החלקות המוצגות: ${fmt.price(totalPortfolioValue)}`}>
+          💰 סה״כ <TotalValueAmount>{fmt.compact(totalPortfolioValue)}</TotalValueAmount>
+        </TotalValueStat>
+      )}
+      {statsBarData.avgPpd > 0 && (
+        <DunamStat title={`מחיר ממוצע לדונם: ${fmt.price(statsBarData.avgPpd)}`}>
+          📐 <DunamStatVal>{fmt.compact(statsBarData.avgPpd)}</DunamStatVal>/דונם
+        </DunamStat>
+      )}
+      {statsBarData.prices.length >= 2 && (
+        <Stat title={`טווח: ${fmt.compact(statsBarData.minPrice)} – ${fmt.compact(statsBarData.maxPrice)}`}>
+          {fmt.short(statsBarData.minPrice)} – <Val>{fmt.short(statsBarData.maxPrice)}</Val>
+        </Stat>
+      )}
+      {statsBarData.avgRoi > 0 && (
+        <Stat title={`תשואה ממוצעת צפויה: +${statsBarData.avgRoi}%`}>
+          ROI <ValOk>+{statsBarData.avgRoi}%</ValOk>
+        </Stat>
+      )}
+      {marketMomentum && (
+        <MomentumBadge $c={marketMomentum.color} title={marketMomentum.tip}>
+          {marketMomentum.label}
+        </MomentumBadge>
+      )}
+      {portfolioQuality && (
+        <PortfolioGauge title={`ציון תיק השקעות ממוצע: ${portfolioQuality.avg}/10 — ${portfolioQuality.grade.grade}`}>
+          <QualityLabel>איכות</QualityLabel>
+          <GaugeTrack>
+            <GaugeFill $w={portfolioQuality.pct} $c={portfolioQuality.grade.color} />
+          </GaugeTrack>
+          <GaugeLabel $c={portfolioQuality.grade.color}>{portfolioQuality.avg}</GaugeLabel>
+        </PortfolioGauge>
+      )}
+      {apiLatency.latencyMs != null && apiLatency.color && dataSource === 'api' && (
+        <LatencyBadge
+          $c={apiLatency.color}
+          title={`זמן תגובת שרת: ${apiLatency.latencyMs}ms — ${apiLatency.label}`}
+        >
+          {apiLatency.label} {apiLatency.latencyMs}ms
+        </LatencyBadge>
+      )}
+      {sse.status === 'connected' ? (
+        <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים מתעדכנים אוטומטית${dataFreshness.relativeTime ? ` · עודכן ${dataFreshness.relativeTime}` : ''}`}>
+          <LiveDot $c={t.ok} /> עדכני {sse.updateCount > 0 && <SseUpdateCount>({sse.updateCount})</SseUpdateCount>}
+        </LiveBadge>
+      ) : dataSource === 'api' ? (
+        <ClickableLiveBadge $connected={false} title={`נתונים מהשרת${dataFreshness.relativeTime ? ` · עודכן ${dataFreshness.relativeTime}` : ''} — לחץ לרענון`}
+          onClick={refreshData}>
+          <LiveDot $c={t.warn} /> {isRefreshing ? 'מרענן...' : (dataFreshness.relativeTime && dataFreshness.relativeTime !== 'עכשיו' ? dataFreshness.relativeTime : 'נתוני שרת')} ↻
+        </ClickableLiveBadge>
+      ) : (
+        <ClickableDemo title="נתונים לדוגמה — לחץ לנסות שוב"
+          onClick={refreshData}>{isRefreshing ? 'מרענן...' : 'נתוני דמו'} ↻</ClickableDemo>
+      )}
+      <KbHintBtn onClick={onShortcutsOpen} title="קיצורי מקלדת (?)">
+        <Keyboard size={10} /> ?
+      </KbHintBtn>
+    </Stats>
+  )
+})
 
 /* ── Extracted: InsightsTickerWidget (memoized to prevent re-render cascades from parent state) ── */
 interface InsightsTickerProps {
@@ -1078,23 +1185,32 @@ const MobilePreviewCard = memo(forwardRef<HTMLDivElement, MobilePreviewProps>(
             <PreviewDetailBtn onClick={onExpand}>
               <ChevronLeft size={16} /> פרטים מלאים
             </PreviewDetailBtn>
-            <PreviewQuickActions>
-              <PreviewQuickBtn onClick={() => onShare(plot)} aria-label="שתף חלקה" title="שתף">
-                <Share2 size={16} />
-              </PreviewQuickBtn>
-              <PreviewQuickBtn $active={isFav} $color="#EF4444" onClick={onToggleFav}
-                aria-label={isFav ? 'הסר מהמועדפים' : 'הוסף למועדפים'} title="מועדפים">
-                <Heart size={16} fill={isFav ? '#EF4444' : 'none'} />
-              </PreviewQuickBtn>
-              <PreviewQuickBtn $active={isCompared} $color={t.info} onClick={onToggleCompare}
-                aria-label={isCompared ? 'הסר מהשוואה' : 'הוסף להשוואה'} title="השוואה">
-                <GitCompareArrows size={16} />
-              </PreviewQuickBtn>
-            </PreviewQuickActions>
+            <WhatsAppCta
+              href={`${SITE_CONFIG.waLink}?text=${encodeURIComponent(`שלום, אני מתעניין/ת בחלקה ${plot.number} גוש ${d.block} ב${plot.city} (${fmt.compact(d.price)})`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="צור קשר בוואטסאפ"
+              title="צור קשר עם יועץ"
+            >
+              <MessageCircle size={16} /> וואטסאפ
+            </WhatsAppCta>
             <PreviewCloseBtn onClick={onClose} aria-label="סגור">
               <X size={18} />
             </PreviewCloseBtn>
           </PreviewActions>
+          <PreviewQuickActions>
+            <PreviewQuickBtn onClick={() => onShare(plot)} aria-label="שתף חלקה" title="שתף">
+              <Share2 size={16} />
+            </PreviewQuickBtn>
+            <PreviewQuickBtn $active={isFav} $color="#EF4444" onClick={onToggleFav}
+              aria-label={isFav ? 'הסר מהמועדפים' : 'הוסף למועדפים'} title="מועדפים">
+              <Heart size={16} fill={isFav ? '#EF4444' : 'none'} />
+            </PreviewQuickBtn>
+            <PreviewQuickBtn $active={isCompared} $color={t.info} onClick={onToggleCompare}
+              aria-label={isCompared ? 'הסר מהשוואה' : 'הוסף להשוואה'} title="השוואה">
+              <GitCompareArrows size={16} />
+            </PreviewQuickBtn>
+          </PreviewQuickActions>
         </PreviewBody>
       </MobilePreview>
     )
@@ -1287,7 +1403,9 @@ export default function Explore() {
     return list
   }, [plots, filters.sizeMin, filters.sizeMax, filters.belowAvg, filters.minRoi, filters.ripeness, dSearch, areaBounds])
 
-  const sorted = useMemo(() => sortPlots(filtered, sortKey, userGeo.location), [filtered, sortKey, userGeo.location])
+  // Only pass geolocation when sort is 'nearest' — avoids re-sorting on every location update
+  const geoForSort = sortKey === 'nearest' ? userGeo.location : null
+  const sorted = useMemo(() => sortPlots(filtered, sortKey, geoForSort), [filtered, sortKey, geoForSort])
 
   // ── Computed stats ──
   const avg = useMemo(() => filtered.length ? filtered.reduce((s, pl) => s + p(pl).price, 0) / filtered.length : 0, [filtered])
@@ -2135,79 +2253,24 @@ export default function Explore() {
           <InsightsTickerWidget insights={marketInsights} hasCompare={compareIds.length > 0} />
         )}
 
-        {/* Stats bar with viewport visible count, total value, market momentum */}
+        {/* Stats bar — extracted memoized component to prevent re-renders on selection/sort/tab changes */}
         {!mapFullscreen && (
-          <Stats>
-            <Stat><Val><AnimatedValue value={filtered.length} /></Val> חלקות</Stat>
-            {visibleInViewport != null && visibleInViewport < filtered.length && (
-              <ViewportStat title="חלקות הנראות בתצוגת המפה הנוכחית">
-                <Eye size={10} /> {visibleInViewport} נראות
-              </ViewportStat>
-            )}
-            <Stat>ממוצע <Val><AnimatedValue value={Math.round(avg)} format={fmt.compact} /></Val></Stat>
-            {/* Total portfolio value — shows aggregate investment scope */}
-            {totalPortfolioValue > 0 && (
-              <TotalValueStat title={`סך שווי כל החלקות המוצגות: ${fmt.price(totalPortfolioValue)}`}>
-                💰 סה״כ <TotalValueAmount>{fmt.compact(totalPortfolioValue)}</TotalValueAmount>
-              </TotalValueStat>
-            )}
-            {/* Average ₪/dunam — the Israeli standard land pricing metric */}
-            {statsBarData.avgPpd > 0 && (
-              <DunamStat title={`מחיר ממוצע לדונם: ${fmt.price(statsBarData.avgPpd)}`}>
-                📐 <DunamStatVal>{fmt.compact(statsBarData.avgPpd)}</DunamStatVal>/דונם
-              </DunamStat>
-            )}
-            {statsBarData.prices.length >= 2 && (
-              <Stat title={`טווח: ${fmt.compact(statsBarData.minPrice)} – ${fmt.compact(statsBarData.maxPrice)}`}>
-                {fmt.short(statsBarData.minPrice)} – <Val>{fmt.short(statsBarData.maxPrice)}</Val>
-              </Stat>
-            )}
-            {statsBarData.avgRoi > 0 && (
-              <Stat title={`תשואה ממוצעת צפויה: +${statsBarData.avgRoi}%`}>
-                ROI <ValOk>+{statsBarData.avgRoi}%</ValOk>
-              </Stat>
-            )}
-            {/* Market momentum — buyer's/seller's market indicator */}
-            {marketMomentum && (
-              <MomentumBadge $c={marketMomentum.color} title={marketMomentum.tip}>
-                {marketMomentum.label}
-              </MomentumBadge>
-            )}
-            {portfolioQuality && (
-              <PortfolioGauge title={`ציון תיק השקעות ממוצע: ${portfolioQuality.avg}/10 — ${portfolioQuality.grade.grade}`}>
-                <QualityLabel>איכות</QualityLabel>
-                <GaugeTrack>
-                  <GaugeFill $w={portfolioQuality.pct} $c={portfolioQuality.grade.color} />
-                </GaugeTrack>
-                <GaugeLabel $c={portfolioQuality.grade.color}>{portfolioQuality.avg}</GaugeLabel>
-              </PortfolioGauge>
-            )}
-            {/* API response latency — data confidence indicator */}
-            {apiLatency.latencyMs != null && apiLatency.color && dataSource === 'api' && (
-              <LatencyBadge
-                $c={apiLatency.color}
-                title={`זמן תגובת שרת: ${apiLatency.latencyMs}ms — ${apiLatency.label}`}
-              >
-                {apiLatency.label} {apiLatency.latencyMs}ms
-              </LatencyBadge>
-            )}
-            {sse.status === 'connected' ? (
-              <LiveBadge $connected title={`חיבור חי — ${sse.updateCount} עדכונים מתעדכנים אוטומטית${dataFreshness.relativeTime ? ` · עודכן ${dataFreshness.relativeTime}` : ''}`}>
-                <LiveDot $c={t.ok} /> עדכני {sse.updateCount > 0 && <SseUpdateCount>({sse.updateCount})</SseUpdateCount>}
-              </LiveBadge>
-            ) : dataSource === 'api' ? (
-              <ClickableLiveBadge $connected={false} title={`נתונים מהשרת${dataFreshness.relativeTime ? ` · עודכן ${dataFreshness.relativeTime}` : ''} — לחץ לרענון`}
-                onClick={refreshData}>
-                <LiveDot $c={t.warn} /> {isRefreshing ? 'מרענן...' : (dataFreshness.relativeTime && dataFreshness.relativeTime !== 'עכשיו' ? dataFreshness.relativeTime : 'נתוני שרת')} ↻
-              </ClickableLiveBadge>
-            ) : (
-              <ClickableDemo title="נתונים לדוגמה — לחץ לנסות שוב"
-                onClick={refreshData}>{isRefreshing ? 'מרענן...' : 'נתוני דמו'} ↻</ClickableDemo>
-            )}
-            <KbHintBtn onClick={() => setShortcutsOpen(true)} title="קיצורי מקלדת (?)">
-              <Keyboard size={10} /> ?
-            </KbHintBtn>
-          </Stats>
+          <StatsBarWidget
+            filtered={filtered}
+            avg={avg}
+            visibleInViewport={visibleInViewport}
+            totalPortfolioValue={totalPortfolioValue}
+            statsBarData={statsBarData}
+            marketMomentum={marketMomentum}
+            portfolioQuality={portfolioQuality}
+            apiLatency={apiLatency}
+            dataSource={dataSource}
+            sse={sse}
+            dataFreshness={dataFreshness}
+            isRefreshing={isRefreshing}
+            refreshData={refreshData}
+            onShortcutsOpen={() => setShortcutsOpen(true)}
+          />
         )}
 
         {/* Mobile Favorites Overlay */}

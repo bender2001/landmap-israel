@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import styled, { keyframes } from 'styled-components'
+import styled, { keyframes, createGlobalStyle } from 'styled-components'
 import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, TrendingDown, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon, MessageCircle, Compass, ClipboardCopy, Construction, Milestone, Phone } from 'lucide-react'
 import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites, useSimilarPlots, useRecentlyViewed, useAllPlots, usePlotCityRanking } from '../hooks'
@@ -190,6 +190,84 @@ const HighlightLabel = styled.div`font-size:11px;color:${t.lTextSec};font-weight
 const HighlightVal = styled.div<{$c?:string}>`font-size:15px;font-weight:800;color:${pr=>pr.$c||t.lText};font-family:${t.font};`
 
 const Center = styled.div`display:flex;align-items:center;justify-content:center;min-height:60vh;`
+
+/* ── Print Styles — professional investor report layout ── */
+const PrintStyles = createGlobalStyle`
+  @media print {
+    /* Reset page for clean A4 printing */
+    @page { margin: 16mm 12mm; size: A4; }
+    body { background: #fff !important; color: #1a1a2e !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    /* Hide non-essential UI */
+    nav, header, footer, .chat-widget, .toast-container,
+    [data-print-hide], button:not([data-print-show]) { display: none !important; }
+
+    /* Show the bottom bar price info but hide CTA buttons */
+    ${BottomBar} { display: none !important; }
+
+    /* Ensure page content is visible and not clipped */
+    ${Page} { max-width: 100% !important; padding: 0 !important; }
+
+    /* Cards: remove shadows, ensure borders print */
+    ${Card}, ${Metric}, ${HighlightsCard} {
+      box-shadow: none !important;
+      break-inside: avoid;
+      border: 1px solid #ddd !important;
+      page-break-inside: avoid;
+    }
+
+    /* Grid: single column for print */
+    ${Grid} { grid-template-columns: 1fr !important; gap: 16px !important; }
+
+    /* Metrics: compact grid */
+    ${Metrics} { grid-template-columns: repeat(3, 1fr) !important; gap: 8px !important; }
+
+    /* Values: ensure readable colors */
+    ${MetricVal} { color: #1a1a2e !important; font-size: 20px !important; }
+    ${Title} { color: #1a1a2e !important; font-size: 24px !important; }
+
+    /* Add print header */
+    ${Page}::before {
+      content: 'LandMap Israel — דו״ח חלקה להשקעה';
+      display: block;
+      font-size: 10px;
+      color: #888;
+      text-align: center;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    /* Add print date */
+    ${Page}::after {
+      content: 'הודפס: ' attr(data-print-date);
+      display: block;
+      font-size: 9px;
+      color: #aaa;
+      text-align: center;
+      padding-top: 12px;
+      margin-top: 24px;
+      border-top: 1px solid #eee;
+    }
+
+    /* Animations: disable */
+    *, *::before, *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+
+    /* Links: show URL */
+    a[href^="http"]::after {
+      content: " (" attr(href) ")";
+      font-size: 9px;
+      color: #888;
+      font-weight: 400;
+    }
+
+    /* Hide reading progress bar */
+    ${ReadingProgress} { display: none !important; }
+  }
+`
 
 /* ── Reading Progress Bar ── */
 const ReadingProgress = styled.div<{$pct:number}>`
@@ -1283,6 +1361,7 @@ export default function PlotDetail() {
   return (
     <PublicLayout>
       <ErrorBoundary>
+        <PrintStyles />
         <ReadingProgress $pct={readingProgress} />
         <PlotJsonLd plot={plot} />
         {/* Sticky scroll-spy navigation */}
@@ -1297,7 +1376,7 @@ export default function PlotDetail() {
             </SectionNavBtn>
           ))}
         </StickyNav>
-        <Page>
+        <Page data-print-date={new Date().toLocaleDateString('he-IL', { year: 'numeric', month: 'long', day: 'numeric' })}>
           <PrintHeader>
             <PrintLogo>🗺️ LandMap Israel</PrintLogo>
             <PrintMeta>

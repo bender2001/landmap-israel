@@ -37,12 +37,15 @@ const Particle = styled.div<{$x:number;$size:number;$dur:number;$delay:number}>`
   width:${p=>p.$size}px;height:${p=>p.$size}px;border-radius:50%;pointer-events:none;
   background:radial-gradient(circle,rgba(212,168,75,0.5),transparent 70%);
   animation:${particleDrift} ${p=>p.$dur}s linear ${p=>p.$delay}s infinite;
+  @media(prefers-reduced-motion:reduce){animation:none;display:none;}
 `
 const Orb = styled.div<{$size:number;$top:string;$left:string;$delay:number}>`
   position:absolute;width:${p=>p.$size}px;height:${p=>p.$size}px;border-radius:50%;
   background:radial-gradient(circle,rgba(212,168,75,0.1),transparent 70%);
   top:${p=>p.$top};left:${p=>p.$left};pointer-events:none;
   animation:${orbFloat} ${p=>6+p.$delay}s ease-in-out infinite;animation-delay:${p=>p.$delay}s;
+  will-change:transform;
+  @media(prefers-reduced-motion:reduce){animation:none;}
 `
 const HeroContent = styled.div`
   position:relative;z-index:2;text-align:center;max-width:780px;
@@ -1198,7 +1201,7 @@ export default function Landing(){
         <WaSection>
           <SectionHead style={{marginBottom:24}}>רוצים לדבר עם מומחה?</SectionHead>
           <p style={{color:t.textSec,marginBottom:28,fontSize:16}}>צוות מומחי הקרקע שלנו זמין עבורכם לכל שאלה</p>
-          <WaBtn href={SITE_CONFIG.waLink} target="_blank" rel="noopener">
+          <WaBtn href={SITE_CONFIG.waLink} target="_blank" rel="noopener noreferrer">
             <MessageCircle size={22}/> שלח הודעה בוואטסאפ
           </WaBtn>
           <br/>

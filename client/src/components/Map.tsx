@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Polygon, Popup, Tooltip, Marker, CircleMarker,
 import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 import { Heart, Phone, Layers, Map as MapIcon, Satellite, Mountain, GitCompareArrows, ExternalLink, Maximize2, Minimize2, Palette, Ruler, Undo2, Trash2, LocateFixed, Copy, Check, Search } from 'lucide-react'
-import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, calcScoreBreakdown, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket, investmentRecommendation, estimatedYear, pricePosition, calcPercentileRank, findBestValueIds, estimateDemand } from '../utils'
+import { statusColors, statusLabels, fmt, p, roi, calcScore, getGrade, calcScoreBreakdown, plotCenter, pricePerSqm, pricePerDunam, zoningLabels, zoningPipeline, daysOnMarket, investmentRecommendation, estimatedYear, pricePosition, calcPercentileRank, findBestValueIds, estimateDemand, satelliteTileUrl } from '../utils'
 import { usePrefetchPlot } from '../hooks'
 import type { Plot, Poi } from '../types'
 import { israelAreas } from '../data'
@@ -973,9 +973,49 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
       streetView: `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${center.lat},${center.lng}`,
       waze: `https://waze.com/ul?ll=${center.lat},${center.lng}&z=17&navigate=yes`,
     } : null
+    const satUrl = center ? satelliteTileUrl(center.lat, center.lng, 17) : null
     return (
       <div className="plot-popup" style={{ padding: 0 }}>
-        {/* Premium gradient header */}
+        {/* Satellite preview banner */}
+        {satUrl && (
+          <div style={{
+            position: 'relative', width: '100%', height: 72, overflow: 'hidden',
+            background: `url(${satUrl}) center/cover no-repeat`,
+            borderBottom: `2px solid ${grade.color}40`,
+          }}>
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'linear-gradient(180deg, transparent 30%, rgba(11,17,32,0.85) 100%)',
+            }} />
+            <div style={{
+              position: 'absolute', bottom: 6, right: 10, left: 10, direction: 'rtl',
+              display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+            }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>
+                  גוש {d.block} · חלקה {plot.number}
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  📍 {plot.city}
+                  {zoningStage && <span style={{ opacity: 0.7 }}>· {zoningStage.icon} {zoningStage.label}</span>}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                <div style={{
+                  width: 34, height: 34, borderRadius: '50%',
+                  border: `2.5px solid ${grade.color}`,
+                  background: `${grade.color}25`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 13, fontWeight: 900, color: grade.color,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                }}>{score}</div>
+                <span style={{ fontSize: 9, fontWeight: 800, color: grade.color, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>{grade.grade}</span>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Fallback header when no satellite image */}
+        {!satUrl && (
         <div style={{
           padding: '14px 16px 10px', direction: 'rtl',
           background: `linear-gradient(135deg, ${grade.color}18, ${grade.color}08)`,
@@ -1001,14 +1041,26 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
               <span style={{ fontSize: 10, fontWeight: 800, color: grade.color }}>{grade.grade}</span>
             </div>
           </div>
+        </div>
+        )}
           {/* Status badge */}
+          {!satUrl && (
           <span className="plot-popup-status" style={{ background: (statusColors[plot.status || ''] || '#888') + '20', color: statusColors[plot.status || ''] || '#888' }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
             {statusLabels[plot.status || ''] || plot.status}
           </span>
-        </div>
+          )}
         {/* Data rows */}
-        <div style={{ padding: '10px 16px 12px' }}>
+        <div style={{ padding: '10px 16px 12px', direction: 'rtl' }}>
+          {satUrl && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+              <span className="plot-popup-status" style={{ background: (statusColors[plot.status || ''] || '#888') + '20', color: statusColors[plot.status || ''] || '#888' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
+                {statusLabels[plot.status || ''] || plot.status}
+              </span>
+              {estYear && <span style={{ fontSize: 10, fontWeight: 700, color: t.gold, padding: '2px 8px', background: `${t.gold}12`, borderRadius: t.r.full, border: `1px solid ${t.gold}25` }}>🏗️ {estYear.label}</span>}
+            </div>
+          )}
           <div className="plot-popup-row"><span className="plot-popup-label">מחיר</span><span className="plot-popup-value" style={{ fontSize: 15, fontWeight: 900 }}>{fmt.compact(d.price)}{(() => {
             const pp = pricePosition(plot, plots)
             if (!pp) return null
