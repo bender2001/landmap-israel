@@ -1655,37 +1655,76 @@ export default function Explore() {
     }
   }, [compareIds, toast])
 
-  // Mobile preview swipe-to-dismiss
+  // Mobile preview swipe gestures: vertical dismiss + horizontal plot navigation
   const previewRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!selected || mobileExpanded || !previewRef.current) return
     const el = previewRef.current
-    let startY = 0, currentY = 0, isDragging = false
+    let startX = 0, startY = 0, currentX = 0, currentY = 0, isDragging = false
+    let direction: 'none' | 'horizontal' | 'vertical' = 'none'
+    const SWIPE_THRESHOLD = 60 // minimum px to trigger a swipe action
+    const DIRECTION_LOCK = 12 // px before locking to a direction
+
     const onTouchStart = (e: TouchEvent) => {
-      startY = e.touches[0].clientY; currentY = startY; isDragging = true
+      startX = e.touches[0].clientX; startY = e.touches[0].clientY
+      currentX = startX; currentY = startY; isDragging = true; direction = 'none'
     }
     const onTouchMove = (e: TouchEvent) => {
       if (!isDragging) return
-      currentY = e.touches[0].clientY
-      const dy = currentY - startY
-      if (dy > 0) { // only allow downward swipe
+      currentX = e.touches[0].clientX; currentY = e.touches[0].clientY
+      const dx = currentX - startX, dy = currentY - startY
+
+      // Lock direction after DIRECTION_LOCK threshold
+      if (direction === 'none' && (Math.abs(dx) > DIRECTION_LOCK || Math.abs(dy) > DIRECTION_LOCK)) {
+        direction = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical'
+      }
+
+      if (direction === 'vertical' && dy > 0) {
+        // Vertical: swipe down to dismiss
         el.style.transform = `translateY(${Math.min(dy, 250)}px)`
         el.style.opacity = `${Math.max(0.3, 1 - dy / 300)}`
+        el.style.transition = 'none'
+      } else if (direction === 'horizontal') {
+        // Horizontal: subtle slide feedback for plot navigation
+        const clamped = Math.max(-80, Math.min(80, dx))
+        el.style.transform = `translateX(${clamped}px)`
+        el.style.opacity = `${Math.max(0.7, 1 - Math.abs(clamped) / 200)}`
         el.style.transition = 'none'
       }
     }
     const onTouchEnd = () => {
       if (!isDragging) return
       isDragging = false
-      const dy = currentY - startY
-      el.style.transition = ''
+      const dx = currentX - startX, dy = currentY - startY
+      el.style.transition = 'transform 0.3s cubic-bezier(0.32,0.72,0,1), opacity 0.3s'
       el.style.opacity = ''
-      if (dy > 100) {
+
+      if (direction === 'vertical' && dy > 100) {
+        // Dismiss: swipe down past threshold
         el.style.transform = 'translateY(120%)'
         setTimeout(() => { setSelected(null); if (el) { el.style.transform = '' } }, 200)
+      } else if (direction === 'horizontal' && Math.abs(dx) > SWIPE_THRESHOLD) {
+        // Navigate: swipe left → next, swipe right → prev (RTL-aware)
+        const idx = sorted.findIndex(pl => pl.id === selected.id)
+        if (idx >= 0) {
+          if (dx < -SWIPE_THRESHOLD && idx < sorted.length - 1) {
+            // Swipe left → next plot
+            el.style.transform = 'translateX(-120%)'
+            setTimeout(() => { selectPlot(sorted[idx + 1]); if (el) el.style.transform = '' }, 200)
+          } else if (dx > SWIPE_THRESHOLD && idx > 0) {
+            // Swipe right → prev plot
+            el.style.transform = 'translateX(120%)'
+            setTimeout(() => { selectPlot(sorted[idx - 1]); if (el) el.style.transform = '' }, 200)
+          } else {
+            el.style.transform = ''
+          }
+        } else {
+          el.style.transform = ''
+        }
       } else {
         el.style.transform = ''
       }
+      direction = 'none'
     }
     el.addEventListener('touchstart', onTouchStart, { passive: true })
     el.addEventListener('touchmove', onTouchMove, { passive: true })
@@ -1695,7 +1734,7 @@ export default function Explore() {
       el.removeEventListener('touchmove', onTouchMove)
       el.removeEventListener('touchend', onTouchEnd)
     }
-  }, [selected, mobileExpanded])
+  }, [selected, mobileExpanded, sorted, selectPlot])
 
   // OG + Twitter meta — updates on every title/desc change
   useEffect(() => {
@@ -1856,10 +1895,39 @@ export default function Explore() {
           selectPlot(sorted[prev])
         }
       }
+      // j/k keys — Gmail-style list navigation (works even without selection)
+      if ((e.key === 'j' || e.key === 'J') && sorted.length > 0) {
+        e.preventDefault()
+        if (!selected) {
+          selectPlot(sorted[0])
+        } else {
+          const idx = sorted.findIndex(pl => pl.id === selected.id)
+          if (idx < sorted.length - 1) selectPlot(sorted[idx + 1])
+        }
+      }
+      if ((e.key === 'k' || e.key === 'K') && sorted.length > 0) {
+        e.preventDefault()
+        if (!selected) {
+          selectPlot(sorted[sorted.length - 1])
+        } else {
+          const idx = sorted.findIndex(pl => pl.id === selected.id)
+          if (idx > 0) selectPlot(sorted[idx - 1])
+        }
+      }
+      // 'o' or Enter — open selected plot detail page
+      if ((e.key === 'o' || e.key === 'O' || e.key === 'Enter') && selected) {
+        e.preventDefault()
+        window.location.href = `/plot/${selected.id}`
+      }
+      // 'c' key — toggle compare for selected plot
+      if ((e.key === 'c' || e.key === 'C') && selected) {
+        e.preventDefault()
+        toggleCompare(selected.id)
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selected, sortOpen, listOpen, sorted, selectPlot, shortcutsOpen, mapFullscreen, sharePlot])
+  }, [selected, sortOpen, listOpen, sorted, selectPlot, shortcutsOpen, mapFullscreen, sharePlot, toggleCompare])
 
   return (
     <Wrap className="dark" aria-label="מפת חלקות להשקעה">
@@ -2319,8 +2387,12 @@ export default function Explore() {
             </KbGroup>
             <KbGroup>
               <KbGroupLabel>חלקה נבחרת</KbGroupLabel>
-              <KbRow><KbLabel>חלקה הבאה</KbLabel><KbKey>←</KbKey></KbRow>
-              <KbRow><KbLabel>חלקה קודמת</KbLabel><KbKey>→</KbKey></KbRow>
+              <KbRow><KbLabel>חלקה הבאה</KbLabel><KbKey>J</KbKey></KbRow>
+              <KbRow><KbLabel>חלקה קודמת</KbLabel><KbKey>K</KbKey></KbRow>
+              <KbRow><KbLabel>חלקה הבאה (חצים)</KbLabel><KbKey>←</KbKey></KbRow>
+              <KbRow><KbLabel>חלקה קודמת (חצים)</KbLabel><KbKey>→</KbKey></KbRow>
+              <KbRow><KbLabel>פתח דף חלקה</KbLabel><KbKey>O</KbKey></KbRow>
+              <KbRow><KbLabel>הוסף להשוואה</KbLabel><KbKey>C</KbKey></KbRow>
               <KbRow><KbLabel>שתף חלקה</KbLabel><KbKey>S</KbKey></KbRow>
             </KbGroup>
             <KbGroup>

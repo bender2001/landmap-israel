@@ -1249,6 +1249,15 @@ const CopyReportBtn = styled.button<{$copied?:boolean}>`
   @media print{display:none;}
 `
 
+/* ── WhatsApp Share Button ── */
+const WhatsAppShareBtn = styled.button`
+  display:flex;align-items:center;justify-content:center;width:40px;height:40px;
+  border-radius:${t.r.md};border:1px solid rgba(37,211,102,0.3);
+  background:rgba(37,211,102,0.06);color:#25D366;cursor:pointer;transition:all ${t.tr};
+  &:hover{border-color:#25D366;background:rgba(37,211,102,0.12);transform:translateY(-1px);box-shadow:0 4px 12px rgba(37,211,102,0.2);}
+  @media print{display:none;}
+`
+
 /* ── Exit Strategy Scenarios ── */
 const ExitCard = styled(AnimatedCard)`
   background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};padding:24px;
@@ -1462,6 +1471,27 @@ export default function PlotDetail() {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
+  }
+
+  // Share formatted plot summary via WhatsApp (opens WhatsApp with pre-filled message)
+  const handleWhatsAppShare = () => {
+    if (!plot) return
+    const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
+    const ppd = pricePerDunam(plot), pps = pricePerSqm(plot)
+    const lines: string[] = [
+      `🗺️ *חלקה להשקעה — ${plot.city}*`,
+      ``,
+      `📍 גוש ${d.block} חלקה ${plot.number}`,
+      `💰 מחיר: ${fmt.price(d.price)}`,
+    ]
+    if (d.size > 0) lines.push(`📐 שטח: ${fmt.dunam(d.size)} דונם`)
+    if (ppd > 0) lines.push(`💵 ₪${fmt.num(ppd)} / דונם`)
+    if (r > 0) lines.push(`📈 תשואה: ${Math.round(r)}%`)
+    if (d.projected > 0 && d.price > 0) lines.push(`💎 רווח צפוי: ${fmt.price(d.projected - d.price)}`)
+    lines.push(`🏆 ציון: ${score}/10 (${grade.grade})`)
+    lines.push(``, `🔗 ${window.location.href}`)
+    const msg = encodeURIComponent(lines.join('\n'))
+    window.open(`https://wa.me/?text=${msg}`, '_blank', 'noopener')
   }
 
   // Track recently viewed
@@ -1753,6 +1783,7 @@ export default function PlotDetail() {
                 {compareIds.length > 0 && <CompareBadge>{compareIds.length}</CompareBadge>}
               </CompareToggleBtn>
               <IconBtn onClick={handleShare} aria-label="שיתוף">{copied ? <Check size={20} color={t.ok} /> : <Share2 size={20} />}</IconBtn>
+              <WhatsAppShareBtn onClick={handleWhatsAppShare} aria-label="שתף בוואטסאפ" title="שתף בוואטסאפ"><MessageCircle size={20} /></WhatsAppShareBtn>
               <PrintBtn onClick={() => window.print()} aria-label="הדפס דו״ח"><Printer size={20} /></PrintBtn>
               <IconBtn aria-label="ניווט" onClick={() => window.open(`https://waze.com/ul?ll=${plot.coordinates?.[0]?.[0]},${plot.coordinates?.[0]?.[1]}&navigate=yes`, '_blank')}><Navigation size={20} /></IconBtn>
             </Actions>
