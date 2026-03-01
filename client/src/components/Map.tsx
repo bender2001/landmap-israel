@@ -1189,6 +1189,10 @@ function MapArea({ plots, pois, selected, onSelect, onLead, favorites, compare, 
               <a href={navLinks.waze} target="_blank" rel="noopener noreferrer"
                 className="popup-nav-link popup-nav-link--waze" title="נווט עם Waze"
               >🚗 Waze</a>
+              <a href={`https://t.me/share/url?url=${encodeURIComponent(`${window.location.origin}/plot/${plot.id}`)}&text=${encodeURIComponent(`🗺️ ${plot.city} — גוש ${d.block} חלקה ${plot.number} | ${fmt.compact(d.price)}`)}`}
+                target="_blank" rel="noopener noreferrer"
+                className="popup-nav-link popup-nav-link--tg" title="שתף בטלגרם"
+              >📨 Telegram</a>
               <button
                 onClick={() => copyCoordinates(center!.lat, center!.lng, plot.id)}
                 className={`popup-nav-link popup-nav-link--coords${copiedCoords === plot.id ? ' copied' : ''}`}

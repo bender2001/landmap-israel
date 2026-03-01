@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import styled, { keyframes, createGlobalStyle } from 'styled-components'
-import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, TrendingDown, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon, MessageCircle, Compass, ClipboardCopy, Construction, Milestone, Phone, GitCompareArrows, RotateCcw } from 'lucide-react'
+import { ArrowRight, Heart, Navigation, MapPin, FileText, Calendar, Building2, Landmark, Clock, TrendingUp, TrendingDown, Shield, Share2, Copy, Check, Waves, TreePine, Hospital, Calculator, DollarSign, Percent, BarChart3, Ruler, Printer, AlertTriangle, Map as MapIcon, MessageCircle, Compass, ClipboardCopy, Construction, Milestone, Phone, GitCompareArrows, RotateCcw, Send } from 'lucide-react'
 import { t, sm, md, lg, fadeInUp } from '../theme'
 import { usePlot, useFavorites, useCompare, useSimilarPlots, useRecentlyViewed, useAllPlots, usePlotCityRanking } from '../hooks'
 import { Spinner, GoldButton, GhostButton, Badge, ErrorBoundary, AnimatedCard, ScrollToTop } from '../components/UI'
@@ -1262,6 +1262,16 @@ const WhatsAppShareBtn = styled.button`
   @media print{display:none;}
 `
 
+/* ── Telegram Share Button ── */
+const TelegramShareBtn = styled.a`
+  display:flex;align-items:center;justify-content:center;width:40px;height:40px;
+  border-radius:${t.r.md};border:1px solid rgba(0,136,204,0.3);
+  background:rgba(0,136,204,0.06);color:#0088CC;cursor:pointer;transition:all ${t.tr};
+  text-decoration:none!important;
+  &:hover{border-color:#0088CC;background:rgba(0,136,204,0.12);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,136,204,0.2);}
+  @media print{display:none;}
+`
+
 /* ── Exit Strategy Scenarios ── */
 const ExitCard = styled(AnimatedCard)`
   background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};padding:24px;
@@ -1790,6 +1800,13 @@ export default function PlotDetail() {
               </CompareToggleBtn>
               <IconBtn onClick={handleShare} aria-label="שיתוף">{copied ? <Check size={20} color={t.ok} /> : <Share2 size={20} />}</IconBtn>
               <WhatsAppShareBtn onClick={handleWhatsAppShare} aria-label="שתף בוואטסאפ" title="שתף בוואטסאפ"><MessageCircle size={20} /></WhatsAppShareBtn>
+              <TelegramShareBtn
+                href={`https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(`🗺️ חלקה להשקעה ב${plot.city} — גוש ${d.block} חלקה ${plot.number}\n💰 ${fmt.compact(d.price)} | 📈 ROI ${Math.round(r)}% | 🏆 ${score}/10`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="שתף בטלגרם"
+                title="שתף בטלגרם"
+              ><Send size={18} /></TelegramShareBtn>
               <PrintBtn onClick={() => window.print()} aria-label="הדפס דו״ח"><Printer size={20} /></PrintBtn>
               <IconBtn aria-label="ניווט" onClick={() => window.open(`https://waze.com/ul?ll=${plot.coordinates?.[0]?.[0]},${plot.coordinates?.[0]?.[1]}&navigate=yes`, '_blank')}><Navigation size={20} /></IconBtn>
             </Actions>

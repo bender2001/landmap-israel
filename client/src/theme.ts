@@ -206,6 +206,7 @@ export const GlobalStyles = createGlobalStyle`
   .popup-nav-link--gmaps{background:rgba(66,133,244,0.1);border-color:rgba(66,133,244,0.2);color:#4285F4;}
   .popup-nav-link--street{background:rgba(251,188,5,0.1);border-color:rgba(251,188,5,0.2);color:#FBBC05;}
   .popup-nav-link--waze{background:rgba(51,181,229,0.1);border-color:rgba(51,181,229,0.2);color:#33B5E5;}
+  .popup-nav-link--tg{background:rgba(0,136,204,0.1);border-color:rgba(0,136,204,0.2);color:#0088CC;}
   .popup-nav-link--coords{background:rgba(148,163,184,0.1);border-color:rgba(148,163,184,0.2);color:#94A3B8;}
   .popup-nav-link--coords.copied{background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.3);color:#10B981;}
 

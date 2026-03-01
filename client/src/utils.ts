@@ -1335,6 +1335,83 @@ export function calcCityQualityScore(plots: Plot[]): {
   return { score: finalScore, label, color, factors }
 }
 
+// ── Payback Period Estimation ──
+/** Estimates how many years until the investment breaks even via appreciation.
+ *  Uses ROI and readiness timeline to project a payback period. */
+export function calcPaybackPeriod(plot: Plot): { years: number; label: string; color: string; speed: 'fast' | 'medium' | 'slow' } | null {
+  const r = roi(plot)
+  const { readiness } = p(plot)
+  if (r <= 0) return null
+  const cagr = calcCAGR(r, readiness)
+  if (!cagr || cagr.cagr <= 0) return null
+  // Using Rule of 72 approximation for doubling time, adjust for break-even
+  const paybackYears = Math.round(100 / cagr.cagr * 10) / 10
+  if (paybackYears > 20) return null
+  const speed = paybackYears <= 3 ? 'fast' : paybackYears <= 7 ? 'medium' : 'slow'
+  const color = speed === 'fast' ? '#10B981' : speed === 'medium' ? '#F59E0B' : '#F97316'
+  const label = paybackYears <= 1 ? 'פחות משנה' : paybackYears <= 2 ? `~${paybackYears} שנים` : `~${Math.round(paybackYears)} שנים`
+  return { years: paybackYears, label, color, speed }
+}
+
+// ── Risk/Reward Ratio ──
+/** Simple risk/reward ratio based on zoning stage progress and ROI.
+ *  Higher zoning = lower risk, higher ROI = higher reward. */
+export function calcRiskReward(plot: Plot): { ratio: number; label: string; color: string; risk: 'low' | 'medium' | 'high'; reward: 'low' | 'medium' | 'high' } {
+  const r = roi(plot)
+  const { zoning } = p(plot)
+  const zi = ZO.indexOf(zoning)
+  // Risk: inversely proportional to zoning progress (higher stage = less risk)
+  const riskScore = zi >= 0 ? 10 - Math.round((zi / (ZO.length - 1)) * 10) : 8
+  // Reward: proportional to ROI
+  const rewardScore = r > 0 ? Math.min(10, Math.round(r / 20)) : 2
+  const ratio = rewardScore > 0 && riskScore > 0 ? Math.round((rewardScore / riskScore) * 10) / 10 : 1
+  const risk: 'low' | 'medium' | 'high' = riskScore <= 3 ? 'low' : riskScore <= 6 ? 'medium' : 'high'
+  const reward: 'low' | 'medium' | 'high' = rewardScore <= 3 ? 'low' : rewardScore <= 6 ? 'medium' : 'high'
+  const color = ratio >= 1.5 ? '#10B981' : ratio >= 0.8 ? '#F59E0B' : '#EF4444'
+  const label = ratio >= 2 ? 'סיכוי/סיכון מצוין' : ratio >= 1.5 ? 'סיכוי/סיכון טוב' : ratio >= 0.8 ? 'סיכוי/סיכון סביר' : 'סיכון גבוה'
+  return { ratio, label, color, risk, reward }
+}
+
+// ── Market Summary Stats ──
+/** Aggregate market-level stats for dashboard/snapshot displays */
+export function calcMarketSnapshot(plots: Plot[]): {
+  totalValue: number; avgPrice: number; avgRoi: number; avgScore: number;
+  hotDeals: number; newListings: number; avgPayback: number | null;
+  priceRange: { min: number; max: number }; avgPpd: number;
+  zoningDistribution: { stage: string; label: string; count: number; pct: number }[];
+} {
+  const prices = plots.map(pl => p(pl).price).filter(v => v > 0)
+  const rois = plots.map(roi).filter(v => v > 0)
+  const scores = plots.map(calcScore)
+  const ppds = plots.map(pricePerDunam).filter(v => v > 0)
+  const totalValue = prices.reduce((s, v) => s + v, 0)
+  const avgPrice = prices.length > 0 ? Math.round(totalValue / prices.length) : 0
+  const avgRoi = rois.length > 0 ? Math.round(rois.reduce((s, v) => s + v, 0) / rois.length) : 0
+  const avgScore = scores.length > 0 ? Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 10) / 10 : 0
+  const avgPpd = ppds.length > 0 ? Math.round(ppds.reduce((s, v) => s + v, 0) / ppds.length) : 0
+  const hotDeals = plots.filter(pl => calcScore(pl) >= 7 && roi(pl) > 20).length
+  const newListings = plots.filter(pl => { const d = daysOnMarket(p(pl).created); return d && d.days <= 14 }).length
+  // Avg payback
+  const paybacks = plots.map(calcPaybackPeriod).filter((pb): pb is NonNullable<typeof pb> => !!pb)
+  const avgPayback = paybacks.length > 0 ? Math.round((paybacks.reduce((s, pb) => s + pb.years, 0) / paybacks.length) * 10) / 10 : null
+  // Zoning distribution
+  const zoningMap = new Map<string, number>()
+  for (const pl of plots) {
+    const z = p(pl).zoning
+    zoningMap.set(z, (zoningMap.get(z) || 0) + 1)
+  }
+  const zoningDistribution = zoningPipeline.map(zp => {
+    const count = zoningMap.get(zp.key) || 0
+    return { stage: zp.key, label: zp.label, count, pct: plots.length > 0 ? Math.round((count / plots.length) * 100) : 0 }
+  }).filter(z => z.count > 0)
+
+  return {
+    totalValue, avgPrice, avgRoi, avgScore, hotDeals, newListings, avgPayback,
+    priceRange: { min: prices.length > 0 ? Math.min(...prices) : 0, max: prices.length > 0 ? Math.max(...prices) : 0 },
+    avgPpd, zoningDistribution,
+  }
+}
+
 // ── Normalize ──
 export function normalizePlot(plot: Plot): Plot {
   return { ...plot, total_price: plot.totalPrice ?? plot.total_price, projected_value: plot.projectedValue ?? plot.projected_value,

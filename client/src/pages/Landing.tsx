@@ -5,7 +5,7 @@ import { MapPin, Zap, TrendingUp, ChevronLeft, ChevronDown, Phone, Bell, Smartph
 import { t, fadeInUp, fadeInScale, shimmer, float, gradientShift, sm, md, lg, mobile } from '../theme'
 import { PublicLayout } from '../components/Layout'
 import { GoldButton, GhostButton, AnimatedCard, CountUpNumber, ScrollToTop } from '../components/UI'
-import { SITE_CONFIG, p, roi, fmt, pricePerDunam, calcScore, getGrade, zoningLabels, statusColors, pricePerSqm } from '../utils'
+import { SITE_CONFIG, p, roi, fmt, pricePerDunam, calcScore, getGrade, zoningLabels, statusColors, pricePerSqm, calcMarketSnapshot, calcPaybackPeriod, calcRiskReward, estimatedYear, daysOnMarket } from '../utils'
 import { useAllPlots, useFeaturedPlots, usePopularPlots, usePlotStats, useInView, usePrefetchPlotsByCity, useRecentlyViewed, usePlotsBatch, useDocumentTitle, useMetaDescription } from '../hooks'
 import { preloadRoutes } from '../App'
 
@@ -483,6 +483,57 @@ const COMPARE_FEATURES = [
   { feature: 'מיקוד בקרקעות להשקעה', us: true, madlan: false, yad2: false },
 ]
 
+/* ══════ MARKET SNAPSHOT DASHBOARD ══════ */
+const SnapshotSection = styled.section`
+  padding:56px 24px;direction:rtl;position:relative;overflow:hidden;
+  background:linear-gradient(180deg,${t.bg},rgba(212,168,75,0.03),${t.bg});
+  content-visibility:auto;contain-intrinsic-size:auto 360px;
+`
+const SnapshotGrid = styled.div`
+  max-width:1060px;margin:0 auto;display:grid;grid-template-columns:repeat(2,1fr);gap:14px;
+  ${sm}{grid-template-columns:repeat(3,1fr);}
+  ${lg}{grid-template-columns:repeat(6,1fr);}
+`
+const snapshotCardIn = keyframes`from{opacity:0;transform:translateY(12px) scale(0.95)}to{opacity:1;transform:translateY(0) scale(1)}`
+const SnapshotCard = styled.div<{$delay:number;$accent?:string}>`
+  display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 14px;
+  background:${t.surface};border:1px solid ${pr=>pr.$accent?`${pr.$accent}30`:t.border};
+  border-radius:${t.r.lg};text-align:center;
+  animation:${snapshotCardIn} 0.4s ease-out ${pr=>pr.$delay}s both;
+  transition:all 0.3s cubic-bezier(0.32,0.72,0,1);
+  &:hover{border-color:${pr=>pr.$accent||t.goldBorder};transform:translateY(-4px);box-shadow:0 8px 24px ${pr=>pr.$accent?`${pr.$accent}15`:'rgba(212,168,75,0.1)'};}
+`
+const SnapshotIcon = styled.span`font-size:22px;line-height:1;`
+const SnapshotVal = styled.div<{$c?:string}>`
+  font-size:clamp(18px,2.5vw,24px);font-weight:900;color:${pr=>pr.$c||t.gold};font-family:${t.font};
+  line-height:1.2;
+`
+const SnapshotLabel = styled.div`font-size:11px;font-weight:600;color:${t.textDim};line-height:1.3;`
+const SnapshotSubVal = styled.span<{$c?:string}>`
+  font-size:10px;font-weight:700;color:${pr=>pr.$c||t.textDim};
+`
+const SnapshotZoningBar = styled.div`
+  max-width:1060px;margin:18px auto 0;display:flex;align-items:center;gap:0;
+  height:10px;border-radius:5px;overflow:hidden;background:${t.surfaceLight};
+`
+const SnapshotZoningSeg = styled.div<{$w:number;$c:string}>`
+  height:100%;width:${pr=>pr.$w}%;background:${pr=>pr.$c};
+  transition:width 0.6s cubic-bezier(0.32,0.72,0,1);
+  min-width:${pr=>pr.$w > 0 ? '2px' : '0'};
+`
+const SnapshotZoningLegend = styled.div`
+  max-width:1060px;margin:8px auto 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  justify-content:center;
+`
+const SnapshotZoningItem = styled.span`
+  display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:${t.textSec};
+`
+const SnapshotZoningDot = styled.span<{$c:string}>`
+  width:8px;height:8px;border-radius:50%;background:${pr=>pr.$c};flex-shrink:0;
+`
+
+const ZONING_COLORS = ['#10B981', '#3B82F6', '#6366F1', '#8B5CF6', '#A855F7', '#D946EF', '#EC4899', '#F43F5E']
+
 /* ══════ HOW IT WORKS ══════ */
 const HowSection = styled.section`padding:80px 24px;direction:rtl;position:relative;content-visibility:auto;contain-intrinsic-size:auto 500px;`
 const SectionHead = styled.h2`
@@ -959,6 +1010,12 @@ export default function Landing(){
     return plots.filter(pl => calcScore(pl) >= 7 && roi(pl) > 0 && p(pl).price > 0).length
   }, [plots])
 
+  // Market snapshot for dashboard section
+  const marketSnapshot = useMemo(() => {
+    if (!plots || plots.length < 3) return null
+    return calcMarketSnapshot(plots)
+  }, [plots])
+
   const liveStats = useMemo(() => {
     if (!plots || plots.length === 0) return FALLBACK_STATS
     const uniqueCities = new Set(plots.map(pl => pl.city).filter(Boolean))
@@ -1165,10 +1222,23 @@ export default function Landing(){
                         </FeaturedBadge>
                       </FeaturedBadges>
                       <FeaturedTitle>{cityEmoji} גוש {d.block} חלקה {pl.number}</FeaturedTitle>
-                      <FeaturedCity><MapPin size={13}/> {pl.city} · {zoningLabels[d.zoning] || d.zoning}</FeaturedCity>
+                      <FeaturedCity><MapPin size={13}/> {pl.city} · {zoningLabels[d.zoning] || d.zoning}{(() => {
+                        const ey = estimatedYear(pl)
+                        return ey ? <span style={{color:t.goldBright,fontWeight:700}}> · 🏗️ {ey.label}</span> : null
+                      })()}</FeaturedCity>
                     </FeaturedHeader>
                     <FeaturedBody>
-                      <FeaturedPrice>{fmt.compact(d.price)}</FeaturedPrice>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+                        <FeaturedPrice>{fmt.compact(d.price)}</FeaturedPrice>
+                        {(() => {
+                          const dom = daysOnMarket(d.created)
+                          return dom ? (
+                            <span style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:10,fontWeight:700,color:dom.color,padding:'2px 8px',borderRadius:t.r.full,background:`${dom.color}12`,border:`1px solid ${dom.color}25`}}>
+                              <Clock size={10}/> {dom.label}
+                            </span>
+                          ) : null
+                        })()}
+                      </div>
                       <FeaturedMetrics>
                         <FeaturedMetric>
                           <FeaturedMetricVal $c={t.ok}>+{Math.round(plotRoi)}%</FeaturedMetricVal>
