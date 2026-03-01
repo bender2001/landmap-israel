@@ -10,7 +10,18 @@ import { initWebVitals } from './vitals'
 
 const qc = new QueryClient({
   defaultOptions: {
-    queries: { retry: 2, retryDelay: a => Math.min(1000 * 2 ** a, 8000), staleTime: 30_000, gcTime: 10 * 60_000, refetchOnWindowFocus: true },
+    queries: {
+      retry: 2,
+      retryDelay: a => Math.min(1000 * 2 ** a, 8000),
+      staleTime: 30_000,
+      gcTime: 10 * 60_000,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: 'always',        // auto-refresh stale data when network recovers
+      networkMode: 'offlineFirst',          // serve cache immediately, revalidate in background
+    },
+    mutations: {
+      networkMode: 'offlineFirst',          // queue mutations during offline → fire when back online
+    },
   },
 })
 

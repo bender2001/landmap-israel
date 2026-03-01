@@ -1020,3 +1020,88 @@ export function useMetaDescription(description: string | null | undefined) {
 }
 
 // (useDataFreshness already defined above at line ~243)
+
+// ── Connection Quality Detection ──
+
+type ConnectionSpeed = 'fast' | 'slow' | 'unknown'
+
+/**
+ * Detect connection quality via the Network Information API (navigator.connection).
+ * Falls back to 'unknown' on unsupported browsers.
+ * Use to conditionally disable expensive prefetches on slow/metered connections.
+ */
+export function useConnectionQuality(): { speed: ConnectionSpeed; saveData: boolean } {
+  const [state, setState] = useState<{ speed: ConnectionSpeed; saveData: boolean }>(() => {
+    const conn = (navigator as any).connection
+    if (!conn) return { speed: 'unknown', saveData: false }
+    const ect = conn.effectiveType as string | undefined
+    const saveData = !!conn.saveData
+    const speed: ConnectionSpeed = saveData ? 'slow'
+      : (ect === '4g' || ect === '5g') ? 'fast'
+      : (ect === '3g' || ect === '2g' || ect === 'slow-2g') ? 'slow'
+      : 'unknown'
+    return { speed, saveData }
+  })
+
+  useEffect(() => {
+    const conn = (navigator as any).connection
+    if (!conn) return
+    const handler = () => {
+      const ect = conn.effectiveType as string | undefined
+      const saveData = !!conn.saveData
+      const speed: ConnectionSpeed = saveData ? 'slow'
+        : (ect === '4g' || ect === '5g') ? 'fast'
+        : (ect === '3g' || ect === '2g' || ect === 'slow-2g') ? 'slow'
+        : 'unknown'
+      setState({ speed, saveData })
+    }
+    conn.addEventListener('change', handler)
+    return () => conn.removeEventListener('change', handler)
+  }, [])
+
+  return state
+}
+
+// ── Native Share (Web Share API with clipboard fallback) ──
+
+/**
+ * Share a plot via the Web Share API on mobile, or fall back to clipboard copy.
+ * Returns `{ share, canNativeShare }`.
+ */
+export function useSharePlot() {
+  const canNativeShare = typeof navigator !== 'undefined' && !!navigator.share
+
+  const share = useCallback(async (opts: { title: string; text: string; url: string }): Promise<'shared' | 'copied' | 'failed'> => {
+    // Try native share first (mobile browsers, PWA)
+    if (navigator.share) {
+      try {
+        await navigator.share(opts)
+        return 'shared'
+      } catch (err) {
+        // User cancelled — not an error
+        if ((err as Error).name === 'AbortError') return 'failed'
+      }
+    }
+    // Fallback: copy URL to clipboard
+    try {
+      await navigator.clipboard.writeText(opts.url)
+      return 'copied'
+    } catch {
+      // Last resort: execCommand
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = opts.url
+        ta.style.cssText = 'position:fixed;top:-9999px;opacity:0'
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+        return 'copied'
+      } catch {
+        return 'failed'
+      }
+    }
+  }, [])
+
+  return { share, canNativeShare }
+}

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState, useRef } from 'react'
 import { Routes, Route, useLocation, Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { ErrorBoundary, PageLoader, CookieConsent, PWAInstallPrompt } from './components/UI'
@@ -26,6 +26,13 @@ export const preloadRoutes = {
   landing: () => import('./pages/Landing'),
   auth: () => import('./pages/Auth'),
 } as const
+
+/* ── Route Transition Wrapper ── */
+const routeFadeIn = keyframes`from{opacity:0}to{opacity:1}`
+const RouteTransition = styled.div<{$key:string}>`
+  animation:${routeFadeIn} 0.18s ease-out;
+  @media(prefers-reduced-motion:reduce){animation:none;}
+`
 
 /* ── Premium 404 Page ── */
 const nfFloat = keyframes`0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}`
@@ -97,10 +104,22 @@ const NotFound = () => (
 
 export default function App() {
   const { pathname } = useLocation()
+  // Track previous pathname to trigger transition animation on route changes
+  const prevPath = useRef(pathname)
+  const [transitionKey, setTransitionKey] = useState(pathname)
+
   useEffect(() => {
     // Explore page manages its own scroll (full-height map); skip it
     if (pathname === '/explore') return
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+  }, [pathname])
+
+  // Trigger route transition animation when pathname changes
+  useEffect(() => {
+    if (prevPath.current !== pathname) {
+      prevPath.current = pathname
+      setTransitionKey(pathname + ':' + Date.now())
+    }
   }, [pathname])
 
   return (
@@ -108,6 +127,7 @@ export default function App() {
       <a href="#main-content" className="skip-link">דלג לתוכן הראשי</a>
       <Suspense fallback={null}><CommandPalette /></Suspense>
       <Suspense fallback={<PageLoader />}>
+        <RouteTransition $key={transitionKey} key={transitionKey}>
         <main id="main-content">
         <Routes>
           {/* Public */}
@@ -140,6 +160,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
         </main>
+        </RouteTransition>
       </Suspense>
       <CookieConsent />
       <PWAInstallPrompt />
