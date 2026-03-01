@@ -4,7 +4,7 @@ import { Search, SlidersHorizontal, X, Sparkles, MapPin, Bookmark, BookmarkCheck
 import { t, mobile } from '../theme'
 import { Select, RangeInput } from './UI'
 import { p, fmt, calcScore, roi, pricePerSqm } from '../utils'
-import { useSavedSearches, useFocusTrap } from '../hooks'
+import { useSavedSearches, useFocusTrap, useTrendingSearches } from '../hooks'
 import type { Filters, Plot } from '../types'
 
 const EMPTY: Filters = { city: '', priceMin: '', priceMax: '', sizeMin: '', sizeMax: '', ripeness: '', minRoi: '', zoning: '', search: '', belowAvg: '' }
@@ -316,6 +316,7 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
   const [suggestIdx, setSuggestIdx] = useState(-1)
   const suggestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [kbdHintVisible, setKbdHintVisible] = useState(true)
+  const { data: trendingSearches } = useTrendingSearches(5)
 
   // Quick filter result count preview — how many plots each filter would return
   const quickFilterCounts = useMemo(() => {
@@ -400,18 +401,28 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
     return { cities: cities.slice(0, 4), matchedPlots: matchedPlots.slice(0, 5) }
   }, [filters.search, plots])
 
+  // Trending items for empty-query state (shown when input focused without text)
+  const trendingItems = useMemo(() => {
+    if ((filters.search?.trim().length ?? 0) > 0 || !trendingSearches?.length) return []
+    return trendingSearches.map(q => ({ type: 'trending' as const, label: q }))
+  }, [filters.search, trendingSearches])
+
   const allSuggestions = useMemo(() => [
+    ...trendingItems,
     ...suggestions.cities.map(c => ({ type: 'city' as const, ...c })),
     ...suggestions.matchedPlots.map(pl => ({ type: 'plot' as const, ...pl })),
-  ], [suggestions])
+  ], [trendingItems, suggestions])
 
-  const hasSuggestions = allSuggestions.length > 0 && (filters.search?.trim().length ?? 0) > 0
+  const hasSuggestions = allSuggestions.length > 0
 
   const selectSuggestion = useCallback((idx: number) => {
     const item = allSuggestions[idx]
     if (!item) return
     if (item.type === 'city') {
       onChange({ ...filters, city: item.label, search: '' })
+    } else if (item.type === 'trending') {
+      // Set the trending term as the search query
+      onChange({ ...filters, search: item.label })
     } else if (item.type === 'plot' && 'id' in item) {
       onSelectPlot?.(item.id)
       onChange({ ...filters, search: '' })
@@ -499,25 +510,43 @@ export default function FiltersBar({ filters, onChange, resultCount, plots, onSe
           {/* Search autocomplete dropdown */}
           {showSuggestions && hasSuggestions && (
             <SuggestWrap role="listbox" onMouseDown={() => { if (suggestTimeoutRef.current) clearTimeout(suggestTimeoutRef.current) }}>
+              {/* Trending searches — shown when input is empty (like Google/Madlan) */}
+              {trendingItems.length > 0 && (
+                <>
+                  <SuggestGroup>🔥 חיפושים פופולריים</SuggestGroup>
+                  {trendingItems.map((item, i) => (
+                    <SuggestItem key={item.label} $focused={suggestIdx === i}
+                      role="option" aria-selected={suggestIdx === i}
+                      onMouseDown={() => selectSuggestion(i)}>
+                      <SuggestIconWrap $c="#F59E0B"><Search size={13} /></SuggestIconWrap>
+                      <SuggestLabel>{item.label}</SuggestLabel>
+                      <SuggestMeta>פופולרי</SuggestMeta>
+                    </SuggestItem>
+                  ))}
+                </>
+              )}
               {suggestions.cities.length > 0 && (
                 <>
                   <SuggestGroup>📍 ערים</SuggestGroup>
-                  {suggestions.cities.map((c, i) => (
-                    <SuggestItem key={c.label} $focused={suggestIdx === i}
-                      role="option" aria-selected={suggestIdx === i}
-                      onMouseDown={() => selectSuggestion(i)}>
-                      <SuggestIconWrap $c="#3B82F6"><MapPin size={14} /></SuggestIconWrap>
-                      <SuggestLabel>{c.label}</SuggestLabel>
-                      <SuggestMeta>{c.count} חלקות</SuggestMeta>
-                    </SuggestItem>
-                  ))}
+                  {suggestions.cities.map((c, i) => {
+                    const idx = trendingItems.length + i
+                    return (
+                      <SuggestItem key={c.label} $focused={suggestIdx === idx}
+                        role="option" aria-selected={suggestIdx === idx}
+                        onMouseDown={() => selectSuggestion(idx)}>
+                        <SuggestIconWrap $c="#3B82F6"><MapPin size={14} /></SuggestIconWrap>
+                        <SuggestLabel>{c.label}</SuggestLabel>
+                        <SuggestMeta>{c.count} חלקות</SuggestMeta>
+                      </SuggestItem>
+                    )
+                  })}
                 </>
               )}
               {suggestions.matchedPlots.length > 0 && (
                 <>
                   <SuggestGroup>📋 חלקות</SuggestGroup>
                   {suggestions.matchedPlots.map((pl, i) => {
-                    const idx = suggestions.cities.length + i
+                    const idx = trendingItems.length + suggestions.cities.length + i
                     return (
                       <SuggestItem key={pl.id} $focused={suggestIdx === idx}
                         role="option" aria-selected={suggestIdx === idx}

@@ -74,6 +74,67 @@ export function usePlotStats() {
   })
 }
 
+/**
+ * Fetch trending/popular search terms from server analytics.
+ * Displayed in the search autocomplete when the input is focused with no query —
+ * like Google's trending searches or Madlan's "חיפושים פופולריים".
+ * Light endpoint (in-memory analytics, no DB hit), cached 2min.
+ */
+export function useTrendingSearches(limit = 5) {
+  return useQuery<string[]>({
+    queryKey: ['trending-searches', limit],
+    queryFn: async () => {
+      try {
+        const res = await api.getTrendingSearches(limit) as { searches: string[] }
+        return res.searches || []
+      } catch {
+        return []
+      }
+    },
+    staleTime: 2 * 60_000,
+  })
+}
+
+/**
+ * Fetch most-viewed/popular plots (social proof, like Yad2's "הכי נצפים").
+ * Returns plots with _viewVelocity for trending badges.
+ */
+export function usePopularPlots(limit = 6) {
+  return useQuery<Plot[]>({
+    queryKey: ['plots', 'popular', limit],
+    queryFn: async () => {
+      try {
+        const data = await api.getPopularPlots(limit) as Plot[]
+        return data.map(normalizePlot)
+      } catch {
+        return []
+      }
+    },
+    staleTime: 5 * 60_000,
+  })
+}
+
+/**
+ * Personalized recommendations based on user's favorite plots.
+ * Like Netflix's "Because you liked..." — analyzes favorite patterns and
+ * returns matching plots the user hasn't seen yet.
+ */
+export function useRecommendations(favoriteIds: string[], limit = 6) {
+  return useQuery<Plot[]>({
+    queryKey: ['plots', 'recommendations', favoriteIds.sort().join(','), limit],
+    queryFn: async () => {
+      try {
+        const data = await api.getRecommendations(favoriteIds, limit) as Plot[]
+        return data.map(normalizePlot)
+      } catch {
+        return []
+      }
+    },
+    enabled: favoriteIds.length > 0,
+    staleTime: 2 * 60_000,
+  })
+}
+
 /** Track API response latency for UX confidence indicators */
 export function useApiLatency() {
   const [latencyMs, setLatencyMs] = useState<number | null>(() => {

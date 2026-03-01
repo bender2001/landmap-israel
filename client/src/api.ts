@@ -133,6 +133,10 @@ export const getPlotsBatch = (ids: string[]) => ids.length ? api.get(`/plots/bat
 export const trackView = (id: string) => api.post(`/plots/${id}/view`, {}).catch(() => {})
 export const getFeaturedPlots = (limit = 3) => api.get(`/plots/featured?limit=${limit}`)
 export const getPlotStats = () => api.get('/plots/stats')
+export const getPopularPlots = (limit = 6, days = 30) => api.get(`/plots/popular?limit=${limit}&days=${days}`)
+export const getTrendingSearches = (limit = 5) => api.get(`/plots/trending-searches?limit=${limit}`)
+export const getRecommendations = (favoriteIds: string[], limit = 6) =>
+  favoriteIds.length > 0 ? api.get(`/plots/recommendations?favorites=${favoriteIds.join(',')}&limit=${limit}`) : Promise.resolve([])
 // Leads
 export const createLead = (d: { plot_id?: string; name: string; phone: string; email: string; message?: string }) => api.post('/leads', d)
 export const getLeads = (f?: Record<string, string>) => { const ps = new URLSearchParams(f); return api.get(`/leads?${ps}`) }

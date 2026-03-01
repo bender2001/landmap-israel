@@ -6,7 +6,7 @@ import { t, fadeInUp, fadeInScale, shimmer, float, gradientShift, sm, md, lg, mo
 import { PublicLayout } from '../components/Layout'
 import { GoldButton, GhostButton, AnimatedCard, CountUpNumber, ScrollToTop } from '../components/UI'
 import { SITE_CONFIG, p, roi, fmt, pricePerDunam, calcScore, getGrade, zoningLabels, statusColors, pricePerSqm } from '../utils'
-import { useAllPlots, useFeaturedPlots, usePlotStats, useInView, usePrefetchPlotsByCity, useRecentlyViewed, usePlotsBatch, useDocumentTitle, useMetaDescription } from '../hooks'
+import { useAllPlots, useFeaturedPlots, usePopularPlots, usePlotStats, useInView, usePrefetchPlotsByCity, useRecentlyViewed, usePlotsBatch, useDocumentTitle, useMetaDescription } from '../hooks'
 import { preloadRoutes } from '../App'
 
 /* ── extra keyframes ── */
@@ -329,6 +329,53 @@ const ViewAllBtn = styled(Link)`
   color:${t.gold};font-size:15px;font-weight:700;font-family:${t.font};
   text-decoration:none!important;transition:all ${t.tr};
   &:hover{background:${t.goldDim};border-color:${t.gold};transform:translateY(-2px);box-shadow:${t.sh.glow};}
+`
+
+/* ══════ POPULAR / MOST VIEWED (like Yad2's "הכי נצפים") ══════ */
+const PopularStrip = styled.section`
+  padding:40px 24px 48px;direction:rtl;position:relative;overflow:hidden;
+  background:${t.bg};
+  content-visibility:auto;contain-intrinsic-size:auto 220px;
+`
+const PopularScroll = styled.div`
+  max-width:1100px;margin:0 auto;display:flex;gap:16px;
+  overflow-x:auto;padding-bottom:8px;scroll-snap-type:x mandatory;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  &::-webkit-scrollbar{display:none;}
+  /* Fade edges for scroll hint */
+  mask-image:linear-gradient(to left, transparent 0, black 24px, black calc(100% - 24px), transparent 100%);
+  -webkit-mask-image:linear-gradient(to left, transparent 0, black 24px, black calc(100% - 24px), transparent 100%);
+`
+const popularCardIn = keyframes`from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}`
+const PopularCard = styled(Link)<{$delay:number}>`
+  flex-shrink:0;width:260px;scroll-snap-align:start;
+  display:flex;flex-direction:column;gap:0;
+  background:${t.surface};border:1px solid ${t.border};border-radius:${t.r.lg};
+  text-decoration:none!important;overflow:hidden;
+  transition:all 0.3s cubic-bezier(0.32,0.72,0,1);
+  animation:${popularCardIn} 0.4s ease-out ${pr=>pr.$delay}s both;
+  &:hover{border-color:${t.goldBorder};transform:translateY(-4px);box-shadow:${t.sh.lg};}
+  ${mobile}{width:220px;}
+`
+const PopularCardTop = styled.div`
+  display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
+  border-bottom:1px solid ${t.border};background:${t.surfaceLight};
+`
+const PopularCardCity = styled.span`font-size:13px;font-weight:700;color:${t.text};`
+const PopularCardViews = styled.span`
+  display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;
+  padding:2px 8px;border-radius:${t.r.full};
+  color:#EF4444;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);
+`
+const PopularCardBody = styled.div`padding:14px 16px;display:flex;flex-direction:column;gap:6px;`
+const PopularCardTitle = styled.div`font-size:12px;font-weight:600;color:${t.textSec};`
+const PopularCardPrice = styled.div`font-size:18px;font-weight:900;color:${t.gold};`
+const PopularCardMeta = styled.div`
+  display:flex;align-items:center;gap:10px;font-size:11px;color:${t.textDim};
+`
+const PopularCardMetaItem = styled.span<{$c?:string}>`
+  display:inline-flex;align-items:center;gap:3px;font-weight:600;
+  color:${pr=>pr.$c||t.textDim};
 `
 
 /* ── Featured Skeleton (loading placeholder) ── */
@@ -790,6 +837,7 @@ export default function Landing(){
   // Fetch featured plots from dedicated lightweight endpoint (server-scored, cached 5min)
   // Avoids client-side scoring computation — server already ranks by deal factor + ROI + freshness
   const { data: serverFeatured, isLoading: featuredLoading } = useFeaturedPlots(3)
+  const { data: popularPlots } = usePopularPlots(6)
 
   // Recently viewed plots for returning users
   const { ids: recentIds } = useRecentlyViewed()
@@ -1183,6 +1231,47 @@ export default function Landing(){
               }) }} />
             )}
           </FeaturedSection></Reveal>
+        )}
+
+        {/* ── Popular / Most Viewed (like Yad2's "הכי נצפים") ── */}
+        {popularPlots && popularPlots.length > 0 && (
+          <Reveal><PopularStrip>
+            <CitiesSectionHead>👁️ הכי <span>נצפים</span> השבוע</CitiesSectionHead>
+            <PopularScroll>
+              {popularPlots.map((pl, i) => {
+                const d = p(pl)
+                const plotRoi = roi(pl)
+                const score = calcScore(pl)
+                const grade = getGrade(score)
+                const views = (pl as any)._viewVelocity != null
+                  ? `${((pl as any)._viewVelocity as number).toFixed(1)}/יום`
+                  : `${pl.views || 0}`
+                return (
+                  <PopularCard key={pl.id} to={`/plot/${pl.id}`} $delay={i * 0.08} onMouseEnter={preloadRoutes.plotDetail}>
+                    <PopularCardTop>
+                      <PopularCardCity>{pl.city}</PopularCardCity>
+                      <PopularCardViews><Eye size={11} /> {views}</PopularCardViews>
+                    </PopularCardTop>
+                    <PopularCardBody>
+                      <PopularCardTitle>גוש {d.block} · חלקה {pl.number}</PopularCardTitle>
+                      <PopularCardPrice>{d.price > 0 ? fmt.compact(d.price) : '—'}</PopularCardPrice>
+                      <PopularCardMeta>
+                        <PopularCardMetaItem $c={t.ok}>
+                          <TrendingUp size={11} /> {plotRoi > 0 ? `+${Math.round(plotRoi)}%` : '—'}
+                        </PopularCardMetaItem>
+                        <PopularCardMetaItem>
+                          {fmt.dunam(d.size)} דונם
+                        </PopularCardMetaItem>
+                        <PopularCardMetaItem $c={grade.color}>
+                          {grade.grade}
+                        </PopularCardMetaItem>
+                      </PopularCardMeta>
+                    </PopularCardBody>
+                  </PopularCard>
+                )
+              })}
+            </PopularScroll>
+          </PopularStrip></Reveal>
         )}
 
         {/* ── Stats (live market data) ── */}
