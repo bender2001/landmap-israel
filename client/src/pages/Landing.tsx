@@ -6,7 +6,7 @@ import { t, fadeInUp, fadeInScale, shimmer, float, gradientShift, sm, md, lg, mo
 import { PublicLayout } from '../components/Layout'
 import { GoldButton, GhostButton, AnimatedCard, CountUpNumber, ScrollToTop } from '../components/UI'
 import { SITE_CONFIG, p, roi, fmt, pricePerDunam, calcScore, getGrade, zoningLabels, statusColors, pricePerSqm } from '../utils'
-import { useAllPlots, useInView, usePrefetchPlotsByCity, useRecentlyViewed, usePlotsBatch, useDocumentTitle, useMetaDescription } from '../hooks'
+import { useAllPlots, useFeaturedPlots, usePlotStats, useInView, usePrefetchPlotsByCity, useRecentlyViewed, usePlotsBatch, useDocumentTitle, useMetaDescription } from '../hooks'
 import { preloadRoutes } from '../App'
 
 /* ── extra keyframes ── */
@@ -784,8 +784,12 @@ export default function Landing(){
   const prefetchCity = usePrefetchPlotsByCity()
   useEffect(()=>{setVis(true)},[])
 
-  // Fetch live market data for stats
+  // Fetch live market data for stats (used by ticker, city cards, hot opportunity count)
   const { data: plots, isLoading: plotsLoading } = useAllPlots()
+
+  // Fetch featured plots from dedicated lightweight endpoint (server-scored, cached 5min)
+  // Avoids client-side scoring computation — server already ranks by deal factor + ROI + freshness
+  const { data: serverFeatured, isLoading: featuredLoading } = useFeaturedPlots(3)
 
   // Recently viewed plots for returning users
   const { ids: recentIds } = useRecentlyViewed()
@@ -888,14 +892,18 @@ export default function Landing(){
       .sort(() => Math.random() - 0.5) // shuffle for variety
   }, [plots])
 
-  // Featured plots — top investment-scored plots for the showcase
+  // Featured plots — prefer server-scored featured endpoint (pre-computed, cached 5min).
+  // Falls back to client-side scoring if the endpoint hasn't responded yet.
   const featuredPlots = useMemo(() => {
+    // Prefer server-scored featured plots (lighter, pre-ranked)
+    if (serverFeatured && serverFeatured.length > 0) return serverFeatured
+    // Fallback: compute from all plots while server data loads
     if (!plots || plots.length === 0) return []
     return [...plots]
       .filter(pl => p(pl).price > 0 && roi(pl) > 0)
       .sort((a, b) => calcScore(b) - calcScore(a) || roi(b) - roi(a))
       .slice(0, 3)
-  }, [plots])
+  }, [serverFeatured, plots])
 
   // Count high-opportunity plots (score >= 7 AND positive ROI) for the live badge
   const hotOpportunityCount = useMemo(() => {
@@ -1059,11 +1067,11 @@ export default function Landing(){
         </Reveal>
 
         {/* ── Featured Plots ── */}
-        {(featuredPlots.length > 0 || plotsLoading) && (
+        {(featuredPlots.length > 0 || featuredLoading || plotsLoading) && (
           <Reveal><FeaturedSection id="featured">
             <CitiesSectionHead>🔥 חלקות <span>מומלצות</span> להשקעה</CitiesSectionHead>
             <FeaturedGrid>
-              {plotsLoading && featuredPlots.length === 0 && Array.from({length:3}).map((_,i) => (
+              {(featuredLoading || plotsLoading) && featuredPlots.length === 0 && Array.from({length:3}).map((_,i) => (
                 <FeaturedSkelCard key={i}>
                   <FeaturedSkelHeader>
                     <SkelBar $w="45%" $h="12px" />
@@ -1143,6 +1151,37 @@ export default function Landing(){
             <ViewAllBtn to="/explore" onMouseEnter={preloadRoutes.explore} onFocus={preloadRoutes.explore}>
               <Eye size={18}/> צפו בכל החלקות על המפה
             </ViewAllBtn>
+            {/* ItemList Schema.org JSON-LD — helps Google index featured plots as rich results.
+                Google displays "Top picks" or "Recommended" cards in SERPs when ItemList is present.
+                Each item links to the canonical plot page for better crawling & indexing. */}
+            {featuredPlots.length > 0 && (
+              <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+                '@context': 'https://schema.org',
+                '@type': 'ItemList',
+                name: 'חלקות מומלצות להשקעה',
+                description: 'חלקות קרקע מובילות להשקעה בישראל — דירוג לפי פוטנציאל תשואה וערך עסקה',
+                numberOfItems: featuredPlots.length,
+                itemListElement: featuredPlots.map((pl, i) => {
+                  const d = p(pl)
+                  return {
+                    '@type': 'ListItem',
+                    position: i + 1,
+                    item: {
+                      '@type': 'RealEstateListing',
+                      name: `גוש ${d.block} חלקה ${pl.number} - ${pl.city}`,
+                      url: `${window.location.origin}/plot/${pl.id}`,
+                      ...(d.price > 0 && {
+                        offers: { '@type': 'Offer', price: d.price, priceCurrency: 'ILS', availability: 'https://schema.org/InStock' },
+                      }),
+                      address: { '@type': 'PostalAddress', addressLocality: pl.city, addressCountry: 'IL' },
+                      ...(d.size > 0 && {
+                        floorSize: { '@type': 'QuantitativeValue', value: d.size, unitCode: 'MTK' },
+                      }),
+                    },
+                  }
+                }),
+              }) }} />
+            )}
           </FeaturedSection></Reveal>
         )}
 

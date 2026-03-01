@@ -131,6 +131,8 @@ export const getPlot = (id: string) => api.get(`/plots/${id}`)
 export const getSimilarPlots = (id: string, limit = 4) => api.get(`/plots/${id}/similar?limit=${limit}`)
 export const getPlotsBatch = (ids: string[]) => ids.length ? api.get(`/plots/batch?ids=${ids.join(',')}`) : Promise.resolve([])
 export const trackView = (id: string) => api.post(`/plots/${id}/view`, {}).catch(() => {})
+export const getFeaturedPlots = (limit = 3) => api.get(`/plots/featured?limit=${limit}`)
+export const getPlotStats = () => api.get('/plots/stats')
 // Leads
 export const createLead = (d: { plot_id?: string; name: string; phone: string; email: string; message?: string }) => api.post('/leads', d)
 export const getLeads = (f?: Record<string, string>) => { const ps = new URLSearchParams(f); return api.get(`/leads?${ps}`) }

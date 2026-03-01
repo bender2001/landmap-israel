@@ -1735,6 +1735,8 @@ export default function PlotDetail() {
                 alt={`תצלום לוויין — גוש ${d.block} חלקה ${plot.number}, ${plot.city}`}
                 loading="eager"
                 decoding="async"
+                // @ts-expect-error — fetchpriority is a valid HTML attribute (Chrome 101+, Safari 17.2+)
+                fetchpriority="high"
               />
               <HeroBannerOverlay />
               <HeroBannerContent>

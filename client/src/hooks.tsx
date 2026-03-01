@@ -36,6 +36,44 @@ export function useAllPlots(filters: Partial<Filters> = {}) {
   })
 }
 
+/**
+ * Fetch featured/top investment plots from the server (pre-scored, cached 5min).
+ * Much lighter than useAllPlots() — returns only top N plots with _score/_roi.
+ * Ideal for Landing page where we only need 3-6 featured plots.
+ */
+export function useFeaturedPlots(limit = 3) {
+  return useQuery<Plot[]>({
+    queryKey: ['plots', 'featured', limit],
+    queryFn: async () => {
+      try {
+        const data = await api.getFeaturedPlots(limit) as Plot[]
+        return data.map(normalizePlot)
+      } catch {
+        return []
+      }
+    },
+    staleTime: 5 * 60_000, // Match server cache (5min)
+  })
+}
+
+/**
+ * Fetch lightweight aggregate stats from the server.
+ * Avoids loading all plots just to compute counts/averages.
+ */
+export function usePlotStats() {
+  return useQuery<{ totalPlots: number; cities: number; avgPrice: number; avgRoi: number; totalValue: number }>({
+    queryKey: ['plots', 'stats'],
+    queryFn: async () => {
+      try {
+        return await api.getPlotStats() as any
+      } catch {
+        return null
+      }
+    },
+    staleTime: 2 * 60_000,
+  })
+}
+
 /** Track API response latency for UX confidence indicators */
 export function useApiLatency() {
   const [latencyMs, setLatencyMs] = useState<number | null>(() => {
