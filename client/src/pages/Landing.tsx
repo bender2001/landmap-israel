@@ -7,6 +7,7 @@ import { PublicLayout } from '../components/Layout'
 import { GoldButton, GhostButton, AnimatedCard, CountUpNumber, ScrollToTop } from '../components/UI'
 import { SITE_CONFIG, p, roi, fmt, pricePerDunam, calcScore, getGrade, zoningLabels, statusColors, pricePerSqm } from '../utils'
 import { useAllPlots, useInView, usePrefetchPlotsByCity, useRecentlyViewed, usePlotsBatch, useDocumentTitle, useMetaDescription } from '../hooks'
+import { preloadRoutes } from '../App'
 
 /* ── extra keyframes ── */
 const glow = keyframes`0%,100%{box-shadow:0 0 20px rgba(212,168,75,0.15)}50%{box-shadow:0 0 50px rgba(212,168,75,0.35)}`
@@ -905,8 +906,8 @@ export default function Landing(){
               <ProofText>מאות משקיעים כבר בפלטפורמה</ProofText>
             </SocialProof>
             <CTAs>
-              <HeroGold to="/explore">גלו את ההזדמנויות <ChevronLeft size={18}/></HeroGold>
-              <HeroGhost to="/login">הרשמה חינם</HeroGhost>
+              <HeroGold to="/explore" onMouseEnter={preloadRoutes.explore} onFocus={preloadRoutes.explore}>גלו את ההזדמנויות <ChevronLeft size={18}/></HeroGold>
+              <HeroGhost to="/login" onMouseEnter={preloadRoutes.auth} onFocus={preloadRoutes.auth}>הרשמה חינם</HeroGhost>
             </CTAs>
             <TrustRow>
               <TrustBadge><Shield size={14}/> מידע מאובטח</TrustBadge>
@@ -1006,7 +1007,7 @@ export default function Landing(){
             {POPULAR_CITIES.map((c,i)=>{
               const cd = cityData.get(c.name)
               return (
-              <CityCard key={c.name} to={`/explore?city=${encodeURIComponent(c.name)}`} $hue={c.hue} $delay={i*0.06} onMouseEnter={() => prefetchCity(c.name)}>
+              <CityCard key={c.name} to={`/explore?city=${encodeURIComponent(c.name)}`} $hue={c.hue} $delay={i*0.06} onMouseEnter={() => { prefetchCity(c.name); preloadRoutes.explore() }}>
                 <CityEmoji>{c.emoji}</CityEmoji>
                 <CityName>{c.name}</CityName>
                 {cd ? (
@@ -1039,7 +1040,7 @@ export default function Landing(){
                 const cityEmoji = POPULAR_CITIES.find(c => c.name === pl.city)?.emoji || '📍'
                 const cityHue = POPULAR_CITIES.find(c => c.name === pl.city)?.hue ?? 200
                 return (
-                  <FeaturedCard key={pl.id} to={`/plot/${pl.id}`} $delay={i * 0.1}>
+                  <FeaturedCard key={pl.id} to={`/plot/${pl.id}`} $delay={i * 0.1} onMouseEnter={preloadRoutes.plotDetail} onFocus={preloadRoutes.plotDetail}>
                     <FeaturedHeader $hue={cityHue}>
                       <FeaturedBadges>
                         {score >= 8 && (
@@ -1083,7 +1084,7 @@ export default function Landing(){
                 )
               })}
             </FeaturedGrid>
-            <ViewAllBtn to="/explore">
+            <ViewAllBtn to="/explore" onMouseEnter={preloadRoutes.explore} onFocus={preloadRoutes.explore}>
               <Eye size={18}/> צפו בכל החלקות על המפה
             </ViewAllBtn>
           </FeaturedSection></Reveal>
@@ -1185,7 +1186,7 @@ export default function Landing(){
               {recentPlots.slice(0, 4).map((pl, i) => {
                 const d = p(pl), score = calcScore(pl), grade = getGrade(score)
                 return (
-                  <RecentCard key={pl.id} to={`/plot/${pl.id}`} $delay={i * 0.08}>
+                  <RecentCard key={pl.id} to={`/plot/${pl.id}`} $delay={i * 0.08} onMouseEnter={preloadRoutes.plotDetail} onFocus={preloadRoutes.plotDetail}>
                     <RecentScoreBubble $c={grade.color}>{score}</RecentScoreBubble>
                     <RecentInfo>
                       <RecentName>גוש {d.block} · {pl.city}</RecentName>

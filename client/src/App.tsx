@@ -16,6 +16,17 @@ const Business = lazy(() => import('./pages/Business'))
 const Admin = lazy(() => import('./pages/Admin'))
 const CommandPalette = lazy(() => import('./components/CommandPalette'))
 
+// ── Route Preloading ──────────────────────────────────────────────────
+// Warm up the JS chunk for a route before the user navigates.
+// Call these on link hover/focus for instant page transitions.
+// Each import() is only fetched once by the browser; subsequent calls return the cached module.
+export const preloadRoutes = {
+  explore: () => import('./pages/Explore'),
+  plotDetail: () => import('./pages/PlotDetail'),
+  landing: () => import('./pages/Landing'),
+  auth: () => import('./pages/Auth'),
+} as const
+
 /* ── Premium 404 Page ── */
 const nfFloat = keyframes`0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}`
 const nfFadeIn = keyframes`from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}`

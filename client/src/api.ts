@@ -1,5 +1,20 @@
 const BASE = '/api'
 
+// ── ETag cache for conditional GET requests ──────────────────────────
+// Stores { etag, data } per URL so subsequent GETs can send If-None-Match.
+// On 304 Not Modified, the cached data is returned instantly without re-parsing.
+// This can reduce bandwidth by 60-90% when data hasn't changed.
+const etagCache = new Map<string, { etag: string; data: unknown }>()
+const ETAG_CACHE_MAX = 100
+
+function pruneEtagCache() {
+  if (etagCache.size > ETAG_CACHE_MAX) {
+    // Remove oldest half of entries (FIFO)
+    const keys = [...etagCache.keys()]
+    for (let i = 0; i < keys.length / 2; i++) etagCache.delete(keys[i])
+  }
+}
+
 /** User-friendly Hebrew error messages for common HTTP status codes */
 const HTTP_ERROR_MESSAGES: Record<number, string> = {
   400: 'בקשה לא תקינה — נסו שוב',
@@ -67,11 +82,26 @@ async function req(path: string, opts: RequestInit & { timeoutMs?: number; retri
   if (token) headers.Authorization = `Bearer ${token}`
   const { timeoutMs, retries, ...fetchOpts } = opts
   const isGet = !opts.method || opts.method === 'GET'
+  const fullUrl = `${BASE}${path}`
+
+  // Attach If-None-Match for GET requests when we have a cached ETag
+  if (isGet) {
+    const cached = etagCache.get(fullUrl)
+    if (cached?.etag) headers['If-None-Match'] = cached.etag
+  }
+
   const r = await fetchWithRetry(
-    `${BASE}${path}`,
+    fullUrl,
     { ...fetchOpts, headers },
     { timeoutMs: timeoutMs ?? 15000, maxRetries: retries ?? (isGet ? 2 : 0) }
   )
+
+  // 304 Not Modified — return cached data without parsing response body
+  if (r.status === 304 && isGet) {
+    const cached = etagCache.get(fullUrl)
+    if (cached?.data) return cached.data
+  }
+
   if (!r.ok) {
     const b = await r.json().catch(() => ({})) as Record<string, unknown>
     const serverMsg = b.error as string | undefined
@@ -79,7 +109,19 @@ async function req(path: string, opts: RequestInit & { timeoutMs?: number; retri
     const message = serverMsg || hebrewMsg || `שגיאה ${r.status}`
     throw Object.assign(new Error(message), { status: r.status, serverError: serverMsg, hebrewMessage: hebrewMsg })
   }
-  return r.json()
+
+  const data = await r.json()
+
+  // Cache the ETag + data for future conditional requests
+  if (isGet) {
+    const etag = r.headers.get('etag')
+    if (etag) {
+      pruneEtagCache()
+      etagCache.set(fullUrl, { etag, data })
+    }
+  }
+
+  return data
 }
 const api = { get: (p: string) => req(p), post: (p: string, d: unknown) => req(p, { method: 'POST', body: JSON.stringify(d) }), patch: (p: string, d: unknown) => req(p, { method: 'PATCH', body: JSON.stringify(d) }), delete: (p: string) => req(p, { method: 'DELETE' }) }
 

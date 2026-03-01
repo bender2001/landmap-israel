@@ -4,6 +4,7 @@ import { List, X, MapPin, TrendingUp, TrendingDown, Ruler, ChevronRight, Chevron
 import { useNavigate } from 'react-router-dom'
 import { t, mobile } from '../theme'
 import { p, roi, fmt, calcScore, getGrade, pricePerSqm, pricePerDunam, statusColors, statusLabels, daysOnMarket, pricePosition, calcAggregateStats, plotDistanceFromUser, fmtDistance, zoningPipeline, exportPlotsCsv, getLocationTags, calcPercentileRank, estimatedYear, findBestValueIds, SITE_CONFIG, plotCenter, satelliteTileUrl, investmentRecommendation, calcQuickInsight, estimateDemand, calcLocationScore, dataFreshnessLabel } from '../utils'
+import { usePrefetchPlot } from '../hooks'
 import { Skeleton, PriceAlertButton } from './UI'
 import type { Plot } from '../types'
 
@@ -810,6 +811,7 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
   plot: Plot; active: boolean; index: number; onClick: () => void; allPlots: Plot[]; onDetailClick: (id: string) => void
   userLocation?: { lat: number; lng: number } | null; isBestValue?: boolean
 }) {
+  const prefetch = usePrefetchPlot()
   const d = p(plot), r = roi(plot), score = calcScore(plot), grade = getGrade(score)
   const status = (plot.status || 'AVAILABLE') as string
   const sColor = statusColors[status] || t.gold
@@ -834,7 +836,7 @@ const PlotItem = memo(function PlotItem({ plot, active, index, onClick, allPlots
   const currentZoning = zoningIdx >= 0 ? zoningPipeline[zoningIdx] : null
 
   return (
-    <ItemWrap $active={active} $i={index} $gradeColor={grade.color} onClick={onClick} aria-label={`חלקה ${plot.number} גוש ${d.block}`}>
+    <ItemWrap $active={active} $i={index} $gradeColor={grade.color} onClick={onClick} onPointerEnter={() => prefetch(plot.id)} aria-label={`חלקה ${plot.number} גוש ${d.block}`}>
       <ItemRow>
         {thumbUrl && <SatThumb $url={thumbUrl} title={`תצלום לוויין — ${plot.city}`} />}
         <ItemInner>
