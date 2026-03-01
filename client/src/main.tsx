@@ -6,6 +6,7 @@ import { AuthProvider } from './hooks'
 import { ToastProvider } from './components/UI'
 import { GlobalStyles } from './theme'
 import App from './App'
+import { initWebVitals } from './vitals'
 
 const qc = new QueryClient({
   defaultOptions: {
@@ -27,3 +28,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </StrictMode>
 )
+
+// Collect & report Core Web Vitals after hydration (non-blocking)
+if (typeof requestIdleCallback === 'function') {
+  requestIdleCallback(initWebVitals)
+} else {
+  setTimeout(initWebVitals, 2000)
+}

@@ -331,6 +331,38 @@ const ViewAllBtn = styled(Link)`
   &:hover{background:${t.goldDim};border-color:${t.gold};transform:translateY(-2px);box-shadow:${t.sh.glow};}
 `
 
+/* ── Featured Skeleton (loading placeholder) ── */
+const skelPulse = keyframes`0%{background-position:-200% 0}100%{background-position:200% 0}`
+const SkelBar = styled.div<{$w?:string;$h?:string}>`
+  width:${pr=>pr.$w||'100%'};height:${pr=>pr.$h||'16px'};border-radius:${t.r.sm};
+  background:linear-gradient(90deg,${t.surfaceLight} 25%,${t.bg} 50%,${t.surfaceLight} 75%);
+  background-size:200% 100%;animation:${skelPulse} 1.5s ease-in-out infinite;
+`
+const FeaturedSkelCard = styled.div`
+  display:flex;flex-direction:column;gap:0;
+  background:${t.surface};border:1px solid ${t.border};border-radius:${t.r.xl};
+  overflow:hidden;
+`
+const FeaturedSkelHeader = styled.div`
+  padding:20px 20px 16px;
+  background:${t.surfaceLight};border-bottom:1px solid ${t.border};
+  display:flex;flex-direction:column;gap:8px;
+`
+const FeaturedSkelBody = styled.div`
+  padding:16px 20px;display:flex;flex-direction:column;gap:12px;
+`
+const FeaturedSkelMetrics = styled.div`
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+`
+const FeaturedSkelMetric = styled.div`
+  display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;
+  background:${t.surfaceLight};border:1px solid ${t.border};border-radius:${t.r.md};
+`
+const FeaturedSkelFooter = styled.div`
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;border-top:1px solid ${t.border};
+`
+
 const POPULAR_CITIES = [
   { name: 'חדרה', emoji: '🏗️', hue: 35, count: 'אזור ביקוש' },
   { name: 'נתניה', emoji: '🌊', hue: 200, count: 'קו חוף' },
@@ -753,7 +785,7 @@ export default function Landing(){
   useEffect(()=>{setVis(true)},[])
 
   // Fetch live market data for stats
-  const { data: plots } = useAllPlots()
+  const { data: plots, isLoading: plotsLoading } = useAllPlots()
 
   // Recently viewed plots for returning users
   const { ids: recentIds } = useRecentlyViewed()
@@ -1027,10 +1059,34 @@ export default function Landing(){
         </Reveal>
 
         {/* ── Featured Plots ── */}
-        {featuredPlots.length > 0 && (
+        {(featuredPlots.length > 0 || plotsLoading) && (
           <Reveal><FeaturedSection id="featured">
             <CitiesSectionHead>🔥 חלקות <span>מומלצות</span> להשקעה</CitiesSectionHead>
             <FeaturedGrid>
+              {plotsLoading && featuredPlots.length === 0 && Array.from({length:3}).map((_,i) => (
+                <FeaturedSkelCard key={i}>
+                  <FeaturedSkelHeader>
+                    <SkelBar $w="45%" $h="12px" />
+                    <SkelBar $w="70%" $h="20px" />
+                    <SkelBar $w="55%" $h="12px" />
+                  </FeaturedSkelHeader>
+                  <FeaturedSkelBody>
+                    <SkelBar $w="40%" $h="28px" />
+                    <FeaturedSkelMetrics>
+                      {[1,2,3].map(j => (
+                        <FeaturedSkelMetric key={j}>
+                          <SkelBar $w="60%" $h="14px" />
+                          <SkelBar $w="80%" $h="10px" />
+                        </FeaturedSkelMetric>
+                      ))}
+                    </FeaturedSkelMetrics>
+                  </FeaturedSkelBody>
+                  <FeaturedSkelFooter>
+                    <SkelBar $w="30%" $h="12px" />
+                    <SkelBar $w="25%" $h="12px" />
+                  </FeaturedSkelFooter>
+                </FeaturedSkelCard>
+              ))}
               {featuredPlots.map((pl, i) => {
                 const d = p(pl)
                 const score = calcScore(pl)
