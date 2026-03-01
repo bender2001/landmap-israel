@@ -159,9 +159,13 @@ const Title = styled.h1`font-size:clamp(22px,3vw,30px);font-weight:800;color:${t
 const Actions = styled.div`display:flex;gap:8px;`
 const IconBtn = styled.button<{$active?:boolean}>`display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:${t.r.md};border:1px solid ${t.lBorder};background:${pr=>pr.$active?t.goldDim:'#fff'};color:${pr=>pr.$active?t.gold:t.lTextSec};cursor:pointer;transition:all ${t.tr};&:hover{border-color:${t.gold};color:${t.gold};}`
 
-const Metrics = styled.div`display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:32px;${sm}{grid-template-columns:repeat(2,1fr);}${md}{grid-template-columns:repeat(3,1fr);}${lg}{grid-template-columns:repeat(5,1fr);}`
+const Metrics = styled.div`display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:32px;
+  @media(max-width:359px){grid-template-columns:1fr;gap:10px;}
+  ${sm}{grid-template-columns:repeat(2,1fr);gap:16px;}${md}{grid-template-columns:repeat(3,1fr);}${lg}{grid-template-columns:repeat(5,1fr);}`
 const Metric = styled(AnimatedCard)`padding:20px;background:#fff;border:1px solid ${t.lBorder};border-radius:${t.r.lg};text-align:center;transition:all ${t.tr};&:hover{border-color:${t.goldBorder};box-shadow:${t.sh.glow};}`
-const MetricVal = styled.div`font-size:24px;font-weight:800;color:${t.lText};font-family:${t.font};`
+const MetricVal = styled.div`font-size:24px;font-weight:800;color:${t.lText};font-family:${t.font};
+  @media(max-width:479px){font-size:20px;}
+`
 const MetricLabel = styled.div`font-size:12px;color:${t.lTextSec};margin-top:4px;`
 
 const Grid = styled.div`display:grid;grid-template-columns:1fr;gap:24px;${lg}{grid-template-columns:1fr 360px;}`
@@ -2233,6 +2237,45 @@ export default function PlotDetail() {
                     </HighlightText>
                   </HighlightItem>
                 )}
+                {/* Deal Discount vs City Average (from server enrichment) */}
+                {(() => {
+                  const discount = (plot as any)._dealDiscount as number | null
+                  const cityAvgPpd = (plot as any)._cityAvgPricePerDunam as number | null
+                  if (discount != null && Math.abs(discount) >= 3 && cityAvgPpd && cityAvgPpd > 0) {
+                    const isBelowAvg = discount > 0
+                    return (
+                      <HighlightItem>
+                        <HighlightIcon>{isBelowAvg ? '🏷️' : '📊'}</HighlightIcon>
+                        <HighlightText>
+                          <HighlightLabel>vs ממוצע {plot.city} (₪{fmt.num(cityAvgPpd)}/דונם)</HighlightLabel>
+                          <HighlightVal $c={isBelowAvg ? t.ok : t.warn}>
+                            {isBelowAvg ? `${discount}% מתחת לממוצע` : `${Math.abs(discount)}% מעל הממוצע`}
+                          </HighlightVal>
+                        </HighlightText>
+                      </HighlightItem>
+                    )
+                  }
+                  return null
+                })()}
+                {/* Net ROI after all Israeli costs (from server enrichment) */}
+                {(() => {
+                  const netRoi = (plot as any)._netRoi as number | null
+                  const netProfit = (plot as any)._netProfit as number | null
+                  if (netRoi != null && netProfit != null && d.price > 0) {
+                    return (
+                      <HighlightItem>
+                        <HighlightIcon>🧾</HighlightIcon>
+                        <HighlightText>
+                          <HighlightLabel>תשואה נטו (אחרי כל העלויות)</HighlightLabel>
+                          <HighlightVal $c={netRoi > 0 ? t.ok : t.err}>
+                            {netRoi > 0 ? '+' : ''}{netRoi}% ({netProfit > 0 ? '+' : ''}{fmt.compact(netProfit)})
+                          </HighlightVal>
+                        </HighlightText>
+                      </HighlightItem>
+                    )
+                  }
+                  return null
+                })()}
                 <HighlightItem>
                   <HighlightIcon>🛡️</HighlightIcon>
                   <HighlightText>
@@ -2258,6 +2301,25 @@ export default function PlotDetail() {
                     </HighlightText>
                   </HighlightItem>
                 )}
+                {/* Payback Period — server-enriched */}
+                {(() => {
+                  const payback = (plot as any)._paybackYears as number | null
+                  if (payback != null && payback > 0) {
+                    const color = payback <= 3 ? t.ok : payback <= 5 ? t.gold : t.warn
+                    return (
+                      <HighlightItem>
+                        <HighlightIcon>⏳</HighlightIcon>
+                        <HighlightText>
+                          <HighlightLabel>נקודת איזון</HighlightLabel>
+                          <HighlightVal $c={color}>
+                            {payback < 2 ? `${payback} שנה` : `${payback} שנים`}
+                          </HighlightVal>
+                        </HighlightText>
+                      </HighlightItem>
+                    )
+                  }
+                  return null
+                })()}
               </HighlightsCard>
 
               {/* Contact Agent Card — Madlan-style */}

@@ -343,6 +343,16 @@ function computeNetReturn(plot) {
   }
 }
 
+// ─── Global City Averages Cache ──────────────────────────────────────────
+// Persists city-level average price/sqm and price/dunam across enrichment calls.
+// When the full plot list is enriched (10+ plots), the cache is refreshed.
+// When a single plot is enriched (e.g., getPlotById), the stale cache provides
+// accurate city averages instead of meaningless self-comparison.
+// Prevents the PlotDetail page from showing "0% vs city average" on single-plot loads.
+let globalCityAvgPsm = {}   // city → avg ₪/sqm
+let globalCityAvgPpd = {}   // city → avg ₪/dunam
+let globalCityAvgUpdatedAt = 0
+
 /**
  * Enrich an array of plots with computed investment metrics.
  * Adds _investmentScore, _grade, _roi, _riskLevel, _netRoi, and more fields to each plot.
@@ -354,21 +364,47 @@ async function enrichPlotsWithScores(plots) {
   // Fetch area trends (cached, non-blocking on cache hit)
   const trends = await refreshAreaMarketTrends()
 
-  // Pre-compute city average price/sqm for risk deviation calculation.
-  // Single pass over all plots — O(n) instead of O(n²) per card.
-  const cityPsmAccum = {} // city → { totalPsm, count }
+  // Pre-compute city average price/sqm AND price/dunam for risk deviation
+  // and deal comparison. Single pass over all plots — O(n) instead of O(n²) per card.
+  const cityPsmAccum = {} // city → { totalPsm, totalPpd, count }
   for (const p of plots) {
     const price = p.total_price || 0
     const size = p.size_sqm || 0
     if (price > 0 && size > 0 && p.city) {
-      if (!cityPsmAccum[p.city]) cityPsmAccum[p.city] = { totalPsm: 0, count: 0 }
+      if (!cityPsmAccum[p.city]) cityPsmAccum[p.city] = { totalPsm: 0, totalPpd: 0, count: 0 }
       cityPsmAccum[p.city].totalPsm += price / size
+      cityPsmAccum[p.city].totalPpd += price / (size / 1000)
       cityPsmAccum[p.city].count += 1
     }
   }
   const cityAvgPsm = {}
+  const cityAvgPpd = {} // city → avg price per dunam
   for (const [city, acc] of Object.entries(cityPsmAccum)) {
     cityAvgPsm[city] = acc.count > 0 ? acc.totalPsm / acc.count : 0
+    cityAvgPpd[city] = acc.count > 0 ? acc.totalPpd / acc.count : 0
+  }
+
+  // Update global cache when we have meaningful data (3+ plots = full list enrichment).
+  // Single-plot enrichment (getPlotById) uses the stale global cache for city averages.
+  if (plots.length >= 3) {
+    globalCityAvgPsm = { ...cityAvgPsm }
+    globalCityAvgPpd = { ...cityAvgPpd }
+    globalCityAvgUpdatedAt = now
+  } else if (globalCityAvgUpdatedAt > 0) {
+    // Single-plot enrichment: merge global cached averages for cities not in this batch
+    for (const [city, avg] of Object.entries(globalCityAvgPsm)) {
+      if (!(city in cityAvgPsm)) cityAvgPsm[city] = avg
+    }
+    for (const [city, avg] of Object.entries(globalCityAvgPpd)) {
+      if (!(city in cityAvgPpd)) cityAvgPpd[city] = avg
+    }
+    // For cities in this batch (single plot), prefer global cached average if available
+    for (const p of plots) {
+      if (p.city && globalCityAvgPsm[p.city] && cityPsmAccum[p.city]?.count === 1) {
+        cityAvgPsm[p.city] = globalCityAvgPsm[p.city]
+        cityAvgPpd[p.city] = globalCityAvgPpd[p.city] || 0
+      }
+    }
   }
 
   for (const p of plots) {
@@ -389,6 +425,12 @@ async function enrichPlotsWithScores(plots) {
     // Eliminates redundant division in every plot card, tooltip, and comparison.
     const size = p.size_sqm || 0
     p._pricePerSqm = size > 0 ? Math.round(price / size) : null
+
+    // Price per dunam (1000 sqm) — THE standard metric for Israeli land deals.
+    // Investors and agents discuss land prices in ₪/dunam, not ₪/sqm.
+    // Pre-computed to save client-side recalculation on every card render.
+    const dunams = size / 1000
+    p._pricePerDunam = size > 0 && price > 0 ? Math.round(price / dunams) : null
 
     // Monthly payment estimate (50% LTV, 6% rate, 15yr term) — pre-computed
     // for affordability sort and display. Matches client's calcMonthlyPayment().
@@ -451,9 +493,14 @@ async function enrichPlotsWithScores(plots) {
       // for "vs city average" comparisons without needing a separate API call.
       // Eliminates the need for useMarketOverview on PlotDetail just to show the benchmark.
       p._cityAvgPriceSqm = Math.round(cityAvgPsm[p.city])
+      // Expose city average price per dunam — the Israeli standard for land deals.
+      // Used by the PlotDetail comparison card to show how this plot compares
+      // to the city average in ₪/dunam terms, which is what investors actually discuss.
+      p._cityAvgPricePerDunam = cityAvgPpd[p.city] ? Math.round(cityAvgPpd[p.city]) : null
     } else {
       p._dealDiscount = null
       p._cityAvgPriceSqm = null
+      p._cityAvgPricePerDunam = null
     }
 
     // Net investment return — THE metric professional investors use.
